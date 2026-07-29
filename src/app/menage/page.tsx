@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/utils";
-import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer } from "lucide-react";
+import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer, AlertTriangle } from "lucide-react";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
 export default function MenagePage() {
@@ -163,6 +163,14 @@ export default function MenagePage() {
                   <Badge variant="error"><AlertCircle className="w-3 h-3" /></Badge>
                 )}
               </div>
+
+              {/* Note spéciale : chambre occupée — ménage en cours de séjour */}
+              {task.notes && task.notes.includes("occupée") && (
+                <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 mb-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400">{task.notes}</p>
+                </div>
+              )}
 
               {task.checkout_time && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-3">

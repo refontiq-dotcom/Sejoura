@@ -25,6 +25,7 @@ import {
   UserX,
   Loader2,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import type { Accommodation, RoomType, Room, Client, Booking } from "@/types/database";
 
@@ -36,6 +37,9 @@ export default function BookingsPage() {
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [cleaningModalOpen, setCleaningModalOpen] = useState(false);
+  const [cleaningBookingId, setCleaningBookingId] = useState<string>("");
+  const [cleaningLoading, setCleaningLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState("");
@@ -285,6 +289,33 @@ export default function BookingsPage() {
     }
   }
 
+  async function handleMidStayCleaning(bookingId: string) {
+    setCleaningBookingId(bookingId);
+    setCleaningModalOpen(true);
+  }
+
+  async function confirmMidStayCleaning() {
+    setCleaningLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("request_mid_stay_cleaning", {
+        p_booking_id: cleaningBookingId,
+        p_user_id: userId,
+      });
+
+      if (error) {
+        alert("Erreur: " + error.message);
+      } else {
+        setCleaningModalOpen(false);
+        alert("Demande de ménage envoyée dans le pool des ménagères.");
+      }
+    } catch {
+      alert("Une erreur est survenue.");
+    } finally {
+      setCleaningLoading(false);
+    }
+  }
+
   async function handleAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
     try {
       const supabase = createClient();
@@ -431,6 +462,11 @@ export default function BookingsPage() {
                             <LogOut className="w-4 h-4" />
                           </button>
                         )}
+                        {b.status === "checked_in" && (
+                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                        )}
                         {(b.status === "confirmed" || b.status === "checked_in") && (
                           <button onClick={() => handleAction(b.id, "cancel")} title="Annuler" className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                             <XCircle className="w-4 h-4" />
@@ -562,6 +598,32 @@ export default function BookingsPage() {
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSave} loading={saving}>Créer la réservation</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal demande ménage en cours de séjour */}
+      <Modal
+        open={cleaningModalOpen}
+        onClose={() => setCleaningModalOpen(false)}
+        title="Demander un ménage en cours de séjour"
+        description="Une tâche de ménage sera envoyée dans le pool des ménagères"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20">
+            <Sparkles className="w-6 h-6 text-purple-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-purple-900 dark:text-purple-300">Ménage en cours de séjour</p>
+              <p className="text-xs text-purple-700 dark:text-purple-400 mt-1">
+                La chambre restera occupée. La ménagère verra la mention « Chambre occupée — vérifier avant d'entrer ».
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setCleaningModalOpen(false)}>Annuler</Button>
+            <Button className="flex-1" onClick={confirmMidStayCleaning} loading={cleaningLoading}>
+              <Sparkles className="w-4 h-4" /> Confirmer la demande
+            </Button>
           </div>
         </div>
       </Modal>

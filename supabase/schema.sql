@@ -1521,6 +1521,60 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ----------------------------------------------------------------------------
+-- 34b. FONCTION: Demander un ménage en cours de séjour (mid-stay cleaning)
+-- Contrairement au check-out, la chambre reste 'occupied' (le client y est encore)
+-- La tâche est créée avec une note d'avertissement pour les ménagères
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION request_mid_stay_cleaning(
+  p_booking_id UUID,
+  p_user_id UUID
+)
+RETURNS cleaning_tasks AS $$
+DECLARE
+  v_booking bookings;
+  v_task cleaning_tasks;
+BEGIN
+  -- Récupérer la réservation (doit être checked_in)
+  SELECT * INTO v_booking
+  FROM bookings
+  WHERE id = p_booking_id AND status = 'checked_in'
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'BOOKING_NOT_ACTIVE: Réservation introuvable ou client non arrivé';
+  END IF;
+
+  -- Créer la tâche de ménage SANS changer le statut de la chambre
+  INSERT INTO cleaning_tasks (
+    tenant_id, accommodation_id, room_id, booking_id,
+    status, priority, notes,
+    checkout_time, alert_time, force_release_time,
+    created_at
+  ) VALUES (
+    v_booking.tenant_id,
+    v_booking.accommodation_id,
+    v_booking.room_id,
+    v_booking.id,
+    'pending',
+    5, -- Priorité moyenne (moins urgente qu'un check-out qui est à 10)
+    'Chambre occupée — vérifier avant d''entrer',
+    NULL, -- Pas de checkout_time car c'est un ménage en cours de séjour
+    NULL, -- Pas d'alerte basée sur le départ
+    NULL, -- Pas de libération forcée
+    NOW()
+  )
+  RETURNING * INTO v_task;
+
+  -- Journal d'audit
+  INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, new_values, created_at)
+  VALUES (v_booking.tenant_id, p_user_id, 'mid_stay_cleaning_requested', 'booking', v_booking.id,
+    jsonb_build_object('cleaning_task_id', v_task.id, 'note', 'Chambre occupée — vérifier avant d''entrer'), NOW());
+
+  RETURN v_task;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ----------------------------------------------------------------------------
 -- 35. VUES (pour faciliter les requêtes)
 -- ----------------------------------------------------------------------------
 

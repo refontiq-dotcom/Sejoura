@@ -508,6 +508,10 @@ export interface Database {
       check_cleaning_alerts: { Args: Record<string, never>; Returns: void };
       suspend_tenant: { Args: { p_tenant_id: string; p_reason: string }; Returns: Tenant };
       reactivate_tenant: { Args: { p_tenant_id: string }; Returns: Tenant };
+      request_mid_stay_cleaning: {
+        Args: { p_booking_id: string; p_user_id: string };
+        Returns: CleaningTask;
+      };
     };
   };
 }
