@@ -4,138 +4,71 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
-import { Moon, Sun, Phone, Lock, Loader2, Eye, EyeOff } from "lucide-react";
+import { Moon, Sun, Loader2, Eye, EyeOff, Check } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [phone, setPhone] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"login" | "activate">("login");
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!agreeTerms) {
+      setError("You must agree to the terms and conditions.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const supabase = createClient();
 
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id, auth_user_id, role, is_active, full_name, tenant_id")
-        .eq("phone", phone)
-        .single();
-
-      if (userError || !userData) {
-        setError("Aucun compte trouvé avec ce numéro de téléphone.");
-        setLoading(false);
-        return;
-      }
-
-      if (!userData.is_active && mode === "login") {
-        setError("Votre compte n'est pas encore activé. Utilisez l'activation.");
-        setMode("activate");
-        setLoading(false);
-        return;
-      }
-
-      const fakeEmail = `${phone}@sejoura.app`;
-
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: fakeEmail,
-        password: password,
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
       });
 
       if (authError) {
-        setError("Numéro de téléphone ou mot de passe incorrect.");
+        setError(authError.message);
         setLoading(false);
         return;
       }
 
-      if (userData.role === "super_admin") {
-        router.push("/admin");
-      } else if (userData.role === "menagere") {
-        router.push("/menage");
-      } else if (userData.role === "client") {
-        router.push("/client");
-      } else {
-        router.push("/dashboard");
-      }
-    } catch {
-      setError("Une erreur est survenue. Veuillez réessayer.");
-      setLoading(false);
-    }
-  }
-
-  async function handleActivate(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const supabase = createClient();
-
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id, auth_user_id, role, is_active, full_name, phone")
-        .eq("phone", phone)
-        .single();
-
-      if (userError || !userData) {
-        setError("Aucun compte trouvé avec ce numéro de téléphone.");
-        setLoading(false);
-        return;
-      }
-
-      if (userData.is_active) {
-        setError("Ce compte est déjà activé. Utilisez la connexion normale.");
-        setLoading(false);
-        return;
-      }
-
-      if (!userData.auth_user_id) {
-        const fakeEmail = `${phone}@sejoura.app`;
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: fakeEmail,
-          password: password,
+      if (authData.user) {
+        await supabase.from("users").insert({
+          auth_user_id: authData.user.id,
+          full_name: fullName,
+          email,
+          phone: "",
+          role: "client",
+          is_active: true,
+          tenant_id: null,
         });
-
-        if (authError) {
-          setError("Erreur lors de la création du compte: " + authError.message);
-          setLoading(false);
-          return;
-        }
-
-        await supabase
-          .from("users")
-          .update({
-            auth_user_id: authData.user?.id,
-            is_active: true,
-            activated_at: new Date().toISOString(),
-          })
-          .eq("id", userData.id);
-      } else {
-        await supabase
-          .from("users")
-          .update({
-            is_active: true,
-            activated_at: new Date().toISOString(),
-          })
-          .eq("id", userData.id);
       }
 
-      setError("");
-      setMode("login");
-      setPassword("");
       setLoading(false);
-      setError("Compte activé avec succès ! Vous pouvez maintenant vous connecter.");
+      router.push("/dashboard");
     } catch {
-      setError("Une erreur est survenue lors de l'activation.");
+      setError("An error occurred. Please try again.");
       setLoading(false);
     }
   }
@@ -146,7 +79,7 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
@@ -154,20 +87,21 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setError("Erreur lors de la connexion Google: " + error.message);
+        setError("Google sign-in error: " + error.message);
         setLoading(false);
       }
     } catch {
-      setError("Une erreur est survenue lors de la connexion Google.");
+      setError("An error occurred during Google sign-in.");
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-indigo-50 to-purple-50 dark:from-slate-950 dark:via-indigo-950 dark:to-purple-950 p-4">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white dark:bg-slate-950">
+      {/* Theme toggle */}
       <button
         onClick={toggleTheme}
-        className="absolute top-6 right-6 p-3 rounded-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all"
+        className="absolute top-6 right-6 p-3 rounded-xl bg-slate-100 dark:bg-slate-800 shadow-md hover:shadow-lg transition-all z-10"
         aria-label="Changer le thème"
       >
         {theme === "light" ? (
@@ -177,137 +111,232 @@ export default function LoginPage() {
         )}
       </button>
 
-      <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-2xl bg-white dark:bg-slate-800 shadow-xl mb-4 flex items-center justify-center overflow-hidden">
-            <Image src="/logo.png" alt="Séjoura by Refontiq" width={96} height={96} />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Séjoura by Refontiq</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Gestion de Résidences
-          </p>
+      {/* Left Panel — Blue */}
+      <div className="relative lg:w-[45%] w-full min-h-[45vh] lg:min-h-screen bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 flex flex-col items-center justify-center p-8 lg:p-12 overflow-hidden">
+        {/* Wavy separator */}
+        <div className="absolute top-0 right-0 w-1/2 h-full lg:w-16 lg:h-full">
+          <svg
+            viewBox="0 0 200 100"
+            preserveAspectRatio="none"
+            className="w-full h-full"
+          >
+            <path
+              d="M200,0 C180,30 160,70 140,100 L200,100 Z"
+              fill="white"
+            />
+          </svg>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 animate-fade-in">
-          <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl">
-            <button
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                mode === "login"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
-            >
-              Connexion
-            </button>
-            <button
-              onClick={() => {
-                setMode("activate");
-                setError("");
-              }}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                mode === "activate"
-                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-              }`}
-            >
-              Première connexion
-            </button>
+        {/* Decorative circles */}
+        <div className="absolute top-10 right-10 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute bottom-10 left-10 w-48 h-48 rounded-full bg-purple-500/20 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col items-center text-center max-w-md">
+          {/* Logo */}
+          <div className="w-24 h-24 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-8 shadow-lg">
+            <Image
+              src="/logo.png"
+              alt="Séjoura by Refontiq"
+              width={96}
+              height={96}
+            />
           </div>
 
-          <form onSubmit={mode === "login" ? handleLogin : handleActivate} className="space-y-5">
+          {/* Welcome text */}
+          <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+            Welcome Back
+          </h1>
+          <p className="text-indigo-100 text-lg leading-relaxed mb-8">
+            Join Séjoura by Refontiq to manage your residences with ease.
+            Create your account and get started today.
+          </p>
+
+          {/* Stats / features */}
+          <div className="flex gap-8 text-white/80">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">100+</p>
+              <p className="text-xs uppercase tracking-wider mt-1">
+                Residences
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">500+</p>
+              <p className="text-xs uppercase tracking-wider mt-1">
+                Rooms
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white">24/7</p>
+              <p className="text-xs uppercase tracking-wider mt-1">Support</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel — White Form */}
+      <div className="lg:w-[55%] w-full flex items-center justify-center p-6 lg:p-12 bg-slate-50 dark:bg-slate-900">
+        <div className="w-full max-w-md">
+          {/* Form header */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Create Account
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
+              Sign up to get started with Séjoura by Refontiq
+            </p>
+          </div>
+
+          {/* Sign Up Form */}
+          <form onSubmit={handleSignUp} className="space-y-5">
+            {/* Full Name */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Numéro de téléphone
+                Full name
               </label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+225 07 00 00 00 00"
-                  required
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Jean Kouassi"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
             </div>
 
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {mode === "login" ? "Mot de passe" : "Créer un mot de passe"}
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="jean@entreprise.com"
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === "login" ? "••••••••" : "Minimum 6 caractères"}
+                  placeholder="Minimum 6 characters"
                   required
                   minLength={6}
-                  className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
 
+            {/* Terms checkbox */}
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div className="relative mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 bg-white dark:bg-slate-800"
+                />
+                {agreeTerms && (
+                  <Check className="w-3 h-3 text-white absolute inset-0.5 flex items-center justify-center pointer-events-none" />
+                )}
+              </div>
+              <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
+                I agree to the{" "}
+                <a href="#" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
+                  Terms and Conditions
+                </a>
+              </span>
+            </label>
+
+            {/* Error */}
             {error && (
-              <div
-                className={`p-3 rounded-xl text-sm ${
-                  error.includes("succès")
-                    ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
-                    : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
-                }`}
-              >
+              <div className="p-3 rounded-xl text-sm bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
                 {error}
               </div>
             )}
 
+            {/* Sign Up Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  {mode === "login" ? "Connexion..." : "Activation..."}
+                  Creating account...
                 </>
               ) : (
-                <>{mode === "login" ? "Se connecter" : "Activer mon compte"}</>
+                "Sign Up"
               )}
             </button>
           </form>
 
-          {mode === "login" && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200 dark:border-slate-600" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500">
-                    ou continuer avec
-                  </span>
-                </div>
+          {/* Social Sign Up */}
+          <div className="mt-8">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-700" />
               </div>
+              <div className="relative flex justify-center">
+                <span className="px-4 bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500 text-sm font-medium">
+                  Sign Up with
+                </span>
+              </div>
+            </div>
 
+            <div className="mt-4 grid grid-cols-4 gap-3">
+              {/* Facebook */}
               <button
+                type="button"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Sign up with Facebook"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                </svg>
+              </button>
+
+              {/* X / Twitter */}
+              <button
+                type="button"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Sign up with X"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1DA1F2">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </button>
+
+              {/* Google */}
+              <button
+                type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="mt-4 w-full py-3.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Sign up with Google"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                     fill="#4285F4"
@@ -325,43 +354,33 @@ export default function LoginPage() {
                     fill="#EA4335"
                   />
                 </svg>
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  "Se connecter avec Google"
-                )}
               </button>
-            </div>
-          )}
 
-          {mode === "login" && (
-            <div className="mt-6 text-center">
+              {/* Apple */}
               <button
-                onClick={() => setError("Contactez votre administrateur pour réinitialiser votre mot de passe (OTP SMS).")}
-                className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                type="button"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                aria-label="Sign up with Apple"
               >
-                Mot de passe oublié ?
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#000000">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                </svg>
               </button>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Vous souhaitez utiliser Séjoura by Refontiq pour votre résidence ?{" "}
-            <button
-              onClick={() => router.push("/register")}
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
-            >
-              Créer un compte entreprise
-            </button>
-          </p>
-        </div>
-
-        <div className="mt-8 text-center">
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            © 2024 Séjoura by Refontiq. Tous droits réservés.
-          </p>
+          {/* Sign in link */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              >
+                Sign in
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>
