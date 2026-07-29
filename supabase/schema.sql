@@ -9,90 +9,159 @@
 -- ----------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "btree_gist";
+
+-- ----------------------------------------------------------------------------
+-- 0b. NETTOYAGE (rend le script idempotent — ré-exécutable sans erreur)
+-- ----------------------------------------------------------------------------
+-- Vues
+DROP VIEW IF EXISTS v_dashboard_kpis CASCADE;
+DROP VIEW IF EXISTS v_room_status_distribution CASCADE;
+DROP VIEW IF EXISTS v_monthly_revenue CASCADE;
+DROP VIEW IF EXISTS v_daily_movements CASCADE;
+
+-- Fonctions (DROP IF EXISTS pour toutes les fonctions SECURITY DEFINER)
+DROP FUNCTION IF EXISTS request_mid_stay_cleaning(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS reactivate_tenant(UUID) CASCADE;
+DROP FUNCTION IF EXISTS suspend_tenant(UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS check_cleaning_alerts() CASCADE;
+DROP FUNCTION IF EXISTS mark_no_show(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS cancel_booking(UUID, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS check_out_booking(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS check_in_booking(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS create_booking CASCADE;
+DROP FUNCTION IF EXISTS check_double_booking CASCADE;
+DROP FUNCTION IF EXISTS complete_cleaning_task(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS claim_cleaning_task(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS is_super_admin() CASCADE;
+DROP FUNCTION IF EXISTS get_current_user_role() CASCADE;
+DROP FUNCTION IF EXISTS get_current_user_tenant_id() CASCADE;
+DROP FUNCTION IF EXISTS is_tenant_locked(UUID) CASCADE;
+DROP FUNCTION IF EXISTS generate_booking_code(UUID) CASCADE;
+DROP FUNCTION IF EXISTS log_price_change() CASCADE;
+DROP FUNCTION IF EXISTS update_booking_payment_status() CASCADE;
+DROP FUNCTION IF EXISTS update_room_status_on_checkin() CASCADE;
+DROP FUNCTION IF EXISTS create_cleaning_task_on_checkout() CASCADE;
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
+
+-- Tables (CASCADE supprime aussi indexes, triggers, policies, constraints, RLS)
+DROP TABLE IF EXISTS whatsapp_messages CASCADE;
+DROP TABLE IF EXISTS client_sessions CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS expenses CASCADE;
+DROP TABLE IF EXISTS cleaning_tasks CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS bookings CASCADE;
+DROP TABLE IF EXISTS clients CASCADE;
+DROP TABLE IF EXISTS rooms CASCADE;
+DROP TABLE IF EXISTS room_types CASCADE;
+DROP TABLE IF EXISTS accommodations CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS subscriptions CASCADE;
+DROP TABLE IF EXISTS tenants CASCADE;
 
 -- ----------------------------------------------------------------------------
 -- 1. TYPES ÉNUMÉRÉS
 -- ----------------------------------------------------------------------------
 
 -- Rôles utilisateurs
-CREATE TYPE user_role AS ENUM (
-  'super_admin',       -- Super Admin Séjoura
-  'admin_residence',   -- Admin Résidence (propriétaire)
-  'receptionniste',    -- Réceptionniste
-  'menagere',          -- Ménagère
-  'client'             -- Client (accès temporaire)
-);
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM (
+    'super_admin',       -- Super Admin Séjoura
+    'admin_residence',   -- Admin Résidence (propriétaire)
+    'receptionniste',    -- Réceptionniste
+    'menagere',          -- Ménagère
+    'client'             -- Client (accès temporaire)
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Statuts d'abonnement
-CREATE TYPE subscription_status AS ENUM (
-  'trial',     -- Essai gratuit
-  'active',    -- Actif (payé)
-  'overdue',   -- En retard (soft lock)
-  'suspended', -- Suspendu
-  'cancelled'  -- Annulé
-);
+DO $$ BEGIN
+  CREATE TYPE subscription_status AS ENUM (
+    'trial',     -- Essai gratuit
+    'active',    -- Actif (payé)
+    'overdue',   -- En retard (soft lock)
+    'suspended', -- Suspendu
+    'cancelled'  -- Annulé
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Plans tarifaires
-CREATE TYPE subscription_plan AS ENUM (
-  'standard',   -- 15 000 FCFA/mois
-  'pro',        -- 35 000 FCFA/mois
-  'enterprise'  -- 55 000 FCFA/mois
-);
+DO $$ BEGIN
+  CREATE TYPE subscription_plan AS ENUM (
+    'standard',   -- 15 000 FCFA/mois
+    'pro',        -- 35 000 FCFA/mois
+    'enterprise'  -- 55 000 FCFA/mois
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Statuts de réservation
-CREATE TYPE booking_status AS ENUM (
-  'confirmed',  -- Confirmée
-  'cancelled',  -- Annulée
-  'no_show',    -- No-show
-  'checked_in', -- Client arrivé
-  'checked_out' -- Client parti
-);
+DO $$ BEGIN
+  CREATE TYPE booking_status AS ENUM (
+    'confirmed',  -- Confirmée
+    'cancelled',  -- Annulée
+    'no_show',    -- No-show
+    'checked_in', -- Client arrivé
+    'checked_out' -- Client parti
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Statuts de chambre
-CREATE TYPE room_status AS ENUM (
-  'available',   -- Disponible
-  'occupied',    -- Occupée
-  'alert',       -- Alerte (dépassement de délai)
-  'cleaning'     -- En nettoyage
-);
+DO $$ BEGIN
+  CREATE TYPE room_status AS ENUM (
+    'available',   -- Disponible
+    'occupied',    -- Occupée
+    'alert',       -- Alerte (dépassement de délai)
+    'cleaning'     -- En nettoyage
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Statuts de tâche de ménage
-CREATE TYPE cleaning_task_status AS ENUM (
-  'pending',     -- En attente dans le pool
-  'claimed',     -- Récupérée par une ménagère
-  'in_progress', -- En cours de réalisation
-  'done',        -- Terminée
-  'expired'      -- Expirée
-);
+DO $$ BEGIN
+  CREATE TYPE cleaning_task_status AS ENUM (
+    'pending',     -- En attente dans le pool
+    'claimed',     -- Récupérée par une ménagère
+    'in_progress', -- En cours de réalisation
+    'done',        -- Terminée
+    'expired'      -- Expirée
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Statuts de paiement
-CREATE TYPE payment_status AS ENUM (
-  'unpaid',     -- Non payé
-  'partial',    -- Partiellement payé
-  'paid',       -- Payé
-  'refunded'    -- Remboursé
-);
+DO $$ BEGIN
+  CREATE TYPE payment_status AS ENUM (
+    'unpaid',     -- Non payé
+    'partial',    -- Partiellement payé
+    'paid',       -- Payé
+    'refunded'    -- Remboursé
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Méthodes de paiement
-CREATE TYPE payment_method AS ENUM (
-  'cash',     -- Espèces
-  'wave',     -- Wave
-  'pi_spi',   -- PI-SPI
-  'bank',     -- Virement bancaire
-  'other'     -- Autre
-);
+DO $$ BEGIN
+  CREATE TYPE payment_method AS ENUM (
+    'cash',     -- Espèces
+    'wave',     -- Wave
+    'pi_spi',   -- PI-SPI
+    'bank',     -- Virement bancaire
+    'other'     -- Autre
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Catégories de dépense
-CREATE TYPE expense_category AS ENUM (
-  'salaries',     -- Salaires
-  'utilities',    -- Charges (eau, électricité, internet)
-  'maintenance',  -- Maintenance & réparations
-  'supplies',     -- Fournitures
-  'marketing',    -- Marketing
-  'rent',         -- Loyer
-  'taxes',        -- Taxes & impôts
-  'other'         -- Autre
-);
+DO $$ BEGIN
+  CREATE TYPE expense_category AS ENUM (
+    'salaries',     -- Salaires
+    'utilities',    -- Charges (eau, électricité, internet)
+    'maintenance',  -- Maintenance & réparations
+    'supplies',     -- Fournitures
+    'marketing',    -- Marketing
+    'rent',         -- Loyer
+    'taxes',        -- Taxes & impôts
+    'other'         -- Autre
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ----------------------------------------------------------------------------
 -- 2. TABLE: tenants (Entreprises inscrites sur Séjoura)
