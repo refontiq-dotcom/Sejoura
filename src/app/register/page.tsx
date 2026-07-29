@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
 import { Moon, Sun, Building2, User, Mail, Phone, Lock, Loader2, Eye, EyeOff, ArrowLeft, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
 import { getPlanPrice, formatFCFA } from "@/lib/utils";
 
 export default function RegisterPage() {
@@ -112,10 +113,10 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-xl mb-4">
-            <Building2 className="w-10 h-10 text-white" />
+          <div className="w-24 h-24 rounded-2xl bg-white dark:bg-slate-800 shadow-xl mb-4 flex items-center justify-center overflow-hidden">
+            <Image src="/logo.png" alt="Séjoura by Refontiq" width={96} height={96} />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Séjoura</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Séjoura by Refontiq</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Créer votre compte entreprise</p>
         </div>
 

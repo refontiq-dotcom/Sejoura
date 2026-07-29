@@ -31,7 +31,6 @@ export default function DashboardLayout({
           return;
         }
 
-        // Récupérer les infos utilisateur
         const { data: userData } = await supabase
           .from("users")
           .select("*")
@@ -50,7 +49,6 @@ export default function DashboardLayout({
 
         setUser(userData as unknown as User);
 
-        // Récupérer le nom de l'entreprise
         if (userData.tenant_id) {
           const { data: tenantData } = await supabase
             .from("tenants")
@@ -62,7 +60,6 @@ export default function DashboardLayout({
             setCompanyName(tenantData.company_name);
           }
 
-          // Récupérer le plan d'abonnement
           const { data: subData } = await supabase
             .from("subscriptions")
             .select("plan")
@@ -96,7 +93,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <Sidebar
         userRole={user.role}
         userName={user.full_name}

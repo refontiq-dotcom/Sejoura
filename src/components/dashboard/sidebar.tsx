@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState } from "react";
+import Image from "next/image";
 
 interface NavItem {
   label: string;
@@ -59,12 +60,12 @@ export function Sidebar({ userRole, userName, companyName, plan }: SidebarProps)
     >
       {/* Logo */}
       <div className="flex items-center gap-3 p-6 border-b border-indigo-800/50">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-          <Building2 className="w-6 h-6 text-white" />
+        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <Image src="/logo.png" alt="Séjoura by Refontiq" width={40} height={40} />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-lg font-bold text-white whitespace-nowrap">Séjoura</h1>
+            <h1 className="text-lg font-bold text-white whitespace-nowrap">Séjoura by Refontiq</h1>
             <p className="text-xs text-indigo-300 whitespace-nowrap truncate">{companyName}</p>
           </div>
         )}

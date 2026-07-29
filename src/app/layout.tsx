@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Séjoura — Gestion de Résidences",
-  description: "Application SaaS de gestion d'hébergements et de réservations",
+  title: "Séjoura by Refontiq — Gestion de Résidences",
+  description: "Application SaaS de gestion d'hébergements et de résidences",
 };
 
 export default function RootLayout({

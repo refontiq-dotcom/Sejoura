@@ -98,7 +98,7 @@ export default function SuperAdminPage() {
           <Shield className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Séjoura</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Séjoura by Refontiq</h1>
           <p className="text-sm text-slate-500">Supervision des entreprises inscrites</p>
         </div>
       </div>

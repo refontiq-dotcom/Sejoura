@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Bell, Moon, Sun, Search, Menu } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, UserCircle } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
+import Image from "next/image";
 
 interface HeaderProps {
   title: string;
@@ -19,7 +20,6 @@ interface NotificationItem {
   isRead: boolean;
 }
 
-// Notifications simulées (seront remplacées par les vraies données Supabase)
 const mockNotifications: NotificationItem[] = [
   {
     id: "1",
@@ -75,7 +75,6 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between px-6 py-4">
-        {/* Left: Title */}
         <div className="flex items-center gap-4">
           {onMenuClick && (
             <button
@@ -93,9 +92,7 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
           </div>
         </div>
 
-        {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* Search */}
           <div className="relative">
             {searchOpen ? (
               <input
@@ -119,7 +116,6 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
             )}
           </div>
 
-          {/* Theme toggle */}
           <button
             onClick={toggleTheme}
             className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
@@ -132,7 +128,6 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
             )}
           </button>
 
-          {/* Notifications */}
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setNotifOpen(!notifOpen)}
@@ -147,7 +142,6 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
               )}
             </button>
 
-            {/* Notification dropdown */}
             {notifOpen && (
               <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -194,6 +188,10 @@ export function Header({ title, subtitle, onMenuClick }: HeaderProps) {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold text-sm">
+            <UserCircle className="w-5 h-5" />
           </div>
         </div>
       </div>
