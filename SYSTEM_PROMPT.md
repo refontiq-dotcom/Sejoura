@@ -21,6 +21,8 @@ Ta mission est de développer l'application SaaS "Séjoura" de zéro, de manièr
    - Dashboard unique (layout adaptable) avec Thème Sombre / Clair commutable partout.
    - La page "Paramètres" Admin doit être visuellement IDENTIQUE à l'interface de l'application Claude.
 4. MONNAIE & DEVISE : Tous les montants sont gérés et affichés en FCFA (XOF).
+5. DOSSIER DE TRAVAIL : Toutes les commandes npm et modifications de code doivent se faire à l'intérieur du dossier `/home/dukoua/Projets/Séjoura`.
+6. COMMIT AUTOMATIQUE : À chaque fois que tu termines une étape de développement, exécute automatiquement dans le terminal : `git add .`, `git commit -m "explication courte"` puis `git push`.
 
 ---
 
