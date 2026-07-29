@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
-import { Moon, Sun, Loader2, Eye, EyeOff, Check } from "lucide-react";
+import { Moon, Sun, Loader2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -111,29 +111,30 @@ export default function LoginPage() {
         )}
       </button>
 
-      {/* Left Panel — Blue */}
-      <div className="relative lg:w-[45%] w-full min-h-[45vh] lg:min-h-screen bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-700 flex flex-col items-center justify-center p-8 lg:p-12 overflow-hidden">
-        {/* Wavy separator */}
-        <div className="absolute top-0 right-0 w-1/2 h-full lg:w-16 lg:h-full">
+      {/* Left Panel — Blue with wavy separator */}
+      <div className="relative lg:w-[45%] w-full min-h-[40vh] lg:min-h-screen bg-gradient-to-b from-blue-500 via-blue-600 to-blue-700 flex flex-col items-center justify-center p-8 lg:p-12 overflow-hidden">
+        {/* Wavy separator on the right edge */}
+        <div className="absolute top-0 right-0 h-full lg:w-16 w-1/2">
           <svg
-            viewBox="0 0 200 100"
+            viewBox="0 0 200 600"
             preserveAspectRatio="none"
             className="w-full h-full"
           >
             <path
-              d="M200,0 C180,30 160,70 140,100 L200,100 Z"
+              d="M200,0 C170,50 150,150 160,250 C170,350 140,450 150,500 C155,530 145,560 150,600 L200,600 L200,0 Z"
               fill="white"
             />
           </svg>
         </div>
 
         {/* Decorative circles */}
-        <div className="absolute top-10 right-10 w-64 h-64 rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute bottom-10 left-10 w-48 h-48 rounded-full bg-purple-500/20 blur-3xl" />
+        <div className="absolute top-10 right-10 w-72 h-72 rounded-full bg-blue-400/20 blur-3xl" />
+        <div className="absolute bottom-10 left-10 w-56 h-56 rounded-full bg-blue-300/20 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 rounded-full bg-blue-400/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
           {/* Logo */}
-          <div className="w-24 h-24 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-8 shadow-lg">
+          <div className="w-24 h-24 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center mb-8 shadow-lg border border-white/20">
             <Image
               src="/logo.png"
               alt="Séjoura by Refontiq"
@@ -146,12 +147,12 @@ export default function LoginPage() {
           <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4">
             Welcome Back
           </h1>
-          <p className="text-indigo-100 text-lg leading-relaxed mb-8">
+          <p className="text-blue-100 text-lg leading-relaxed mb-8">
             Join Séjoura by Refontiq to manage your residences with ease.
             Create your account and get started today.
           </p>
 
-          {/* Stats / features */}
+          {/* Stats */}
           <div className="flex gap-8 text-white/80">
             <div className="text-center">
               <p className="text-2xl font-bold text-white">100+</p>
@@ -161,9 +162,7 @@ export default function LoginPage() {
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-white">500+</p>
-              <p className="text-xs uppercase tracking-wider mt-1">
-                Rooms
-              </p>
+              <p className="text-xs uppercase tracking-wider mt-1">Rooms</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-white">24/7</p>
@@ -174,7 +173,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Panel — White Form */}
-      <div className="lg:w-[55%] w-full flex items-center justify-center p-6 lg:p-12 bg-slate-50 dark:bg-slate-900">
+      <div className="lg:w-[55%] w-full flex items-center justify-center p-6 lg:p-12 bg-white dark:bg-slate-950">
         <div className="w-full max-w-md">
           {/* Form header */}
           <div className="mb-8">
@@ -199,7 +198,7 @@ export default function LoginPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Jean Kouassi"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
@@ -214,7 +213,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="jean@entreprise.com"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
@@ -231,7 +230,7 @@ export default function LoginPage() {
                   placeholder="Minimum 6 characters"
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-12"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-12"
                 />
                 <button
                   type="button"
@@ -254,15 +253,12 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 bg-white dark:bg-slate-800"
+                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 bg-white dark:bg-slate-800"
                 />
-                {agreeTerms && (
-                  <Check className="w-3 h-3 text-white absolute inset-0.5 flex items-center justify-center pointer-events-none" />
-                )}
               </div>
               <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
                 I agree to the{" "}
-                <a href="#" className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
+                <a href="#" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">
                   Terms and Conditions
                 </a>
               </span>
@@ -279,7 +275,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -296,10 +292,10 @@ export default function LoginPage() {
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+                <div className="w-full border-t border-slate-200 dark:border-slate-200" />
               </div>
               <div className="relative flex justify-center">
-                <span className="px-4 bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500 text-sm font-medium">
+                <span className="px-4 bg-white dark:bg-slate-950 text-slate-400 dark:text-slate-500 text-sm font-medium">
                   Sign Up with
                 </span>
               </div>
@@ -309,7 +305,7 @@ export default function LoginPage() {
               {/* Facebook */}
               <button
                 type="button"
-                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
                 aria-label="Sign up with Facebook"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2">
@@ -320,7 +316,7 @@ export default function LoginPage() {
               {/* X / Twitter */}
               <button
                 type="button"
-                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
                 aria-label="Sign up with X"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1DA1F2">
@@ -333,7 +329,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
                 aria-label="Sign up with Google"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -359,7 +355,7 @@ export default function LoginPage() {
               {/* Apple */}
               <button
                 type="button"
-                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="flex items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
                 aria-label="Sign up with Apple"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#000000">
@@ -375,7 +371,7 @@ export default function LoginPage() {
               Already have an account?{" "}
               <a
                 href="/login"
-                className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+                className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
               >
                 Sign in
               </a>
