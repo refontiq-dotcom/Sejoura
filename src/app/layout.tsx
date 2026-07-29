@@ -42,6 +42,10 @@ export default function RootLayout({
                   if (theme === 'dark') {
                     document.documentElement.classList.add('dark');
                   }
+                  var lang = localStorage.getItem('sejoura-lang');
+                  if (lang === 'en' || lang === 'fr') {
+                    document.documentElement.lang = lang;
+                  }
                 } catch (e) {}
               })();
             `,

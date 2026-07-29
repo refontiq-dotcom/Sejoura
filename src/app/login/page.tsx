@@ -5,15 +5,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
 import { Moon, Sun, Loader2, Eye, EyeOff } from "lucide-react";
-import Image from "next/image";
 
 type Lang = "fr" | "en";
 
 const messages: Record<Lang, Record<string, string>> = {
   fr: {
-    welcome: "Bienvenue sur Séjoura by Refontiq",
-    subtitle: "Gestion centralisée, automatisation intelligente et suivi en temps réel de vos résidences.",
-    tagline: "Simplifiez la gestion de vos hébergements.",
+    welcome: "Bienvenue sur Séjoura",
+    subtitle: "La plateforme de gestion intelligente pour vos résidences et hébergements.",
+    tagline: "Centralisez. Automatisez. Maîtrisez.",
     login: "Se connecter",
     signup: "Créer un compte",
     fullName: "Nom complet",
@@ -25,8 +24,8 @@ const messages: Record<Lang, Record<string, string>> = {
     signUpWith: "Continuer avec Google",
     signInWith: "Se connecter avec Google",
     or: "ou",
-    alreadyAccount: "Déjà un compte ?",
-    noAccount: "Pas encore de compte ?",
+    alreadyAccount: "Heureux de vous revoir !",
+    noAccount: "Démarrez votre essai gratuit de 30 jours",
     creating: "Création du compte...",
     signing: "Connexion en cours...",
     googleError: "Erreur lors de la connexion Google.",
@@ -35,11 +34,14 @@ const messages: Record<Lang, Record<string, string>> = {
     termsError: "Vous devez accepter les conditions d'utilisation.",
     theme: "Changer le thème",
     langLabel: "Langue",
+    feature1: "Gestion centralisée des réservations",
+    feature2: "Automatisation du ménage et des check-outs",
+    feature3: "Comptabilité et traçabilité en temps réel",
   },
   en: {
-    welcome: "Welcome to Séjoura by Refontiq",
-    subtitle: "Centralized management, smart automation, and real-time tracking for your residences.",
-    tagline: "Simplify your property management.",
+    welcome: "Welcome to Séjoura",
+    subtitle: "The smart management platform for your residences and accommodations.",
+    tagline: "Centralize. Automate. Master.",
     login: "Sign in",
     signup: "Create account",
     fullName: "Full name",
@@ -51,8 +53,8 @@ const messages: Record<Lang, Record<string, string>> = {
     signUpWith: "Continue with Google",
     signInWith: "Sign in with Google",
     or: "or",
-    alreadyAccount: "Already have an account?",
-    noAccount: "Don't have an account yet?",
+    alreadyAccount: "Welcome back!",
+    noAccount: "Start your 30-day free trial",
     creating: "Creating account...",
     signing: "Signing in...",
     googleError: "Google sign-in error.",
@@ -61,13 +63,22 @@ const messages: Record<Lang, Record<string, string>> = {
     termsError: "You must accept the terms and conditions.",
     theme: "Toggle theme",
     langLabel: "Language",
+    feature1: "Centralized reservation management",
+    feature2: "Automated cleaning and check-outs",
+    feature3: "Real-time accounting and tracking",
   },
 };
 
 export default function LoginPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [lang, setLang] = useState<Lang>("fr");
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("sejoura-lang");
+      if (stored === "en" || stored === "fr") return stored;
+    }
+    return "fr";
+  });
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -196,7 +207,11 @@ export default function LoginPage() {
       <div className="absolute top-4 right-20 flex items-center gap-2 z-10">
         <span className="text-xs text-slate-400 dark:text-slate-500 mr-1">{t.langLabel}</span>
         <button
-          onClick={() => setLang(lang === "fr" ? "en" : "fr")}
+          onClick={() => {
+            const next = lang === "fr" ? "en" : "fr";
+            setLang(next);
+            localStorage.setItem("sejoura-lang", next);
+          }}
           className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
         >
           {lang === "fr" ? "FR" : "EN"}
@@ -226,7 +241,7 @@ export default function LoginPage() {
             className="w-full h-full"
           >
             <path
-              d="M200,0 C185,80 170,200 175,320 C180,440 160,560 165,680 C168,740 172,770 175,800 L200,800 L200,0 Z"
+              d="M200,0 C195,40 188,90 182,150 C176,210 168,270 172,340 C176,410 158,470 155,540 C152,610 162,670 158,730 C155,760 160,785 165,800 L200,800 L200,0 Z"
               fill="white"
             />
           </svg>
@@ -238,47 +253,43 @@ export default function LoginPage() {
         <div className="absolute top-1/3 left-1/4 w-96 h-96 rounded-full bg-blue-400/8 blur-3xl" />
 
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-          {/* Logo — integrated naturally into the blue background, no box */}
-          <div className="mb-8 opacity-90 hover:opacity-100 transition-opacity">
-            <Image
-              src="/logo.png"
+          {/* Logo — SVG noir sur fond bleu, inversé en blanc */}
+          <div className="mb-8 opacity-95 hover:opacity-100 transition-opacity">
+            <img
+              src="/logo-noir.svg"
               alt="Séjoura by Refontiq"
-              width={120}
-              height={120}
+              className="w-56 h-auto invert brightness-0"
+              style={{ filter: "brightness(0) invert(1)" }}
             />
           </div>
 
-          {/* Welcome text */}
-          <h1 className="text-3xl lg:text-4xl font-bold text-white mb-5 leading-tight">
+          {/* Welcome text — disposition professionnelle */}
+          <h1 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight tracking-tight">
             {t.welcome}
           </h1>
-          <p className="text-blue-100 text-base leading-relaxed mb-3">
+
+          <p className="text-blue-100 text-lg leading-relaxed mb-2 font-medium">
             {t.subtitle}
           </p>
-          <p className="text-blue-200/80 text-sm italic mb-8">
+
+          <p className="text-blue-200/90 text-base italic mb-8 tracking-wide">
             {t.tagline}
           </p>
 
-          {/* Stats */}
-          <div className="flex gap-10 text-white/70">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">100+</p>
-              <p className="text-[10px] uppercase tracking-widest mt-1.5">
-                {lang === "fr" ? "Résidences" : "Residences"}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">500+</p>
-              <p className="text-[10px] uppercase tracking-widest mt-1.5">
-                {lang === "fr" ? "Chambres" : "Rooms"}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">24/7</p>
-              <p className="text-[10px] uppercase tracking-widest mt-1.5">
-                {lang === "fr" ? "Support" : "Support"}
-              </p>
-            </div>
+          {/* Feature list — disposition professionnelle */}
+          <div className="mt-4 space-y-3 text-left w-full max-w-sm">
+            {[
+              { icon: "✓", text: t.feature1 },
+              { icon: "✓", text: t.feature2 },
+              { icon: "✓", text: t.feature3 },
+            ].map((feature, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">
+                  {feature.icon}
+                </span>
+                <span className="text-blue-50 text-sm leading-snug">{feature.text}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
