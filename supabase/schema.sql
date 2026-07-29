@@ -1244,15 +1244,15 @@ CREATE OR REPLACE FUNCTION create_booking(
   p_client_id UUID,
   p_check_in_date DATE,
   p_check_out_date DATE,
-  p_check_in_time TIME DEFAULT '14:00',
-  p_check_out_time TIME DEFAULT '11:00',
   p_base_price INTEGER,
   p_negotiated_price INTEGER,
   p_nights_count INTEGER,
   p_total_amount INTEGER,
+  p_created_by UUID,
+  p_check_in_time TIME DEFAULT '14:00',
+  p_check_out_time TIME DEFAULT '11:00',
   p_number_of_guests INTEGER DEFAULT 1,
-  p_special_requests TEXT DEFAULT NULL,
-  p_created_by UUID
+  p_special_requests TEXT DEFAULT NULL
 )
 RETURNS bookings AS $$
 DECLARE

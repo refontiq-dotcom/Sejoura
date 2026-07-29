@@ -486,15 +486,15 @@ export interface Database {
           p_client_id: string;
           p_check_in_date: string;
           p_check_out_date: string;
-          p_check_in_time?: string;
-          p_check_out_time?: string;
           p_base_price: number;
           p_negotiated_price: number;
           p_nights_count: number;
           p_total_amount: number;
+          p_created_by: string;
+          p_check_in_time?: string;
+          p_check_out_time?: string;
           p_number_of_guests?: number;
           p_special_requests?: string;
-          p_created_by: string;
         };
         Returns: Booking;
       };
