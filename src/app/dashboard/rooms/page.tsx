@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import { BedDouble, Plus, Edit2, Trash2, Loader2, Building2, Tag } from "lucide-
 import type { Accommodation, RoomType, Room } from "@/types/database";
 
 export default function RoomsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -27,6 +30,16 @@ export default function RoomsPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const residenceParam = searchParams.get("residence");
+    if (residenceParam && accommodations.length > 0) {
+      const exists = accommodations.some(a => a.id === residenceParam);
+      if (exists) {
+        setSelectedAcc(residenceParam);
+      }
+    }
+  }, [searchParams, accommodations]);
 
   async function loadData() {
     try {
@@ -49,12 +62,11 @@ export default function RoomsPage() {
         .order("name");
       if (accData) {
         setAccommodations(accData as unknown as Accommodation[]);
-        if (accData.length > 0 && !selectedAcc) {
+        if (accData.length > 0 && !selectedAcc && !searchParams.get("residence")) {
           setSelectedAcc(accData[0].id);
         }
       }
 
-      // Charger tous les types de chambres
       if (accData && accData.length > 0) {
         const { data: typesData } = await supabase
           .from("room_types")
@@ -62,8 +74,9 @@ export default function RoomsPage() {
           .in("accommodation_id", accData.map((a: { id: string }) => a.id));
         if (typesData) setRoomTypes(typesData as unknown as RoomType[]);
       }
-    } catch {
-      // Erreur silencieuse
+    } catch (err) {
+      toast.error("Impossible de charger les données des chambres.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -76,14 +89,16 @@ export default function RoomsPage() {
   async function loadRooms() {
     try {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("rooms")
         .select("*")
         .eq("accommodation_id", selectedAcc)
         .order("room_number");
+      if (error) throw error;
       if (data) setRooms(data as unknown as Room[]);
-    } catch {
-      // Erreur silencieuse
+    } catch (err) {
+      toast.error("Impossible de charger les chambres.");
+      console.error(err);
     }
   }
 
@@ -112,7 +127,10 @@ export default function RoomsPage() {
   }
 
   async function saveRoom() {
-    if (!roomForm.room_number || !roomForm.room_type_id) return;
+    if (!roomForm.room_number || !roomForm.room_type_id) {
+      toast.error("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createClient();
@@ -132,15 +150,20 @@ export default function RoomsPage() {
       }
       setRoomModalOpen(false);
       loadRooms();
-    } catch {
-      // Erreur silencieuse
+      toast.success(editingRoom ? "Chambre modifiée" : "Chambre créée");
+    } catch (err) {
+      toast.error("Impossible d'enregistrer la chambre.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
   async function saveType() {
-    if (!typeForm.name || !typeForm.base_price) return;
+    if (!typeForm.name || !typeForm.base_price) {
+      toast.error("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createClient();
@@ -162,8 +185,10 @@ export default function RoomsPage() {
       }
       setTypeModalOpen(false);
       loadData();
-    } catch {
-      // Erreur silencieuse
+      toast.success(editingType ? "Type modifié" : "Type créé");
+    } catch (err) {
+      toast.error("Impossible d'enregistrer le type de chambre.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -175,19 +200,23 @@ export default function RoomsPage() {
       const supabase = createClient();
       await supabase.from("rooms").delete().eq("id", id);
       loadRooms();
-    } catch {
-      // Erreur silencieuse
+      toast.success("Chambre supprimée");
+    } catch (err) {
+      toast.error("Impossible de supprimer la chambre.");
+      console.error(err);
     }
   }
 
   async function deleteType(id: string) {
-    if (!confirm("Supprimer ce type de chambre ? Les chambres associées seront aussi supprimées.")) return;
+    if (!confirm("Supprimer ce type de chambre ?")) return;
     try {
       const supabase = createClient();
       await supabase.from("room_types").delete().eq("id", id);
       loadData();
-    } catch {
-      // Erreur silencieuse
+      toast.success("Type de chambre supprimé");
+    } catch (err) {
+      toast.error("Impossible de supprimer le type de chambre.");
+      console.error(err);
     }
   }
 
@@ -200,6 +229,7 @@ export default function RoomsPage() {
   }
 
   const currentTypes = roomTypes.filter(rt => rt.accommodation_id === selectedAcc);
+  const selectedAccData = accommodations.find(a => a.id === selectedAcc);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -209,7 +239,7 @@ export default function RoomsPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Gérez vos chambres et types de tarification</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={openAddTypeModal}>
+            <Button variant="outline" onClick={openAddTypeModal}>
             <Tag className="w-4 h-4" /> Type de chambre
           </Button>
           <Button onClick={openAddRoomModal} disabled={!selectedAcc || currentTypes.length === 0}>
@@ -218,21 +248,26 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {/* Sélecteur de résidence */}
+      {/* Sélecteur d'établissement en tabs */}
       {accommodations.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 overflow-x-auto pb-2">
           {accommodations.map((acc) => (
             <button
               key={acc.id}
               onClick={() => setSelectedAcc(acc.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 selectedAcc === acc.id
                   ? "bg-indigo-600 text-white shadow-md"
                   : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
               }`}
             >
-              <Building2 className="w-4 h-4 inline mr-2" />
+              <Building2 className="w-4 h-4" />
               {acc.name}
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                selectedAcc === acc.id ? "bg-indigo-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+              }`}>
+                {acc.total_rooms}
+              </span>
             </button>
           ))}
         </div>
@@ -241,18 +276,18 @@ export default function RoomsPage() {
       {accommodations.length === 0 ? (
         <Card className="p-12 text-center">
           <Building2 className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucune résidence</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Ajoutez d'abord une résidence</p>
-          <Button onClick={() => window.location.href = "/dashboard/residences"}>
-            <Building2 className="w-4 h-4" /> Aller aux résidences
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun établissement</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Ajoutez d&apos;abord un établissement</p>
+          <Button onClick={() => router.push("/dashboard/residences")}>
+            <Building2 className="w-4 h-4" /> Aller aux établissements
           </Button>
         </Card>
       ) : (
         <>
-          {/* Types de chambres */}
+          {/* Types de chambre */}
           {currentTypes.length > 0 && (
             <Card className="p-5">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Types de chambres</h2>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Types de chambre — {selectedAccData?.name}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {currentTypes.map((rt) => (
                   <div key={rt.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow">
@@ -260,12 +295,12 @@ export default function RoomsPage() {
                       <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                         <Tag className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                       </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => openEditTypeModal(rt)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
-                          <Edit2 className="w-3.5 h-3.5" />
+                       <div className="flex gap-1">
+                        <button onClick={() => openEditTypeModal(rt)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre">
+                          <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteType(rt.id)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
-                          <Trash2 className="w-3.5 h-3.5" />
+                        <button onClick={() => deleteType(rt.id)} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre">
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -286,15 +321,15 @@ export default function RoomsPage() {
             {currentTypes.length === 0 ? (
               <div className="text-center py-8">
                 <Tag className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Créez d'abord un type de chambre</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Créez d&apos;abord un type de chambre</p>
                 <Button size="sm" onClick={openAddTypeModal}>
-                  <Plus className="w-4 h-4" /> Créer un type
+                  <Plus className="w-4 h-4" /> Créer un type de chambre
                 </Button>
               </div>
             ) : rooms.length === 0 ? (
               <div className="text-center py-8">
                 <BedDouble className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune chambre dans cette résidence</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune chambre dans cet établissement</p>
                 <Button size="sm" onClick={openAddRoomModal}>
                   <Plus className="w-4 h-4" /> Ajouter une chambre
                 </Button>
@@ -306,18 +341,36 @@ export default function RoomsPage() {
                   return (
                     <div
                       key={room.id}
-                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => openEditRoomModal(room)}
+                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <BedDouble className="w-5 h-5 text-slate-400" />
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRoomStatusColor(room.status)}`}>
-                          {getRoomStatusLabel(room.status)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <BedDouble className="w-5 h-5 text-slate-400" />
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">{room.room_number}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRoomStatusColor(room.status)}`}>
+                            {getRoomStatusLabel(room.status)}
+                          </span>
+                          <button
+                            onClick={() => openEditRoomModal(room)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            title="Modifier la chambre"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteRoom(room.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            title="Supprimer la chambre"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-lg font-bold text-slate-900 dark:text-white">Ch. {room.room_number}</p>
                       <p className="text-xs text-slate-400 mt-1">{rt?.name || "—"}</p>
                       {rt && <p className="text-xs text-indigo-500 mt-0.5">{formatFCFA(rt.base_price)}</p>}
+                      {room.floor && <p className="text-xs text-slate-400 mt-1">Étage {room.floor}</p>}
                     </div>
                   );
                 })}
@@ -330,16 +383,17 @@ export default function RoomsPage() {
       {/* Modal Chambre */}
       <Modal open={roomModalOpen} onClose={() => setRoomModalOpen(false)} title={editingRoom ? "Modifier la chambre" : "Ajouter une chambre"}>
         <div className="space-y-4">
-          <Input label="Numéro de chambre" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} placeholder="101" />
-          <Input label="Étage (optionnel)" type="number" value={roomForm.floor} onChange={(e) => setRoomForm({ ...roomForm, floor: e.target.value })} placeholder="1" />
+          <Input label="Nom / Numéro (ex: 101, A-12, Villa 3)" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} placeholder="101" required />
+          <Input label="Étage (optionnel)" type="number" value={roomForm.floor} onChange={(e) => setRoomForm({ ...roomForm, floor: e.target.value })} placeholder="1" min="0" />
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre *</label>
             <select
               value={roomForm.room_type_id}
               onChange={(e) => setRoomForm({ ...roomForm, room_type_id: e.target.value })}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
             >
-              <option value="">Sélectionner un type</option>
+              <option value="">Sélectionner un type de chambre</option>
               {currentTypes.map((rt) => (
                 <option key={rt.id} value={rt.id}>{rt.name} — {formatFCFA(rt.base_price)}</option>
               ))}
@@ -353,16 +407,30 @@ export default function RoomsPage() {
       </Modal>
 
       {/* Modal Type */}
-      <Modal open={typeModalOpen} onClose={() => setTypeModalOpen(false)} title={editingType ? "Modifier le type" : "Nouveau type de chambre"}>
+      <Modal open={typeModalOpen} onClose={() => setTypeModalOpen(false)} title={editingType ? "Modifier le type de chambre" : "Nouveau type de chambre"}>
         <div className="space-y-4">
-          <Input label="Nom du type" value={typeForm.name} onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} placeholder="Standard" />
-          <Input label="Description" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Chambre standard avec climatisation" />
+          <Input 
+            label="Type de chambre (ex: Chambre, Studio, Appartement, Suite)" 
+            value={typeForm.name} 
+            onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} 
+            placeholder="Studio" 
+            list="accommodation-types"
+            required 
+          />
+          <datalist id="accommodation-types">
+            <option value="Chambre" />
+            <option value="Studio" />
+            <option value="Appartement" />
+            <option value="Suite" />
+            <option value="Villa" />
+          </datalist>
+          <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" />
-            <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" />
+            <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
+            <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Résidence</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Établissement</label>
             <select
               value={typeForm.accommodation_id}
               onChange={(e) => setTypeForm({ ...typeForm, accommodation_id: e.target.value })}

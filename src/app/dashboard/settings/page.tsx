@@ -22,6 +22,11 @@ import {
   Check,
   Save,
   LogOut,
+  Copy,
+  Share2,
+  Users,
+  Phone,
+  ExternalLink,
 } from "lucide-react";
 import type { Tenant, User as UserType } from "@/types/database";
 
@@ -33,6 +38,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState<UserType | null>(null);
   const [activeSection, setActiveSection] = useState("company");
   const [savedMsg, setSavedMsg] = useState("");
+  const [copiedPortalLink, setCopiedPortalLink] = useState(false);
 
   const [companyForm, setCompanyForm] = useState({
     company_name: "",
@@ -201,30 +207,98 @@ export default function SettingsPage() {
         <div className="lg:col-span-9 space-y-6">
           {/* Entreprise */}
           {activeSection === "company" && (
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Informations de l'entreprise</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Modifiez les détails de votre entreprise</p>
+            <div className="space-y-6">
+              <Card className="p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Informations de l'entreprise</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Modifiez les détails de votre entreprise</p>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Nom de l'entreprise" value={companyForm.company_name} onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })} />
-                  <Input label="Nom du contact" value={companyForm.contact_name} onChange={(e) => setCompanyForm({ ...companyForm, contact_name: e.target.value })} />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Nom de l'entreprise" value={companyForm.company_name} onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })} />
+                    <Input label="Nom du contact" value={companyForm.contact_name} onChange={(e) => setCompanyForm({ ...companyForm, contact_name: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Email" type="email" value={companyForm.contact_email} onChange={(e) => setCompanyForm({ ...companyForm, contact_email: e.target.value })} />
+                    <Input label="Téléphone" value={companyForm.contact_phone} onChange={(e) => setCompanyForm({ ...companyForm, contact_phone: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="Ville" value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} />
+                    <Input label="Adresse" value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} />
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSaveCompany} loading={saving}>
+                      <Save className="w-4 h-4" /> Enregistrer
+                    </Button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Email" type="email" value={companyForm.contact_email} onChange={(e) => setCompanyForm({ ...companyForm, contact_email: e.target.value })} />
-                  <Input label="Téléphone" value={companyForm.contact_phone} onChange={(e) => setCompanyForm({ ...companyForm, contact_phone: e.target.value })} />
+              </Card>
+
+              {/* Portail Employés */}
+              <Card className="p-6 border-t-4 border-t-purple-500 dark:border-t-purple-400">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Portail de connexion des Employés</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Transmettez ce lien à votre personnel (Réceptionnistes, Ménagères, etc.)</p>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Ville" value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} />
-                  <Input label="Adresse" value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} />
+
+                <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
+                      Lien d'accès officiel au Portail Employés
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={typeof window !== "undefined" ? `${window.location.origin}/employee-login` : "/employee-login"}
+                        className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono select-all focus:outline-none"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = typeof window !== "undefined" ? `${window.location.origin}/employee-login` : "/employee-login";
+                          navigator.clipboard.writeText(link);
+                          setCopiedPortalLink(true);
+                          setTimeout(() => setCopiedPortalLink(false), 3000);
+                        }}
+                        className="gap-1.5 shrink-0"
+                      >
+                        {copiedPortalLink ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        {copiedPortalLink ? "Copié !" : "Copier"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <Button
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                      onClick={() => {
+                        const link = typeof window !== "undefined" ? `${window.location.origin}/employee-login` : "/employee-login";
+                        const msg = `Bonjour, voici le lien de connexion au portail des employés de notre établissement :\n${link}\n\nSeuls les numéros préalablement enregistrés pourront s'y connecter.`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                      }}
+                    >
+                      <Share2 className="w-4 h-4" /> Partager par WhatsApp
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        const link = typeof window !== "undefined" ? `${window.location.origin}/employee-login` : "/employee-login";
+                        window.open(link, "_blank");
+                      }}
+                    >
+                      <ExternalLink className="w-4 h-4" /> Tester le portail
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex justify-end pt-2">
-                  <Button onClick={handleSaveCompany} loading={saving}>
-                    <Save className="w-4 h-4" /> Enregistrer
-                  </Button>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
           )}
 
           {/* Compte */}

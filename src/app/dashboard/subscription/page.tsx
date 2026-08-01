@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,14 +50,15 @@ export default function SubscriptionPage() {
         .eq("tenant_id", userData.tenant_id)
         .single();
       if (subData) setSubscription(subData as unknown as Subscription);
-    } catch {
-      // Erreur silencieuse
-    } finally {
-      setLoading(false);
-    }
-  }
+} catch (err) {
+       toast.error("Impossible de charger les données. Veuillez réessayer.");
+       console.error(err);
+     } finally {
+       setLoading(false);
+     }
+   }
 
-  async function handleUpgrade() {
+   async function handleUpgrade() {
     if (!selectedPlan || !subscription) return;
     setLoading(true);
     try {
@@ -76,16 +78,17 @@ export default function SubscriptionPage() {
         })
         .eq("id", subscription.id);
 
-      setModalOpen(false);
-      loadData();
-    } catch {
-      // Erreur silencieuse
-    } finally {
-      setLoading(false);
-    }
-  }
+setModalOpen(false);
+       loadData();
+     } catch (err) {
+       toast.error("Impossible de mettre à niveau l'abonnement.");
+       console.error(err);
+     } finally {
+       setLoading(false);
+     }
+   }
 
-  if (loading) {
+   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
@@ -101,7 +104,7 @@ export default function SubscriptionPage() {
       icon: Zap,
       color: "blue",
       features: [
-        "5 hébergements maximum",
+        "5 établissements maximum",
         "1 admin + 1 réceptionniste",
         "Réservations et check-in/out",
         "Comptabilité de base",
@@ -116,7 +119,7 @@ export default function SubscriptionPage() {
       icon: Sparkles,
       color: "purple",
       features: [
-        "Hébergements illimités",
+        "Établissements illimités",
         "Module ménage inclus",
         "Statistiques avancées",
         "5 admins + 10 réceptionnistes",
@@ -133,7 +136,7 @@ export default function SubscriptionPage() {
       color: "gold",
       features: [
         "Tout le plan Pro",
-        "Multi-résidences",
+        "Multi-établissements",
         "Rapports consolidés",
         "Utilisateurs illimités",
         "API WhatsApp Business",
@@ -155,7 +158,7 @@ export default function SubscriptionPage() {
       </div>
 
       {/* Statut actuel */}
-      <Card className={`p-6 ${isLocked ? "border-red-300 dark:border-red-800" : ""}`}>
+      <Card className={`p-6 border-t-4 border-t-indigo-500 dark:border-t-indigo-400 ${isLocked ? "border-red-300 dark:border-red-800" : ""}`}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
@@ -180,7 +183,7 @@ export default function SubscriptionPage() {
             </div>
           </div>
           {isLocked && (
-            <Button variant="primary" onClick={() => { setSelectedPlan("standard"); setModalOpen(true); }}>
+            <Button variant="primary" onClick={() => { setSelectedPlan(currentPlan); setModalOpen(true); }}>
               <CreditCard className="w-4 h-4" /> Payer maintenant
             </Button>
           )}
@@ -206,7 +209,11 @@ export default function SubscriptionPage() {
           return (
             <Card
               key={plan.key}
-              className={`p-6 relative ${isCurrent ? "border-2 border-indigo-500" : ""} ${plan.key === "pro" ? "ring-2 ring-purple-200 dark:ring-purple-800" : ""}`}
+              className={`p-6 relative border-t-4 ${
+                plan.color === "blue" ? "border-t-blue-500 dark:border-t-blue-400" :
+                plan.color === "purple" ? "border-t-purple-500 dark:border-t-purple-400" :
+                "border-t-amber-500 dark:border-t-amber-400"
+              } ${isCurrent ? "border-2 border-indigo-500" : ""} ${plan.key === "pro" ? "ring-2 ring-purple-200 dark:ring-purple-800" : ""}`}
             >
               {plan.key === "pro" && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">

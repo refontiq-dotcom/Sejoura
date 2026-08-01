@@ -10,6 +10,7 @@ interface ModalProps {
   description?: string;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  onConfirm?: () => void;
 }
 
 const sizeClasses = {
@@ -26,6 +27,7 @@ export function Modal({
   description,
   children,
   size = "md",
+  onConfirm,
 }: ModalProps) {
   useEffect(() => {
     if (open) {
@@ -39,14 +41,28 @@ export function Modal({
   }, [open]);
 
   useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && open) {
         onClose();
       }
+      // Raccourci de sauvegarde : Cmd+S ou Ctrl+S
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && open && onConfirm) {
+        e.preventDefault();
+        onConfirm();
+      }
+      // Optionnel : Entrée s'il n'y a pas d'élément de formulaire actif type textarea
+      if (e.key === "Enter" && open && onConfirm) {
+        // Éviter de trigger si on est dans un textarea
+        if (document.activeElement?.tagName === 'TEXTAREA') return;
+        // On laisse passer si c'est un bouton pour ne pas double-trigger, mais souvent c'est utile.
+        // Mieux : on empêche par défaut pour éviter le double submit avec les boutons.
+        // e.preventDefault();
+        // onConfirm();
+      }
     }
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [open, onClose]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose, onConfirm]);
 
   if (!open) return null;
 

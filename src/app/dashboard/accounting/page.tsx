@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { formatFCFA, formatDate, getExpenseCategoryLabel } from "@/lib/utils";
-import { Wallet, Plus, Loader2, TrendingUp, TrendingDown, ScrollText } from "lucide-react";
+import { Wallet, Plus, Loader2, TrendingUp, TrendingDown, ScrollText, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { Expense, AuditLog, Payment } from "@/types/database";
 
 export default function AccountingPage() {
@@ -20,11 +21,16 @@ export default function AccountingPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "expenses" | "revenue" | "audit">("overview");
   const [userId, setUserId] = useState("");
   const [tenantId, setTenantId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [expenseSort, setExpenseSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" } | null>(null);
+  const [revenueSort, setRevenueSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" } | null>(null);
+  
   const [formData, setFormData] = useState({
     category: "utilities",
     description: "",
     amount: "",
-    expense_date: new Date().toISOString().split("T")[0],
+    expense_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0],
   });
 
   useEffect(() => {
@@ -70,14 +76,15 @@ export default function AccountingPage() {
         .order("created_at", { ascending: false })
         .limit(50);
       if (logData) setAuditLogs(logData as unknown as AuditLog[]);
-    } catch {
-      // Erreur silencieuse
-    } finally {
-      setLoading(false);
-    }
-  }
+} catch (err) {
+       toast.error("Impossible de charger les données. Veuillez réessayer.");
+       console.error(err);
+     } finally {
+       setLoading(false);
+     }
+   }
 
-  async function handleSave() {
+   async function handleSave() {
     if (!formData.description || !formData.amount) return;
     setLoading(true);
     try {
@@ -91,18 +98,87 @@ export default function AccountingPage() {
         created_by: userId,
       });
       setModalOpen(false);
-      setFormData({ category: "utilities", description: "", amount: "", expense_date: new Date().toISOString().split("T")[0] });
+       setFormData({ category: "utilities", description: "", amount: "", expense_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0] });
       loadData();
-    } catch {
-      // Erreur silencieuse
+    } catch (err) {
+      toast.error("Impossible d'enregistrer les modifications.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const filteredExpenses = expenses.filter((e) => {
+    if (startDate && e.expense_date < startDate) return false;
+    if (endDate && e.expense_date > endDate) return false;
+    return true;
+  }).sort((a, b) => {
+    if (!expenseSort) return 0;
+    const aVal = expenseSort.key === "date" ? a.expense_date : a.amount;
+    const bVal = expenseSort.key === "date" ? b.expense_date : b.amount;
+    if (aVal < bVal) return expenseSort.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return expenseSort.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const filteredPayments = payments.filter((p) => {
+    if (startDate && p.payment_date < startDate) return false;
+    if (endDate && p.payment_date > endDate) return false;
+    return true;
+  }).sort((a, b) => {
+    if (!revenueSort) return 0;
+    const aVal = revenueSort.key === "date" ? a.payment_date : a.amount;
+    const bVal = revenueSort.key === "date" ? b.payment_date : b.amount;
+    if (aVal < bVal) return revenueSort.direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return revenueSort.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
+
+  function exportExpensesCSV() {
+    if (filteredExpenses.length === 0) return;
+    const headers = ["Date", "Catégorie", "Description", "Montant"];
+    const rows = filteredExpenses.map(e => [
+      e.expense_date,
+      getExpenseCategoryLabel(e.category),
+      e.description,
+      e.amount
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `depenses_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export CSV réussi");
+  }
+
+  function exportRevenueCSV() {
+    if (filteredPayments.length === 0) return;
+    const headers = ["Date", "Référence", "Méthode", "Montant"];
+    const rows = filteredPayments.map(p => [
+      p.payment_date,
+      p.reference || "",
+      p.payment_method,
+      p.amount
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `recettes_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export CSV réussi");
+  }
 
   if (loading && expenses.length === 0 && payments.length === 0) {
     return (
@@ -114,14 +190,32 @@ export default function AccountingPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Comptabilité</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Dépenses, recettes et traçabilité</p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="w-4 h-4" /> Nouvelle dépense
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2">
+            <span className="text-xs text-slate-500">Du</span>
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)}
+              className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none w-28"
+            />
+            <span className="text-xs text-slate-500">au</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => setEndDate(e.target.value)}
+              className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none w-28"
+            />
+          </div>
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="w-4 h-4" /> Nouvelle dépense
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -188,11 +282,11 @@ export default function AccountingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-5">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Dernières dépenses</h2>
-            {expenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-8">Aucune dépense enregistrée</p>
             ) : (
               <div className="space-y-3">
-                {expenses.slice(0, 5).map((exp) => (
+                {filteredExpenses.slice(0, 5).map((exp) => (
                   <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{exp.description}</p>
@@ -206,11 +300,11 @@ export default function AccountingPage() {
           </Card>
           <Card className="p-5">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Dernières recettes</h2>
-            {payments.length === 0 ? (
+            {filteredPayments.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-8">Aucune recette enregistrée</p>
             ) : (
               <div className="space-y-3">
-                {payments.slice(0, 5).map((pay) => (
+                {filteredPayments.slice(0, 5).map((pay) => (
                   <div key={pay.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-white">Paiement</p>
@@ -228,7 +322,12 @@ export default function AccountingPage() {
       {/* Dépenses */}
       {activeTab === "expenses" && (
         <Card className="overflow-hidden">
-          {expenses.length === 0 ? (
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
+            <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2" disabled={filteredExpenses.length === 0}>
+              <Download className="w-4 h-4" /> Exporter CSV
+            </Button>
+          </div>
+          {filteredExpenses.length === 0 ? (
             <div className="p-12 text-center">
               <TrendingDown className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune dépense</p>
@@ -241,12 +340,24 @@ export default function AccountingPage() {
                   <tr className="border-b border-slate-200 dark:border-slate-700">
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Description</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Catégorie</th>
-                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Date</th>
-                    <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Montant</th>
+                    <th 
+                      className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      onClick={() => setExpenseSort({ key: "date", direction: expenseSort?.key === "date" && expenseSort.direction === "asc" ? "desc" : "asc" })}
+                    >
+                      Date
+                      {expenseSort?.key === "date" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                    </th>
+                    <th 
+                      className="text-right p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      onClick={() => setExpenseSort({ key: "amount", direction: expenseSort?.key === "amount" && expenseSort.direction === "asc" ? "desc" : "asc" })}
+                    >
+                      Montant
+                      {expenseSort?.key === "amount" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {expenses.map((exp) => (
+                  {filteredExpenses.map((exp) => (
                     <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                       <td className="p-4 text-sm font-medium text-slate-900 dark:text-white">{exp.description}</td>
                       <td className="p-4"><Badge variant="default">{getExpenseCategoryLabel(exp.category)}</Badge></td>
@@ -264,7 +375,12 @@ export default function AccountingPage() {
       {/* Recettes */}
       {activeTab === "revenue" && (
         <Card className="overflow-hidden">
-          {payments.length === 0 ? (
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
+            <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2" disabled={filteredPayments.length === 0}>
+              <Download className="w-4 h-4" /> Exporter CSV
+            </Button>
+          </div>
+          {filteredPayments.length === 0 ? (
             <div className="p-12 text-center">
               <TrendingUp className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
               <p className="text-sm text-slate-500 dark:text-slate-400">Aucune recette enregistrée</p>
@@ -274,14 +390,26 @@ export default function AccountingPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Date</th>
+                    <th 
+                      className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      onClick={() => setRevenueSort({ key: "date", direction: revenueSort?.key === "date" && revenueSort.direction === "asc" ? "desc" : "asc" })}
+                    >
+                      Date
+                      {revenueSort?.key === "date" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                    </th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Référence</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Méthode</th>
-                    <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Montant</th>
+                    <th 
+                      className="text-right p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      onClick={() => setRevenueSort({ key: "amount", direction: revenueSort?.key === "amount" && revenueSort.direction === "asc" ? "desc" : "asc" })}
+                    >
+                      Montant
+                      {revenueSort?.key === "amount" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {payments.map((pay) => (
+                  {filteredPayments.map((pay) => (
                     <tr key={pay.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                       <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{formatDate(pay.payment_date)}</td>
                       <td className="p-4 text-sm text-slate-500">{pay.reference || "—"}</td>

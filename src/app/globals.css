@@ -3,21 +3,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f1f5f9;
+  --background: #E2E1E0;
+  --background-gradient-start: #E2E1E0;
+  --background-gradient-end: #E2E1E0;
   --foreground: #0f172a;
   --card: #ffffff;
   --card-foreground: #0f172a;
   --sidebar: #1e1b4b;
   --sidebar-foreground: #e0e7ff;
   --sidebar-active: #4f46e5;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
+  --border: #c0c0c0;
+  --input: #c0c0c0;
   --primary: #4f46e5;
   --primary-foreground: #ffffff;
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --secondary: #6366f1;
   --accent: #8b5cf6;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted: #E2E1E0;
+  --muted-hover: #D8D5D3;
+  --muted-foreground: #475569;
   --destructive: #ef4444;
   --success: #10b981;
   --warning: #f59e0b;
@@ -26,25 +31,30 @@
 }
 
 .dark {
-  --background: #0f172a;
+  --background: #000000;
+  --background-gradient-start: #000000;
+  --background-gradient-end: #000000;
   --foreground: #f1f5f9;
-  --card: #1e293b;
+  --card: #050505;
   --card-foreground: #f1f5f9;
-  --sidebar: #0f0a2e;
-  --sidebar-foreground: #c7d2fe;
-  --sidebar-active: #6366f1;
-  --border: #334155;
-  --input: #334155;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #818cf8;
+  --sidebar: #000000;
+  --sidebar-foreground: #d1d5db;
+  --sidebar-active: #1a1a2e;
+  --border: #2a2a2a;
+  --input: #1a1a1a;
+  --primary: #818cf8;
+  --primary-foreground: #000000;
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --secondary: #94a3b8;
   --accent: #a78bfa;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --destructive: #f87171;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --ring: #6366f1;
+  --muted: #0a0a0a;
+  --muted-hover: #151515;
+  --muted-foreground: #d1d5db;
+  --destructive: #dc2626;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --ring: #818cf8;
 }
 
 @theme inline {
@@ -62,6 +72,7 @@
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
   --color-muted: var(--muted);
+  --color-muted-hover: var(--muted-hover);
   --color-muted-foreground: var(--muted-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
@@ -70,6 +81,8 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius: var(--radius);
+  --gradient-dashboard-start: var(--background-gradient-start);
+  --gradient-dashboard-end: var(--background-gradient-end);
 }
 
 * {
@@ -80,6 +93,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.dashboard-bg {
+  background: linear-gradient(135deg, var(--gradient-dashboard-start) 0%, var(--gradient-dashboard-end) 100%);
+  background-attachment: fixed;
 }
 
 /* Scrollbar personnalisée */
@@ -105,7 +123,11 @@ body {
 
 /* Animation pour les transitions de thème */
 .theme-transition * {
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.theme-transition .dashboard-bg {
+  transition: background 0.5s ease;
 }
 
 /* Effet de découpe arrondie pour le menu actif de la sidebar */
@@ -125,6 +147,58 @@ body {
   height: 60%;
   background: var(--sidebar-active);
   border-radius: 0 4px 4px 0;
+}
+
+/* ============================================
+   Sidebar Bridge — Pont visuel fluide
+   Effet de flux de couleur depuis le menu
+   actif vers la zone de contenu principal
+   ============================================ */
+
+/* Pont coloré depuis l'élément de menu actif */
+.sidebar-bridge {
+  position: fixed;
+  left: 256px;
+  border-radius: 0 9999px 9999px 0;
+  background: var(--primary);
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--primary) 35%, transparent),
+    0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
+  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Courbe organique à la jonction sidebar / contenu */
+.sidebar-bridge::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 140%;
+  background: inherit;
+  border-radius: 0 50% 50% 0;
+  filter: blur(4px);
+  opacity: 0.5;
+}
+
+/* Lueur décorative à la frontière sidebar / contenu */
+.sidebar-boundary-glow {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 30;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--primary) 10%, transparent) 0%,
+    color-mix(in srgb, var(--primary) 4%, transparent) 50%,
+    transparent 100%
+  );
+  transition: width 0.3s ease;
 }
 
 /* Cartes avec grands arrondis */
@@ -178,4 +252,55 @@ body {
 
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+/* ============================================
+   Sonner Toaster — Glassmorphism SaaS
+   ============================================ */
+.toaster-group {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--foreground);
+  --success-bg: #064e3b;
+  --success-border: #10b981;
+  --success-text: #ecfdf5;
+  --error-bg: #7f1d1d;
+  --error-border: #ef4444;
+  --error-text: #fef2f2;
+}
+
+.toaster-group [data-sonner-toast] {
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--normal-border);
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--normal-bg), transparent 12%);
+}
+
+.toaster-group [data-sonner-toast][data-type="success"] {
+  border-color: var(--success-border);
+  background: color-mix(in srgb, var(--success-bg), transparent 18%);
+  color: var(--success-text);
+}
+
+.toaster-group [data-sonner-toast][data-type="error"] {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-bg), transparent 18%);
+  color: var(--error-text);
+}
+
+.toaster-group [data-sonner-toast] {
+  animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
 }

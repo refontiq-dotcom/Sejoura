@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { LanguageProvider } from "@/hooks/use-language";
+import { Toaster } from "sonner";
+import { InlineScript } from "@/components/inline-script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Séjoura by Refontiq — Gestion de Résidences",
-  description: "Application SaaS de gestion d'hébergements et de résidences",
+  title: "Séjoura by Refontiq — Gestion d'établissements",
+  description: "Application SaaS de gestion d'établissements et de chambres",
 };
 
 export default function RootLayout({
@@ -30,30 +33,27 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var theme = localStorage.getItem('sejoura-theme');
-                  if (!theme) {
-                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                  }
-                  if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                  }
-                  var lang = localStorage.getItem('sejoura-lang');
-                  if (lang === 'en' || lang === 'fr') {
-                    document.documentElement.lang = lang;
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
+        <InlineScript
+          html={`(function(){try{var t=localStorage.getItem('sejoura-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}if(t==='dark'){document.documentElement.classList.add('dark');}var l=localStorage.getItem('sejoura-lang');if(l==='en'||l==='fr'){document.documentElement.lang=l;}}catch(e){}})()`}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider>{children}</ThemeProvider>
+      <body className="min-h-full flex flex-col bg-background text-foreground theme-transition">
+        <ThemeProvider>
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
+        </ThemeProvider>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={4000}
+          theme="system"
+          className="toaster-group"
+          style={{
+            fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
+          }}
+        />
       </body>
     </html>
   );

@@ -5,12 +5,12 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className = "", hover = false, children, ...props }, ref) => {
+  ({ className = "", hover = true, children, ...props }, ref) => {
     return (
       <div
         ref={ref}
-        className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm ${
-          hover ? "hover:shadow-md transition-shadow" : ""
+        className={`bg-[var(--card)] text-[var(--card-foreground)] rounded-2xl border border-[var(--border)] shadow-sm ${
+          hover ? "hover:shadow-md hover:-translate-y-0.5 transition-all duration-300" : ""
         } ${className}`}
         {...props}
       >
@@ -27,7 +27,7 @@ export const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     return (
       <div
         ref={ref}
-        className={`p-6 border-b border-slate-200 dark:border-slate-700 ${className}`}
+        className={`p-6 border-b border-[var(--border)] ${className}`}
         {...props}
       >
         {children}
@@ -43,7 +43,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadi
     return (
       <h3
         ref={ref}
-        className={`text-lg font-semibold text-slate-900 dark:text-white ${className}`}
+        className={`text-lg font-semibold text-[var(--foreground)] ${className}`}
         {...props}
       >
         {children}
@@ -59,7 +59,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<H
     return (
       <p
         ref={ref}
-        className={`text-sm text-slate-500 dark:text-slate-400 mt-1 ${className}`}
+        className={`text-sm text-[var(--muted-foreground)] mt-1 ${className}`}
         {...props}
       >
         {children}
@@ -87,7 +87,7 @@ export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     return (
       <div
         ref={ref}
-        className={`p-6 border-t border-slate-200 dark:border-slate-700 ${className}`}
+        className={`p-6 border-t border-[var(--border)] ${className}`}
         {...props}
       >
         {children}

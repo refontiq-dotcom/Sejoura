@@ -1,19 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useLanguage } from "@/hooks/use-language";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
-import { Moon, Sun, Loader2, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
+import { Moon, Sun, Loader2, Eye, EyeOff, Calendar, Wallet, Building2, Phone, ShieldCheck } from "lucide-react";
 import Image from "next/image";
+import { PasswordStrength } from "@/components/auth/password-strength";
 
 type Lang = "fr" | "en";
 
 const messages: Record<Lang, Record<string, string>> = {
   fr: {
-    welcome: "Bienvenue sur Séjoura",
-    subtitle: "La plateforme de gestion intelligente pour vos résidences et hébergements.",
-    tagline: "Centralisez. Automatisez. Maîtrisez.",
+    welcome: "Propulsez la gestion de vos établissements.",
+    subtitle: "La plateforme intelligente qui centralise, automatise et simplifie l'exploitation de vos établissements.",
+    tagline: "Centralisez. Automatisez. Simplifiez.",
     login: "Se connecter",
     signup: "Créer un compte",
     fullName: "Nom complet",
@@ -26,7 +31,7 @@ const messages: Record<Lang, Record<string, string>> = {
     signInWith: "Se connecter avec Google",
     or: "ou",
     alreadyAccount: "Heureux de vous revoir !",
-    noAccount: "Démarrez votre essai gratuit de 30 jours",
+    noAccount: "Créez votre espace en quelques secondes",
     creating: "Création du compte...",
     signing: "Connexion en cours...",
     googleError: "Erreur lors de la connexion Google.",
@@ -37,9 +42,9 @@ const messages: Record<Lang, Record<string, string>> = {
     langLabel: "Langue",
   },
   en: {
-    welcome: "Welcome to Séjoura",
-    subtitle: "The smart management platform for your residences and accommodations.",
-    tagline: "Centralize. Automate. Master.",
+    welcome: "Elevate your property management.",
+    subtitle: "The intelligent platform that centralizes, automates and simplifies the operation of your furnished accommodations.",
+    tagline: "Centralize. Automate. Simplify.",
     login: "Sign in",
     signup: "Create account",
     fullName: "Full name",
@@ -52,7 +57,7 @@ const messages: Record<Lang, Record<string, string>> = {
     signInWith: "Sign in with Google",
     or: "or",
     alreadyAccount: "Welcome back!",
-    noAccount: "Start your 30-day free trial",
+    noAccount: "Create your space in seconds",
     creating: "Creating account...",
     signing: "Signing in...",
     googleError: "Google sign-in error.",
@@ -64,37 +69,85 @@ const messages: Record<Lang, Record<string, string>> = {
   },
 };
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
+  );
+}
+
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialPhone = searchParams.get("phone") || "";
+  const initialModeParam = searchParams.get("mode");
+
   const { theme, toggleTheme } = useTheme();
-  const [lang, setLang] = useState<Lang>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("sejoura-lang");
-      if (stored === "en" || stored === "fr") return stored;
-    }
-    return "fr";
-  });
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const { lang, toggle: toggleLang } = useLanguage();
+  const [mode, setMode] = useState<"login" | "signup" | "employee">(
+    initialPhone || initialModeParam === "employee" ? "employee" : "login"
+  );
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [employeePhone, setEmployeePhone] = useState(initialPhone);
+  const [employeePassword, setEmployeePassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string; phone?: string }>({});
   const t = messages[lang];
+
+  useEffect(() => {
+    if (initialPhone || initialModeParam === "employee") {
+      const target = initialPhone
+        ? `/employee-login?phone=${encodeURIComponent(initialPhone)}`
+        : "/employee-login";
+      router.push(target);
+    }
+  }, [initialPhone, initialModeParam, router]);
+
+  const clearErrors = useCallback(() => {
+    setErrors({});
+  }, []);
+
+
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    clearErrors();
+
+    const newErrors: typeof errors = {};
+
+    if (!fullName.trim()) {
+      newErrors.fullName = t.fullName + " requis.";
+    }
+
+    if (!isValidEmail(email)) {
+      newErrors.email = "Adresse e-mail invalide.";
+    }
 
     if (!agreeTerms) {
-      setError(t.termsError);
+      toast.error(t.termsError);
       return;
     }
 
     if (password.length < 6) {
-      setError(t.passwordShort);
+      newErrors.password = t.passwordShort;
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error("Veuillez corriger les erreurs du formulaire.");
       return;
     }
 
@@ -114,37 +167,44 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message);
+        toast.error(t.generalError);
         setLoading(false);
         return;
       }
 
       if (authData.user) {
-        await supabase.from("users").insert({
-          auth_user_id: authData.user.id,
-          full_name: fullName,
-          email,
-          phone: "",
-          role: "client",
-          is_active: true,
-          tenant_id: null,
-        });
+        toast.success("Compte créé avec succès !");
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setAgreeTerms(false);
+        setErrors({});
+        setMode("login");
+        setLoading(false);
       }
-
-      setLoading(false);
-      router.push("/register");
     } catch {
-      setError(t.generalError);
+      toast.error(t.generalError);
       setLoading(false);
     }
   }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    clearErrors();
+
+    const newErrors: typeof errors = {};
+
+    if (!isValidEmail(email)) {
+      newErrors.email = "Adresse e-mail invalide.";
+    }
 
     if (password.length < 6) {
-      setError(t.passwordShort);
+      newErrors.password = t.passwordShort;
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error("Veuillez corriger les erreurs du formulaire.");
       return;
     }
 
@@ -159,21 +219,37 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        setError(authError.message || "Adresse e-mail ou mot de passe incorrect.");
+        toast.error("Adresse e-mail ou mot de passe incorrect.");
         setLoading(false);
         return;
       }
 
-      setLoading(false);
-      router.push("/dashboard");
+      const { data: { session } } = await supabase.auth.getSession();
+      let targetRoute = "/dashboard";
+      if (session) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("role")
+          .eq("auth_user_id", session.user.id)
+          .maybeSingle();
+        if (userData?.role === "menagere") {
+          targetRoute = "/menage";
+        }
+      }
+
+      toast.success("Connexion réussie !");
+      setEmail("");
+      setPassword("");
+      setTimeout(() => {
+        router.push(targetRoute);
+      }, 800);
     } catch {
-      setError(t.generalError);
+      toast.error(t.generalError);
       setLoading(false);
     }
   }
 
   async function handleGoogleAuth() {
-    setError("");
     setLoading(true);
 
     try {
@@ -186,11 +262,11 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setError(t.googleError);
+        toast.error(t.googleError);
         setLoading(false);
       }
     } catch {
-      setError(t.generalError);
+      toast.error(t.generalError);
       setLoading(false);
     }
   }
@@ -200,23 +276,20 @@ export default function LoginPage() {
       {/* Language selector */}
       <div className="absolute top-3 right-16 flex items-center gap-2 z-10">
         <span className="text-[10px] text-slate-400 dark:text-slate-500 mr-1">{t.langLabel}</span>
-        <button
-          onClick={() => {
-            const next = lang === "fr" ? "en" : "fr";
-            setLang(next);
-            localStorage.setItem("sejoura-lang", next);
-          }}
-          className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-        >
-          {lang === "fr" ? "FR" : "EN"}
-        </button>
+          <button
+            onClick={toggleLang}
+            className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            aria-label={t.langLabel}
+          >
+            {lang === "fr" ? "FR" : "EN"}
+          </button>
       </div>
 
       {/* Theme toggle */}
       <button
         onClick={toggleTheme}
         className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-800 shadow-sm hover:shadow-md transition-all z-10"
-        aria-label={t.theme}
+        aria-label="Basculer le thème"
       >
         {theme === "light" ? (
           <Moon className="w-4 h-4 text-slate-700" />
@@ -226,34 +299,23 @@ export default function LoginPage() {
       </button>
 
       {/* Left Panel — Blue with organic wave divider */}
-      <div className="relative lg:w-[45%] w-full h-full bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 flex items-center justify-center p-4 lg:p-8 overflow-hidden">
-        <div className="absolute inset-0 opacity-80">
-          <div className="absolute top-8 left-6 w-56 h-56 rounded-full bg-sky-400/20 blur-3xl" />
-          <div className="absolute top-24 right-12 w-44 h-44 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute bottom-10 left-8 w-56 h-56 rounded-full bg-blue-300/20 blur-3xl" />
-        </div>
-
-        <div className="absolute inset-y-0 right-0 w-full max-w-[380px] pointer-events-none">
-          <svg viewBox="0 0 420 800" preserveAspectRatio="none" className="w-full h-full">
-            <path
-              d="M0,0 C110,36 160,170 220,260 C280,350 310,490 350,600 C390,710 420,760 420,800 L420,0 Z"
-              fill="rgba(255,255,255,0.14)"
-            />
-            <path
-              d="M0,0 C100,0 150,140 200,240 C250,340 290,480 340,590 C380,690 420,760 420,800 L420,0 Z"
-              fill="rgba(255,255,255,0.28)"
-            />
+      <div className="relative lg:w-[45%] w-full h-full bg-blue-600 flex items-center justify-center p-4 lg:p-8 z-10">
+        {/* Organic wave divider overflowing into the right panel */}
+        <div className="hidden lg:block absolute inset-y-0 left-full w-[120px] xl:w-[150px] h-full pointer-events-none z-0 -ml-[1px]">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-blue-600" fill="currentColor">
+            <path d="M0,0 Q100,30 50,60 T0,100 Z" />
           </svg>
         </div>
 
-        <div className="relative z-10 flex flex-col items-center text-center max-w-[340px]">
-          <div className="mb-6 w-full max-w-[260px]">
+        <div className="relative z-10 flex flex-col items-center text-center max-w-[380px]">
+          <div className="mb-8 inline-flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 p-4 shadow-xl">
             <Image
-              src="/logo.png"
+              src="/logo-noir.svg"
               alt="Séjoura logo"
-              width={160}
-              height={160}
-              className="mx-auto"
+              width={200}
+              height={200}
+              className="w-full h-auto max-w-[200px]"
+              style={{ filter: "brightness(0) invert(1)" }}
             />
           </div>
 
@@ -261,42 +323,54 @@ export default function LoginPage() {
             {t.welcome}
           </h1>
 
-          <p className="text-sky-100 text-sm sm:text-base leading-relaxed mb-3 max-w-xs">
+          <p className="text-sky-100 text-sm sm:text-base leading-relaxed mb-6 max-w-xs">
             {t.subtitle}
           </p>
 
-          <p className="text-sky-100/90 text-xs sm:text-sm mb-6 tracking-wide max-w-xs">
-            {t.tagline}
-          </p>
+          <div className="flex flex-col gap-3 w-full mt-2 text-left">
+             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/20 flex items-center gap-4 transition hover:bg-white/20">
+               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                 <Calendar className="w-5 h-5" />
+               </div>
+               <div>
+                 <h3 className="font-semibold text-white text-sm">Réservations</h3>
+                 <p className="text-xs text-sky-100/90 mt-0.5">Centralisez vos plannings en un clin d&apos;œil.</p>
+               </div>
+             </div>
+             
+             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/20 flex items-center gap-4 transition hover:bg-white/20">
+               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                 <Wallet className="w-5 h-5" />
+               </div>
+               <div>
+                 <h3 className="font-semibold text-white text-sm">Finances</h3>
+                 <p className="text-xs text-sky-100/90 mt-0.5">Suivi financier et rentabilité en temps réel.</p>
+               </div>
+             </div>
 
-          <div className="mt-2 space-y-2 text-left w-full max-w-sm">
-            {[
-              { icon: "•", text: t.welcome },
-              { icon: "•", text: t.subtitle },
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="flex-shrink-0 inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-                <span className="text-sky-100 text-xs leading-snug">{feature.text}</span>
-              </div>
-            ))}
+             <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/20 flex items-center gap-4 transition hover:bg-white/20">
+               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0">
+                 <Building2 className="w-5 h-5" />
+               </div>
+               <div>
+                 <h3 className="font-semibold text-white text-sm">Gestion</h3>
+                 <p className="text-xs text-sky-100/90 mt-0.5">Pilotage intuitif via vos tableaux de bord.</p>
+               </div>
+             </div>
           </div>
         </div>
       </div>
 
       {/* Right Panel — White Form */}
       <div className="lg:w-[55%] w-full h-full flex items-center justify-center p-3 lg:p-6 bg-slate-50 dark:bg-slate-950">
-        <div className="relative w-full max-w-md bg-white dark:bg-slate-950 rounded-2xl shadow-[0_16px_60px_rgba(15,23,42,0.06)] p-5 lg:p-7 overflow-hidden">
-          <div className="absolute left-0 top-0 h-16 w-16 rounded-br-[2rem] bg-blue-700/5" />
-
+        <div className="relative w-full max-w-md bg-white dark:bg-slate-950 rounded-2xl shadow-2xl shadow-blue-900/5 dark:shadow-blue-900/20 p-5 lg:p-7 overflow-hidden border border-blue-500/20 dark:border-blue-500/30">
           <div className="relative z-10">
             {/* Tab switcher */}
-            <div className="flex gap-1 mb-5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <div className="flex gap-1 mb-5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-medium">
               <button
-                onClick={() => {
-                  setMode("login");
-                  setError("");
-                }}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                type="button"
+                onClick={() => setMode("login")}
+                className={`flex-1 py-2 px-3 rounded-lg transition-all ${
                   mode === "login"
                     ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
@@ -305,11 +379,9 @@ export default function LoginPage() {
                 {t.login}
               </button>
               <button
-                onClick={() => {
-                  setMode("signup");
-                  setError("");
-                }}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                type="button"
+                onClick={() => setMode("signup")}
+                className={`flex-1 py-2 px-3 rounded-lg transition-all ${
                   mode === "signup"
                     ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
@@ -333,52 +405,69 @@ export default function LoginPage() {
             <form onSubmit={mode === "signup" ? handleSignUp : handleLogin} className="space-y-3">
               {mode === "signup" && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  <label htmlFor="signup-fullname" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     {t.fullName}
                   </label>
                   <input
+                    id="signup-fullname"
                     type="text"
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => { setFullName(e.target.value); clearErrors(); }}
                     placeholder="Jean Kouassi"
                     required
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                    autoComplete="name"
+                    className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm ${
+                      errors.fullName ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-600"
+                    }`}
                   />
+                  {errors.fullName && (
+                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.fullName}</p>
+                  )}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                <label htmlFor={mode === "signup" ? "signup-email" : "login-email"} className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                   {t.email}
                 </label>
                 <input
+                  id={mode === "signup" ? "signup-email" : "login-email"}
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); clearErrors(); }}
                   placeholder={mode === "signup" ? "jean@entreprise.com" : "jean@entreprise.com"}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                  autoComplete="email"
+                  className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm ${
+                    errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-slate-600"
+                  }`}
                 />
+                {errors.email && (
+                  <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                <label htmlFor={mode === "signup" ? "signup-password" : "login-password"} className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                   {t.password}
                 </label>
                 <div className="relative">
                   <input
+                    id={mode === "signup" ? "signup-password" : "login-password"}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={mode === "signup" ? "Minimum 6 caractères" : "••••••••"}
                     required
                     minLength={6}
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-10 text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -386,13 +475,20 @@ export default function LoginPage() {
                       <Eye className="w-4 h-4" />
                     )}
                   </button>
+                  {errors.password && (
+                    <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>
+                  )}
+                  {mode === "signup" && <PasswordStrength password={password} />}
                 </div>
               </div>
+
+              {mode === "login" && <ForgotPasswordLink />}
 
               {mode === "signup" && (
                 <label className="flex items-start gap-2.5 cursor-pointer group">
                   <div className="relative mt-0.5">
                     <input
+                      id="terms"
                       type="checkbox"
                       checked={agreeTerms}
                       onChange={(e) => setAgreeTerms(e.target.checked)}
@@ -400,15 +496,15 @@ export default function LoginPage() {
                     />
                   </div>
                   <span className="text-xs text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
-                    {t.terms}
+                    {t.terms}{" "}
+                    <Link
+                      href="/cgu"
+                      className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+                    >
+                      CGU
+                    </Link>
                   </span>
                 </label>
-              )}
-
-              {error && (
-                <div className="p-2 rounded-lg text-xs bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                  {error}
-                </div>
               )}
 
               <button
@@ -470,6 +566,16 @@ export default function LoginPage() {
                   mode === "signup" ? t.signUpWith : t.signInWith
                 )}
               </button>
+            </div>
+
+            {/* Lien portail employé */}
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+              <Link
+                href="/employee-login"
+                className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-medium inline-flex items-center gap-1"
+              >
+                Vous êtes un employé ? Accédez au portail employé →
+              </Link>
             </div>
           </div>
         </div>

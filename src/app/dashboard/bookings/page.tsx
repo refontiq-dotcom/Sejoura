@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,21 @@ import {
   Loader2,
   AlertCircle,
   Sparkles,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  List,
+  Eye,
+  X,
+  Share2,
+  Copy,
+  Check,
+  MessageSquare,
+  ExternalLink,
 } from "lucide-react";
 import type { Accommodation, RoomType, Room, Client, Booking } from "@/types/database";
 
@@ -42,10 +58,38 @@ export default function BookingsPage() {
   const [cleaningLoading, setCleaningLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: "cancel" | "no_show" } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  function shareStayWhatsApp(phone: string, clientName: string, bookingCode: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const stayLink = `${origin}/stay?code=${encodeURIComponent(bookingCode)}`;
+    const cleanPhone = (phone || "").replace(/[^0-9]/g, "");
+    const message = `Bonjour ${clientName}, bienvenue ! Voici votre lien d'accès à l'espace client pour votre séjour (Code: ${bookingCode}) :\n${stayLink}`;
+    if (cleanPhone) {
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+    }
+  }
+
+  function copyStayLink(bookingCode: string) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const stayLink = `${origin}/stay?code=${encodeURIComponent(bookingCode)}`;
+    navigator.clipboard.writeText(stayLink);
+    toast.success(`Lien du séjour ${bookingCode} copié !`);
+  }
+
+  const ITEMS_PER_PAGE = 10;
 
   const [formData, setFormData] = useState({
     accommodation_id: "",
@@ -53,112 +97,116 @@ export default function BookingsPage() {
     client_id: "",
     newClientName: "",
     newClientPhone: "",
+    newClientEmail: "",
+    newClientIdType: "",
+    newClientIdNumber: "",
+    newClientEmergencyContact: "",
+    newClientNationality: "",
     check_in_date: "",
     check_out_date: "",
     negotiated_price: "",
     number_of_guests: "1",
     special_requests: "",
+    payment_method: "",
+    immediateCheckIn: false,
   });
 
   useEffect(() => {
     loadInitData();
   }, []);
 
-  async function loadInitData() {
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+   async function loadInitData() {
+     try {
+       const supabase = createClient();
+       const { data: { session } } = await supabase.auth.getSession();
+       if (!session) return;
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
+       const { data: userData } = await supabase
+         .from("users")
+         .select("id, tenant_id")
+         .eq("auth_user_id", session.user.id)
+         .single();
 
-      if (!userData) return;
-      setTenantId(userData.tenant_id);
-      setUserId(userData.id);
+       if (!userData) return;
+       setTenantId(userData.tenant_id);
+       setUserId(userData.id);
 
-      const { data: accData } = await supabase
-        .from("accommodations")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id);
-      if (accData) setAccommodations(accData as unknown as Accommodation[]);
+       const { data: accData } = await supabase
+         .from("accommodations")
+         .select("*")
+         .eq("tenant_id", userData.tenant_id);
+       if (accData) setAccommodations(accData as unknown as Accommodation[]);
 
-      const { data: clientData } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id)
-        .order("full_name");
-      if (clientData) setClients(clientData as unknown as Client[]);
+       const { data: clientData } = await supabase
+         .from("clients")
+         .select("*")
+         .eq("tenant_id", userData.tenant_id)
+         .order("full_name");
+       if (clientData) setClients(clientData as unknown as Client[]);
 
-      await loadBookings(userData.tenant_id);
-    } catch {
-      // Erreur silencieuse
-    } finally {
-      setLoading(false);
-    }
-  }
+       await loadBookings(userData.tenant_id);
+     } catch (err) {
+       toast.error("Impossible de charger les données initiales.");
+       console.error(err);
+     } finally {
+       setLoading(false);
+     }
+   }
 
-  async function loadBookings(tId: string) {
-    try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("bookings")
-        .select(`
-          *,
-          client:clients(*),
-          room:rooms(*)
-        `)
-        .eq("tenant_id", tId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+   async function loadBookings(tId: string) {
+     try {
+       const supabase = createClient();
+       const { data, error } = await supabase
+         .from("bookings")
+         .select(`
+           *,
+           client:clients(*),
+           room:rooms(*, room_type:room_types(*))
+         `)
+         .eq("tenant_id", tId)
+         .order("created_at", { ascending: false })
+         .limit(50);
 
-      if (data) {
-        // Enrichir avec les types de chambres
-        const enriched = await Promise.all(
-          (data as unknown as (Booking & { client: Client; room: Room })[]).map(async (b) => {
-            if (b.room) {
-              const { data: rt } = await supabase
-                .from("room_types")
-                .select("*")
-                .eq("id", b.room.room_type_id)
-                .single();
-              return { ...b, room_type: rt as unknown as RoomType };
-            }
-            return b;
-          })
-        );
-        setBookings(enriched);
-      }
-    } catch {
-      // Erreur silencieuse
-    }
-  }
+       if (error) throw error;
 
-  async function loadRoomsForAccommodation(accId: string) {
-    try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("rooms")
-        .select(`
-          *,
-          room_type:room_types(*)
-        `)
-        .eq("accommodation_id", accId)
-        .order("room_number");
-      if (data) {
-        setRooms(data as unknown as Room[]);
-        const types = (data as unknown as (Room & { room_type: RoomType })[])
-          .map((r) => r.room_type)
-          .filter((t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i);
-        setRoomTypes(types);
-      }
-    } catch {
-      // Erreur silencieuse
-    }
-  }
+       if (data) {
+         const enriched = (data as unknown as (Booking & { client?: Client; room?: Room & { room_type?: RoomType } })[]).map((b) => ({
+           ...b,
+           room_type: b.room?.room_type,
+         }));
+
+         setBookings(enriched);
+       }
+     } catch (err) {
+       toast.error("Impossible de charger les réservations.");
+       console.error(err);
+     }
+   }
+
+   async function loadRoomsForAccommodation(accId: string) {
+     try {
+       const supabase = createClient();
+       const { data, error } = await supabase
+         .from("rooms")
+         .select(`
+           *,
+           room_type:room_types(*)
+         `)
+         .eq("accommodation_id", accId)
+         .order("room_number");
+       if (error) throw error;
+       if (data) {
+         setRooms(data as unknown as Room[]);
+         const types = (data as unknown as (Room & { room_type: RoomType })[])
+           .map((r) => r.room_type)
+           .filter((t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i);
+         setRoomTypes(types);
+       }
+     } catch (err) {
+       toast.error("Impossible de charger les chambres.");
+       console.error(err);
+     }
+   }
 
   function openAddModal() {
     setFormData({
@@ -167,11 +215,18 @@ export default function BookingsPage() {
       client_id: "",
       newClientName: "",
       newClientPhone: "",
-      check_in_date: new Date().toISOString().split("T")[0],
-      check_out_date: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+      newClientEmail: "",
+      newClientIdType: "",
+      newClientIdNumber: "",
+      newClientEmergencyContact: "",
+      newClientNationality: "",
+      check_in_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0],
+      check_out_date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 86400000).toISOString().split("T")[0],
       negotiated_price: "",
       number_of_guests: "1",
       special_requests: "",
+      payment_method: "",
+      immediateCheckIn: false,
     });
     setError("");
     setModalOpen(true);
@@ -211,6 +266,11 @@ export default function BookingsPage() {
             tenant_id: tenantId,
             full_name: formData.newClientName,
             phone: formData.newClientPhone || null,
+            email: formData.newClientEmail || null,
+            id_type: formData.newClientIdType || null,
+            id_number: formData.newClientIdNumber || null,
+            emergency_contact: formData.newClientEmergencyContact || null,
+            nationality: formData.newClientNationality || null,
           })
           .select()
           .single();
@@ -280,6 +340,20 @@ export default function BookingsPage() {
         return;
       }
 
+      if (formData.immediateCheckIn && booking) {
+        const { error: checkInErr } = await supabase.rpc("check_in_booking", {
+          p_booking_id: booking.id,
+          p_user_id: userId,
+        });
+        if (checkInErr) {
+          toast.error("La réservation a été créée mais le check-in immédiat a échoué: " + checkInErr.message);
+        } else {
+          toast.success("Réservation créée et check-in effectué avec succès.");
+        }
+      } else {
+        toast.success("Réservation créée avec succès.");
+      }
+
       setModalOpen(false);
       loadBookings(tenantId);
     } catch {
@@ -304,42 +378,82 @@ export default function BookingsPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
       } else {
         setCleaningModalOpen(false);
-        alert("Demande de ménage envoyée dans le pool des ménagères.");
+        toast.success("Demande de ménage envoyée dans le pool des ménagères.");
       }
     } catch {
-      alert("Une erreur est survenue.");
+      toast.error("Une erreur est survenue.");
     } finally {
       setCleaningLoading(false);
     }
   }
 
   async function handleAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc(
-        action === "check_in" ? "check_in_booking" :
-        action === "check_out" ? "check_out_booking" :
-        action === "cancel" ? "cancel_booking" :
-        "mark_no_show",
-        { p_booking_id: bookingId, p_user_id: userId }
-      );
-
-      if (error) {
-        alert("Erreur: " + error.message);
-        return;
-      }
-
-      loadBookings(tenantId);
-    } catch {
-      // Erreur silencieuse
+    if (action === "cancel" || action === "no_show") {
+      setConfirmAction({ id: bookingId, action });
+      return;
     }
+    await executeAction(bookingId, action);
+  }
+
+  async function executeAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
+     try {
+       const supabase = createClient();
+       const { error } = await supabase.rpc(
+         action === "check_in" ? "check_in_booking" :
+         action === "check_out" ? "check_out_booking" :
+         action === "cancel" ? "cancel_booking" :
+         "mark_no_show",
+         { p_booking_id: bookingId, p_user_id: userId }
+       );
+
+       if (error) {
+         toast.error("Erreur: " + error.message);
+         return;
+       }
+
+       toast.success("Action effectuée avec succès.");
+       setConfirmAction(null);
+       loadBookings(tenantId);
+     } catch (err) {
+       toast.error("Une erreur est survenue lors de l'action.");
+       console.error(err);
+     }
+  }
+
+  function exportToCSV() {
+    if (filteredBookings.length === 0) return;
+    const headers = ["Code", "Client", "Téléphone", "Chambre", "Arrivée", "Départ", "Nuits", "Montant Total", "Statut Paiement", "Statut"];
+    const rows = filteredBookings.map(b => [
+      b.booking_code,
+      b.client?.full_name || "",
+      b.client?.phone || "",
+      b.room?.room_number || "",
+      b.check_in_date,
+      b.check_out_date,
+      b.nights_count,
+      b.total_amount,
+      getPaymentStatusLabel(b.payment_status),
+      getBookingStatusLabel(b.status)
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `reservations_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Export CSV réussi");
   }
 
   const filteredBookings = bookings.filter((b) => {
     if (filterStatus !== "all" && b.status !== filterStatus) return false;
+    if (startDate && b.check_in_date < startDate) return false;
+    if (endDate && b.check_out_date > endDate) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -350,6 +464,47 @@ export default function BookingsPage() {
     }
     return true;
   });
+
+  const sortedBookings = [...filteredBookings].sort((a, b) => {
+    if (!sortConfig) return 0;
+    let aValue: any, bValue: any;
+    
+    switch (sortConfig.key) {
+      case 'date':
+        aValue = a.check_in_date;
+        bValue = b.check_in_date;
+        break;
+      case 'amount':
+        aValue = a.total_amount;
+        bValue = b.total_amount;
+        break;
+      case 'client':
+        aValue = a.client?.full_name?.toLowerCase() || "";
+        bValue = b.client?.full_name?.toLowerCase() || "";
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const requestSort = (key: string) => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const totalPages = Math.ceil(sortedBookings.length / ITEMS_PER_PAGE);
+  const paginatedBookings = sortedBookings.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset page on filter change
+  }, [filterStatus, searchQuery, startDate, endDate]);
 
   if (loading) {
     return (
@@ -371,9 +526,9 @@ export default function BookingsPage() {
         </Button>
       </div>
 
-      {/* Filtres */}
+      {/* Filtres & Export */}
       <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-64">
+        <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
@@ -381,6 +536,22 @@ export default function BookingsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1">
+          <span className="text-xs text-slate-500">Du</span>
+          <input 
+            type="date" 
+            value={startDate} 
+            onChange={(e) => setStartDate(e.target.value)}
+            className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
+          />
+          <span className="text-xs text-slate-500">au</span>
+          <input 
+            type="date" 
+            value={endDate} 
+            onChange={(e) => setEndDate(e.target.value)}
+            className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
         </div>
         <select
@@ -395,10 +566,59 @@ export default function BookingsPage() {
           <option value="cancelled">Annulée</option>
           <option value="no_show">No-show</option>
         </select>
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "table" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            title="Vue Tableau"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("calendar")}
+            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "calendar" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            title="Vue Calendrier"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+        </div>
+        <Button variant="outline" onClick={exportToCSV} className="gap-2">
+          <Download className="w-4 h-4" /> Export CSV
+        </Button>
       </div>
 
-      {/* Tableau */}
-      <Card className="overflow-hidden">
+      {/* Calendrier ou Tableau */}
+      {viewMode === "calendar" ? (
+        <Card className="p-6 border-t-4 border-t-blue-500 dark:border-t-blue-400">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Vue Calendrier (Réservations en cours)</h3>
+          <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400 mb-2">
+            <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
+          </div>
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 31 }).map((_, idx) => {
+              const dayNum = idx + 1;
+              const dateStr = `2026-07-${dayNum < 10 ? '0' + dayNum : dayNum}`;
+              const dayBookings = sortedBookings.filter(b => b.check_in_date <= dateStr && b.check_out_date >= dateStr);
+              return (
+                <div key={idx} className="min-h-[80px] p-2 border border-slate-100 dark:border-slate-700/50 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between">
+                  <span className="text-xs font-bold text-slate-500">{dayNum}</span>
+                  <div className="space-y-1">
+                    {dayBookings.slice(0, 2).map(b => (
+                      <div key={b.id} className="text-[10px] p-1 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
+                        {b.client?.full_name || "Réservation"}
+                      </div>
+                    ))}
+                    {dayBookings.length > 2 && (
+                      <span className="text-[9px] text-slate-400">+{dayBookings.length - 2} de plus</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center">
             <CalendarCheck className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
@@ -414,24 +634,51 @@ export default function BookingsPage() {
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Code</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Client</th>
+                  <th 
+                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => requestSort("client")}
+                  >
+                    Client
+                    {sortConfig?.key === "client" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                  </th>
                   <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Chambre</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Dates</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Montant</th>
+                  <th 
+                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => requestSort("date")}
+                  >
+                    Dates
+                    {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                  </th>
+                  <th 
+                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    onClick={() => requestSort("amount")}
+                  >
+                    Montant
+                    {sortConfig?.key === "amount" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
+                  </th>
                   <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Statut</th>
                   <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {filteredBookings.map((b) => (
+                {paginatedBookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                     <td className="p-4">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{b.booking_code}</p>
                       <p className="text-xs text-slate-400">{b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}</p>
                     </td>
                     <td className="p-4">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client?.full_name || "—"}</p>
-                      <p className="text-xs text-slate-400">{b.client?.phone || ""}</p>
+                      {b.client ? (
+                        <button
+                          onClick={() => setSelectedClient(b.client!)}
+                          className="text-left hover:underline decoration-1 decoration-[var(--muted-hover)]"
+                        >
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client.full_name}</p>
+                          <p className="text-xs text-slate-400">{b.client.phone || ""}</p>
+                        </button>
+                      ) : (
+                        <p className="text-sm text-slate-400">—</p>
+                      )}
                     </td>
                     <td className="p-4">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">Ch. {b.room?.room_number || "—"}</p>
@@ -452,6 +699,20 @@ export default function BookingsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1 justify-end">
+                        <button 
+                          onClick={() => shareStayWhatsApp(b.client?.phone || "", b.client?.full_name || "Client", b.booking_code)} 
+                          title="Envoyer l'accès séjour par WhatsApp" 
+                          className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => copyStayLink(b.booking_code)} 
+                          title="Copier le lien d'accès au séjour" 
+                          className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
                         {b.status === "confirmed" && (
                           <button onClick={() => handleAction(b.id, "check_in")} title="Check-in" className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
                             <LogIn className="w-4 h-4" />
@@ -485,7 +746,159 @@ export default function BookingsPage() {
             </table>
           </div>
         )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <span className="text-sm text-slate-500">
+              Affichage {((currentPage - 1) * ITEMS_PER_PAGE) + 1} à {Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)} sur {filteredBookings.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium px-2 text-slate-700 dark:text-slate-300">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
+       )}
+
+      {/* Drawer — Détails client (panneau latéral droit) */}
+      {selectedClient && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            onClick={() => setSelectedClient(null)}
+          />
+
+          {/* Panel latéral */}
+          <div className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-md lg:w-[480px] h-full transform transition-transform duration-300 ease-in-out">
+            <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
+
+              {/* Header */}
+              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white truncate">
+                    {selectedClient.full_name}
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Détails du client</p>
+                </div>
+                <button
+                  onClick={() => setSelectedClient(null)}
+                  className="ml-4 p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+                  aria-label="Fermer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                {/* Contact */}
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Contact</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Téléphone principal</label>
+                      <p className="text-sm text-slate-900 dark:text-white">{selectedClient.phone || "—"}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
+                      {selectedClient.email ? (
+                        <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.email}</p>
+                      ) : (
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                          Non renseigné
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Contact d'urgence</label>
+                      <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.emergency_contact || "—"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pièce d'identité & Nationalité */}
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Identité & Nationalité</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Pièce</label>
+                      <p className="text-sm text-slate-900 dark:text-white">{selectedClient.id_type || "—"}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Numéro de pièce</label>
+                      <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.id_number || "—"}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nationalité</label>
+                    <p className="text-sm text-slate-900 dark:text-white">{selectedClient.nationality || "—"}</p>
+                  </div>
+                </div>
+
+                {/* Historique des réservations */}
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Historique des réservations</h3>
+                  {bookings.filter(bk => bk.client_id === selectedClient.id).length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Aucune réservation enregistrée.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {bookings.filter(bk => bk.client_id === selectedClient.id).map(bk => (
+                        <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">{bk.booking_code}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {formatDate(bk.check_in_date)} → {formatDate(bk.check_out_date)} — {bk.nights_count} nuit{bk.nights_count > 1 ? "s" : ""}
+                          </p>
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <span className="text-xs text-slate-500">{formatFCFA(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => shareStayWhatsApp(selectedClient.phone || "", selectedClient.full_name, bk.booking_code)}
+                                className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-xs flex items-center gap-1 font-medium"
+                                title="Partager WhatsApp"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                              </button>
+                              <button
+                                onClick={() => copyStayLink(bk.booking_code)}
+                                className="p-1 rounded text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs flex items-center gap-1 font-medium"
+                                title="Copier le lien"
+                              >
+                                <Copy className="w-3.5 h-3.5" /> Copier
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modal nouvelle réservation */}
       <Modal
@@ -504,7 +917,7 @@ export default function BookingsPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Résidence</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Établissement</label>
             <select
               value={formData.accommodation_id}
               onChange={(e) => {
@@ -513,7 +926,7 @@ export default function BookingsPage() {
               }}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">Sélectionner une résidence</option>
+              <option value="">Sélectionner un établissement</option>
               {accommodations.map((acc) => (
                 <option key={acc.id} value={acc.id}>{acc.name}</option>
               ))}
@@ -560,9 +973,34 @@ export default function BookingsPage() {
           </div>
 
           {!formData.client_id && (
-            <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30">
-              <Input label="Nom du nouveau client" value={formData.newClientName} onChange={(e) => setFormData({ ...formData, newClientName: e.target.value })} placeholder="Jean Kouassi" />
-              <Input label="Téléphone (optionnel)" value={formData.newClientPhone} onChange={(e) => setFormData({ ...formData, newClientPhone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+            <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Nom du nouveau client" value={formData.newClientName} onChange={(e) => setFormData({ ...formData, newClientName: e.target.value })} placeholder="Jean Kouassi" />
+                <Input label="Téléphone (optionnel)" value={formData.newClientPhone} onChange={(e) => setFormData({ ...formData, newClientPhone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Email (optionnel)" type="email" value={formData.newClientEmail} onChange={(e) => setFormData({ ...formData, newClientEmail: e.target.value })} placeholder="jean@example.com" />
+                <Input label="Contact d'urgence (optionnel)" value={formData.newClientEmergencyContact} onChange={(e) => setFormData({ ...formData, newClientEmergencyContact: e.target.value })} placeholder="+225 01 00 00 00 00" />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de pièce</label>
+                  <select
+                    value={formData.newClientIdType}
+                    onChange={(e) => setFormData({ ...formData, newClientIdType: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    <option value="CNI">CNI</option>
+                    <option value="Passeport">Passeport</option>
+                    <option value="Permis">Permis de conduire</option>
+                    <option value="Carte Consulaire">Carte Consulaire</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <Input label="Numéro de pièce (optionnel)" value={formData.newClientIdNumber} onChange={(e) => setFormData({ ...formData, newClientIdNumber: e.target.value })} placeholder="Numéro..." />
+                <Input label="Nationalité (optionnel)" value={formData.newClientNationality} onChange={(e) => setFormData({ ...formData, newClientNationality: e.target.value })} placeholder="Ivoirienne" />
+              </div>
             </div>
           )}
 
@@ -580,9 +1018,27 @@ export default function BookingsPage() {
 
           <Input label="Prix négocié par nuit (FCFA)" type="number" value={formData.negotiated_price} onChange={(e) => setFormData({ ...formData, negotiated_price: e.target.value })} placeholder="15000" />
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Nombre de clients" type="number" value={formData.number_of_guests} onChange={(e) => setFormData({ ...formData, number_of_guests: e.target.value })} placeholder="1" />
-          </div>
+           <div className="grid grid-cols-2 gap-4">
+             <Input label="Nombre de clients" type="number" value={formData.number_of_guests} onChange={(e) => setFormData({ ...formData, number_of_guests: e.target.value })} placeholder="1" />
+           </div>
+
+           <div>
+             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Moyen de paiement</label>
+             <select
+               name="payment_method"
+               value={formData.payment_method}
+               onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+             >
+               <option value="">Sélectionner un moyen de paiement</option>
+               <option value="cash">Espèces</option>
+               <option value="wave">Wave</option>
+               <option value="orange_money">Orange Money</option>
+               <option value="mtn_mobile_money">MTN Mobile Money</option>
+               <option value="moov_money">Moov Money</option>
+               <option value="card">Carte Bancaire</option>
+             </select>
+           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Demandes spéciales (optionnel)</label>
@@ -593,6 +1049,23 @@ export default function BookingsPage() {
               placeholder="Lit bébé, étage élevé, etc."
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+
+          <div 
+            className="flex items-center gap-3 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/50 dark:bg-indigo-900/10 cursor-pointer" 
+            onClick={() => setFormData({ ...formData, immediateCheckIn: !formData.immediateCheckIn })}
+          >
+            <input 
+              type="checkbox" 
+              checked={formData.immediateCheckIn} 
+              onChange={(e) => setFormData({ ...formData, immediateCheckIn: e.target.checked })}
+              className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Check-in immédiat (Walk-in)</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Le client occupe la chambre dès maintenant.</p>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -623,6 +1096,32 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setCleaningModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={confirmMidStayCleaning} loading={cleaningLoading}>
               <Sparkles className="w-4 h-4" /> Confirmer la demande
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Confirmation (Annulation / No-Show) */}
+      <Modal
+        open={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        title="Confirmation requise"
+        description={confirmAction?.action === "cancel" ? "Êtes-vous sûr de vouloir annuler cette réservation ?" : "Voulez-vous marquer cette réservation comme No-show ?"}
+      >
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-sm">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>Cette action est irréversible. La chambre sera immédiatement libérée pour d'autres réservations.</p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setConfirmAction(null)}>Retour</Button>
+            <Button 
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white" 
+              onClick={() => {
+                if (confirmAction) executeAction(confirmAction.id, confirmAction.action);
+              }}
+            >
+              Confirmer
             </Button>
           </div>
         </div>

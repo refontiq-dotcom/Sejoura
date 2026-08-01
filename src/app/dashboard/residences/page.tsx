@@ -1,24 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { formatFCFA, getPlanLimits } from "@/lib/utils";
-import { Building2, Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, Lock } from "lucide-react";
+import { formatFCFA, getPlanLimits, getPlanLabel } from "@/lib/utils";
+import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2 } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
 
 export default function ResidencesPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [residences, setResidences] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType[]>>({});
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingResidence, setEditingResidence] = useState<Accommodation | null>(null);
-  const [plan, setPlan] = useState("standard");
-  const [formData, setFormData] = useState({ name: "", address: "", city: "", contact_phone: "" });
+  const [plan, setPlan] = useState("");
+  const [formData, setFormData] = useState({ name: "", address: "", city: "", contact_phone: "", image_url: "" });
 
   useEffect(() => {
     loadData();
@@ -46,7 +51,7 @@ export default function ResidencesPage() {
         .single();
       if (subData) setPlan(subData.plan);
 
-      // Récupérer les résidences
+      // Récupérer les établissements
       const { data: accData } = await supabase
         .from("accommodations")
         .select("*")
@@ -56,38 +61,42 @@ export default function ResidencesPage() {
       if (accData) {
         setResidences(accData as unknown as Accommodation[]);
 
-        // Récupérer les types de chambres pour chaque résidence
+        const accommodationIds = accData.map((a) => a.id);
+        const { data: allTypes } = await supabase
+          .from("room_types")
+          .select("*")
+          .in("accommodation_id", accommodationIds);
+
         const typesMap: Record<string, RoomType[]> = {};
-        for (const acc of accData) {
-          const { data: types } = await supabase
-            .from("room_types")
-            .select("*")
-            .eq("accommodation_id", acc.id);
-          typesMap[acc.id] = (types || []) as unknown as RoomType[];
-        }
+        (allTypes || []).forEach((rt: RoomType) => {
+          if (!typesMap[rt.accommodation_id]) typesMap[rt.accommodation_id] = [];
+          typesMap[rt.accommodation_id].push(rt);
+        });
         setRoomTypes(typesMap);
       }
-    } catch {
-      // Erreur silencieuse — données simulées
+    } catch (err) {
+      toast.error("Impossible de charger les établissements.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
   function openAddModal() {
+    if (!plan) return;
     const limits = getPlanLimits(plan);
     if (limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations) {
-      alert(`Votre plan ${plan} est limité à ${limits.maxAccommodations} hébergements. Passez au plan Pro pour des hébergements illimités.`);
+      toast.error(`Votre plan ${getPlanLabel(plan)} est limité à ${limits.maxAccommodations} établissement${limits.maxAccommodations > 1 ? "s" : ""}. Passez au plan Pro pour des établissements illimités.`);
       return;
     }
     setEditingResidence(null);
-    setFormData({ name: "", address: "", city: "", contact_phone: "" });
+    setFormData({ name: "", address: "", city: "", contact_phone: "", image_url: "" });
     setModalOpen(true);
   }
 
   function openEditModal(acc: Accommodation) {
     setEditingResidence(acc);
-    setFormData({ name: acc.name, address: acc.address || "", city: acc.city || "", contact_phone: acc.contact_phone || "" });
+    setFormData({ name: acc.name, address: acc.address || "", city: acc.city || "", contact_phone: acc.contact_phone || "", image_url: (acc as any).image_url || "" });
     setModalOpen(true);
   }
 
@@ -115,7 +124,8 @@ export default function ResidencesPage() {
             address: formData.address,
             city: formData.city,
             contact_phone: formData.contact_phone,
-          })
+            image_url: formData.image_url || null,
+          } as any)
           .eq("id", editingResidence.id);
       } else {
         await supabase
@@ -126,26 +136,31 @@ export default function ResidencesPage() {
             address: formData.address,
             city: formData.city,
             contact_phone: formData.contact_phone,
-          });
+            image_url: formData.image_url || null,
+          } as any);
       }
 
       setModalOpen(false);
       loadData();
-    } catch {
-      // Erreur silencieuse
+    } catch (err) {
+      toast.error("Impossible d'enregistrer l'établissement.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Voulez-vous vraiment supprimer cette résidence ? Toutes les chambres et réservations associées seront supprimées.")) return;
     try {
       const supabase = createClient();
       await supabase.from("accommodations").delete().eq("id", id);
+      toast.success("Établissement supprimé avec succès.");
+      setDeleteConfirmOpen(false);
+      setDeletingId(null);
       loadData();
-    } catch {
-      // Erreur silencieuse
+    } catch (err) {
+      toast.error("Impossible de supprimer l'établissement.");
+      console.error(err);
     }
   }
 
@@ -164,64 +179,94 @@ export default function ResidencesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Résidences</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Établissements</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {residences.length} hébergement{residences.length > 1 ? "s" : ""}
+            {residences.length} établissement{residences.length > 1 ? "s" : ""}
             {limits.maxAccommodations !== null && ` / ${limits.maxAccommodations} max`}
           </p>
         </div>
         <Button onClick={openAddModal}>
-          <Plus className="w-4 h-4" /> Ajouter
+          <Plus className="w-4 h-4" /> Ajouter un établissement
         </Button>
       </div>
 
       {/* Limite plan */}
-      {limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations && (
+      {plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations && (
         <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
           <Lock className="w-5 h-5 text-orange-600 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Limite du plan Standard atteinte</p>
-            <p className="text-xs text-orange-600 dark:text-orange-400">Passez au plan Pro pour des hébergements illimités.</p>
+            <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Limite du plan {getPlanLabel(plan)} atteinte</p>
+            <p className="text-xs text-orange-600 dark:text-orange-400">Passez au plan Pro pour des établissements illimités.</p>
           </div>
-          <Button size="sm" variant="primary">Mettre à niveau</Button>
+          <Button size="sm" variant="primary" onClick={() => router.push("/dashboard/subscription")}>Mettre à niveau</Button>
         </div>
       )}
 
-      {/* Grille des résidences */}
+      {/* Grille des établissements */}
       {residences.length === 0 ? (
         <Card className="p-12 text-center">
           <Building2 className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucune résidence</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Commencez par ajouter votre premier hébergement</p>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun établissement</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Commencez par ajouter votre premier établissement</p>
           <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4" /> Ajouter une résidence
+            <Plus className="w-4 h-4" /> Ajouter un établissement
           </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {residences.map((acc) => (
-            <Card key={acc.id} className="p-5 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEditModal(acc)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(acc.id)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            <Card 
+              key={acc.id} 
+              className="p-5 cursor-pointer border-t-4 border-t-indigo-500 dark:border-t-indigo-400 hover:border-indigo-400 overflow-hidden flex flex-col justify-between"
+              onClick={() => router.push(`/dashboard/residences/${acc.id}`)}
+            >
+              <div>
+                {(acc as any).image_url ? (
+                  <div className="h-32 -mx-5 -mt-5 mb-4 overflow-hidden relative">
+                    <img src={(acc as any).image_url} alt={acc.name} className="w-full h-full object-cover" />
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-white bg-slate-900/50 hover:bg-red-600 absolute top-2 right-2 z-10" 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setDeletingId(acc.id); 
+                        setDeleteConfirmOpen(true); 
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 z-10" 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setDeletingId(acc.id); 
+                        setDeleteConfirmOpen(true); 
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">{acc.name}</h3>
 
               <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
-                {acc.address && (
+                {(acc.address || acc.city) && (
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 flex-shrink-0" />
-                    <span>{acc.address}, {acc.city}</span>
+                    <span>
+                      {acc.address}{acc.address && acc.city ? ", " : ""}{acc.city}
+                    </span>
                   </div>
                 )}
                 {acc.contact_phone && (
@@ -236,29 +281,21 @@ export default function ResidencesPage() {
                 </div>
               </div>
 
-              {/* Types de chambres */}
+                  {/* Types de chambre */}
               {roomTypes[acc.id] && roomTypes[acc.id].length > 0 && (
                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                  <p className="text-xs font-medium text-slate-400 uppercase mb-2">Types de chambres</p>
+                  <p className="text-xs font-medium text-slate-400 uppercase mb-2">Types de chambre</p>
                   <div className="flex flex-wrap gap-2">
                     {roomTypes[acc.id].map((rt) => (
-                      <Badge key={rt.id} variant="purple">
-                        {rt.name} — {formatFCFA(rt.base_price)}
-                      </Badge>
+                        <Badge key={rt.id} variant="purple">
+                          {rt.name} — {formatFCFA(rt.base_price)}
+                        </Badge>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="mt-4 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => window.location.href = `/dashboard/rooms?residence=${acc.id}`}>
-                  <BedDouble className="w-4 h-4" /> Chambres
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => openEditModal(acc)}>
-                  <Edit2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </Card>
+              </Card>
           ))}
         </div>
       )}
@@ -267,14 +304,16 @@ export default function ResidencesPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingResidence ? "Modifier la résidence" : "Ajouter une résidence"}
-        description="Renseignez les informations de votre hébergement"
+        title={editingResidence ? "Modifier l'établissement" : "Ajouter un établissement"}
+        description="Renseignez les informations de votre établissement"
+        onConfirm={handleSave}
       >
         <div className="space-y-4">
-          <Input label="Nom de la résidence" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Résidence Palm Beach" />
+          <Input label="Nom de l'établissement" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Hôtel Palm Beach, Villa Ivoire" />
           <Input label="Adresse" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Cocody Riviera 2" />
           <Input label="Ville" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder="Abidjan" />
           <Input label="Téléphone de contact" value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+          <Input label="URL de l'image (optionnelle)" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
@@ -282,6 +321,29 @@ export default function ResidencesPage() {
               {editingResidence ? "Enregistrer" : "Créer"}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal 
+        open={deleteConfirmOpen} 
+        onClose={() => setDeleteConfirmOpen(false)} 
+        title="Confirmation" 
+        description="Êtes-vous sûr de vouloir supprimer cet établissement ? Toutes les chambres et réservations associées seront supprimées."
+        onConfirm={async () => {
+          if (deletingId) await handleDelete(deletingId);
+        }}
+      >
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
+          <Button
+            className="flex-1 bg-red-600 hover:bg-red-700"
+            onClick={async () => {
+              if (deletingId) await handleDelete(deletingId);
+            }}
+            loading={loading}
+          >
+            Supprimer
+          </Button>
         </div>
       </Modal>
     </div>

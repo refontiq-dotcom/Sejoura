@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/utils";
-import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer, Lock } from "lucide-react";
+import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer, Lock, Search } from "lucide-react";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
 export default function CleaningPage() {
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<(CleaningTask & { room?: Room; accommodation?: Accommodation })[]>([]);
   const [userId, setUserId] = useState("");
-  const [plan, setPlan] = useState("standard");
+  const [plan, setPlan] = useState("");
   const [filter, setFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadData();
@@ -55,10 +57,11 @@ export default function CleaningPage() {
       if (taskData) {
         setTasks(taskData as unknown as (CleaningTask & { room: Room; accommodation: Accommodation })[]);
       }
-    } catch {
-      // Erreur silencieuse
-    } finally {
-      setLoading(false);
+} catch (err) {
+       toast.error("Impossible de charger les données. Veuillez réessayer.");
+       console.error(err);
+     } finally {
+       setLoading(false);
     }
   }
 
@@ -71,23 +74,24 @@ export default function CleaningPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
         return;
       }
 
       if (!data) {
-        alert("Cette tâche a déjà été prise par une autre ménagère.");
+        toast.error("Cette tâche a déjà été prise par une autre ménagère.");
         loadData();
         return;
       }
 
       loadData();
-    } catch {
-      // Erreur silencieuse
-    }
-  }
+} catch (err) {
+       toast.error("Impossible de prendre la tâche.");
+       console.error(err);
+     }
+   }
 
-  async function handleComplete(taskId: string) {
+   async function handleComplete(taskId: string) {
     try {
       const supabase = createClient();
       const { error } = await supabase.rpc("complete_cleaning_task", {
@@ -96,22 +100,29 @@ export default function CleaningPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
         return;
       }
 
       loadData();
-    } catch {
-      // Erreur silencieuse
-    }
-  }
+} catch (err) {
+       toast.error("Impossible de marquer la tâche comme terminée.");
+       console.error(err);
+     }
+   }
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filter === "all") return true;
-    if (filter === "pending") return t.status === "pending";
-    if (filter === "claimed") return t.status === "claimed" || t.status === "in_progress";
-    if (filter === "done") return t.status === "done";
-    if (filter === "alert") return t.is_alert_sent && t.status !== "done";
+   const filteredTasks = tasks.filter((t) => {
+    if (filter === "pending" && t.status !== "pending") return false;
+    if (filter === "claimed" && t.status !== "claimed" && t.status !== "in_progress") return false;
+    if (filter === "done" && t.status !== "done") return false;
+    if (filter === "alert" && (!t.is_alert_sent || t.status === "done")) return false;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const roomNum = t.room?.room_number?.toLowerCase() || "";
+      const accName = t.accommodation?.name?.toLowerCase() || "";
+      return roomNum.includes(q) || accName.includes(q);
+    }
     return true;
   });
 
@@ -174,7 +185,7 @@ export default function CleaningPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+        <Card className="p-4 border-t-4 border-t-orange-500 dark:border-t-orange-400">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
               <Clock className="w-5 h-5 text-orange-600" />
@@ -185,7 +196,7 @@ export default function CleaningPage() {
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-blue-600" />
@@ -196,7 +207,7 @@ export default function CleaningPage() {
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 border-t-4 border-t-green-500 dark:border-t-green-400">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -207,7 +218,7 @@ export default function CleaningPage() {
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 border-t-4 border-t-red-500 dark:border-t-red-400">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
               <AlertCircle className="w-5 h-5 text-red-600" />
@@ -220,27 +231,39 @@ export default function CleaningPage() {
         </Card>
       </div>
 
-      {/* Filtres */}
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { key: "all", label: "Toutes" },
-          { key: "pending", label: "En attente" },
-          { key: "claimed", label: "En cours" },
-          { key: "done", label: "Terminées" },
-          { key: "alert", label: "Alertes" },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              filter === f.key
-                ? "bg-indigo-600 text-white shadow-md"
-                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      {/* Filtres & Recherche */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par chambre, établissement..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { key: "all", label: "Toutes" },
+            { key: "pending", label: "En attente" },
+            { key: "claimed", label: "En cours" },
+            { key: "done", label: "Terminées" },
+            { key: "alert", label: "Alertes" },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                filter === f.key
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Liste des tâches */}
@@ -255,7 +278,7 @@ export default function CleaningPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTasks.map((task) => (
-            <Card key={task.id} className={`p-5 ${task.is_alert_sent && task.status !== "done" ? "border-red-300 dark:border-red-800" : ""}`}>
+            <Card key={task.id} className={`p-5 border-t-4 ${task.is_alert_sent && task.status !== "done" ? "border-t-red-500 border-red-300 dark:border-red-800" : "border-t-purple-500 dark:border-t-purple-400"}`}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
