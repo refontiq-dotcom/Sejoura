@@ -8,7 +8,6 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import {
-  formatFCFA,
   formatDate,
   calculateNights,
   getBookingStatusLabel,
@@ -16,6 +15,7 @@ import {
   getPaymentStatusLabel,
   getPaymentStatusColor,
 } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import {
   CalendarCheck,
   Plus,
@@ -42,10 +42,13 @@ import {
   Check,
   MessageSquare,
   ExternalLink,
+  Receipt,
 } from "lucide-react";
-import type { Accommodation, RoomType, Room, Client, Booking } from "@/types/database";
+import { getActiveAssignmentId } from "@/lib/assignments";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice } from "@/types/database";
 
 export default function BookingsPage() {
+  const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType })[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -69,6 +72,11 @@ export default function BookingsPage() {
   const [tenantId, setTenantId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
+  const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
+  const [emailInput, setEmailInput] = useState("");
 
   function shareStayWhatsApp(phone: string, clientName: string, bookingCode: string) {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -115,73 +123,90 @@ export default function BookingsPage() {
     loadInitData();
   }, []);
 
-   async function loadInitData() {
-     try {
-       const supabase = createClient();
-       const { data: { session } } = await supabase.auth.getSession();
-       if (!session) return;
+  async function loadInitData() {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-       const { data: userData } = await supabase
-         .from("users")
-         .select("id, tenant_id")
-         .eq("auth_user_id", session.user.id)
-         .single();
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id, tenant_id, role, accommodation_id")
+        .eq("auth_user_id", session.user.id)
+        .single();
 
-       if (!userData) return;
-       setTenantId(userData.tenant_id);
-       setUserId(userData.id);
+      if (!userData) return;
+      setTenantId(userData.tenant_id);
+      setUserId(userData.id);
 
-       const { data: accData } = await supabase
-         .from("accommodations")
-         .select("*")
-         .eq("tenant_id", userData.tenant_id);
-       if (accData) setAccommodations(accData as unknown as Accommodation[]);
+      // Résoudre l'affectation active (temporaire ou permanente) pour l'utilisateur
+      const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
 
-       const { data: clientData } = await supabase
-         .from("clients")
-         .select("*")
-         .eq("tenant_id", userData.tenant_id)
-         .order("full_name");
-       if (clientData) setClients(clientData as unknown as Client[]);
+      // Filtre les résidences visibles selon le rôle
+      let accQuery = supabase.from("accommodations").select("*").eq("tenant_id", userData.tenant_id);
+      if (userData.role === "receptionniste" && activeAccId) {
+        accQuery = accQuery.eq("id", activeAccId);
+      }
+      const { data: accData } = await accQuery;
+      if (accData) setAccommodations(accData as unknown as Accommodation[]);
 
-       await loadBookings(userData.tenant_id);
-     } catch (err) {
-       toast.error("Impossible de charger les données initiales.");
-       console.error(err);
-     } finally {
-       setLoading(false);
-     }
-   }
+      // Clients : filtrés par résidence active pour les réceptionnistes
+      let clientQuery = supabase.from("clients").select("*").eq("tenant_id", userData.tenant_id).order("full_name");
+      if (userData.role === "receptionniste" && activeAccId) {
+        clientQuery = clientQuery.eq("accommodation_id", activeAccId);
+      }
+      const { data: clientData } = await clientQuery;
+      if (clientData) setClients(clientData as unknown as Client[]);
 
-   async function loadBookings(tId: string) {
-     try {
-       const supabase = createClient();
-       const { data, error } = await supabase
-         .from("bookings")
-         .select(`
-           *,
-           client:clients(*),
-           room:rooms(*, room_type:room_types(*))
-         `)
-         .eq("tenant_id", tId)
-         .order("created_at", { ascending: false })
-         .limit(50);
+      // Pré-sélectionner la résidence si le réceptionniste n'en a qu'une
+      if (userData.role === "receptionniste" && activeAccId) {
+        setFormData((prev) => ({ ...prev, accommodation_id: activeAccId ?? "" }));
+      }
 
-       if (error) throw error;
+      await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
+      await loadInvoices(userData.tenant_id);
+    } catch (err) {
+      toast.error("Impossible de charger les données initiales.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-       if (data) {
-         const enriched = (data as unknown as (Booking & { client?: Client; room?: Room & { room_type?: RoomType } })[]).map((b) => ({
-           ...b,
-           room_type: b.room?.room_type,
-         }));
+  async function loadBookings(tId: string, accommodationId?: string) {
+    try {
+      const supabase = createClient();
+      let query = supabase
+        .from("bookings")
+        .select(`
+          *,
+          client:clients(*),
+          room:rooms(*, room_type:room_types(*))
+        `)
+        .eq("tenant_id", tId)
+        .order("created_at", { ascending: false })
+        .limit(200);
 
-         setBookings(enriched);
-       }
-     } catch (err) {
-       toast.error("Impossible de charger les réservations.");
-       console.error(err);
-     }
-   }
+      // Filtrer par résidence pour les réceptionnistes
+      if (accommodationId) {
+        query = query.eq("accommodation_id", accommodationId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data) {
+        const enriched = (data as unknown as (Booking & { client?: Client; room?: Room & { room_type?: RoomType } })[]).map((b) => ({
+          ...b,
+          room_type: b.room?.room_type,
+        }));
+        setBookings(enriched);
+      }
+    } catch (err) {
+      toast.error("Impossible de charger les réservations.");
+      console.error(err);
+    }
+  }
 
    async function loadRoomsForAccommodation(accId: string) {
      try {
@@ -202,11 +227,115 @@ export default function BookingsPage() {
            .filter((t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i);
          setRoomTypes(types);
        }
-     } catch (err) {
-       toast.error("Impossible de charger les chambres.");
-       console.error(err);
-     }
-   }
+      } catch (err) {
+        toast.error("Impossible de charger les chambres.");
+        console.error(err);
+      }
+    }
+
+    async function loadInvoices(tId: string) {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("invoices")
+          .select("*")
+          .eq("tenant_id", tId)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        if (data) {
+          const map: Record<string, Invoice> = {};
+          (data as unknown as Invoice[]).forEach((inv) => {
+            map[inv.booking_id] = inv;
+          });
+          setInvoicesMap(map);
+        }
+      } catch (err) {
+        console.error("Erreur lors du chargement des factures:", err);
+      }
+    }
+
+    async function handleGenerateInvoice(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+      const loadingToast = toast.loading("Génération de la facture en cours...", { duration: Infinity });
+      try {
+        const response = await fetch("/api/invoice/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId: booking.id }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          toast.error(result.error || "Erreur lors de la génération de la facture.", { id: loadingToast });
+          return;
+        }
+
+        const invoice = result.invoice as Invoice;
+        setInvoicesMap((prev) => ({ ...prev, [booking.id]: invoice }));
+        setSelectedBookingForInvoice(booking);
+        setInvoiceModalOpen(true);
+
+        if (result.alreadyGenerated) {
+          toast("Facture existante retrouvée.", { id: loadingToast, duration: 3000 });
+        } else {
+          toast.success("Facture générée avec succès !", { id: loadingToast });
+        }
+      } catch (err) {
+        toast.error("Une erreur est survenue.", { id: loadingToast });
+        console.error(err);
+      }
+    }
+
+    async function handleSendInvoice(invoice: Invoice) {
+      const email = emailInput.trim();
+      if (!email) {
+        toast.error("Veuillez indiquer une adresse e-mail.");
+        return;
+      }
+      const loadingToast = toast.loading("Envoi de la facture...", { duration: Infinity });
+      try {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from("invoices")
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            sent_to: email,
+          })
+          .eq("id", invoice.id);
+
+        if (error) throw error;
+
+        setInvoicesMap((prev) => ({
+          ...prev,
+          [invoice.booking_id]: { ...prev[invoice.booking_id], status: "sent", sent_at: new Date().toISOString(), sent_to: email } as Invoice,
+        }));
+        setInvoiceToSend(null);
+        setEmailInput("");
+        toast.success("Facture marquée comme envoyée.", { id: loadingToast });
+      } catch (err) {
+        toast.error("Erreur lors de l'envoi.", { id: loadingToast });
+        console.error(err);
+      }
+    }
+
+    function handleDownloadInvoice(invoice: Invoice) {
+      if (!invoice.pdf_url) {
+        toast.error("Aucun PDF disponible pour cette facture.");
+        return;
+      }
+      window.open(invoice.pdf_url, "_blank");
+    }
+
+    function openSendInvoiceModal(invoice: Invoice) {
+      setInvoiceToSend(invoice);
+      setEmailInput(invoice.sent_to || "");
+    }
+
+    function closeSendInvoiceModal() {
+      setInvoiceToSend(null);
+      setEmailInput("");
+    }
 
   function openAddModal() {
     setFormData({
@@ -340,6 +469,43 @@ export default function BookingsPage() {
         return;
       }
 
+      const totalAmount = negotiatedPrice * nights;
+
+      // ── ENREGISTREMENT DU PAIEMENT ──────────────────────────────────────────
+      // Si un mode de paiement a été sélectionné, on enregistre la transaction
+      // dans la table payments pour alimenter la caisse du shift en temps réel.
+      if (formData.payment_method && booking) {
+        const { error: payErr } = await supabase
+          .from("payments")
+          .insert({
+            tenant_id: tenantId,
+            booking_id: booking.id,
+            accommodation_id: formData.accommodation_id,
+            amount: totalAmount,
+            payment_method: formData.payment_method,
+            payment_date: new Date().toISOString(),
+            received_by: userId,
+            operation_type: "booking",
+            notes: `Paiement à la réservation — ${nights} nuit(s)`,
+          });
+
+        if (payErr) {
+          // Le paiement a échoué mais la réservation est créée → avertir sans bloquer
+          toast.error("Réservation créée, mais le paiement n'a pas pu être enregistré : " + payErr.message);
+        } else {
+          // Mettre à jour le statut de paiement de la réservation
+          const paymentStatus = totalAmount > 0 ? "paid" : "unpaid";
+          await supabase
+            .from("bookings")
+            .update({
+              payment_status: paymentStatus,
+              amount_paid: totalAmount,
+            })
+            .eq("id", booking.id);
+        }
+      }
+      // ── FIN ENREGISTREMENT PAIEMENT ──────────────────────────────────────────
+
       if (formData.immediateCheckIn && booking) {
         const { error: checkInErr } = await supabase.rpc("check_in_booking", {
           p_booking_id: booking.id,
@@ -348,10 +514,13 @@ export default function BookingsPage() {
         if (checkInErr) {
           toast.error("La réservation a été créée mais le check-in immédiat a échoué: " + checkInErr.message);
         } else {
-          toast.success("Réservation créée et check-in effectué avec succès.");
+          toast.success("Réservation créée, check-in effectué et paiement enregistré ✓");
         }
       } else {
-        toast.success("Réservation créée avec succès.");
+        toast.success(formData.payment_method
+          ? "Réservation créée et paiement enregistré ✓"
+          : "Réservation créée avec succès."
+        );
       }
 
       setModalOpen(false);
@@ -362,6 +531,7 @@ export default function BookingsPage() {
       setSaving(false);
     }
   }
+
 
   async function handleMidStayCleaning(bookingId: string) {
     setCleaningBookingId(bookingId);
@@ -401,20 +571,39 @@ export default function BookingsPage() {
   async function executeAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
      try {
        const supabase = createClient();
-       const { error } = await supabase.rpc(
-         action === "check_in" ? "check_in_booking" :
-         action === "check_out" ? "check_out_booking" :
-         action === "cancel" ? "cancel_booking" :
-         "mark_no_show",
-         { p_booking_id: bookingId, p_user_id: userId }
-       );
+       const rpcName = action === "check_in" ? "check_in_booking" :
+                       action === "check_out" ? "check_out_booking" :
+                       action === "cancel" ? "cancel_booking" :
+                       "mark_no_show";
 
-       if (error) {
-         toast.error("Erreur: " + error.message);
-         return;
+       const { error: rpcErr } = await supabase.rpc(rpcName, { p_booking_id: bookingId, p_user_id: userId });
+
+       if (rpcErr) {
+         // Fallback direct sur la table bookings si la fonction RPC échoue (ex: statut intermédiaire)
+         const statusMap: Record<string, string> = {
+           check_in: "checked_in",
+           check_out: "checked_out",
+           cancel: "cancelled",
+           no_show: "no_show",
+         };
+         const extraFields = action === "check_in" ? { actual_check_in: new Date().toISOString() } :
+                             action === "check_out" ? { actual_check_out: new Date().toISOString() } : {};
+
+         const { error: updateErr } = await supabase
+           .from("bookings")
+           .update({
+             status: statusMap[action],
+             ...extraFields,
+           })
+           .eq("id", bookingId);
+
+         if (updateErr) {
+           toast.error("Impossible d'effectuer l'action : " + updateErr.message);
+           return;
+         }
        }
 
-       toast.success("Action effectuée avec succès.");
+       toast.success("Action effectuée avec succès ✓");
        setConfirmAction(null);
        loadBookings(tenantId);
      } catch (err) {
@@ -509,17 +698,17 @@ export default function BookingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Réservations</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{bookings.length} réservation{bookings.length > 1 ? "s" : ""}</p>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Réservations</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">{bookings.length} réservation{bookings.length > 1 ? "s" : ""}</p>
         </div>
         <Button onClick={openAddModal}>
           <Plus className="w-4 h-4" /> Nouvelle réservation
@@ -529,24 +718,24 @@ export default function BookingsPage() {
       {/* Filtres & Export */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[250px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             placeholder="Rechercher par code, client, chambre..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
           />
         </div>
         <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1">
-          <span className="text-xs text-slate-500">Du</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Du</span>
           <input 
             type="date" 
             value={startDate} 
             onChange={(e) => setStartDate(e.target.value)}
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
-          <span className="text-xs text-slate-500">au</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">au</span>
           <input 
             type="date" 
             value={endDate} 
@@ -557,7 +746,7 @@ export default function BookingsPage() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
         >
           <option value="all">Tous les statuts</option>
           <option value="confirmed">Confirmée</option>
@@ -569,14 +758,14 @@ export default function BookingsPage() {
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setViewMode("table")}
-            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "table" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "table" ? "bg-white dark:bg-slate-700 text-[var(--primary-color,#0C1C33)] dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:text-slate-700"}`}
             title="Vue Tableau"
           >
             <List className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode("calendar")}
-            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "calendar" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            className={`p-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "calendar" ? "bg-white dark:bg-slate-700 text-[var(--primary-color,#0C1C33)] dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:text-slate-700"}`}
             title="Vue Calendrier"
           >
             <Calendar className="w-4 h-4" />
@@ -589,9 +778,9 @@ export default function BookingsPage() {
 
       {/* Calendrier ou Tableau */}
       {viewMode === "calendar" ? (
-        <Card className="p-6 border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <Card className="p-3 border-t-4 border-t-blue-500 dark:border-t-blue-400">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Vue Calendrier (Réservations en cours)</h3>
-          <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400 mb-2">
+          <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2">
             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
           </div>
           <div className="grid grid-cols-7 gap-2">
@@ -601,15 +790,15 @@ export default function BookingsPage() {
               const dayBookings = sortedBookings.filter(b => b.check_in_date <= dateStr && b.check_out_date >= dateStr);
               return (
                 <div key={idx} className="min-h-[80px] p-2 border border-slate-100 dark:border-slate-700/50 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between">
-                  <span className="text-xs font-bold text-slate-500">{dayNum}</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">{dayNum}</span>
                   <div className="space-y-1">
                     {dayBookings.slice(0, 2).map(b => (
-                      <div key={b.id} className="text-[10px] p-1 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
+                      <div key={b.id} className="text-[10px] p-1 rounded bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] font-medium truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
                         {b.client?.full_name || "Réservation"}
                       </div>
                     ))}
                     {dayBookings.length > 2 && (
-                      <span className="text-[9px] text-slate-400">+{dayBookings.length - 2} de plus</span>
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500">+{dayBookings.length - 2} de plus</span>
                     )}
                   </div>
                 </div>
@@ -621,9 +810,9 @@ export default function BookingsPage() {
         <Card className="overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center">
-            <CalendarCheck className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+            <CalendarCheck className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucune réservation</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Créez votre première réservation</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Créez votre première réservation</p>
             <Button onClick={openAddModal}>
               <Plus className="w-4 h-4" /> Nouvelle réservation
             </Button>
@@ -633,71 +822,71 @@ export default function BookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Code</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Code</th>
                   <th 
-                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("client")}
                   >
                     Client
                     {sortConfig?.key === "client" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
                   </th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Chambre</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Chambre</th>
                   <th 
-                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("date")}
                   >
                     Dates
                     {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
                   </th>
                   <th 
-                    className="text-left p-4 text-xs font-medium text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("amount")}
                   >
                     Montant
                     {sortConfig?.key === "amount" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
                   </th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Statut</th>
-                  <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Statut</th>
+                  <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                 {paginatedBookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                    <td className="p-4">
+                    <td className="p-3">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{b.booking_code}</p>
-                      <p className="text-xs text-slate-400">{b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}</p>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       {b.client ? (
                         <button
                           onClick={() => setSelectedClient(b.client!)}
                           className="text-left hover:underline decoration-1 decoration-[var(--muted-hover)]"
                         >
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client.full_name}</p>
-                          <p className="text-xs text-slate-400">{b.client.phone || ""}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">{b.client.phone || ""}</p>
                         </button>
                       ) : (
-                        <p className="text-sm text-slate-400">—</p>
+                        <p className="text-sm text-slate-400 dark:text-slate-500">—</p>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">Ch. {b.room?.room_number || "—"}</p>
-                      <p className="text-xs text-slate-400">{b.room_type?.name || ""}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{b.room_type?.name || ""}</p>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       <p className="text-sm text-slate-700 dark:text-slate-300">{formatDate(b.check_in_date)}</p>
-                      <p className="text-xs text-slate-400">→ {formatDate(b.check_out_date)}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">→ {formatDate(b.check_out_date)}</p>
                     </td>
-                    <td className="p-4">
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">{formatFCFA(b.total_amount)}</p>
+                    <td className="p-3">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{fmt(b.total_amount)}</p>
                       <span className={`text-xs ${getPaymentStatusColor(b.payment_status)}`}>{getPaymentStatusLabel(b.payment_status)}</span>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
                         {getBookingStatusLabel(b.status)}
                       </span>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       <div className="flex items-center gap-1 justify-end">
                         <button 
                           onClick={() => shareStayWhatsApp(b.client?.phone || "", b.client?.full_name || "Client", b.booking_code)} 
@@ -709,10 +898,29 @@ export default function BookingsPage() {
                         <button 
                           onClick={() => copyStayLink(b.booking_code)} 
                           title="Copier le lien d'accès au séjour" 
-                          className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                          className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
+                        {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
+                          invoicesMap[b.id]?.pdf_url ? (
+                            <button 
+                              onClick={() => handleDownloadInvoice(invoicesMap[b.id])} 
+                              title="Télécharger la facture" 
+                              className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleGenerateInvoice(b)} 
+                              title="Générer une facture PDF" 
+                              className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+                          )
+                        )}
                         {b.status === "confirmed" && (
                           <button onClick={() => handleAction(b.id, "check_in")} title="Check-in" className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
                             <LogIn className="w-4 h-4" />
@@ -724,7 +932,7 @@ export default function BookingsPage() {
                           </button>
                         )}
                         {b.status === "checked_in" && (
-                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20">
+                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]">
                             <Sparkles className="w-4 h-4" />
                           </button>
                         )}
@@ -734,7 +942,7 @@ export default function BookingsPage() {
                           </button>
                         )}
                         {b.status === "confirmed" && (
-                          <button onClick={() => handleAction(b.id, "no_show")} title="No-show" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+                          <button onClick={() => handleAction(b.id, "no_show")} title="No-show" className="p-2 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
                             <UserX className="w-4 h-4" />
                           </button>
                         )}
@@ -749,8 +957,8 @@ export default function BookingsPage() {
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <span className="text-sm text-slate-500">
+          <div className="p-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
               Affichage {((currentPage - 1) * ITEMS_PER_PAGE) + 1} à {Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)} sur {filteredBookings.length}
             </span>
             <div className="flex items-center gap-2">
@@ -793,16 +1001,16 @@ export default function BookingsPage() {
             <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
 
               {/* Header */}
-              <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
+              <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white truncate">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
                     {selectedClient.full_name}
                   </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Détails du client</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Détails du client</p>
                 </div>
                 <button
                   onClick={() => setSelectedClient(null)}
-                  className="ml-4 p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
+                  className="ml-4 p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
                   aria-label="Fermer"
                 >
                   <X className="w-5 h-5" />
@@ -810,28 +1018,28 @@ export default function BookingsPage() {
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
                 {/* Contact */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Contact</h3>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Contact</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Téléphone principal</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Téléphone principal</label>
                       <p className="text-sm text-slate-900 dark:text-white">{selectedClient.phone || "—"}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Email</label>
                       {selectedClient.email ? (
                         <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.email}</p>
                       ) : (
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           Non renseigné
                         </span>
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Contact d'urgence</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Contact d'urgence</label>
                       <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.emergency_contact || "—"}</p>
                     </div>
                   </div>
@@ -839,38 +1047,38 @@ export default function BookingsPage() {
 
                 {/* Pièce d'identité & Nationalité */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Identité & Nationalité</h3>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Identité & Nationalité</h3>
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Pièce</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Pièce</label>
                       <p className="text-sm text-slate-900 dark:text-white">{selectedClient.id_type || "—"}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Numéro de pièce</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Numéro de pièce</label>
                       <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.id_number || "—"}</p>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nationalité</label>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Nationalité</label>
                     <p className="text-sm text-slate-900 dark:text-white">{selectedClient.nationality || "—"}</p>
                   </div>
                 </div>
 
                 {/* Historique des réservations */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Historique des réservations</h3>
+                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Historique des réservations</h3>
                   {bookings.filter(bk => bk.client_id === selectedClient.id).length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Aucune réservation enregistrée.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Aucune réservation enregistrée.</p>
                   ) : (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {bookings.filter(bk => bk.client_id === selectedClient.id).map(bk => (
                         <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{bk.booking_code}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
                             {formatDate(bk.check_in_date)} → {formatDate(bk.check_out_date)} — {bk.nights_count} nuit{bk.nights_count > 1 ? "s" : ""}
                           </p>
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                            <span className="text-xs text-slate-500">{formatFCFA(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{fmt(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => shareStayWhatsApp(selectedClient.phone || "", selectedClient.full_name, bk.booking_code)}
@@ -881,7 +1089,7 @@ export default function BookingsPage() {
                               </button>
                               <button
                                 onClick={() => copyStayLink(bk.booking_code)}
-                                className="p-1 rounded text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs flex items-center gap-1 font-medium"
+                                className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] text-xs flex items-center gap-1 font-medium"
                                 title="Copier le lien"
                               >
                                 <Copy className="w-3.5 h-3.5" /> Copier
@@ -908,7 +1116,7 @@ export default function BookingsPage() {
         description="Créez une réservation avec vérification anti double-booking"
         size="lg"
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -950,7 +1158,7 @@ export default function BookingsPage() {
                 const rt = roomTypes.find((t) => t.id === r.room_type_id);
                 return (
                   <option key={r.id} value={r.id}>
-                    Ch. {r.room_number} — {rt?.name || ""} — {rt ? formatFCFA(rt.base_price) : ""}
+                    Ch. {r.room_number} — {rt?.name || ""} — {rt ? fmt(rt.base_price) : ""}
                   </option>
                 );
               })}
@@ -973,7 +1181,7 @@ export default function BookingsPage() {
           </div>
 
           {!formData.client_id && (
-            <div className="space-y-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+            <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30">
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Nom du nouveau client" value={formData.newClientName} onChange={(e) => setFormData({ ...formData, newClientName: e.target.value })} placeholder="Jean Kouassi" />
                 <Input label="Téléphone (optionnel)" value={formData.newClientPhone} onChange={(e) => setFormData({ ...formData, newClientPhone: e.target.value })} placeholder="+225 07 00 00 00 00" />
@@ -1011,8 +1219,8 @@ export default function BookingsPage() {
 
           {formData.check_in_date && formData.check_out_date && (
             <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-sm text-indigo-700 dark:text-indigo-300">
-              {calculateNights(formData.check_in_date, formData.check_out_date)} nuit(s) × {formatFCFA(parseInt(formData.negotiated_price) || 0)} ={" "}
-              <strong>{formatFCFA((parseInt(formData.negotiated_price) || 0) * calculateNights(formData.check_in_date, formData.check_out_date))}</strong>
+              {calculateNights(formData.check_in_date, formData.check_out_date)} nuit(s) × {fmt(parseInt(formData.negotiated_price) || 0)} ={" "}
+              <strong>{fmt((parseInt(formData.negotiated_price) || 0) * calculateNights(formData.check_in_date, formData.check_out_date))}</strong>
             </div>
           )}
 
@@ -1033,10 +1241,9 @@ export default function BookingsPage() {
                <option value="">Sélectionner un moyen de paiement</option>
                <option value="cash">Espèces</option>
                <option value="wave">Wave</option>
-               <option value="orange_money">Orange Money</option>
-               <option value="mtn_mobile_money">MTN Mobile Money</option>
-               <option value="moov_money">Moov Money</option>
-               <option value="card">Carte Bancaire</option>
+               <option value="pi_spi">Pi-SPI / Mobile Money</option>
+               <option value="bank">Virement bancaire</option>
+               <option value="other">Autre</option>
              </select>
            </div>
 
@@ -1064,7 +1271,7 @@ export default function BookingsPage() {
             />
             <div>
               <p className="text-sm font-medium text-slate-900 dark:text-white">Check-in immédiat (Walk-in)</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Le client occupe la chambre dès maintenant.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Le client occupe la chambre dès maintenant.</p>
             </div>
           </div>
 
@@ -1082,12 +1289,12 @@ export default function BookingsPage() {
         title="Demander un ménage en cours de séjour"
         description="Une tâche de ménage sera envoyée dans le pool des ménagères"
       >
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20">
-            <Sparkles className="w-6 h-6 text-purple-600 flex-shrink-0" />
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] border border-[var(--primary-color)]/20">
+            <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-purple-900 dark:text-purple-300">Ménage en cours de séjour</p>
-              <p className="text-xs text-purple-700 dark:text-purple-400 mt-1">
+              <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Ménage en cours de séjour</p>
+              <p className="text-xs text-[var(--primary-color,#0C1C33)]/80 mt-1">
                 La chambre restera occupée. La ménagère verra la mention « Chambre occupée — vérifier avant d'entrer ».
               </p>
             </div>
@@ -1108,7 +1315,7 @@ export default function BookingsPage() {
         title="Confirmation requise"
         description={confirmAction?.action === "cancel" ? "Êtes-vous sûr de vouloir annuler cette réservation ?" : "Voulez-vous marquer cette réservation comme No-show ?"}
       >
-        <div className="space-y-4 pt-2">
+        <div className="space-y-3 pt-2">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-sm">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <p>Cette action est irréversible. La chambre sera immédiatement libérée pour d'autres réservations.</p>
@@ -1126,6 +1333,104 @@ export default function BookingsPage() {
           </div>
         </div>
       </Modal>
+
+        {/* Modal Facture */}
+        {selectedBookingForInvoice && (
+          <Modal
+            open={invoiceModalOpen}
+            onClose={() => setInvoiceModalOpen(false)}
+            title="Facture générée"
+            size="md"
+          >
+            <div className="space-y-3">
+              {invoicesMap[selectedBookingForInvoice.id]?.pdf_url && (
+                <div className="aspect-[3/4] bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <iframe
+                    src={invoicesMap[selectedBookingForInvoice.id]?.pdf_url || ""}
+                    title={`Facture ${invoicesMap[selectedBookingForInvoice.id].invoice_number}`}
+                    className="w-full h-full"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Numéro de facture</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {invoicesMap[selectedBookingForInvoice.id]?.invoice_number || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Montant total</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                    {fmt(invoicesMap[selectedBookingForInvoice.id]?.total_amount || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Statut</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {invoicesMap[selectedBookingForInvoice.id]?.status === "draft"
+                      ? "Brouillon"
+                      : invoicesMap[selectedBookingForInvoice.id]?.status === "sent"
+                      ? "Envoyée"
+                      : invoicesMap[selectedBookingForInvoice.id]?.status === "paid"
+                      ? "Payée"
+                      : "Non payée"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={() => handleDownloadInvoice(invoicesMap[selectedBookingForInvoice.id])}
+                  disabled={!invoicesMap[selectedBookingForInvoice.id]?.pdf_url}
+                >
+                  <Download className="w-4 h-4" /> Télécharger
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => openSendInvoiceModal(invoicesMap[selectedBookingForInvoice.id])}
+                >
+                  <MessageSquare className="w-4 h-4" /> Envoyer
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Modal Envoi de facture */}
+        {invoiceToSend && (
+          <Modal
+            open={!!invoiceToSend}
+            onClose={closeSendInvoiceModal}
+            title="Envoyer la facture"
+            size="sm"
+          >
+            <div className="space-y-3">
+              <Input
+                label="Adresse e-mail du client"
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="client@example.com"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                La facture sera marquée comme "Envoyée" dans le système.
+                Un lien de téléchargement peut être partagé via WhatsApp.
+              </p>
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={closeSendInvoiceModal}>
+                  Annuler
+                </Button>
+                <Button className="flex-1" onClick={() => handleSendInvoice(invoiceToSend)}>
+                  Confirmer l'envoi
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
     </div>
   );
 }

@@ -22,9 +22,9 @@ export const translations = {
       navItems: [
         { label: "Tableau de bord", href: "/dashboard" },
         { label: "Établissements", href: "/dashboard/residences" },
-        { label: "Chambres", href: "/dashboard/rooms" },
         { label: "Réservations", href: "/dashboard/bookings" },
         { label: "Ménage", href: "/dashboard/cleaning" },
+        { label: "Mon Shift / Caisse", href: "/dashboard/shift" },
         { label: "Comptabilité", href: "/dashboard/accounting" },
         { label: "Employés", href: "/dashboard/employees" },
         { label: "Paramètres", href: "/dashboard/settings" },
@@ -35,7 +35,7 @@ export const translations = {
       headerTitle: "Séjoura by Refontiq",
     },
     header: {
-      searchPlaceholder: "Rechercher des réservations, clients...",
+      searchPlaceholder: "Rechercher...",
       themeToggle: "Changer le thème",
       notifications: "Notifications",
       noNotifications: "Aucune notification",
@@ -457,7 +457,6 @@ export const translations = {
       navItems: [
         { label: "Dashboard", href: "/dashboard" },
         { label: "Residences", href: "/dashboard/residences" },
-        { label: "Rooms", href: "/dashboard/rooms" },
         { label: "Bookings", href: "/dashboard/bookings" },
         { label: "Cleaning", href: "/dashboard/cleaning" },
         { label: "Accounting", href: "/dashboard/accounting" },
@@ -470,7 +469,7 @@ export const translations = {
       headerTitle: "Séjoura by Refontiq",
     },
     header: {
-      searchPlaceholder: "Search bookings, clients...",
+      searchPlaceholder: "Search...",
       themeToggle: "Toggle theme",
       notifications: "Notifications",
       noNotifications: "No notifications",

@@ -15,12 +15,16 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === "undefined") return "fr";
+  // Toujours initialiser à "fr" pour correspondre au rendu serveur (évite les mismatches d'hydratation)
+  const [lang, setLangState] = useState<Lang>("fr");
+
+  // Lire la préférence stockée uniquement après l'hydratation côté client
+  useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "fr") return stored;
-    return "fr";
-  });
+    if (stored === "en" || stored === "fr") {
+      setLangState(stored);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

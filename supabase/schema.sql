@@ -22,6 +22,7 @@ DROP VIEW IF EXISTS v_daily_movements CASCADE;
 
 -- Fonctions (DROP IF EXISTS pour toutes les fonctions SECURITY DEFINER)
 DROP FUNCTION IF EXISTS request_mid_stay_cleaning(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS generate_invoice(UUID, UUID, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS reactivate_tenant(UUID) CASCADE;
 DROP FUNCTION IF EXISTS suspend_tenant(UUID, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS check_cleaning_alerts() CASCADE;
@@ -45,6 +46,7 @@ DROP FUNCTION IF EXISTS create_cleaning_task_on_checkout() CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
 -- Tables (CASCADE supprime aussi indexes, triggers, policies, constraints, RLS)
+DROP TABLE IF EXISTS invoices CASCADE;
 DROP TABLE IF EXISTS whatsapp_messages CASCADE;
 DROP TABLE IF EXISTS client_sessions CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
@@ -91,7 +93,6 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TYPE subscription_plan AS ENUM (
     'standard',   -- 15 000 FCFA/mois
-    'pro',        -- 35 000 FCFA/mois
     'enterprise'  -- 55 000 FCFA/mois
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -160,6 +161,17 @@ DO $$ BEGIN
     'rent',         -- Loyer
     'taxes',        -- Taxes & impôts
     'other'         -- Autre
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Statuts de facture
+DO $$ BEGIN
+  CREATE TYPE invoice_status AS ENUM (
+    'draft',     -- Brouillon
+    'sent',      -- Envoyée au client
+    'paid',      -- Payée
+    'partial',   -- Partiellement payée
+    'cancelled'  -- Annulée
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -448,6 +460,32 @@ CREATE INDEX idx_expenses_tenant ON expenses(tenant_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);
 CREATE INDEX idx_expenses_category ON expenses(category);
 CREATE INDEX idx_expenses_accommodation ON expenses(accommodation_id);
+
+-- ----------------------------------------------------------------------------
+-- 12b. TABLE: invoices (Factures PDF générées)
+-- ----------------------------------------------------------------------------
+CREATE TABLE invoices (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  booking_id      UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  invoice_number  TEXT NOT NULL,              -- ex: F-2026-0001
+  amount          INTEGER NOT NULL,           -- Sous-total HT (en FCFA)
+  tax_amount      INTEGER NOT NULL DEFAULT 0, -- TVA (en FCFA)
+  total_amount    INTEGER NOT NULL,           -- Total TTC (en FCFA)
+  status          invoice_status NOT NULL DEFAULT 'draft',
+  pdf_url         TEXT,                       -- URL vers le PDF dans Supabase Storage
+  sent_at         TIMESTAMPTZ,                -- Date d'envoi au client
+  sent_to         TEXT,                       -- Destinataire (email ou téléphone)
+  created_by      UUID NOT NULL REFERENCES users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_invoices_tenant ON invoices(tenant_id);
+CREATE INDEX idx_invoices_booking ON invoices(booking_id);
+CREATE INDEX idx_invoices_number ON invoices(invoice_number);
+CREATE INDEX idx_invoices_status ON invoices(status);
+CREATE INDEX idx_invoices_created ON invoices(created_at);
 
 -- ----------------------------------------------------------------------------
 -- 13. TABLE: audit_logs (Journal d'audit — Traçabilité)
@@ -772,6 +810,7 @@ ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cleaning_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE client_sessions ENABLE ROW LEVEL SECURITY;
@@ -1105,6 +1144,27 @@ CREATE POLICY "expenses_delete_admin" ON expenses
   FOR DELETE USING (
     tenant_id = get_current_user_tenant_id()
     AND get_current_user_role() = 'admin_residence'
+  );
+
+-- ----------------------------------------------------------------------------
+-- 23k-bis. POLITIQUES RLS — invoices
+-- ----------------------------------------------------------------------------
+CREATE POLICY "invoices_select_own" ON invoices
+  FOR SELECT USING (tenant_id = get_current_user_tenant_id());
+
+CREATE POLICY "invoices_select_super_admin" ON invoices
+  FOR SELECT USING (is_super_admin());
+
+CREATE POLICY "invoices_insert_own" ON invoices
+  FOR INSERT WITH CHECK (
+    tenant_id = get_current_user_tenant_id()
+    AND get_current_user_role() IN ('admin_residence', 'receptionniste')
+  );
+
+CREATE POLICY "invoices_update_own" ON invoices
+  FOR UPDATE USING (
+    tenant_id = get_current_user_tenant_id()
+    AND get_current_user_role() IN ('admin_residence', 'receptionniste')
   );
 
 -- ----------------------------------------------------------------------------
@@ -1640,6 +1700,92 @@ BEGIN
     jsonb_build_object('cleaning_task_id', v_task.id, 'note', 'Chambre occupée — vérifier avant d''entrer'), NOW());
 
   RETURN v_task;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ----------------------------------------------------------------------------
+-- 34c. FONCTION: Générer une facture pour une réservation
+-- Crée un enregistrement de facture avec tous les montants calculés automatiquement.
+-- Le PDF est généré côté application (API route) ; cette fonction prépare les données.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION generate_invoice(
+  p_booking_id UUID,
+  p_user_id UUID,
+  p_invoice_number TEXT
+)
+RETURNS invoices AS $$
+DECLARE
+  v_booking bookings;
+  v_invoice invoices;
+  v_tax integer := 0;
+BEGIN
+  -- Récupérer la réservation avec ses relations
+  SELECT b.* INTO v_booking
+  FROM bookings b
+  WHERE b.id = p_booking_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'BOOKING_NOT_FOUND: Réservation introuvable';
+  END IF;
+
+  -- Vérifier que l'utilisateur appartient au même tenant
+  IF v_booking.tenant_id != (
+    SELECT tenant_id FROM users WHERE id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Vous n''êtes pas autorisé à générer une facture pour cette réservation';
+  END IF;
+
+  -- Calcul automatique des montants (sans calcul manuel)
+  -- Le total est déjà calculé lors de la création de la réservation : total_amount = negotiated_price * nights_count
+  -- On applique une TVA de 10 % (configurable)
+  v_tax := ROUND(v_booking.total_amount * 0.10);
+
+  -- Créer l'enregistrement de facture
+  INSERT INTO invoices (
+    tenant_id,
+    booking_id,
+    invoice_number,
+    amount,
+    tax_amount,
+    total_amount,
+    status,
+    created_by,
+    created_at,
+    updated_at
+  ) VALUES (
+    v_booking.tenant_id,
+    v_booking.id,
+    p_invoice_number,
+    v_booking.total_amount,
+    v_tax,
+    v_booking.total_amount + v_tax,
+    'draft',
+    p_user_id,
+    NOW(),
+    NOW()
+  )
+  RETURNING * INTO v_invoice;
+
+  -- Journal d'audit
+  INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id, new_values, created_at)
+  VALUES (
+    v_booking.tenant_id,
+    p_user_id,
+    'invoice_generated',
+    'invoice',
+    v_invoice.id,
+    jsonb_build_object(
+      'invoice_number', p_invoice_number,
+      'booking_id', v_booking.id,
+      'total_amount', v_booking.total_amount,
+      'tax_amount', v_tax,
+      'invoice_total', v_booking.total_amount + v_tax
+    ),
+    NOW()
+  );
+
+  RETURN v_invoice;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

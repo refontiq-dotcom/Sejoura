@@ -15,14 +15,26 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Phone,
+  Mail,
+  CreditCard,
+  BedDouble,
+  User,
+  Info,
 } from "lucide-react";
 import {
-  formatFCFA,
   getPaymentStatusLabel,
   getPaymentStatusColor,
   getRoomStatusLabel,
   getRoomStatusChartColor,
+  canAccessPlanFeature,
 } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
+import { convertXofTo, getCurrencyDecimals } from "@/lib/currencyConverter";
 import { createClient } from "@/lib/supabase/client";
 import { DashboardSkeletons } from "@/components/ui/skeletons";
 import { AlertCircle, PlusCircle, RefreshCw } from "lucide-react";
@@ -45,14 +57,48 @@ interface Movement {
   id: string;
   bookingCode: string;
   clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientNationality?: string;
   roomNumber: string;
   roomType: string;
+  accommodationName?: string;
   time: string;
   movementType: "check_in" | "check_out";
   paymentStatus: string;
+  paymentMethod?: string;
   totalAmount: number;
   amountPaid: number;
   bookingStatus: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  nightsCount?: number;
+  numberOfGuests?: number;
+  specialRequests?: string;
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Date locale au format YYYY-MM-DD (évite les décalages UTC de toISOString) */
+function toLocalISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Extrait la date locale YYYY-MM-DD depuis un TIMESTAMPTZ ou une DATE */
+function toLocalDateStr(value: string): string {
+  if (value.length === 10) return value; // DATE simple
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value.slice(0, 10);
+  return toLocalISODate(d);
+}
+
+/** Formate un montant sans symbole de devise (converti depuis XOF, locale fr-FR) */
+function formatAmountOnly(amountInXof: number, currencyCode: string): string {
+  const converted = convertXofTo(amountInXof, currencyCode);
+  const decimals = getCurrencyDecimals(currencyCode);
+  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(converted || 0);
 }
 
 interface RoomStatusData {
@@ -69,7 +115,7 @@ function normalizeUnknownError(err: unknown): Error {
   if (err instanceof Error) return err;
   if (err && typeof err === "object") {
     const entries = Object.getOwnPropertyNames(err).map((key) => {
-      const value = (err as any)[key];
+      const value = (err as Record<string, unknown>)[key];
       return `${key}: ${value}`;
     }).filter(Boolean);
     if (entries.length > 0) {
@@ -77,6 +123,221 @@ function normalizeUnknownError(err: unknown): Error {
     }
   }
   return new Error(String(err ?? "Erreur inconnue"));
+}
+
+// ============================================================================
+// CLIENT DRAWER — Panneau latéral détail client
+// ============================================================================
+
+function ClientDrawer({
+  movement,
+  onClose,
+  onAction,
+  actionLoading,
+  fmt,
+  isPastDate,
+}: {
+  movement: Movement;
+  onClose: () => void;
+  onAction: (id: string, action: "check_in" | "check_out") => Promise<boolean>;
+  actionLoading: string;
+  fmt: (n: number) => string;
+  isPastDate: boolean;
+}) {
+  const paymentLabel: Record<string, string> = {
+    cash: "Espèces",
+    wave: "Wave",
+    pi_spi: "PI-SPI",
+    bank: "Virement",
+    other: "Autre",
+  };
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
+        onClick={onClose}
+      />
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-full max-w-md z-50 flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-l border-slate-200 dark:border-slate-700 animate-slide-in-right">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+              {movement.clientName.charAt(0)}
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">{movement.clientName}</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{movement.bookingCode}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {/* Infos client */}
+          <section>
+            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <User className="w-3.5 h-3.5" /> Informations client
+            </h3>
+            <div className="space-y-2">
+              {movement.clientPhone && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
+                  <div>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Téléphone</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientPhone}</p>
+                  </div>
+                </div>
+              )}
+              {movement.clientEmail && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
+                  <div>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Email</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientEmail}</p>
+                  </div>
+                </div>
+              )}
+              {movement.clientNationality && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <Info className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
+                  <div>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Nationalité</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientNationality}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Chambre */}
+          <section>
+            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <BedDouble className="w-3.5 h-3.5" /> Séjour
+            </h3>
+            <div className="p-4 rounded-xl bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/20 space-y-3 dark:bg-slate-700/50 dark:border-slate-600">
+              <div className="flex justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambre</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Ch. {movement.roomNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Type</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.roomType}</span>
+              </div>
+              {movement.checkInDate && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Arrivée</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {new Date(movement.checkInDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                  </span>
+                </div>
+              )}
+              {movement.checkOutDate && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Départ</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {new Date(movement.checkOutDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                  </span>
+                </div>
+              )}
+              {movement.nightsCount && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Durée</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.nightsCount} nuit{movement.nightsCount > 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {movement.numberOfGuests && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Voyageurs</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.numberOfGuests}</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Paiement */}
+          <section>
+            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <CreditCard className="w-3.5 h-3.5" /> Paiement
+            </h3>
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Montant total</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{fmt(movement.totalAmount)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Encaissé</span>
+                <span className={`text-sm font-bold ${movement.amountPaid >= movement.totalAmount ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"}`}>
+                  {fmt(movement.amountPaid)}
+                </span>
+              </div>
+              {movement.paymentMethod && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Mode</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {paymentLabel[movement.paymentMethod] || movement.paymentMethod}
+                  </span>
+                </div>
+              )}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Statut</span>
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                  movement.paymentStatus === "paid"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : movement.paymentStatus === "partial"
+                    ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                }`}>
+                  {movement.paymentStatus === "paid" ? "Soldé" : movement.paymentStatus === "partial" ? "Partiel" : "Non payé"}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Demandes spéciales */}
+          {movement.specialRequests && (
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">Demandes spéciales</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800">
+                {movement.specialRequests}
+              </p>
+            </section>
+          )}
+        </div>
+
+        {/* Actions — affichées uniquement si le statut de la réservation le permet */}
+        {!isPastDate &&
+          ((movement.movementType === "check_in" && movement.bookingStatus === "confirmed") ||
+            (movement.movementType === "check_out" && movement.bookingStatus === "checked_in")) && (
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+            <Button
+              className="w-full"
+              variant={movement.movementType === "check_in" ? "primary" : "secondary"}
+              loading={actionLoading === movement.id}
+              disabled={actionLoading === movement.id}
+              onClick={async () => {
+                const success = await onAction(movement.id, movement.movementType);
+                if (success) onClose();
+              }}
+            >
+              {movement.movementType === "check_in" ? (
+                <><LogIn className="w-4 h-4" /> Effectuer le Check-in</>
+              ) : (
+                <><LogOut className="w-4 h-4" /> Effectuer le Check-out</>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
 // ============================================================================
@@ -88,7 +349,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
 
   if (total === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+      <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500">
         <span className="text-4xl font-bold text-slate-300">0</span>
         <span className="text-sm mt-1">Chambres</span>
       </div>
@@ -98,7 +359,30 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
   const radius = 70;
   const strokeWidth = 28;
   const circumference = 2 * Math.PI * radius;
-  let offset = 0;
+
+  const segments = data.reduce((acc, item, index) => {
+    const percentage = item.count / total;
+    const dashLength = percentage * circumference;
+    const circle = (
+      <circle
+        key={index}
+        cx="100"
+        cy="100"
+        r={radius}
+        fill="none"
+        stroke={getRoomStatusChartColor(item.status)}
+        strokeWidth={strokeWidth}
+        strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+        strokeDashoffset={-acc.offset}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dashoffset 0.5s ease" }}
+      />
+    );
+    return {
+      elements: [...acc.elements, circle],
+      offset: acc.offset + dashLength,
+    };
+  }, { elements: [] as React.ReactNode[], offset: 0 });
 
   return (
     <div className="flex items-center justify-center">
@@ -115,32 +399,12 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
             className="text-slate-100 dark:text-slate-700"
           />
           {/* Segments */}
-          {data.map((item, index) => {
-            const percentage = item.count / total;
-            const dashLength = percentage * circumference;
-            const circle = (
-              <circle
-                key={index}
-                cx="100"
-                cy="100"
-                r={radius}
-                fill="none"
-                stroke={getRoomStatusChartColor(item.status)}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${dashLength} ${circumference - dashLength}`}
-                strokeDashoffset={-offset}
-                strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset 0.5s ease" }}
-              />
-            );
-            offset += dashLength;
-            return circle;
-          })}
+          {segments.elements}
         </svg>
         {/* Centre */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-3xl font-bold text-slate-900 dark:text-white">{total}</span>
-          <span className="text-sm text-slate-500 dark:text-slate-400">Chambres</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambres</span>
         </div>
       </div>
     </div>
@@ -151,12 +415,12 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
 // LINE CHART (SVG natif)
 // ============================================================================
 
-function LineChart({ data }: { data: MonthlyRevenueData[] }) {
+function LineChart({ data, fmt, currencyCode }: { data: MonthlyRevenueData[]; fmt: (amount: number) => string; currencyCode: string }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   if (data.length === 0) {
     return (
-      <div className="h-64 flex items-center justify-center text-slate-400 text-sm">
+      <div className="h-64 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">
         Aucune donnée disponible
       </div>
     );
@@ -216,7 +480,7 @@ function LineChart({ data }: { data: MonthlyRevenueData[] }) {
               textAnchor="end"
               className="text-xs fill-slate-400"
             >
-              {formatFCFA(line.value).replace(" FCFA", "")}
+               {formatAmountOnly(line.value, currencyCode)}
             </text>
           </g>
         ))}
@@ -255,7 +519,7 @@ function LineChart({ data }: { data: MonthlyRevenueData[] }) {
               x={p.x}
               y={height - padding.bottom + 20}
               textAnchor="middle"
-              className={`text-xs ${hoveredIndex === i ? "fill-indigo-600 font-bold" : "fill-slate-500 dark:fill-slate-400"}`}
+              className={`text-xs ${hoveredIndex === i ? "fill-[var(--primary-color,#0C1C33)] font-bold" : "fill-slate-500 dark:fill-slate-400"}`}
             >
               {p.month}
             </text>
@@ -279,7 +543,7 @@ function LineChart({ data }: { data: MonthlyRevenueData[] }) {
                   fill="#ffffff"
                   className="text-xs font-semibold"
                 >
-                  {formatFCFA(p.revenue)}
+                  {fmt(p.revenue)}
                 </text>
               </g>
             )}
@@ -296,7 +560,9 @@ function LineChart({ data }: { data: MonthlyRevenueData[] }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { currency, fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
+  const [plan, setPlan] = useState("standard");
   const [kpis, setKpis] = useState<KPIData>({
     occupancyRate: 0,
     dailyRevenue: 0,
@@ -313,9 +579,11 @@ export default function DashboardPage() {
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
+  const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
 
-  const loadDashboardData = useCallback(async () => {
-    setLoading(true);
+  const loadDashboardData = useCallback(async (isSilent = false, date?: string) => {
+    if (!isSilent) setLoading(true);
     setError(false);
     try {
         const supabase = createClient();
@@ -324,7 +592,7 @@ export default function DashboardPage() {
           throw new Error(sessionError.message || "Erreur de session Supabase");
         }
         if (!sessionData?.session) {
-          setLoading(false);
+          if (!isSilent) setLoading(false);
           return;
         }
 
@@ -337,7 +605,7 @@ export default function DashboardPage() {
         if (userError || !userData?.tenant_id) {
           setError(true);
           toast.error("Compte utilisateur introuvable. Veuillez contacter l'administrateur.");
-          setLoading(false);
+          if (!isSilent) setLoading(false);
           return;
         }
 
@@ -345,37 +613,55 @@ export default function DashboardPage() {
 
         const tenantId = userData.tenant_id;
         const now = new Date();
-        const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+        const today = toLocalISODate(now);
+        const targetDate = date || today;
 
-        const [bookingsData, paymentsData, cleaningTasksData, accommodationsData] =
+        // Fenêtre de 12 mois glissants pour le graphique des recettes
+        const twelveMonthsAgo = toLocalISODate(new Date(now.getFullYear(), now.getMonth() - 11, 1));
+
+        const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData] =
           await Promise.all([
+            supabase
+              .from("subscriptions")
+              .select("plan")
+              .eq("tenant_id", tenantId)
+              .single(),
             supabase
               .from("bookings")
               .select(`
                 *,
                 client:clients(*),
-                room:rooms(*, room_type:room_types(*))
+                room:rooms(*, room_type:room_types(*), accommodation:accommodations(name))
               `)
               .eq("tenant_id", tenantId)
-              .in("status", ["confirmed", "checked_in"]),
+              .in("status", ["confirmed", "checked_in", "checked_out", "cancelled"])
+              .lte("check_in_date", targetDate)
+              .gte("check_out_date", targetDate),
             supabase
               .from("payments")
               .select("amount, payment_date")
-              .eq("tenant_id", tenantId),
+              .eq("tenant_id", tenantId)
+              .gte("payment_date", `${twelveMonthsAgo}T00:00:00`),
             supabase
               .from("cleaning_tasks")
-              .select("status")
-              .eq("tenant_id", tenantId),
+              .select("status, created_at")
+              .eq("tenant_id", tenantId)
+              .gte("created_at", `${targetDate}T00:00:00`)
+              .lte("created_at", `${targetDate}T23:59:59.999`),
             supabase
               .from("accommodations")
               .select("id")
               .eq("tenant_id", tenantId),
           ]);
 
+        if (subscriptionsData.error) throw new Error(subscriptionsData.error.message || "Erreur lors de la récupération de l'abonnement.");
         if (bookingsData.error) throw new Error(bookingsData.error.message || "Erreur lors de la récupération des réservations.");
         if (paymentsData.error) throw new Error(paymentsData.error.message || "Erreur lors de la récupération des paiements.");
         if (cleaningTasksData.error) throw new Error(cleaningTasksData.error.message || "Erreur lors de la récupération des tâches de ménage.");
         if (accommodationsData.error) throw new Error(accommodationsData.error.message || "Erreur lors de la récupération des établissements.");
+
+        const planValue = (subscriptionsData.data?.plan as string | undefined) || "standard";
+        setPlan(planValue);
 
         const bookings = (bookingsData.data || []) as unknown as (Booking & { client?: Client; room?: Room; room_type?: RoomType })[];
         const accommodations = (accommodationsData.data || []) as { id: string }[];
@@ -383,32 +669,35 @@ export default function DashboardPage() {
         
         setHasAccommodations(accommodationIds.length > 0);
 
-        const roomsQuery = supabase
-          .from("rooms")
-          .select("status")
-          .in("accommodation_id", accommodationIds.length > 0 ? accommodationIds : ["00000000-0000-0000-0000-000000000000"]);
-
-        const roomsDataResult = await roomsQuery;
-        if (roomsDataResult.error) throw new Error(roomsDataResult.error.message || "Erreur lors de la récupération des chambres.");
-        const rooms = (roomsDataResult.data || []) as unknown as { status: string }[];
+        // Pas d'établissement => pas de chambres : on évite la requête avec un UUID factice
+        let rooms: { status: string }[] = [];
+        if (accommodationIds.length > 0) {
+          const roomsDataResult = await supabase
+            .from("rooms")
+            .select("status")
+            .in("accommodation_id", accommodationIds);
+          if (roomsDataResult.error) throw new Error(roomsDataResult.error.message || "Erreur lors de la récupération des chambres.");
+          rooms = (roomsDataResult.data || []) as unknown as { status: string }[];
+        }
         const payments = (paymentsData.data || []) as unknown as { amount: number; payment_date: string }[];
         const cleaningTasks = (cleaningTasksData.data || []) as unknown as { status: string }[];
 
-        const todayBookings = bookings.filter((b) => {
-          return b.check_in_date === today || b.check_out_date === today;
+        const targetBookings = bookings.filter((b) => {
+          return b.check_in_date === targetDate || b.check_out_date === targetDate;
         });
 
         const expectedCheckins = bookings.filter(
-          (b) => b.check_in_date === today && b.status === "confirmed"
+          (b) => b.check_in_date === targetDate && b.status === "confirmed"
         ).length;
         const expectedCheckouts = bookings.filter(
-          (b) => b.check_out_date === today && b.status === "checked_in"
+          (b) => b.check_out_date === targetDate && b.status === "checked_in"
         ).length;
 
-        const todayPayments = payments.filter(
-          (p) => p.payment_date === today
+        // payment_date est un TIMESTAMPTZ : on compare la date locale, pas la chaîne brute
+        const targetPayments = payments.filter(
+          (p) => toLocalDateStr(p.payment_date) === targetDate
         );
-        const dailyRevenue = todayPayments.reduce((sum, p) => sum + p.amount, 0);
+        const dailyRevenue = targetPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalRooms = rooms.length || 1;
         const occupiedRooms = rooms.filter((r) => r.status === "occupied").length;
@@ -430,19 +719,50 @@ export default function DashboardPage() {
           cleaningDone,
         });
 
-        const movements: Movement[] = todayBookings.map((b) => ({
-          id: b.id,
-          bookingCode: b.booking_code,
-          clientName: b.client?.full_name || "—",
-          roomNumber: b.room?.room_number || "—",
-          roomType: b.room_type?.name || "—",
-          time: b.check_in_date === today ? b.check_in_time || "14:00" : b.check_out_time || "11:00",
-          movementType: b.check_in_date === today ? "check_in" : "check_out",
-          paymentStatus: b.payment_status,
-          totalAmount: b.total_amount,
-          amountPaid: b.amount_paid,
-          bookingStatus: b.status,
-        }));
+        // Une réservation arrivant ET repartant le jour cible génère deux mouvements distincts
+        const movements: Movement[] = targetBookings.flatMap((b) => {
+          const base = {
+            bookingCode: b.booking_code,
+            clientName: b.client?.full_name || "—",
+            clientPhone: b.client?.phone || undefined,
+            clientEmail: b.client?.email || undefined,
+            clientNationality: b.client?.nationality || undefined,
+            roomNumber: b.room?.room_number || "—",
+            roomType: b.room_type?.name || "—",
+            accommodationName: (b.room as unknown as { accommodation?: { name?: string } })?.accommodation?.name || undefined,
+            paymentStatus: b.payment_status,
+            paymentMethod: (b as unknown as Record<string, unknown>).payment_method as string | undefined,
+            totalAmount: b.total_amount,
+            amountPaid: b.amount_paid,
+            bookingStatus: b.status,
+            checkInDate: b.check_in_date,
+            checkOutDate: b.check_out_date,
+            nightsCount: b.nights_count,
+            numberOfGuests: b.number_of_guests,
+            specialRequests: b.special_requests || undefined,
+          };
+          const entries: Movement[] = [];
+          if (b.check_in_date === targetDate) {
+            entries.push({
+              ...base,
+              id: `${b.id}-in`,
+              time: b.check_in_time || "14:00",
+              movementType: "check_in",
+            });
+          }
+          if (b.check_out_date === targetDate) {
+            entries.push({
+              ...base,
+              id: `${b.id}-out`,
+              time: b.check_out_time || "11:00",
+              movementType: "check_out",
+            });
+          }
+          return entries;
+        });
+
+        // Tri chronologique (départs le matin avant les arrivées de l'après-midi)
+        movements.sort((a, b) => a.time.localeCompare(b.time));
 
         setMovements(movements);
 
@@ -457,41 +777,40 @@ export default function DashboardPage() {
           { status: "alert", count: statusCounts["alert"] || 0 },
         ]);
 
+        // Clés YYYY-MM pour éviter les collisions de libellés entre années (ex. "janv." 2025 vs 2026)
         const monthMap: Record<string, number> = {};
-        const monthMapPrev: Record<string, number> = {};
-        const monthLabels: string[] = [];
-        const monthLabelsPrev: string[] = [];
+        const currentKeys: string[] = [];
+        const prevKeys: string[] = [];
+        const labelByKey: Record<string, string> = {};
 
         for (let i = 5; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const label = d.toLocaleString("fr-FR", { month: "short" });
-          monthLabels.push(label);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          currentKeys.push(key);
+          labelByKey[key] = d.toLocaleString("fr-FR", { month: "short" });
         }
         for (let i = 11; i >= 6; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const label = d.toLocaleString("fr-FR", { month: "short" });
-          monthLabelsPrev.push(label);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          prevKeys.push(key);
+          labelByKey[key] = d.toLocaleString("fr-FR", { month: "short" });
         }
 
         payments.forEach((p) => {
-          const d = new Date(p.payment_date);
-          const key = d.toLocaleString("fr-FR", { month: "short" });
-          if (monthLabels.includes(key)) {
+          const key = toLocalDateStr(p.payment_date).slice(0, 7);
+          if (currentKeys.includes(key) || prevKeys.includes(key)) {
             monthMap[key] = (monthMap[key] || 0) + p.amount;
-          }
-          if (monthLabelsPrev.includes(key)) {
-            monthMapPrev[key] = (monthMapPrev[key] || 0) + p.amount;
           }
         });
 
-        const monthlyData: MonthlyRevenueData[] = monthLabels.map((month) => ({
-          month,
-          revenue: monthMap[month] || 0,
+        const monthlyData: MonthlyRevenueData[] = currentKeys.map((key) => ({
+          month: labelByKey[key],
+          revenue: monthMap[key] || 0,
         }));
         setMonthlyRevenue(monthlyData);
 
-        const currentTotal = monthLabels.reduce((sum, m) => sum + (monthMap[m] || 0), 0);
-        const previousTotal = monthLabelsPrev.reduce((sum, m) => sum + (monthMapPrev[m] || 0), 0);
+        const currentTotal = currentKeys.reduce((sum, k) => sum + (monthMap[k] || 0), 0);
+        const previousTotal = prevKeys.reduce((sum, k) => sum + (monthMap[k] || 0), 0);
         const trend = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
         setTrendPercentage(trend);
       } catch (err) {
@@ -500,37 +819,81 @@ export default function DashboardPage() {
         const normalizedError = normalizeUnknownError(err);
         console.error(normalizedError, err);
       } finally {
-        setLoading(false);
+        if (!isSilent) setLoading(false);
       }
   }, []);
 
   useEffect(() => {
-    loadDashboardData();
-    const interval = setInterval(() => {
-      loadDashboardData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [loadDashboardData]);
+    let cancelled = false;
+    let inFlight = false;
 
-  async function handleMovementAction(bookingId: string, action: "check_in" | "check_out") {
-    setActionLoading(bookingId);
+    // setTimeout(0) : évite un setState synchrone dans le corps de l'effet (eslint)
+    const initialLoad = setTimeout(() => {
+      if (!cancelled) loadDashboardData(false, selectedDate);
+    }, 0);
+
+    // Polling silencieux toutes les 30 s, sans chevauchement de requêtes
+    const interval = setInterval(async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        await loadDashboardData(true, selectedDate);
+      } finally {
+        inFlight = false;
+      }
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
+  }, [loadDashboardData, selectedDate]);
+
+  function handleDateChange(newDate: string) {
+    setSelectedDate(newDate);
+  }
+
+  function shiftDate(days: number) {
+    const d = new Date(selectedDate + "T00:00:00");
+    d.setDate(d.getDate() + days);
+    handleDateChange(toLocalISODate(d));
+  }
+
+  const todayStr = toLocalISODate(new Date());
+  const isToday = selectedDate === todayStr;
+  const isPastDate = selectedDate < todayStr;
+  const formattedSelectedDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  async function handleMovementAction(movementId: string, action: "check_in" | "check_out"): Promise<boolean> {
+    // L'id du mouvement est suffixé ("<bookingId>-in" / "<bookingId>-out")
+    const bookingId = movementId.replace(/-(in|out)$/, "");
+    setActionLoading(movementId);
     try {
       const supabase = createClient();
       const rpcName = action === "check_in" ? "check_in_booking" : "check_out_booking";
-      const { error } = await supabase.rpc(rpcName, {
+      const { error: rpcErr } = await supabase.rpc(rpcName, {
         p_booking_id: bookingId,
         p_user_id: userId,
       });
 
-      if (error) {
-        toast.error("Erreur: " + error.message);
-        return;
+      if (rpcErr) {
+        // La RPC applique les gardes de statut et écrit dans audit_logs : on ne la contourne pas
+        toast.error("Impossible d'effectuer l'action : " + rpcErr.message);
+        return false;
       }
 
-      toast.success(action === "check_in" ? "Check-in effectué avec succès." : "Check-out effectué avec succès.");
-      loadDashboardData();
+      toast.success(action === "check_in" ? "Check-in effectué avec succès ✓" : "Check-out effectué avec succès ✓");
+      loadDashboardData(true, selectedDate);
+      return true;
     } catch {
       toast.error("Une erreur est survenue lors de l'action.");
+      return false;
     } finally {
       setActionLoading("");
     }
@@ -542,13 +905,13 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4 animate-fade-in">
+      <div className="flex flex-col items-center justify-center h-96 space-y-3 animate-fade-in">
         <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
         </div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Erreur de chargement</h2>
-        <p className="text-slate-500 dark:text-slate-400">Une erreur est survenue lors de la récupération de vos données.</p>
-        <Button onClick={loadDashboardData} className="gap-2">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Erreur de chargement</h2>
+        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Une erreur est survenue lors de la récupération de vos données.</p>
+        <Button onClick={() => loadDashboardData(false, selectedDate)} className="gap-2">
           <RefreshCw className="w-4 h-4" /> Réessayer
         </Button>
       </div>
@@ -557,13 +920,13 @@ export default function DashboardPage() {
 
   if (!hasAccommodations) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4 animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-2">
-          <Sparkles className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+      <div className="flex flex-col items-center justify-center h-96 space-y-3 animate-fade-in">
+        <div className="w-20 h-20 rounded-full bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center mb-2">
+          <Sparkles className="w-10 h-10 text-[var(--primary-color,#0C1C33)]" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white text-center">Bienvenue sur Séjoura !</h2>
-        <p className="text-slate-500 dark:text-slate-400 max-w-md text-center">
-          Pour commencer à utiliser votre tableau de bord, vous devez d'abord créer votre premier établissement et y ajouter des chambres.
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white text-center">Bienvenue sur Séjoura !</h2>
+        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md text-center">
+          {"Pour commencer à utiliser votre tableau de bord, vous devez d'abord créer votre premier établissement et y ajouter des chambres."}
         </p>
         <div className="pt-4">
           <Button onClick={() => router.push("/dashboard/residences")} className="gap-2" size="lg">
@@ -575,108 +938,175 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
+      {/* 0. SÉLECTEUR DE DATE (discret) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 dark:text-slate-500">
+          <Calendar className="w-4 h-4" />
+          <span className="text-sm font-medium capitalize">{formattedSelectedDate}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">
+            {isToday
+              ? "· Aujourd'hui"
+              : isPastDate
+                ? "· Activités passées"
+                : "· Activités à venir"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => shiftDate(-1)}
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            title="Jour précédent"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => e.target.value && handleDateChange(e.target.value)}
+            className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-all"
+          />
+          <button
+            onClick={() => shiftDate(1)}
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            title="Jour suivant"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          {!isToday && (
+            <button
+              onClick={() => handleDateChange(toLocalISODate(new Date()))}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] transition-colors"
+            >
+              {"Aujourd'hui"}
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Taux d'occupation */}
-        <Card className="p-5 hover:shadow-md transition-shadow border-t-4 border-t-blue-500 dark:border-t-blue-400">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+              </div>
+              <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
             </div>
-            <Badge variant="info">Aujourd'hui</Badge>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">{"Taux d'occupation"}</p>
+            <p className="text-3xl font-extrabold text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Taux d'occupation</p>
-          <p className="text-3xl font-bold text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
-          <div className="mt-3 h-2 bg-[var(--muted)] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
-              style={{ width: `${kpis.occupancyRate}%` }}
-            />
+          <div className="mt-3">
+            <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1.5">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
+                style={{ width: `${kpis.occupancyRate}%` }}
+              />
+            </div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Pourcentage de chambres occupées</p>
           </div>
         </Card>
 
         {/* KPI 2: Encaissements du jour */}
-        <Card className="p-5 hover:shadow-md transition-shadow border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+        <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+              </div>
+              <Badge variant="success">{currency.code}</Badge>
             </div>
-            <Badge variant="success">FCFA</Badge>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Encaissements</p>
+            <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+               {formatAmountOnly(kpis.dailyRevenue, currency.code)}
+            </p>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Encaissements du jour</p>
-          <p className="text-3xl font-bold text-slate-900 dark:text-white">
-            {formatFCFA(kpis.dailyRevenue).replace(" FCFA", "")}
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+            {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
           </p>
-          <p className="text-xs text-slate-400 mt-2">FCFA encaissés aujourd'hui</p>
         </Card>
 
         {/* KPI 3: Entrées / Sorties prévues */}
-        <Card className="p-5 hover:shadow-md transition-shadow border-t-4 border-t-blue-500 dark:border-t-blue-400">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <LogIn className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        <Card className="p-4 border-t-4 border-t-orange-500 dark:border-t-orange-400 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <LogIn className="w-6 h-6 text-orange-700 dark:text-orange-300" />
+              </div>
+              <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+            </div>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Mouvements</p>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
+                </div>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Arrivées</p>
+              </div>
+              <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
+                </div>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Départs</p>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Entrées / Sorties</p>
-          <div className="flex items-center gap-4">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <LogIn className="w-4 h-4 text-emerald-500" />
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
-              </div>
-              <p className="text-xs text-slate-400">Arrivées</p>
-            </div>
-            <div className="w-px h-10 bg-slate-200 dark:bg-slate-700" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <LogOut className="w-4 h-4 text-orange-500" />
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
-              </div>
-              <p className="text-xs text-slate-400">Départs</p>
-            </div>
-          </div>
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+            {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
+          </p>
         </Card>
 
         {/* KPI 4: État Ménage */}
-        <Card className="p-5 hover:shadow-md transition-shadow border-t-4 border-t-purple-500 dark:border-t-purple-400">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+        <Card className="p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
+              </div>
+              <Badge variant="theme">Ménage</Badge>
+            </div>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">État du ménage</p>
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
+                </div>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">À nettoyer</p>
+              </div>
+              <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
+                </div>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Prêtes</p>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">État du ménage</p>
-          <div className="flex items-center gap-4">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-orange-500" />
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
-              </div>
-              <p className="text-xs text-slate-400">À nettoyer</p>
-            </div>
-            <div className="w-px h-10 bg-slate-200 dark:bg-slate-700" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
-              </div>
-              <p className="text-xs text-slate-400">Prêtes</p>
-            </div>
-          </div>
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">Statut de propreté des chambres</p>
         </Card>
       </div>
 
       {/* 2. CONTENEUR PRINCIPAL GAUCHE (70%) + 3. CONTENEUR SECONDAIRE DROITE (30%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-        {/* Tableau des mouvements du jour (70%) */}
-        <Card className="lg:col-span-7 overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
-          <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
+        {/* Tableau des mouvements (70%) */}
+        <Card className="lg:col-span-7 overflow-hidden bg-[var(--card)] border-t-4 border-t-blue-500 dark:border-t-blue-400">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Mouvements du jour
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Arrivées et départs prévus aujourd'hui
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+                {isToday
+                  ? "Arrivées et départs prévus aujourd'hui"
+                  : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
@@ -688,88 +1118,106 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Client
                   </th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Logement
                   </th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Heure
                   </th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Paiement
                   </th>
-                  <th className="text-right p-4 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <th className="text-right p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Action
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {movements.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
-                      Aucun mouvement prévu aujourd'hui
+                    <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
+                      {isToday
+                        ? "Aucun mouvement prévu aujourd'hui"
+                        : isPastDate
+                          ? "Aucune activité enregistrée pour cette date"
+                          : "Aucune activité prévue pour cette date"}
                     </td>
                   </tr>
                 ) : (
                   movements.map((m) => (
                   <tr
                     key={m.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
+                    onClick={() => setDrawerMovement(m)}
                   >
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                          {m.clientName.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900 dark:text-white">
-                            {m.clientName}
-                          </p>
-                          <p className="text-xs text-slate-400">{m.bookingCode}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">
-                        Ch. {m.roomNumber}
-                      </p>
-                      <p className="text-xs text-slate-400">{m.roomType}</p>
-                    </td>
-                    <td className="p-4">
+                     <td className="p-3">
+                       <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                           {m.clientName.charAt(0)}
+                         </div>
+                         <div>
+                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                             {m.clientName}
+                           </p>
+                           <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.bookingCode}</p>
+                         </div>
+                       </div>
+                     </td>
+                     <td className="p-3">
+                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                         Ch. {m.roomNumber}
+                       </p>
+                       <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.roomType}</p>
+                     </td>
+                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         {m.movementType === "check_in" ? (
-                          <LogIn className="w-4 h-4 text-green-500" />
+                          <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         ) : (
-                          <LogOut className="w-4 h-4 text-orange-500" />
+                          <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                         )}
-                        <span className="text-sm text-slate-700 dark:text-slate-300">{m.time}</span>
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.time}</span>
                       </div>
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col gap-1">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(m.paymentStatus)}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
                         >
                           {getPaymentStatusLabel(m.paymentStatus)}
                         </span>
-                        <span className="text-xs text-slate-400">
-                          {formatFCFA(m.amountPaid)} / {formatFCFA(m.totalAmount)}
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
                         </span>
                       </div>
                     </td>
                     <td className="p-4 text-right">
-                      <Button
-                        variant={m.movementType === "check_in" ? "primary" : "secondary"}
-                        size="sm"
-                        loading={actionLoading === m.id}
-                        disabled={actionLoading === m.id}
-                        onClick={() => handleMovementAction(m.id, m.movementType)}
-                      >
-                        {m.movementType === "check_in" ? "Check-in" : "Check-out"}
-                      </Button>
+                      {isPastDate ||
+                      !(
+                        (m.movementType === "check_in" && m.bookingStatus === "confirmed") ||
+                        (m.movementType === "check_out" && m.bookingStatus === "checked_in")
+                      ) ? (
+                        <Badge variant={m.bookingStatus === "checked_out" ? "success" : m.bookingStatus === "cancelled" ? "error" : "info"}>
+                          {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
+                        </Badge>
+                      ) : (
+                        <Button
+                          variant={m.movementType === "check_in" ? "primary" : "secondary"}
+                          size="sm"
+                          loading={actionLoading === m.id}
+                          disabled={actionLoading === m.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMovementAction(m.id, m.movementType);
+                          }}
+                        >
+                          {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 )))}
@@ -779,18 +1227,18 @@ export default function DashboardPage() {
         </Card>
 
         {/* Donut Chart — État du parc (30%) */}
-        <Card className="lg:col-span-3 p-5 border-t-4 border-t-indigo-500 dark:border-t-indigo-400">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+        <Card className="lg:col-span-3 p-4 bg-[var(--card)] border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
             État du parc
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-4">
             Répartition en temps réel
           </p>
 
           <DonutChart data={roomStatusData} />
 
           {/* Légende */}
-          <div className="mt-6 space-y-2.5">
+          <div className="mt-4 space-y-2.5">
             {roomStatusData.map((item) => (
               <div key={item.status} className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -798,11 +1246,11 @@ export default function DashboardPage() {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
                   />
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     {getRoomStatusLabel(item.status)}
                   </span>
                 </div>
-                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                <span className="text-sm font-bold text-slate-900 dark:text-white">
                   {item.count}
                 </span>
               </div>
@@ -811,15 +1259,27 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* 4. CONTENEUR INFÉRIEUR — Graphique linéaire des recettes */}
-      <Card className="p-5 border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
-        <div className="flex items-center justify-between mb-6">
+      {!canAccessPlanFeature(plan, "advancedAccounting") && (
+        <Card className="p-4 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Fonctionnalités Entreprise disponibles</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300">La comptabilité avancée, le boost Trouvetou et l’API Séjoura sont réservés à la formule Entreprise.</p>
+            </div>
+            <Button variant="primary" onClick={() => router.push("/dashboard/subscription")}>Passer à la formule Entreprise</Button>
+          </div>
+        </Card>
+      )}
+
+      {/* 4. CONTENEUR INFÈRIEUR — Graphique linéaire des recettes */}
+      <Card className="p-4 bg-[var(--card)] border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               Suivi des recettes mensuelles
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-              Évolution des encaissements (en FCFA)
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+              Évolution des encaissements (en {currency.symbol})
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -832,8 +1292,18 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <LineChart data={monthlyRevenue} />
+        <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
       </Card>
+      {drawerMovement && (
+        <ClientDrawer
+          movement={drawerMovement}
+          onClose={() => setDrawerMovement(null)}
+          onAction={handleMovementAction}
+          actionLoading={actionLoading}
+          fmt={fmt}
+          isPastDate={isPastDate}
+        />
+      )}
     </div>
   );
 }

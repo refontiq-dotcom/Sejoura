@@ -1,5 +1,6 @@
 "use client";
 
+import { getThemePresetById, THEME_PRESETS, deriveUltraLightColor } from "@/lib/colors";
 import {
   createContext,
   useContext,
@@ -13,9 +14,11 @@ type Theme = "light" | "dark";
 interface ThemeContextType {
   theme: Theme;
   primaryColor: string;
+  themeColor: string | null;
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
   setPrimaryColor: (color: string) => void;
+  setThemeColor: (color: string | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -31,13 +34,18 @@ function getContrastColor(hex: string) {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
-  const [primaryColor, setPrimaryColorState] = useState<string>("#6366f1");
+  const [primaryColor, setPrimaryColorState] = useState<string>("#0C1C33");
+  const [themeColor, setThemeColorState] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const storedTheme = localStorage.getItem("sejoura-theme") as Theme | null;
     const storedColor = localStorage.getItem("sejoura-primary-color");
+    // Persistance : on lit d'abord la clé demandée "theme_color", puis l'ancienne clé pour rétro-compatibilité
+    const storedThemeColor =
+      localStorage.getItem("theme_color") ||
+      localStorage.getItem("sejoura-theme-color");
 
     if (storedTheme) {
       setThemeState(storedTheme);
@@ -48,6 +56,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (storedColor) {
       setPrimaryColorState(storedColor);
     }
+
+    if (storedThemeColor) {
+      setThemeColorState(storedThemeColor);
+      const preset = getThemePresetById(storedThemeColor);
+      document.documentElement.style.setProperty("--sidebar-bg", preset.sidebarBg);
+      document.documentElement.style.setProperty("--main-bg", preset.contentBg);
+      document.documentElement.style.setProperty("--primary-color", preset.sidebarBg);
+      document.documentElement.style.setProperty("--primary-light", preset.contentBg);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    function handleThemeColorUpdated(e: Event) {
+      const colorOrId = (e as CustomEvent<{ themeColor: string }>).detail?.themeColor;
+      if (colorOrId) {
+        setThemeColorState(colorOrId);
+        localStorage.setItem("theme_color", colorOrId);
+        localStorage.setItem("sejoura-theme-color", colorOrId);
+      }
+    }
+
+    window.addEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+    return () => {
+      window.removeEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -63,10 +97,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.style.setProperty("--primary", primaryColor);
       root.style.setProperty("--color-primary-foreground", contrast);
       root.style.setProperty("--primary-foreground", contrast);
+      
+      if (themeColor) {
+        const isCustomHex = themeColor.startsWith("#") &&
+          themeColor.trim().length === 7 &&
+          !THEME_PRESETS.some((p) => p.sidebarBg.toLowerCase() === themeColor!.trim().toLowerCase());
+        const sidebarBg = isCustomHex ? themeColor.trim() : getThemePresetById(themeColor).sidebarBg;
+        const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : getThemePresetById(themeColor).contentBg;
+        root.style.setProperty("--sidebar-bg", sidebarBg);
+        root.style.setProperty("--main-bg", theme === "dark" ? "#090D16" : contentBg);
+        root.style.setProperty("--primary-color", sidebarBg);
+        root.style.setProperty("--primary-light", contentBg);
+        localStorage.setItem("theme_color", themeColor);
+        localStorage.setItem("sejoura-theme-color", themeColor);
+      }
+
       localStorage.setItem("sejoura-theme", theme);
       localStorage.setItem("sejoura-primary-color", primaryColor);
     }
-  }, [theme, primaryColor, mounted]);
+  }, [theme, primaryColor, themeColor, mounted]);
 
   const toggleTheme = () => {
     setThemeState((prev) => (prev === "light" ? "dark" : "light"));
@@ -80,8 +129,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPrimaryColorState(color);
   };
 
+  const setThemeColor = (color: string | null) => {
+    setThemeColorState(color);
+    if (color) {
+      localStorage.setItem("theme_color", color);
+      localStorage.setItem("sejoura-theme-color", color);
+    } else {
+      localStorage.removeItem("theme_color");
+      localStorage.removeItem("sejoura-theme-color");
+    }
+  };
+
+
   return (
-    <ThemeContext.Provider value={{ theme, primaryColor, toggleTheme, setTheme, setPrimaryColor }}>
+    <ThemeContext.Provider value={{ theme, primaryColor, themeColor, toggleTheme, setTheme, setPrimaryColor, setThemeColor }}>
       {children}
     </ThemeContext.Provider>
   );

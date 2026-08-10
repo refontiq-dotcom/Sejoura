@@ -43,7 +43,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
           residenceType,
           residenceLocation,
           phone: "",
-          plan: "free",
+          plan: "standard",
         }),
       });
 
@@ -69,30 +69,30 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700">
-        {/* Beautiful organic gradient header */}
-        <div className="relative bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-700 p-6 text-white text-center">
+      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700">
+        {/* Beautiful organic header */}
+        <div className="relative bg-[var(--primary-color,#0C1C33)] p-6 text-white text-center">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-[-50%] left-[-10%] w-48 h-48 rounded-full bg-white blur-2xl animate-pulse" />
           </div>
           <div className="inline-flex p-3 rounded-full bg-white/10 mb-3 backdrop-blur-md shadow-inner">
-            <Home className="w-6 h-6 text-sky-100" />
+            <Home className="w-6 h-6 text-white" />
           </div>
           <h2 className="text-xl font-bold tracking-tight">{t.title}</h2>
-          <p className="text-sky-100 text-xs mt-1.5 max-w-sm mx-auto">
+          <p className="text-white/80 text-xs mt-1.5 max-w-sm mx-auto">
             {t.subtitle}
           </p>
         </div>
 
         {/* Modal Body / Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4" autoComplete="off">
+        <form onSubmit={handleSubmit} className="p-6 space-y-3" autoComplete="off">
           <input type="text" style={{ display: 'none' }} name="prevent_autofill_username" autoComplete="off" />
           <input type="password" style={{ display: 'none' }} name="prevent_autofill_password" autoComplete="off" />
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Home className="w-3.5 h-3.5 text-blue-500" />
+                <Home className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceName} <span className="text-red-500">*</span>
               </label>
               <input
@@ -102,13 +102,13 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
                 value={residenceName}
                 onChange={(e) => setResidenceName(e.target.value)}
                 placeholder="ex: Hôtel Les Acacias"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceType} <span className="text-red-500">*</span>
               </label>
               <input
@@ -118,13 +118,13 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
                 value={residenceType}
                 onChange={(e) => setResidenceType(e.target.value)}
                 placeholder="ex: Appartements meublés, 5 unités"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                <MapPin className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceLocation} <span className="text-red-500">*</span>
               </label>
               <input
@@ -134,7 +134,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
                 value={residenceLocation}
                 onChange={(e) => setResidenceLocation(e.target.value)}
                 placeholder="ex: Cocody, Abidjan"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-sm"
+            className="w-full mt-2 py-3 rounded-xl bg-[var(--primary-color,#0C1C33)] hover:opacity-90 text-white font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-sm"
           >
             {loading ? (
               <>

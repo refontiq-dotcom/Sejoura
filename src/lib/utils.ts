@@ -2,24 +2,72 @@
 // SÉJOURA — Utilitaires globaux
 // ============================================================================
 
-/**
- * Formate un montant en FCFA (XOF)
- * Ex: 15000 -> "15 000 FCFA"
- */
-export function formatFCFA(amount: number): string {
-  return new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 0,
-  }).format(amount) + " FCFA";
+import { canAccessFeature, getPlanLimits as getNormalizedPlanLimits, getPlanPrice as getNormalizedPlanPrice, normalizePlan } from "@/lib/subscription-plans";
+import { formatPrice, getCurrencySymbol } from "@/lib/currencyConverter";
+
+export { formatPrice };
+
+export function cn(...classes: (string | undefined | null | false)[]): string {
+  return classes.filter(Boolean).join(" ");
 }
 
 /**
- * Formate un montant en FCFA sans le suffixe "FCFA"
+ * Formate un montant avec le symbole de devise d'un établissement
+ * Ex: (15000, "FCFA") -> "15 000 FCFA"
+ * Ex: (15000, "€") -> "converted €"
+ * Ex: (15000, "₦") -> "converted ₦"
+ *
+ * Tous les montants en base de données sont en XOF (devise de référence).
+ * Cette fonction convertit automatiquement depuis XOF vers la devise cible.
+ */
+export function formatAmount(amount: number, symbol: string = "FCFA"): string {
+  const code = symbolToCode(symbol);
+  return formatPrice(amount, code);
+}
+
+function symbolToCode(symbol: string): string {
+  const trimmed = symbol.trim();
+  const map: Record<string, string> = {
+    "FCFA": "XOF",
+    "$": "USD",
+    "€": "EUR",
+    "₦": "NGN",
+    "₵": "GHS",
+    "FG": "GNF",
+    "FC": "CDF",
+    "DH": "MAD",
+    "DT": "TND",
+    "DA": "DZD",
+    "E£": "EGP",
+    "KSh": "KES",
+    "TSh": "TZS",
+    "USh": "UGX",
+    "FRw": "RWF",
+    "Br": "ETB",
+    "R": "ZAR",
+    "Ar": "MGA",
+    "Rs": "MUR",
+    "£": "GBP",
+  };
+  return map[trimmed] || "XOF";
+}
+
+/**
+ * Formate un montant en FCFA (XOF) par défaut
+ * Ex: 15000 -> "15 000 FCFA"
+ */
+export function formatFCFA(amount: number): string {
+  return formatPrice(amount, "XOF");
+}
+
+/**
+ * Formate un montant sans le suffixe
  * Ex: 15000 -> "15 000"
  */
 export function formatNumber(amount: number): string {
   return new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount || 0);
 }
 
 /**
@@ -198,13 +246,16 @@ export function getRoleLabel(role: string): string {
  * Retourne le libellé d'un plan d'abonnement
  */
 export function getPlanLabel(plan: string): string {
+  const normalized = normalizePlan(plan);
   const labels: Record<string, string> = {
     free: "Gratuit",
-    standard: "Standard",
-    pro: "Pro",
-    enterprise: "Enterprise",
+    trial: "Essai gratuit",
+    standard: "Essentiel",
+    essentiel: "Essentiel",
+    enterprise: "Entreprise",
+    entreprise: "Entreprise",
   };
-  return labels[plan] || plan;
+  return labels[normalized] || plan;
 }
 
 /**
@@ -295,13 +346,7 @@ export function getRoomStatusChartColor(status: string): string {
  * Retourne le prix mensuel d'un plan en FCFA
  */
 export function getPlanPrice(plan: string): number {
-  const prices: Record<string, number> = {
-    free: 0,
-    standard: 15000,
-    pro: 35000,
-    enterprise: 55000,
-  };
-  return prices[plan] || 0;
+  return getNormalizedPlanPrice(plan);
 }
 
 /**
@@ -315,46 +360,17 @@ export function getPlanLimits(plan: string): {
   hasAdvancedStats: boolean;
   hasMultiResidences: boolean;
 } {
-  const limits: Record<string, {
-    maxAccommodations: number | null;
-    maxAdmins: number;
-    maxReceptionnists: number;
-    hasCleaningModule: boolean;
-    hasAdvancedStats: boolean;
-    hasMultiResidences: boolean;
-  }> = {
-    free: {
-      maxAccommodations: 1,
-      maxAdmins: 1,
-      maxReceptionnists: 0,
-      hasCleaningModule: false,
-      hasAdvancedStats: false,
-      hasMultiResidences: false,
-    },
-    standard: {
-      maxAccommodations: 5,
-      maxAdmins: 1,
-      maxReceptionnists: 1,
-      hasCleaningModule: false,
-      hasAdvancedStats: false,
-      hasMultiResidences: false,
-    },
-    pro: {
-      maxAccommodations: null, // Illimité
-      maxAdmins: 5,
-      maxReceptionnists: 10,
-      hasCleaningModule: true,
-      hasAdvancedStats: true,
-      hasMultiResidences: false,
-    },
-    enterprise: {
-      maxAccommodations: null, // Illimité
-      maxAdmins: 999,
-      maxReceptionnists: 999,
-      hasCleaningModule: true,
-      hasAdvancedStats: true,
-      hasMultiResidences: true,
-    },
+  const limits = getNormalizedPlanLimits(plan);
+  return {
+    maxAccommodations: limits.maxAccommodations,
+    maxAdmins: limits.maxUsers ?? 2,
+    maxReceptionnists: limits.maxUsers ?? 2,
+    hasCleaningModule: limits.hasAdvancedAccounting || limits.hasExternalApi,
+    hasAdvancedStats: limits.hasAdvancedAccounting,
+    hasMultiResidences: limits.maxAccommodations === null,
   };
-  return limits[plan] || limits.free;
+}
+
+export function canAccessPlanFeature(plan: string, feature: string): boolean {
+  return canAccessFeature(feature, plan);
 }

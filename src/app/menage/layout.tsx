@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Sparkles, LogOut, Building2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
+import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import { Moon, Sun } from "lucide-react";
 
 export default function MenageLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       try {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.push("/login"); return; }
+        if (!session) { router.push(LOGIN_ROUTE); return; }
 
         const { data: userData } = await supabase
           .from("users")
@@ -27,29 +28,35 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
           .single();
 
         if (!userData || userData.role !== "menagere") {
-          router.push("/login");
+          router.push(LOGIN_ROUTE);
           return;
         }
 
         setUserName(userData.full_name);
         setLoading(false);
       } catch {
-        router.push("/login");
+        router.push(LOGIN_ROUTE);
       }
     }
     checkAuth();
   }, [router]);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Erreur silencieuse — on redirige quand même
+    } finally {
+      // L'espace Ménage est réservé aux employés (Ménagères) → rediriger vers la Page Spéciale Employés
+      window.location.href = EMPLOYEE_LOGIN_ROUTE;
+    }
   }
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
@@ -60,7 +67,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -84,7 +91,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       {/* Bottom nav mobile */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-around py-2">
-          <button className="flex flex-col items-center gap-0.5 px-4 py-1 text-indigo-600">
+          <button className="flex flex-col items-center gap-0.5 px-4 py-1 text-[var(--primary-color,#0C1C33)] font-semibold">
             <Sparkles className="w-5 h-5" />
             <span className="text-[10px] font-medium">Tâches</span>
           </button>

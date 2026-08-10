@@ -1,0 +1,1466 @@
+"use client";
+
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/hooks/use-language";
+import { useTheme } from "@/components/providers/theme-provider";
+import { PasswordStrength } from "@/components/auth/password-strength";
+import { toast } from "sonner";
+import {
+  Hotel,
+  Menu,
+  X,
+  Moon,
+  Sun,
+  ShieldCheck,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  Check,
+  Building2,
+  Calendar,
+  Wallet,
+  Users,
+  BarChart3,
+  CreditCard,
+  Globe,
+  Server,
+  Palette,
+  MessageCircle,
+} from "lucide-react";
+
+type Lang = "fr" | "en";
+
+const messages: Record<Lang, Record<string, string>> = {
+  fr: {
+    // Header
+    navFeatures: "Fonctionnalités",
+    navModules: "Modules & Innovations",
+    navPricing: "Tarifs",
+    navFaq: "FAQ",
+    contactTeam: "Contacter l'équipe",
+    // Hero
+    badge: "Solution tout-en-un pour hôtels & résidences",
+    heroTitle: "La gestion simple de vos résidences et hôtels",
+    heroSubtitle:
+      "Zéro frais d'installation. Suivez vos paiements, vos équipes et votre caisse, jour après jour.",
+    dashboardPreview: "Tableau de bord gérant en temps réel",
+    dashboardPreviewDesc: "Suivi des chambres libres, caisse & réservations",
+    dataProtected: "Vos données sont protégées et confidentielles",
+    umoaCompliant: "Conforme aux règles bancaires de la région (UMOA)",
+    // Auth
+    signIn: "Connexion",
+    signUp: "Inscription",
+    managerSpace: "Espace Gérant",
+    createAccount: "Créer un compte",
+    email: "Email professionnel",
+    password: "Mot de passe",
+    rememberMe: "Se souvenir de moi",
+    forgotPassword: "Mot de passe oublié ?",
+    loginBtn: "Se connecter",
+    establishmentName: "Nom de l'établissement",
+    establishmentType: "Type d'établissement",
+    typeBnb: "Résidence Meublée (BnB)",
+    typeHotel: "Hôtel",
+    fullName: "Nom complet",
+    city: "Ville / Localisation",
+    phone: "Téléphone",
+    confirmPassword: "Confirmer le mot de passe",
+    signUpBtn: "S'inscrire (Essai gratuit)",
+    noCardRequired: "Sans carte bancaire requise.",
+    acceptTerms: "J'accepte les",
+    terms: "CGU",
+    privateInfo: "Vos informations restent privées",
+    // Footer
+    footerRights: "© 2026 Séjoura — Tous droits réservés. Zéro frais d'installation.",
+    footerContact: "Abidjan, Côte d'Ivoire • Contact : +225 00 00 00 00 00",
+    // Modal
+    closeModal: "Fermer & Revenir au portail",
+    // Validation
+    emailInvalid: "Adresse e-mail invalide.",
+    passwordShort: "Le mot de passe doit comporter au moins 6 caractères.",
+    passwordMismatch: "Les mots de passe ne correspondent pas.",
+    termsError: "Vous devez accepter les conditions d'utilisation.",
+    fullNameRequired: "Le nom complet est requis.",
+    cityRequired: "La ville est requise.",
+    loginError: "Adresse e-mail ou mot de passe incorrect.",
+    signupError: "Une erreur est survenue lors de l'inscription.",
+    generalError: "Une erreur est survenue. Veuillez réessayer.",
+    loginSuccess: "Connexion réussie !",
+    signupSuccess: "Compte créé avec succès !",
+    signing: "Connexion en cours...",
+    creating: "Création du compte...",
+    or: "ou",
+    signInWith: "Se connecter avec Google",
+    signUpWith: "Continuer avec Google",
+    // Misc
+    langLabel: "Langue",
+    themeToggle: "Changer le thème",
+    menuToggle: "Ouvrir le menu",
+    features: "Fonctionnalités",
+    modules: "Modules & Innovations",
+    pricing: "Tarifs",
+    faq: "FAQ",
+  },
+  en: {
+    navFeatures: "Features",
+    navModules: "Modules & Innovations",
+    navPricing: "Pricing",
+    navFaq: "FAQ",
+    contactTeam: "Contact Team",
+    badge: "All-in-one solution for hotels & residences",
+    heroTitle: "Simple management for your residences and hotels",
+    heroSubtitle:
+      "Zero setup fees. Track your payments, your teams and your cash, day after day.",
+    dashboardPreview: "Real-time manager dashboard",
+    dashboardPreviewDesc: "Track available rooms, cash & reservations",
+    dataProtected: "Your data is protected and confidential",
+    umoaCompliant: "Compliant with regional banking rules (UMOA)",
+    signIn: "Sign in",
+    signUp: "Sign up",
+    managerSpace: "Manager Space",
+    createAccount: "Create account",
+    email: "Professional email",
+    password: "Password",
+    rememberMe: "Remember me",
+    forgotPassword: "Forgot password?",
+    loginBtn: "Sign in",
+    establishmentName: "Establishment name",
+    establishmentType: "Establishment type",
+    typeBnb: "Furnished Residence (BnB)",
+    typeHotel: "Hotel",
+    fullName: "Full name",
+    city: "City / Location",
+    phone: "Phone",
+    confirmPassword: "Confirm password",
+    signUpBtn: "Sign up (Free trial)",
+    noCardRequired: "No credit card required.",
+    acceptTerms: "I accept the",
+    terms: "Terms",
+    privateInfo: "Your information stays private",
+    footerRights: "© 2026 Séjoura — All rights reserved. Zero setup fees.",
+    footerContact: "Abidjan, Côte d'Ivoire • Contact: +225 00 00 00 00 00",
+    closeModal: "Close & Return to portal",
+    emailInvalid: "Invalid email address.",
+    passwordShort: "Password must be at least 6 characters.",
+    passwordMismatch: "Passwords do not match.",
+    termsError: "You must accept the terms and conditions.",
+    fullNameRequired: "Full name is required.",
+    cityRequired: "City is required.",
+    loginError: "Incorrect email or password.",
+    signupError: "An error occurred during registration.",
+    generalError: "An error occurred. Please try again.",
+    loginSuccess: "Login successful!",
+    signupSuccess: "Account created successfully!",
+    signing: "Signing in...",
+    creating: "Creating account...",
+    or: "or",
+    signInWith: "Sign in with Google",
+    signUpWith: "Continue with Google",
+    langLabel: "Language",
+    themeToggle: "Toggle theme",
+    menuToggle: "Open menu",
+    features: "Features",
+    modules: "Modules & Innovations",
+    pricing: "Pricing",
+    faq: "FAQ",
+  },
+};
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+type SectionName = "Fonctionnalités" | "Modules" | "Tarifs" | "FAQ" | null;
+
+export function HomePage() {
+  const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+  const { lang, toggle: toggleLang } = useLanguage();
+  const t = messages[lang];
+
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionName>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Form state
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [establishmentName, setEstablishmentName] = useState("");
+  const [establishmentType, setEstablishmentType] = useState("bnb");
+  const [city, setCity] = useState("");
+  const [phone, setPhone] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    fullName?: string;
+    city?: string;
+  }>({});
+
+  // Modal focus trap refs
+  const modalRef = useRef<HTMLDivElement>(null);
+  const modalCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Mount skip link after hydration to avoid SSR mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close modal on Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (activeSection) {
+          setActiveSection(null);
+        }
+        if (mobileMenuOpen) {
+          setMobileMenuOpen(false);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeSection, mobileMenuOpen]);
+
+  // Focus trap for modal
+  useEffect(() => {
+    if (activeSection && modalCloseRef.current) {
+      modalCloseRef.current.focus();
+
+      function trapFocus(e: KeyboardEvent) {
+        if (e.key !== "Tab" || !modalRef.current) return;
+        const focusable = modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0] as HTMLElement;
+        const last = focusable[focusable.length - 1] as HTMLElement;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      window.addEventListener("keydown", trapFocus);
+      return () => window.removeEventListener("keydown", trapFocus);
+    }
+  }, [activeSection]);
+
+  // Lock body scroll when modal or mobile menu is open
+  useEffect(() => {
+    if (activeSection || mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [activeSection, mobileMenuOpen]);
+
+  const clearErrors = useCallback(() => {
+    setErrors({});
+  }, []);
+
+  function openSection(section: SectionName) {
+    setActiveSection(section);
+    setMobileMenuOpen(false);
+  }
+
+  async function handleGoogleAuth() {
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      if (error) {
+        toast.error(t.generalError);
+        setLoading(false);
+      }
+    } catch {
+      toast.error(t.generalError);
+      setLoading(false);
+    }
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    clearErrors();
+
+    const newErrors: typeof errors = {};
+    if (!isValidEmail(email)) newErrors.email = t.emailInvalid;
+    if (password.length < 6) newErrors.password = t.passwordShort;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error(lang === "fr" ? "Veuillez corriger les erreurs." : "Please fix the errors.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        toast.error(t.loginError);
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      let targetRoute = "/dashboard";
+      if (session) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("role")
+          .eq("auth_user_id", session.user.id)
+          .maybeSingle();
+        if (userData?.role === "menagere") {
+          targetRoute = "/menage";
+        }
+      }
+
+      toast.success(t.loginSuccess);
+      setEmail("");
+      setPassword("");
+      setTimeout(() => router.push(targetRoute), 800);
+    } catch {
+      toast.error(t.generalError);
+      setLoading(false);
+    }
+  }
+
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    clearErrors();
+
+    const newErrors: typeof errors = {};
+    if (!fullName.trim()) newErrors.fullName = t.fullNameRequired;
+    if (!isValidEmail(email)) newErrors.email = t.emailInvalid;
+    if (password.length < 6) newErrors.password = t.passwordShort;
+    if (password !== confirmPassword) newErrors.confirmPassword = t.passwordMismatch;
+    if (!city.trim()) newErrors.city = t.cityRequired;
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error(lang === "fr" ? "Veuillez corriger les erreurs." : "Please fix the errors.");
+      return;
+    }
+
+    if (!agreeTerms) {
+      toast.error(t.termsError);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            residence_name: establishmentName,
+            residence_type: establishmentType,
+            residence_location: city,
+            phone: phone,
+          },
+        },
+      });
+
+      if (authError) {
+        toast.error(t.signupError);
+        setLoading(false);
+        return;
+      }
+
+      if (authData.user) {
+        // Call the register API to create tenant, subscription, accommodation, and user profile
+        try {
+          await fetch("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              fullName,
+              residenceName: establishmentName,
+              residenceType: establishmentType,
+              residenceLocation: city,
+              phone,
+              plan: "standard",
+            }),
+          });
+        } catch {
+          // Registration API might fail if session isn't ready yet; user can retry later
+        }
+
+        toast.success(t.signupSuccess);
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setEstablishmentName("");
+        setCity("");
+        setPhone("");
+        setAgreeTerms(false);
+        setErrors({});
+        setMode("login");
+        setLoading(false);
+      }
+    } catch {
+      toast.error(t.generalError);
+      setLoading(false);
+    }
+  }
+
+  // Modal content
+  const modalContent: Record<string, React.ReactNode> = {
+    Fonctionnalités: (
+      <div className="space-y-3">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
+          {lang === "fr" ? "Le quotidien simplifié" : "Simplified daily life"}
+        </h4>
+        <ul className="space-y-3 text-sm">
+          {[
+            {
+              icon: Calendar,
+              title: lang === "fr" ? "Réservations" : "Reservations",
+              desc:
+                lang === "fr"
+                  ? "Enregistrez chaque réservation et voyez en un coup d'œil qui arrive, qui part, et quelles chambres sont libres."
+                  : "Record each reservation and see at a glance who arrives, who leaves, and which rooms are available.",
+            },
+            {
+              icon: Wallet,
+              title: lang === "fr" ? "Facturation automatique" : "Automatic invoicing",
+              desc:
+                lang === "fr"
+                  ? "Créez une facture en un clic. Elle est prête à envoyer au client, sans calcul à la main."
+                  : "Create an invoice in one click. Ready to send to the client, no manual calculation.",
+            },
+            {
+              icon: CreditCard,
+              title: lang === "fr" ? "Suivi des paiements" : "Payment tracking",
+              desc:
+                lang === "fr"
+                  ? "Enregistrez si le client a payé en espèces ou par Mobile Money (Orange, MTN, Moov, Wave) — tout est noté et retrouvable facilement."
+                  : "Record whether the client paid in cash or via Mobile Money — everything is noted and easily searchable.",
+            },
+            {
+              icon: Wallet,
+              title: lang === "fr" ? "Suivi de la caisse" : "Cash tracking",
+              desc:
+                lang === "fr"
+                  ? "Voyez chaque jour combien d'argent est entré et sorti de votre établissement, sans tenir un cahier à part."
+                  : "See each day how much money entered and left your establishment.",
+            },
+            {
+              icon: Users,
+              title: lang === "fr" ? "Gestion des équipes" : "Team management",
+              desc:
+                lang === "fr"
+                  ? "Organisez les horaires de votre personnel (qui travaille quand) sans confusion ni oubli."
+                  : "Organize your staff schedules without confusion or forgetting.",
+            },
+            {
+              icon: BarChart3,
+              title: lang === "fr" ? "Rapports simples" : "Simple reports",
+              desc:
+                lang === "fr"
+                  ? "Voyez en un coup d'œil combien vous avez gagné ce mois-ci — pas de tableau compliqué à lire."
+                  : "See at a glance how much you earned this month — no complicated spreadsheets.",
+            },
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <item.icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <strong className="text-slate-900 dark:text-[#e8e8e8]">{item.title} :</strong>{" "}
+                <span className="text-slate-600 dark:text-[#c0c0c0]">{item.desc}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+    Modules: (
+      <div className="space-y-3">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
+          {lang === "fr" ? "Fonctions avancées (Plan Enterprise)" : "Advanced features (Enterprise Plan)"}
+        </h4>
+        <ul className="space-y-3 text-sm">
+          {[
+            {
+              icon: CreditCard,
+              title: lang === "fr" ? "Paiement en ligne automatique" : "Automatic online payment",
+              desc:
+                lang === "fr"
+                  ? "Vos clients paient directement par Mobile Money ou Wave depuis leur téléphone, et l'argent est enregistré automatiquement dans Séjoura."
+                  : "Your clients pay directly via Mobile Money or Wave from their phone, automatically recorded in Séjoura.",
+            },
+            {
+              icon: Globe,
+              title: lang === "fr" ? "Moteur de réservation en ligne" : "Online booking engine",
+              desc:
+                lang === "fr"
+                  ? "Un bouton ou un lien « Réserver » à ajouter sur votre site déjà existant."
+                  : "A \"Book\" button or link to add to your existing website.",
+            },
+            {
+              icon: Server,
+              title: "Accès API",
+              desc:
+                lang === "fr"
+                  ? "Permet à votre site ou à une autre application de se connecter directement à Séjoura."
+                  : "Allows your site or another app to connect directly to Séjoura.",
+            },
+            {
+              icon: Palette,
+              title: lang === "fr" ? "Marque blanche" : "White label",
+              desc:
+                lang === "fr"
+                  ? "Vos clients voient votre logo et vos couleurs, jamais le nom « Séjoura »."
+                  : "Your clients see your logo and colors, never the name \"Séjoura\".",
+            },
+            {
+              icon: Building2,
+              title:
+                lang === "fr" ? "Vue multi-établissements" : "Multi-establishment overview",
+              desc:
+                lang === "fr"
+                  ? "Si vous gérez plusieurs résidences ou hôtels, voyez les chiffres de tous vos établissements sur un seul écran."
+                  : "If you manage multiple residences or hotels, see all your establishments' figures on one screen.",
+            },
+            {
+              icon: ShieldCheck,
+              title:
+                lang === "fr" ? "Sécurité aux normes bancaires (UMOA)" : "Bank-grade security (UMOA)",
+              desc:
+                lang === "fr"
+                  ? "Vos transactions respectent les mêmes règles de sécurité que les banques de la région."
+                  : "Your transactions follow the same security rules as regional banks.",
+            },
+          ].map((item, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                <item.icon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <strong className="text-slate-900 dark:text-[#e8e8e8]">{item.title} :</strong>{" "}
+                <span className="text-slate-600 dark:text-[#c0c0c0]">{item.desc}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+    Tarifs: (
+      <div className="space-y-5">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
+          {lang === "fr" ? "Des tarifs simples. Zéro piège." : "Simple pricing. No tricks."}
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Standard */}
+          <div className="bg-slate-50 dark:bg-[#262626]/60 p-6 rounded-2xl border border-slate-200 dark:border-[#404040]">
+            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl">
+              {lang === "fr" ? "Standard" : "Standard"}
+            </h5>
+            <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
+              {lang === "fr" ? "5 établissements maximum" : "Up to 5 establishments"}
+            </p>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
+              15 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+            </div>
+            <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "1 admin + 1 réceptionniste" : "1 admin + 1 receptionist"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Réservations et check-in/out" : "Reservations and check-in/out"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Comptabilité de base" : "Basic accounting"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Support par email" : "Email support"}
+              </li>
+            </ul>
+          </div>
+          {/* Enterprise */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border-2 border-blue-500 shadow-lg shadow-blue-100 dark:shadow-blue-900/20 relative">
+            <span className="absolute -top-3 left-6 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+              {lang === "fr" ? "Le plus choisi" : "Most chosen"}
+            </span>
+            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl mt-1">
+              Enterprise
+            </h5>
+            <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
+              {lang === "fr" ? "Établissements illimités & API" : "Unlimited establishments & API"}
+            </p>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
+              55 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+            </div>
+            <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Établissements & utilisateurs illimités" : "Unlimited establishments & users"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Module ménage & statistiques avancées" : "Cleaning module & advanced statistics"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Passerelles Wave & PI-SPI" : "Wave & PI-SPI gateways"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Marque blanche, API & WhatsApp Business" : "White label, API & WhatsApp Business"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Rapports consolidés & support dédié 24/7" : "Consolidated reports & dedicated 24/7 support"}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    ),
+    FAQ: (
+      <div className="space-y-3">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-4 border-b border-slate-200 dark:border-[#404040] pb-2">
+          {lang === "fr" ? "Questions fréquentes" : "Frequently asked questions"}
+        </h4>
+        <div className="space-y-3 text-sm">
+          {[
+            {
+              q: lang === "fr" ? "C'est quoi Séjoura ?" : "What is Séjoura?",
+              a:
+                lang === "fr"
+                  ? "Un logiciel simple pour gérer votre hôtel ou votre résidence meublée : réservations, factures, paiements et personnel, le tout au même endroit."
+                  : "A simple software to manage your hotel or furnished residence: reservations, invoices, payments and staff, all in one place.",
+            },
+            {
+              q: lang === "fr" ? "Frais d'installation ?" : "Setup fees?",
+              a:
+                lang === "fr"
+                  ? "Non. Séjoura ne facture aucun frais pour démarrer. Vous payez seulement votre abonnement mensuel."
+                  : "No. Séjoura charges no fees to start. You only pay your monthly subscription.",
+            },
+            {
+              q: lang === "fr" ? "Différence entre les deux offres ?" : "Difference between the two plans?",
+              a:
+                lang === "fr"
+                  ? "Le plan Standard (15 000 FCFA/mois) convient jusqu'à 5 établissements avec 1 admin et 1 réceptionniste. Le plan Enterprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage, les statistiques avancées, les passerelles de paiement Wave & PI-SPI, la marque blanche, l'API WhatsApp Business et un support dédié 24/7."
+                  : "The Standard plan (15,000 FCFA/month) suits up to 5 establishments with 1 admin and 1 receptionist. The Enterprise plan (55,000 FCFA/month) adds unlimited establishments, cleaning module, advanced statistics, Wave & PI-SPI payment gateways, white label, WhatsApp Business API and dedicated 24/7 support.",
+            },
+            {
+              q: lang === "fr" ? "Comment mes clients paient-ils ?" : "How do my clients pay?",
+              a:
+                lang === "fr"
+                  ? "Avec le plan Standard : en espèces ou par Mobile Money directement avec vous. Avec le plan Enterprise : directement en ligne par Mobile Money ou Wave, encaissé et suivi automatiquement."
+                  : "With Standard: in cash or via Mobile Money directly with you. With Enterprise: directly online via Mobile Money or Wave, automatically collected and tracked.",
+            },
+            {
+              q: lang === "fr" ? "Ai-je besoin d'un site web ?" : "Do I need a website?",
+              a:
+                lang === "fr"
+                  ? "Non. Séjoura fonctionne même sans site web. Si vous avez déjà un site, on peut y ajouter un simple bouton de réservation."
+                  : "No. Séjoura works even without a website. If you have one, we can add a simple booking button.",
+            },
+            {
+              q: lang === "fr" ? "Mes données sont-elles en sécurité ?" : "Is my data safe?",
+              a:
+                lang === "fr"
+                  ? "Oui. Vos informations et celles de vos clients sont protégées et ne sont jamais visibles par un autre établissement."
+                  : "Yes. Your information and your clients' data are protected and never visible to other establishments.",
+            },
+            {
+              q: lang === "fr" ? "Puis-je annuler mon abonnement ?" : "Can I cancel my subscription?",
+              a: lang === "fr" ? "Oui, sans engagement ni pénalité." : "Yes, no commitment or penalty.",
+            },
+            {
+              q: lang === "fr" ? "Combien de temps pour apprendre ?" : "How long to learn?",
+              a:
+                lang === "fr"
+                  ? "Quelques minutes. Une première réservation peut être créée en moins de 2 minutes, sans formation nécessaire."
+                  : "A few minutes. A first reservation can be created in under 2 minutes, no training needed.",
+            },
+            {
+              q: lang === "fr" ? "C'est quoi la « Marque blanche » ?" : "What is \"White label\"?",
+              a:
+                lang === "fr"
+                  ? "C'est une option qui permet à votre établissement d'utiliser Séjoura sous votre propre nom et logo, sans que vos clients voient le nom « Séjoura »."
+                  : "An option that lets your establishment use Séjoura under your own name and logo.",
+            },
+            {
+              q: lang === "fr" ? "C'est quoi une « API » ?" : "What is an \"API\"?",
+              a:
+                lang === "fr"
+                  ? "C'est un outil technique qui permet à votre site web de se connecter directement à Séjoura. Utile seulement si vous avez déjà un développeur."
+                  : "A technical tool that lets your website connect directly to Séjoura. Only useful if you have a developer.",
+            },
+          ].map((item, i) => (
+            <div
+              key={i}
+              className="bg-slate-50 dark:bg-[#262626]/60 p-3.5 rounded-xl border border-slate-100 dark:border-[#404040]"
+            >
+              <strong className="text-slate-900 dark:text-[#e8e8e8] block mb-1">{item.q}</strong>
+              <p className="text-slate-600 dark:text-[#c0c0c0]">{item.a}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+  };
+
+  const navItems = [
+    { label: t.navFeatures, section: "Fonctionnalités" as const },
+    { label: t.navModules, section: "Modules" as const },
+    { label: t.navPricing, section: "Tarifs" as const },
+    { label: t.navFaq, section: "FAQ" as const },
+  ];
+
+  return (
+    <div className="relative h-screen flex flex-col text-white overflow-hidden">
+      {/* Full-screen panoramic background with dark overlay */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
+      </div>
+
+      {/* Skip link for accessibility - rendered after client mount to avoid hydration mismatch */}
+      {mounted && (
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm"
+        >
+          {lang === "fr" ? "Aller au contenu principal" : "Skip to main content"}
+        </a>
+      )}
+
+      {/* Header */}
+      <header className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
+        {/* Logo */}
+        <div className="flex items-center">
+          <Image
+            src="/logo-sejoura.png"
+            alt="Séjoura"
+            width={140}
+            height={40}
+            className="object-contain h-9 w-auto brightness-0 invert"
+            priority
+          />
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav
+          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-white/80 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-lg"
+          aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
+        >
+          {navItems.map((item) => (
+            <button
+              key={item.section}
+              onClick={() => openSection(item.section)}
+              className="hover:text-white transition-colors"
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Right actions */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Language toggle */}
+          <button
+            onClick={toggleLang}
+            className="px-2.5 py-2 rounded-lg text-[10px] font-medium bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.langLabel}
+          >
+            {lang === "fr" ? "FR" : "EN"}
+          </button>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.themeToggle}
+          >
+            {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
+          </button>
+
+          {/* WhatsApp contact */}
+          <a
+            href="https://wa.me/2250100372900"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex px-4 py-2.5 bg-[#25D366] hover:bg-[#1DA851] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
+          >
+            <MessageCircle className="w-4 h-4" />
+            {t.contactTeam}
+          </a>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.menuToggle}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div
+          ref={mobileMenuRef}
+          id="mobile-menu"
+          className="md:hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div
+            className="absolute top-0 right-0 w-72 h-full bg-white dark:bg-[#1a1a1a] shadow-2xl p-6 animate-slide-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <span className="font-bold text-slate-900 dark:text-[#e8e8e8]">
+                {lang === "fr" ? "Menu" : "Menu"}
+              </span>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-[#2e2e2e]"
+                aria-label="Fermer le menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="flex flex-col space-y-3" aria-label={lang === "fr" ? "Navigation mobile" : "Mobile navigation"}>
+              {navItems.map((item) => (
+                <button
+                  key={item.section}
+                  onClick={() => openSection(item.section)}
+                  className="text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 dark:text-[#c0c0c0] bg-slate-50 dark:bg-[#262626] hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-colors"
+                >
+                  {item.label}
+                </button>
+              ))}
+              <a
+                href="https://wa.me/2250100372900"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 px-4 py-3 bg-[#25D366] hover:bg-[#1DA851] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {t.contactTeam}
+              </a>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      <main
+        id="main-content"
+        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-4 sm:py-6"
+      >
+        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-6 lg:gap-12 min-h-[500px] lg:min-h-[600px]">
+          {/* Left side — Hero text on panoramic background */}
+          <div className="relative lg:flex-1 flex flex-col justify-center text-white">
+            <div className="space-y-3 max-w-lg">
+              <span className="inline-block px-3.5 py-1 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-white uppercase tracking-widest backdrop-blur-md">
+                {t.badge}
+              </span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
+                {t.heroTitle}
+              </h1>
+              <p className="text-blue-100 text-sm font-light leading-relaxed">
+                {t.heroSubtitle}
+              </p>
+
+              {/* App preview card */}
+              <div className="pt-2">
+                <div className="bg-white/10 border border-white/20 p-3 rounded-2xl backdrop-blur-md flex items-center gap-4 shadow-lg">
+                  <div className="relative w-16 h-12 rounded-xl overflow-hidden shadow shrink-0">
+                    <Image
+                      src="https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=300&auto=format&fit=crop"
+                      alt={t.dashboardPreview}
+                      fill
+                      sizes="64px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">{t.dashboardPreview}</p>
+                    <p className="text-[11px] text-blue-200">{t.dashboardPreviewDesc}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Right side — Floating auth card */}
+          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-6 sm:p-7 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-180px)] overflow-y-auto">
+            {/* Tab switcher */}
+            <div>
+              <div
+                className="flex bg-slate-100 dark:bg-[#262626] p-1 rounded-xl mb-6 border border-slate-200 dark:border-[#333333]"
+                role="tablist"
+                aria-label={lang === "fr" ? "Authentification" : "Authentication"}
+              >
+                <button
+                  onClick={() => setMode("login")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                    mode === "login"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
+                  }`}
+                  role="tab"
+                  aria-selected={mode === "login"}
+                  aria-controls="form-login"
+                >
+                  {t.signIn}
+                </button>
+                <button
+                  onClick={() => setMode("signup")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                    mode === "signup"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
+                  }`}
+                  role="tab"
+                  aria-selected={mode === "signup"}
+                  aria-controls="form-signup"
+                >
+                  {t.signUp}
+                </button>
+              </div>
+
+              {/* Login form */}
+              {mode === "login" && (
+                <div id="form-login" role="tabpanel" className="space-y-3">
+                  <h2 className="text-xl font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                    {t.managerSpace}
+                  </h2>
+                  <form onSubmit={handleLogin} className="space-y-3 mt-2" noValidate>
+                    <div>
+                      <label
+                        htmlFor="login-email"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.email}
+                      </label>
+                      <input
+                        id="login-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="contact@sejoura.com"
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.email
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="login-password"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.password}
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="login-password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          required
+                          minLength={6}
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            clearErrors();
+                          }}
+                          placeholder="••••••••"
+                          className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                            errors.password
+                              ? "border-red-400 dark:border-red-500"
+                              : "border-slate-200 dark:border-[#404040]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]"
+                          aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 pb-1">
+                      <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer hover:text-slate-700 dark:hover:text-[#e8e8e8] transition-colors">
+                        <input
+                          type="checkbox"
+                          name="remember"
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3 h-3 cursor-pointer"
+                        />
+                        {t.rememberMe}
+                      </label>
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                      >
+                        {t.forgotPassword}
+                      </Link>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t.signing}
+                        </>
+                      ) : (
+                        t.loginBtn
+                      )}
+                    </button>
+                  </form>
+
+                  {/* Divider */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
+                        {t.or}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Google sign-in */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    disabled={loading}
+                    className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                      </svg>
+                    )}
+                    {t.signInWith}
+                  </button>
+                </div>
+              )}
+
+              {/* Signup form */}
+              {mode === "signup" && (
+                <div id="form-signup" role="tabpanel" className="space-y-3">
+                  <h2 className="text-xl font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                    {t.createAccount}
+                  </h2>
+                  <form onSubmit={handleSignUp} className="space-y-2.5 mt-2" noValidate>
+                    <div>
+                      <label
+                        htmlFor="signup-fullname"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.fullName}
+                      </label>
+                      <input
+                        id="signup-fullname"
+                        name="fullName"
+                        type="text"
+                        autoComplete="name"
+                        required
+                        value={fullName}
+                        onChange={(e) => {
+                          setFullName(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="Jean Kouassi"
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.fullName
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.fullName && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.fullName}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-establishment"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.establishmentName}
+                      </label>
+                      <input
+                        id="signup-establishment"
+                        name="establishmentName"
+                        type="text"
+                        required
+                        value={establishmentName}
+                        onChange={(e) => setEstablishmentName(e.target.value)}
+                        placeholder={lang === "fr" ? "Ex: Résidence Riviera Luxe" : "Ex: Riviera Luxe Residence"}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-type"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.establishmentType}
+                      </label>
+                      <select
+                        id="signup-type"
+                        name="establishmentType"
+                        required
+                        value={establishmentType}
+                        onChange={(e) => setEstablishmentType(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
+                      >
+                        <option value="bnb">{t.typeBnb}</option>
+                        <option value="hotel">{t.typeHotel}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-city"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.city}
+                      </label>
+                      <input
+                        id="signup-city"
+                        name="city"
+                        type="text"
+                        autoComplete="address-level2"
+                        required
+                        value={city}
+                        onChange={(e) => {
+                          setCity(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder={lang === "fr" ? "Ex: Abidjan" : "Ex: Abidjan"}
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.city
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.city && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.city}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-phone"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.phone}
+                      </label>
+                      <input
+                        id="signup-phone"
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+225 00 00 00 00 00"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-email"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.email}
+                      </label>
+                      <input
+                        id="signup-email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="contact@sejoura.com"
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.email
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-password"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.password}
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="signup-password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          required
+                          minLength={6}
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            clearErrors();
+                          }}
+                          placeholder="••••••••"
+                          className={`w-full px-3 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                            errors.password
+                              ? "border-red-400 dark:border-red-500"
+                              : "border-slate-200 dark:border-[#404040]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]"
+                          aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>
+                      )}
+                      <PasswordStrength password={password} />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-confirm"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.confirmPassword}
+                      </label>
+                      <input
+                        id="signup-confirm"
+                        name="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        required
+                        minLength={6}
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="••••••••"
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.confirmPassword
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.confirmPassword && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">
+                          {errors.confirmPassword}
+                        </p>
+                      )}
+                    </div>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
+                      <input
+                        id="terms"
+                        type="checkbox"
+                        checked={agreeTerms}
+                        onChange={(e) => setAgreeTerms(e.target.checked)}
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]"
+                      />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0] group-hover:text-slate-900 dark:group-hover:text-[#e8e8e8] transition-colors">
+                        {t.acceptTerms}{" "}
+                        <Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
+                          {t.terms}
+                        </Link>
+                      </span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full mt-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t.creating}
+                        </>
+                      ) : (
+                        t.signUpBtn
+                      )}
+                    </button>
+                    <p className="text-center text-[10px] text-slate-500 dark:text-[#a0a0a0] font-medium">
+                      {t.noCardRequired}
+                    </p>
+                  </form>
+
+                  {/* Divider */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
+                        {t.or}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Google sign-up */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleAuth}
+                    disabled={loading}
+                    className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                      </svg>
+                    )}
+                    {t.signUpWith}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-[#333333] text-center">
+              <p className="text-[10px] text-slate-500 dark:text-[#a0a0a0] font-bold">
+                <Lock className="w-3 h-3 text-slate-300 dark:text-[#666666] inline mr-1" />
+                {t.privateInfo}
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-6 text-xs text-white/75 space-y-2 px-4">
+        <p>{t.footerRights}</p>
+      </footer>
+
+      {/* Modal */}
+      {activeSection && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setActiveSection(null)}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#404040] text-slate-800 dark:text-[#e8e8e8] w-full max-w-3xl rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[85vh] overflow-y-auto animate-modal-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              ref={modalCloseRef}
+              onClick={() => setActiveSection(null)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-[#ffffff] p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2e2e2e] transition-colors"
+              aria-label="Fermer la modale"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 id="modal-title" className="text-2xl font-black text-slate-900 dark:text-[#e8e8e8] mb-4 pr-8">
+              {activeSection} — Séjoura
+            </h3>
+            <div className="text-slate-600 dark:text-[#c0c0c0] text-sm space-y-3 leading-relaxed">
+              {modalContent[activeSection]}
+            </div>
+            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-[#333333] flex justify-end">
+              <button
+                onClick={() => setActiveSection(null)}
+                className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition-colors shadow-md"
+              >
+                {t.closeModal}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

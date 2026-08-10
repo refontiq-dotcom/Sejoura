@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { formatFCFA, getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
-import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle } from "lucide-react";
+import { formatAmount, getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
+import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye } from "lucide-react";
 import type { Accommodation, RoomType, Room } from "@/types/database";
 
 export default function ResidenceDetailPage() {
@@ -18,6 +18,7 @@ export default function ResidenceDetailPage() {
   const residenceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [residence, setResidence] = useState<Accommodation | null>(null);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -34,23 +35,27 @@ export default function ResidenceDetailPage() {
   const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "" });
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
+  const [roomNumberError, setRoomNumberError] = useState("");
 
   async function loadData() {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.push("/login");
+        window.location.href = "/";
         return;
       }
 
       const { data: userData } = await supabase
         .from("users")
-        .select("tenant_id")
+        .select("tenant_id, role")
         .eq("auth_user_id", session.user.id)
         .single();
 
       if (!userData?.tenant_id) return;
+
+      // Mode lecture seule pour les réceptionnistes
+      setIsReadOnly(userData.role === "receptionniste");
 
       const { data: subData } = await supabase
         .from("subscriptions")
@@ -107,19 +112,19 @@ export default function ResidenceDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
 
   if (!residence) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4 animate-fade-in">
+      <div className="flex flex-col items-center justify-center h-96 space-y-3 animate-fade-in">
         <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
         </div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Établissement introuvable</h2>
-        <p className="text-slate-500 dark:text-slate-400">Cet établissement n'existe pas ou a été supprimé.</p>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Établissement introuvable</h2>
+        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Cet établissement n'existe pas ou a été supprimé.</p>
         <Button onClick={() => router.push("/dashboard/residences")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Retour aux établissements
         </Button>
@@ -212,6 +217,7 @@ export default function ResidenceDetailPage() {
       return;
     }
     setLoading(true);
+    setRoomNumberError("");
     try {
       const supabase = createClient();
       if (editingRoom) {
@@ -231,8 +237,16 @@ export default function ResidenceDetailPage() {
       setRoomModalOpen(false);
       loadData();
       toast.success(editingRoom ? "Chambre modifiée" : "Chambre créée");
-    } catch (err) {
-      toast.error("Impossible d'enregistrer la chambre.");
+    } catch (err: any) {
+      const message = err?.message || "";
+      const code = err?.code || "";
+      if (code === "23505" || message.toLowerCase().includes("duplicate") || message.toLowerCase().includes("unique")) {
+        const errorMessage = "Ce numéro de chambre est déjà utilisé. Veuillez en choisir un autre.";
+        setRoomNumberError(errorMessage);
+        toast.error(errorMessage);
+      } else {
+        toast.error("Impossible d'enregistrer la chambre.");
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -311,87 +325,91 @@ export default function ResidenceDetailPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/residences")}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Retour
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{residence.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {rooms.length} chambre{rooms.length > 1 ? "s" : ""} · {currentTypes.length} type{currentTypes.length > 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={openEditResidenceModal}>
-            <Edit2 className="w-4 h-4" /> Modifier l&apos;établissement
-          </Button>
-           <Button variant="outline" onClick={() => { setDeleteItem({ type: "residence", id: residence.id, name: residence.name }); setDeleteConfirmOpen(true); }} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement">
-             <Trash2 className="w-4 h-4" />
-           </Button>
-        </div>
-      </div>
-
-      {/* Infos établissement */}
-      <Card className="p-5 border-t-4 border-t-indigo-500 dark:border-t-indigo-400">
-        <div className="flex items-start">
-          <div className="space-y-2">
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">{residence.name}</h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
             {(residence.address || residence.city) && (
-              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 flex-shrink-0" />
-                <span>{residence.address}{residence.address && residence.city ? ", " : ""}{residence.city}</span>
-              </div>
+                {residence.address}{residence.address && residence.city ? ", " : ""}{residence.city}
+              </span>
             )}
             {residence.contact_phone && (
-              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1.5">
                 <Phone className="w-4 h-4 flex-shrink-0" />
-                <span>{residence.contact_phone}</span>
-              </div>
+                {residence.contact_phone}
+              </span>
             )}
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
               <BedDouble className="w-4 h-4 flex-shrink-0" />
-              <span>{residence.total_rooms} chambre{residence.total_rooms > 1 ? "s" : ""}</span>
-            </div>
+              {rooms.length} chambre{rooms.length > 1 ? "s" : ""} · {currentTypes.length} type{currentTypes.length > 1 ? "s" : ""}
+            </span>
           </div>
         </div>
-      </Card>
+        {isReadOnly ? (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <Eye className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">Lecture seule</span>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={openEditResidenceModal}>
+              <Edit2 className="w-4 h-4" /> Modifier l'établissement
+            </Button>
+             <Button variant="outline" onClick={() => { setDeleteItem({ type: "residence", id: residence.id, name: residence.name }); setDeleteConfirmOpen(true); }} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement">
+               <Trash2 className="w-4 h-4" />
+             </Button>
+          </div>
+        )}
+      </div>
 
       {/* Types de chambre */}
-      <Card className="p-5 border-t-4 border-t-indigo-500 dark:border-t-indigo-400">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Types de chambre</h2>
-          <Button size="sm" variant="outline" onClick={openAddTypeModal}>
-            <Plus className="w-4 h-4" /> Type de chambre
-          </Button>
+      <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Types de chambre</h2>
+          {!isReadOnly && (
+            <Button size="sm" variant="outline" onClick={openAddTypeModal}>
+              <Plus className="w-4 h-4" /> Type de chambre
+            </Button>
+          )}
         </div>
         {currentTypes.length === 0 ? (
           <div className="text-center py-6">
-            <Tag className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Aucun type de chambre</p>
-            <Button size="sm" onClick={openAddTypeModal}>
-              <Plus className="w-4 h-4" /> Créer un type de chambre
-            </Button>
+            <Tag className="w-8 h-8 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-3">Aucun type de chambre</p>
+            {!isReadOnly && (
+              <Button size="sm" onClick={openAddTypeModal}>
+                <Plus className="w-4 h-4" /> Créer un type de chambre
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {currentTypes.map((rt) => (
-              <div key={rt.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <Tag className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div key={rt.id} className="p-2.5 rounded-md border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow">
+                <div className="flex items-start justify-between mb-1.5">
+                  <div className="w-8 h-8 rounded-md bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+                    <Tag className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
                   </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => openEditTypeModal(rt)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => { setDeleteItem({ type: "type", id: rt.id, name: rt.name }); setDeleteConfirmOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {!isReadOnly && (
+                    <div className="flex gap-0.5">
+                      <button onClick={() => openEditTypeModal(rt)} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => { setDeleteItem({ type: "type", id: rt.id, name: rt.name }); setDeleteConfirmOpen(true); }} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="font-medium text-slate-900 dark:text-white">{rt.name}</p>
-                <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mt-1">{formatFCFA(rt.base_price)}</p>
-                <p className="text-xs text-slate-400 mt-1">{rt.capacity} personne{rt.capacity > 1 ? "s" : ""}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">{rt.name}</p>
+                <p className="text-base font-bold text-[var(--primary-color,#0C1C33)] mt-0.5">{formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{rt.capacity} personne{rt.capacity > 1 ? "s" : ""}</p>
               </div>
             ))}
           </div>
@@ -399,30 +417,36 @@ export default function ResidenceDetailPage() {
       </Card>
 
       {/* Chambres */}
-      <Card className="p-5 border-t-4 border-t-indigo-500 dark:border-t-indigo-400">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+      <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">
             Chambres ({rooms.length})
           </h2>
-          <Button onClick={openAddRoomModal} disabled={currentTypes.length === 0}>
-            <Plus className="w-4 h-4" /> Ajouter une chambre
-          </Button>
+          {!isReadOnly && (
+            <Button onClick={openAddRoomModal} disabled={currentTypes.length === 0}>
+              <Plus className="w-4 h-4" /> Ajouter une chambre
+            </Button>
+          )}
         </div>
         {currentTypes.length === 0 ? (
           <div className="text-center py-8">
-            <Tag className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Créez d&apos;abord un type de chambre</p>
-            <Button size="sm" onClick={openAddTypeModal}>
-              <Plus className="w-4 h-4" /> Créer un type de chambre
-            </Button>
+            <Tag className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Créez d'abord un type de chambre</p>
+            {!isReadOnly && (
+              <Button size="sm" onClick={openAddTypeModal}>
+                <Plus className="w-4 h-4" /> Créer un type de chambre
+              </Button>
+            )}
           </div>
         ) : rooms.length === 0 ? (
           <div className="text-center py-8">
-            <BedDouble className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune chambre dans cet établissement</p>
-            <Button size="sm" onClick={openAddRoomModal}>
-              <Plus className="w-4 h-4" /> Ajouter une chambre
-            </Button>
+            <BedDouble className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Aucune chambre dans cet établissement</p>
+            {!isReadOnly && (
+              <Button size="sm" onClick={openAddRoomModal}>
+                <Plus className="w-4 h-4" /> Ajouter une chambre
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -431,36 +455,40 @@ export default function ResidenceDetailPage() {
               return (
                     <div
                       key={room.id}
-                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all"
+                      className="p-2.5 rounded-md border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <BedDouble className="w-5 h-5 text-slate-400" />
-                          <p className="text-lg font-bold text-slate-900 dark:text-white">{room.room_number}</p>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <BedDouble className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                          <p className="text-base font-bold text-slate-900 dark:text-white">{room.room_number}</p>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getRoomStatusColor(room.status)}`}>
+                          <span className={`inline-flex items-center px-1.5 py-px rounded-full text-[10px] font-medium ${getRoomStatusColor(room.status)}`}>
                             {getRoomStatusLabel(room.status)}
                           </span>
-                          <button
-                            onClick={() => openEditRoomModal(room)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-                            title="Modifier la chambre"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => { setDeleteItem({ type: "room", id: room.id, name: room.room_number }); setDeleteConfirmOpen(true); }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                            title="Supprimer la chambre"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {!isReadOnly && (
+                            <>
+                              <button
+                                onClick={() => openEditRoomModal(room)}
+                                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                title="Modifier la chambre"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => { setDeleteItem({ type: "room", id: room.id, name: room.room_number }); setDeleteConfirmOpen(true); }}
+                                className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                title="Supprimer la chambre"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">{rt?.name || "—"}</p>
-                      {rt && <p className="text-xs text-indigo-500 mt-0.5">{formatFCFA(rt.base_price)}</p>}
-                      {room.floor && <p className="text-xs text-slate-400 mt-1">Étage {room.floor}</p>}
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{rt?.name || "—"}</p>
+                      {rt && !isReadOnly && <p className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium mt-0.5">{formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</p>}
+                      {room.floor && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Étage {room.floor}</p>}
                     </div>
               );
             })}
@@ -469,95 +497,114 @@ export default function ResidenceDetailPage() {
       </Card>
 
       {/* Modal Établissement */}
-      <Modal open={residenceModalOpen} onClose={() => setResidenceModalOpen(false)} title="Modifier l'établissement" description="Renseignez les informations de votre établissement">
-        <div className="space-y-4">
-          <Input label="Nom de l'établissement" value={residenceForm.name} onChange={(e) => setResidenceForm({ ...residenceForm, name: e.target.value })} placeholder="Ex: Hôtel Palm Beach" />
-          <Input label="Adresse" value={residenceForm.address} onChange={(e) => setResidenceForm({ ...residenceForm, address: e.target.value })} placeholder="Cocody Riviera 2" />
-          <Input label="Ville" value={residenceForm.city} onChange={(e) => setResidenceForm({ ...residenceForm, city: e.target.value })} placeholder="Abidjan" />
-          <Input label="Téléphone de contact" value={residenceForm.contact_phone} onChange={(e) => setResidenceForm({ ...residenceForm, contact_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setResidenceModalOpen(false)}>Annuler</Button>
-            <Button className="flex-1" onClick={handleSaveResidence} loading={loading}>Enregistrer</Button>
+      {!isReadOnly && (
+        <Modal open={residenceModalOpen} onClose={() => setResidenceModalOpen(false)} title="Modifier l'établissement" description="Renseignez les informations de votre établissement">
+          <div className="space-y-3">
+            <Input label="Nom de l'établissement" value={residenceForm.name} onChange={(e) => setResidenceForm({ ...residenceForm, name: e.target.value })} placeholder="Ex: Hôtel Palm Beach" />
+            <Input label="Adresse" value={residenceForm.address} onChange={(e) => setResidenceForm({ ...residenceForm, address: e.target.value })} placeholder="Cocody Riviera 2" />
+            <Input label="Ville" value={residenceForm.city} onChange={(e) => setResidenceForm({ ...residenceForm, city: e.target.value })} placeholder="Abidjan" />
+            <Input label="Téléphone de contact" value={residenceForm.contact_phone} onChange={(e) => setResidenceForm({ ...residenceForm, contact_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setResidenceModalOpen(false)}>Annuler</Button>
+              <Button className="flex-1" onClick={handleSaveResidence} loading={loading}>Enregistrer</Button>
+            </div>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Modal Chambre */}
-      <Modal open={roomModalOpen} onClose={() => setRoomModalOpen(false)} title={editingRoom ? "Modifier la chambre" : "Ajouter une chambre"}>
-        <div className="space-y-4">
-          <Input label="Nom / Numéro (ex: 101, A-12, Villa 3)" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} placeholder="101" required />
-          <Input label="Étage (optionnel)" type="number" value={roomForm.floor} onChange={(e) => setRoomForm({ ...roomForm, floor: e.target.value })} placeholder="1" min="0" />
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre *</label>
-            <select
-              value={roomForm.room_type_id}
-              onChange={(e) => setRoomForm({ ...roomForm, room_type_id: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              <option value="">Sélectionner un type de chambre</option>
-              {currentTypes.map((rt) => (
-                <option key={rt.id} value={rt.id}>{rt.name} — {formatFCFA(rt.base_price)}</option>
-              ))}
-            </select>
+      {!isReadOnly && (
+        <Modal open={roomModalOpen} onClose={() => { setRoomModalOpen(false); setRoomNumberError(""); }} title={editingRoom ? "Modifier la chambre" : "Ajouter une chambre"}>
+          <div className="space-y-3">
+            <div>
+              <Input label="Nom / Numéro (ex: 101, A-12, Villa 3)" value={roomForm.room_number} onChange={(e) => { setRoomForm({ ...roomForm, room_number: e.target.value }); setRoomNumberError(""); }} placeholder="101" required />
+              {roomNumberError && (
+                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  {roomNumberError}
+                </p>
+              )}
+            </div>
+            <Input label="Étage (optionnel)" type="number" value={roomForm.floor} onChange={(e) => setRoomForm({ ...roomForm, floor: e.target.value })} placeholder="1" min="0" />
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-0.5">Type de chambre *</label>
+              <select
+                value={roomForm.room_type_id}
+                onChange={(e) => setRoomForm({ ...roomForm, room_type_id: e.target.value })}
+                className="w-full px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1.5 focus:ring-[var(--primary-color,#0C1C33)]"
+                required
+              >
+                <option value="">Sélectionner un type de chambre</option>
+                {currentTypes.map((rt) => (
+                  <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setRoomModalOpen(false)}>Annuler</Button>
+              <Button className="flex-1" onClick={saveRoom} loading={loading}>{editingRoom ? "Enregistrer" : "Créer"}</Button>
+            </div>
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setRoomModalOpen(false)}>Annuler</Button>
-            <Button className="flex-1" onClick={saveRoom} loading={loading}>{editingRoom ? "Enregistrer" : "Créer"}</Button>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Modal Type */}
-      <Modal open={typeModalOpen} onClose={() => setTypeModalOpen(false)} title={editingType ? "Modifier le type de chambre" : "Nouveau type de chambre"}>
-        <div className="space-y-4">
-          <Input 
-            label="Type de chambre (ex: Chambre, Studio, Appartement, Suite)" 
-            value={typeForm.name} 
-            onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} 
-            placeholder="Studio" 
-            list="accommodation-types"
-            required 
-          />
-          <datalist id="accommodation-types">
-            <option value="Chambre" />
-            <option value="Studio" />
-            <option value="Appartement" />
-            <option value="Suite" />
-            <option value="Villa" />
-          </datalist>
-          <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
-            <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
+      {!isReadOnly && (
+        <Modal open={typeModalOpen} onClose={() => setTypeModalOpen(false)} title={editingType ? "Modifier le type de chambre" : "Nouveau type de chambre"}>
+          <div className="space-y-3">
+            <Input 
+              label="Type de chambre (ex: Chambre, Studio, Appartement, Suite)" 
+              value={typeForm.name} 
+              onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} 
+              placeholder="Studio" 
+              list="accommodation-types"
+              required 
+            />
+            <datalist id="accommodation-types">
+              <option value="Chambre standard" />
+              <option value="Studio" />
+              <option value="Appartement" />
+              <option value="Suite" />
+              <option value="Villa" />
+              <option value="Chambre + Salon" />
+              <option value="2 Chambres + Salon" />
+              <option value="3 Chambres + Salon" />
+            </datalist>
+            <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
+              <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)}>Annuler</Button>
+              <Button className="flex-1" onClick={saveType} loading={loading}>{editingType ? "Enregistrer" : "Créer"}</Button>
+            </div>
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)}>Annuler</Button>
-            <Button className="flex-1" onClick={saveType} loading={loading}>{editingType ? "Enregistrer" : "Créer"}</Button>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Delete confirmation */}
-      <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description="Êtes-vous sûr de vouloir supprimer cet élément ?">
-        <div className="flex gap-3 pt-2">
-          <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
-          <Button
-            className="flex-1 bg-red-600 hover:bg-red-700"
-            onClick={async () => {
-              if (!deleteItem) return;
-              if (deleteItem.type === "room") await deleteRoom(deleteItem.id);
-              else if (deleteItem.type === "type") await deleteType(deleteItem.id);
-              else if (deleteItem.type === "residence") await handleDeleteResidence();
-              setDeleteConfirmOpen(false);
-              setDeleteItem(null);
-            }}
-            loading={loading}
-          >
-            Supprimer
-          </Button>
-        </div>
-      </Modal>
+      {!isReadOnly && (
+        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description="Êtes-vous sûr de vouloir supprimer cet élément ?">
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
+            <Button
+              className="flex-1 bg-red-600 hover:bg-red-700"
+              onClick={async () => {
+                if (!deleteItem) return;
+                if (deleteItem.type === "room") await deleteRoom(deleteItem.id);
+                else if (deleteItem.type === "type") await deleteType(deleteItem.id);
+                else if (deleteItem.type === "residence") await handleDeleteResidence();
+                setDeleteConfirmOpen(false);
+                setDeleteItem(null);
+              }}
+              loading={loading}
+            >
+              Supprimer
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

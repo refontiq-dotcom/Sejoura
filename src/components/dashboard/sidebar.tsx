@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
@@ -11,9 +11,10 @@ import {
   Users,
   Settings,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
-  BedDouble,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ClipboardList,
+  Store,
 } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
@@ -22,11 +23,17 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
+import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
+
+import { AppLogo } from "@/components/ui/app-logo";
+
+import { getSidebarThemeStyles } from "@/lib/colors";
+import { useTheme } from "@/components/providers/theme-provider";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement> & { className?: string }>;
   roles?: string[];
   badge?: string;
 }
@@ -34,30 +41,34 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
   { label: "Établissements", href: "/dashboard/residences", icon: Building2, roles: ["admin_residence"] },
-  { label: "Chambres", href: "/dashboard/rooms", icon: BedDouble, roles: ["admin_residence", "receptionniste"] },
   { label: "Réservations", href: "/dashboard/bookings", icon: CalendarCheck, roles: ["admin_residence", "receptionniste"] },
-  { label: "Ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste"] },
+  { label: "Ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["receptionniste", "menagere"] },
+  { label: "Mon Shift / Caisse", href: "/dashboard/shift", icon: ClipboardList, roles: ["receptionniste", "menagere"] },
   { label: "Comptabilité", href: "/dashboard/accounting", icon: Wallet, roles: ["admin_residence"] },
   { label: "Employés", href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },
-  { label: "Paramètres", href: "/dashboard/settings", icon: Settings, roles: ["admin_residence"] },
+  { label: "Vitrine Trouvetou", href: "/dashboard/trouvetou", icon: Store, roles: ["admin_residence"] },
 ];
 
 interface SidebarProps {
   userRole: string;
   userName: string;
   companyName: string;
+  companyLogo?: string | null;
+  themeColor?: string | null;
   collapsed?: boolean;
   onToggle?: () => void;
   onCloseMobile?: () => void;
 }
 
-export function Sidebar({ userRole, userName, companyName, collapsed = false, onToggle, onCloseMobile }: SidebarProps) {
+export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile }: SidebarProps) {
   const { lang } = useLanguage();
+  const { theme } = useTheme();
   const t = translations[lang].sidebar;
   const navLabels = Object.fromEntries(t.navItems.map((item) => [item.href, item.label]));
   const pathname = usePathname();
-  const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const themeStyles = getSidebarThemeStyles(themeColor, theme === "dark");
 
   const isCollapsed = collapsed;
   const toggleCollapsed = () => {
@@ -69,8 +80,8 @@ export function Sidebar({ userRole, userName, companyName, collapsed = false, on
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      toast.success("Vous êtes déconnecté.");
-      router.push("/login");
+      const isEmployee = userRole === "receptionniste" || userRole === "menagere";
+      window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
       toast.error("Impossible de se déconnecter.");
       setLoggingOut(false);
@@ -89,26 +100,76 @@ export function Sidebar({ userRole, userName, companyName, collapsed = false, on
         onClick={() => onCloseMobile && onCloseMobile()}
       />
       <aside
-        className={`flex flex-col bg-blue-600 dark:bg-blue-800 text-white transition-all duration-300 fixed inset-y-0 left-0 z-50 shadow-xl overflow-visible ${
-          isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-64"
-        }}`}
+        style={{
+          backgroundColor: themeStyles.sidebarBg,
+          color: themeStyles.textColor,
+          "--sidebar-bg": themeStyles.sidebarBg,
+          "--main-bg": themeStyles.mainBg,
+        } as React.CSSProperties}
+        className={`group flex flex-col transition-all duration-300 fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible ${
+          isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-60"
+        }`}
       >
 
-      {/* Logo */}
-      <div className="flex items-center gap-3 p-6 border-b border-blue-500/50">
-        <div className="w-10 h-10 rounded-xl bg-[var(--card)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-          <Image src="/logo.png" alt="Séjoura by Refontiq" width={40} height={40} />
+      {/* Logo Section */}
+      <div 
+        className="flex flex-col p-2.5 border-b"
+        style={{ borderColor: themeStyles.borderColor }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-0.5">
+              <AppLogo
+                logoUrl={companyLogo}
+                alt={companyName}
+                width={24}
+                height={24}
+                className="object-contain"
+              />
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden min-w-0">
+                <h1 
+                  className="text-[13px] font-bold whitespace-nowrap truncate"
+                  style={{ color: themeStyles.textColor }}
+                >
+                  {companyName}
+                </h1>
+                <p 
+                  className="text-[9px] font-semibold tracking-wide"
+                  style={{ color: themeStyles.accentColor }}
+                >
+                  Séjoura SaaS
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Integrated Header Toggle Button - Desktop */}
+          <button
+            onClick={toggleCollapsed}
+            style={{ color: themeStyles.textColor }}
+            className="hidden lg:flex p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
+            aria-label={isCollapsed ? t.expand : t.collapse}
+            title={isCollapsed ? t.expand : t.collapse}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-3.5 h-3.5" />
+            ) : (
+              <PanelLeftClose className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
         {!isCollapsed && (
-          <div className="overflow-hidden">
-            <h1 className="text-lg font-bold text-white whitespace-nowrap">Séjoura by Refontiq</h1>
-            <p className="text-xs text-blue-100 whitespace-nowrap truncate">{companyName}</p>
-          </div>
+          <div 
+            className="mt-1.5 h-[1.5px] w-full"
+            style={{ backgroundColor: themeStyles.accentColor }}
+          />
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 relative">
+      {/* Navigation Links */}
+      <nav className="flex-1 overflow-visible py-2 pl-0 pr-0 space-y-0.5 relative">
         {filteredItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
           const Icon = item.icon;
@@ -117,24 +178,35 @@ export function Sidebar({ userRole, userName, companyName, collapsed = false, on
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 py-3 transition-all relative ${
-                isActive
-                  ? "bg-[var(--muted)] dark:bg-slate-900 text-blue-700 dark:text-blue-400 rounded-l-2xl rounded-r-none -mr-4 pr-4 pl-5 z-20 shadow-[-4px_0_12px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_12px_rgba(255,255,255,0.05)]"
-                  : "text-blue-50 hover:bg-blue-700/60 hover:text-white rounded-xl mx-3 px-5"
-              } ${isCollapsed ? "justify-center !px-0 !mx-2 w-auto rounded-xl bg-blue-700 text-white" : ""}`}
-              title={isCollapsed ? item.label : undefined}
+              style={{
+                backgroundColor: isActive ? themeStyles.mainBg : "transparent",
+                color: isActive ? themeStyles.activeTextColor : themeStyles.textColor,
+              }}
+              className={
+                isCollapsed
+                  ? `flex items-center justify-center w-8 h-8 rounded-md mx-auto my-0.5 transition-all ${
+                      !isActive ? "hover:bg-white/10" : ""
+                    }`
+                  : isActive
+                  ? "active-sidebar-tab flex items-center gap-2 py-1.5 px-2.5 text-[13px] font-medium transition-all"
+                  : "flex items-center gap-2 py-1.5 px-2.5 ml-1.5 mr-1.5 rounded-md text-[13px] font-medium transition-all hover:bg-white/10"
+              }
+              title={isCollapsed ? (navLabels[item.href] || item.label) : undefined}
             >
-              {/* Optional SaaS fluid corners using pseudo-elements when active and not collapsed */}
-              {isActive && !isCollapsed && (
-                <>
-                  <div className="absolute -top-4 right-0 w-4 h-4 bg-transparent rounded-br-2xl pointer-events-none" style={{ boxShadow: "4px 4px 0 4px var(--background)" }} />
-                  <div className="absolute -bottom-4 right-0 w-4 h-4 bg-transparent rounded-tr-2xl pointer-events-none" style={{ boxShadow: "4px -4px 0 4px var(--background)" }} />
-                </>
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isActive ? themeStyles.activeTextColor : themeStyles.textColor }} />
+              {!isCollapsed && (
+                <span className="text-[13px] font-medium truncate" style={{ color: isActive ? themeStyles.activeTextColor : themeStyles.textColor }}>
+                  {navLabels[item.href] || item.label}
+                </span>
               )}
-              <Icon className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && <span className="text-sm font-medium">{navLabels[item.href] || item.label}</span>}
               {item.badge && !isCollapsed && (
-                <span className="ml-auto px-2 py-0.5 text-xs rounded-full bg-blue-500 text-white">
+                <span
+                  className="ml-auto px-1.5 py-px text-[10px] rounded-full font-bold"
+                  style={{
+                    backgroundColor: isActive ? themeStyles.sidebarBg : themeStyles.accentColor,
+                    color: isActive ? themeStyles.mainBg : (themeStyles.isDark ? "#0C1C33" : "#FFFFFF"),
+                  }}
+                >
                   {item.badge}
                 </span>
               )}
@@ -143,40 +215,69 @@ export function Sidebar({ userRole, userName, companyName, collapsed = false, on
         })}
       </nav>
 
-      {/* User info & logout */}
-      <div className="p-4 border-t border-blue-500/50">
-        <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
+      <div className="mt-auto">
+        {/* Paramètres Link */}
+        <Link
+          href="/dashboard/settings"
+          style={{
+            backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.mainBg : "transparent",
+            color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,
+          }}
+          className={
+            isCollapsed
+              ? `flex items-center justify-center w-8 h-8 rounded-md mx-auto my-0.5 transition-all ${
+                  !(pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) ? "hover:bg-white/10" : ""
+                }`
+              : (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/"))
+              ? "active-sidebar-tab flex items-center gap-2 py-1.5 px-2.5 text-[13px] font-medium transition-all"
+              : "flex items-center gap-2 py-1.5 px-2.5 ml-1.5 mr-1.5 rounded-md text-[13px] font-medium transition-all hover:bg-white/10"
+          }
+          title={isCollapsed ? (navLabels["/dashboard/settings"] || "Paramètres") : undefined}
+        >
+          <Settings className="w-3.5 h-3.5 flex-shrink-0" style={{ color: (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) ? themeStyles.activeTextColor : themeStyles.textColor }} />
+          {!isCollapsed && (
+            <span className="text-[13px] font-medium truncate" style={{ color: (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) ? themeStyles.activeTextColor : themeStyles.textColor }}>
+              {navLabels["/dashboard/settings"] || "Paramètres"}
+            </span>
+          )}
+        </Link>
+
+        {/* User info & logout */}
+        <div 
+        className="p-2.5 border-t"
+        style={{ borderColor: themeStyles.borderColor }}
+      >
+        <div className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}>
+          <div 
+            className="w-7 h-7 rounded-full flex items-center justify-center font-bold shrink-0 shadow-sm text-[11px]"
+            style={{
+              backgroundColor: themeStyles.accentColor,
+              color: themeStyles.isDark ? "#0C1C33" : "#FFFFFF",
+            }}
+          >
             {userName.charAt(0).toUpperCase()}
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{userName}</p>
-              <p className="text-xs text-blue-100">{getRoleLabel(userRole)}</p>
+              <p className="text-[11px] font-bold truncate" style={{ color: themeStyles.textColor }}>{userName}</p>
+              <p className="text-[9px] font-semibold" style={{ color: themeStyles.mutedTextColor }}>{getRoleLabel(userRole)}</p>
             </div>
           )}
           {!isCollapsed && (
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="p-2 rounded-lg text-blue-200 hover:bg-blue-700/60 hover:text-white transition-colors disabled:opacity-50"
+              style={{ color: themeStyles.mutedTextColor }}
+              className="p-1 rounded-md hover:opacity-75 transition-opacity disabled:opacity-50"
               title={t.logoutTooltip}
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3 h-3" />
             </button>
           )}
         </div>
-      </div>
-
-      {/* Collapse button - Desktop only */}
-      <button
-        onClick={toggleCollapsed}
-        className="hidden lg:flex absolute top-1/2 -right-3 w-6 h-6 rounded-full bg-blue-500 text-white items-center justify-center shadow-lg hover:bg-blue-400 transition-colors"
-        aria-label={isCollapsed ? t.expand : t.collapse}
-      >
-        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-      </button>
-    </aside>
+       </div>
+       </div>
+     </aside>
     </>
   );
 }

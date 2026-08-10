@@ -3,61 +3,76 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #E2E1E0;
-  --background-gradient-start: #E2E1E0;
-  --background-gradient-end: #E2E1E0;
-  --foreground: #0f172a;
+  /* Charte Graphique Officielle Séjoura (Août 2026) */
+  --sejoura-navy: #0C1C33;
+  --sejoura-gold: #C2944E;
+  --sejoura-white: #FFFFFF;
+
+  --background: #F4F6FC;
+  --background-gradient-start: #F4F6FC;
+  --background-gradient-end: #EEF2F9;
+  --foreground: #0C1C33;
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  --sidebar: #1e1b4b;
-  --sidebar-foreground: #e0e7ff;
-  --sidebar-active: #4f46e5;
-  --border: #c0c0c0;
-  --input: #c0c0c0;
-  --primary: #4f46e5;
+  --card-foreground: #0C1C33;
+  --sidebar: #0C1C33;
+  --sidebar-foreground: #ffffff;
+  --sidebar-active: #C2944E;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --primary: #0C1C33;
   --primary-foreground: #ffffff;
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --secondary: #6366f1;
-  --accent: #8b5cf6;
-  --muted: #E2E1E0;
-  --muted-hover: #D8D5D3;
+  --secondary: #C2944E;
+  --accent: #C2944E;
+  --muted: #f1f5f9;
+  --muted-hover: #e2e8f0;
   --muted-foreground: #475569;
   --destructive: #ef4444;
   --success: #10b981;
-  --warning: #f59e0b;
-  --ring: #4f46e5;
-  --radius: 1rem;
+  --warning: #C2944E;
+  --ring: #C2944E;
+  --radius: 0.625rem;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
 }
 
 .dark {
-  --background: #000000;
-  --background-gradient-start: #000000;
-  --background-gradient-end: #000000;
-  --foreground: #f1f5f9;
-  --card: #050505;
-  --card-foreground: #f1f5f9;
-  --sidebar: #000000;
-  --sidebar-foreground: #d1d5db;
-  --sidebar-active: #1a1a2e;
-  --border: #2a2a2a;
-  --input: #1a1a1a;
-  --primary: #818cf8;
-  --primary-foreground: #000000;
+  --sejoura-navy: #0C1C33;
+  --sejoura-gold: #C2944E;
+  --sejoura-white: #FFFFFF;
+
+  --background: #090D16;
+  --background-gradient-start: #090D16;
+  --background-gradient-end: #0F172A;
+  --foreground: #f8fafc;
+  --card: #131C2E;
+  --card-foreground: #f8fafc;
+  --sidebar: #07101e;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-active: #C2944E;
+  --border: #1E293B;
+  --input: #1E293B;
+  --primary: #C2944E;
+  --primary-foreground: #0C1C33;
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --secondary: #94a3b8;
-  --accent: #a78bfa;
-  --muted: #0a0a0a;
-  --muted-hover: #151515;
-  --muted-foreground: #d1d5db;
+  --secondary: #334155;
+  --accent: #C2944E;
+  --muted: #0F172A;
+  --muted-hover: #1E293B;
+  --muted-foreground: #94a3b8;
   --destructive: #dc2626;
   --success: #22c55e;
-  --warning: #f59e0b;
-  --ring: #818cf8;
+  --warning: #C2944E;
+  --ring: #C2944E;
+  --card-bg: #131C2E;
+  --card-border: #1E293B;
 }
 
 @theme inline {
+  --color-sejoura-navy: #0C1C33;
+  --color-sejoura-gold: #C2944E;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -83,6 +98,8 @@
   --radius: var(--radius);
   --gradient-dashboard-start: var(--background-gradient-start);
   --gradient-dashboard-end: var(--background-gradient-end);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
 }
 
 * {
@@ -96,14 +113,15 @@ body {
 }
 
 .dashboard-bg {
-  background: linear-gradient(135deg, var(--gradient-dashboard-start) 0%, var(--gradient-dashboard-end) 100%);
+  background-color: var(--main-bg, #f8fafc);
   background-attachment: fixed;
+  min-height: 100vh;
 }
 
 /* Scrollbar personnalisée */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -112,13 +130,16 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--muted-foreground);
-  border-radius: 4px;
-  opacity: 0.3;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
-  opacity: 0.5;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
 }
 
 /* Animation pour les transitions de thème */
@@ -150,55 +171,57 @@ body {
 }
 
 /* ============================================
-   Sidebar Bridge — Pont visuel fluide
-   Effet de flux de couleur depuis le menu
-   actif vers la zone de contenu principal
+   Onglet Sidebar Actif — Fusion continue & Courbes concaves (Inverted Border Radius)
+   La couleur de fond du menu actif se fonde de manière 100% fluide avec le panneau principal à droite
+   En mode sombre, l'onglet actif prend la couleur Noir/Anthracite du fond de page (#090D16)
    ============================================ */
-
-/* Pont coloré depuis l'élément de menu actif */
-.sidebar-bridge {
-  position: fixed;
-  left: 256px;
-  border-radius: 0 9999px 9999px 0;
-  background: var(--primary);
-  box-shadow:
-    0 0 14px color-mix(in srgb, var(--primary) 35%, transparent),
-    0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
-  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 50;
-  pointer-events: none;
+.active-sidebar-tab {
+  position: relative;
+  border-top-left-radius: 1rem;
+  border-bottom-left-radius: 1rem;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  margin-left: 0.75rem;
+  margin-right: 0 !important;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  z-index: 20;
 }
 
-/* Courbe organique à la jonction sidebar / contenu */
-.sidebar-bridge::after {
+/* Courbe concave haut-droit (Inverted Border Radius Top) */
+.active-sidebar-tab::before {
   content: "";
   position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 12px;
-  height: 140%;
-  background: inherit;
-  border-radius: 0 50% 50% 0;
-  filter: blur(4px);
-  opacity: 0.5;
+  top: -20px;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border-bottom-right-radius: 20px;
+  box-shadow: 6px 6px 0 6px var(--main-bg, #f8fafc);
+  pointer-events: none;
 }
 
-/* Lueur décorative à la frontière sidebar / contenu */
-.sidebar-boundary-glow {
-  position: fixed;
-  top: 0;
-  bottom: 0;
+.dark .active-sidebar-tab::before {
+  box-shadow: 6px 6px 0 6px var(--main-bg, #090D16);
+}
+
+/* Courbe concave bas-droit (Inverted Border Radius Bottom) */
+.active-sidebar-tab::after {
+  content: "";
+  position: absolute;
+  bottom: -20px;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border-top-right-radius: 20px;
+  box-shadow: 6px -6px 0 6px var(--main-bg, #f8fafc);
   pointer-events: none;
-  z-index: 30;
-  background: linear-gradient(
-    to right,
-    color-mix(in srgb, var(--primary) 10%, transparent) 0%,
-    color-mix(in srgb, var(--primary) 4%, transparent) 50%,
-    transparent 100%
-  );
-  transition: width 0.3s ease;
+}
+
+.dark .active-sidebar-tab::after {
+  box-shadow: 6px -6px 0 6px var(--main-bg, #090D16);
 }
 
 /* Cartes avec grands arrondis */

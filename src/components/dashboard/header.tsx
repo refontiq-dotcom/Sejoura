@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
+import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 
 interface HeaderProps {
   title: string;
@@ -138,7 +139,11 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      router.push("/login");
+      // Redirection intelligente selon le rôle :
+      // Employés (Réceptionniste/Ménagère) → Page Spéciale Employés
+      // Administrateur → Portail Général
+      const isEmployee = userRole === "receptionniste" || userRole === "menagere";
+      window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
       toast.error("Impossible de se déconnecter.");
     }
@@ -152,8 +157,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[var(--card)]/80 dark:bg-[var(--card)]/80 backdrop-blur-md border-b border-[var(--border)]">
-      <div className="flex items-center justify-between px-6 py-4">
+    <header className="sticky top-0 z-30 bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-4">
           {onMenuClick && (
             <button
@@ -164,98 +169,98 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
             </button>
           )}
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">{title}</h1>
+            <h1 className="text-lg font-bold text-[var(--foreground)]">{title}</h1>
             {subtitle && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+              <p className="text-xs font-medium text-[var(--muted-foreground)] mt-0.5">{subtitle}</p>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="relative">
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors w-10 lg:w-64"
-              aria-label={t.searchPlaceholder}
-            >
-              <Search className="w-4 h-4" />
-              <span className="text-sm flex-1 text-left hidden lg:inline">{t.searchPlaceholder}</span>
-              <kbd className="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)]">
-                <span className="text-xs">⌘</span>K
-              </kbd>
-            </button>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors w-9 lg:w-56"
+            aria-label={t.searchPlaceholder}
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="text-xs flex-1 text-left hidden lg:inline">{t.searchPlaceholder}</span>
+            <kbd className="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)]">
+              <span className="text-[10px]">⌘</span>K
+            </kbd>
+          </button>
           </div>
 
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+            className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
             aria-label={t.themeToggle}
           >
             {theme === "light" ? (
-              <Moon className="w-5 h-5" />
+              <Moon className="w-4 h-4" />
             ) : (
-              <Sun className="w-5 h-5 text-yellow-400" />
+              <Sun className="w-4 h-4 text-yellow-400" />
             )}
           </button>
 
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setNotifOpen(!notifOpen)}
-            className="p-2.5 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors relative"
+            className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors relative"
             aria-label={t.notifications}
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
                   {unreadCount}
                 </span>
               )}
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-[var(--card)] rounded-2xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
-                <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-                  <h3 className="font-semibold text-[var(--foreground)]">{t.notifications}</h3>
+              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
+                <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
+                  <h3 className="font-semibold text-sm text-[var(--foreground)]">{t.notifications}</h3>
                   {unreadCount > 0 && (
-                    <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                    <span className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium">
                       {unreadCount} {t.unread}
                     </span>
                   )}
                 </div>
-                <div className="max-h-96 overflow-y-auto">
+                <div className="max-h-80 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-[var(--muted-foreground)] text-sm">
+                    <div className="p-6 text-center text-[var(--muted-foreground)] text-xs">
                       {t.noNotifications}
                     </div>
                   ) : (
                     notifications.map((notif) => (
                       <div
                         key={notif.id}
-                        className={`p-4 border-b border-[var(--border)] hover:bg-[var(--muted-hover)] transition-colors cursor-pointer ${
+                        className={`p-3 border-b border-[var(--border)] hover:bg-[var(--muted-hover)] transition-colors cursor-pointer ${
                           !notif.isRead ? "bg-[var(--muted)]" : ""
                         }`}
                       >
-                        <div className="flex items-start gap-3">
-                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notifColors[notif.type]}`} />
+                        <div className="flex items-start gap-2.5">
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${notifColors[notif.type]}`} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                            <p className="text-xs font-medium text-[var(--foreground)]">
                               {notif.title}
                             </p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                            <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
                               {notif.message}
                             </p>
-                            <p className="text-xs text-slate-400 mt-1">{notif.time}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">{notif.time}</p>
                           </div>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
-                <div className="p-3 border-t border-slate-200 dark:border-slate-700">
+                <div className="p-2 border-t border-[var(--border)]">
                   <button
                     onClick={handleMarkAllRead}
                     disabled={unreadCount === 0}
-                    className="w-full text-center text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium disabled:opacity-50 disabled:no-underline"
+                    className="w-full text-center text-[11px] text-[var(--primary-color,#0C1C33)] hover:underline font-medium disabled:opacity-50 disabled:no-underline"
                   >
                     {t.markAllRead}
                   </button>
@@ -267,56 +272,56 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
           <div className="relative" ref={profileRef}>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold text-sm hover:ring-2 hover:ring-indigo-300 transition-all"
+              className="w-7 h-7 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white font-semibold text-xs hover:ring-2 hover:ring-[var(--primary-color)] transition-all"
               aria-label="Profil"
             >
-              <UserCircle className="w-5 h-5" />
+              <UserCircle className="w-4 h-4" />
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-[var(--card)] rounded-2xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in z-50">
-                <div className="p-4 border-b border-[var(--border)]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-semibold">
+              <div className="absolute right-0 mt-1.5 w-64 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in z-50">
+                <div className="p-3 border-b border-[var(--border)]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white font-semibold text-xs">
                       {userName?.charAt(0).toUpperCase() || "U"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[var(--foreground)] truncate">{userName || "Utilisateur"}</p>
-                      <p className="text-xs text-[var(--muted-foreground)] capitalize">{userRole?.replace("_", " ") || "Rôle"}</p>
+                      <p className="text-xs font-semibold text-[var(--foreground)] truncate">{userName || "Utilisateur"}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground)] capitalize">{userRole?.replace("_", " ") || "Rôle"}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--muted)]">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-white" />
+                <div className="p-2.5">
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--muted)]">
+                    <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
+                      <Sparkles className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-[var(--muted-foreground)]">Plan actuel</p>
-                    <p className="text-sm font-semibold text-[var(--foreground)] capitalize">{monthlyPrice === 0 ? "Free" : plan || "Free"}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">Plan actuel</p>
+                    <p className="text-xs font-semibold text-[var(--foreground)] capitalize">{monthlyPrice === 0 ? "Free" : plan || "Free"}</p>
                     </div>
                   </div>
                 </div>
-                <div className="border-t border-[var(--border)] py-2">
+                <div className="border-t border-[var(--border)] py-1.5">
                   <button
                     onClick={() => { setProfileOpen(false); router.push("/dashboard/settings"); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <Settings className="w-4 h-4" />
+                    <Settings className="w-3.5 h-3.5" />
                     Paramètres
                   </button>
                   <button
                     onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <CreditCard className="w-4 h-4" />
+                    <CreditCard className="w-3.5 h-3.5" />
                     Abonnement
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-3.5 h-3.5" />
                     Se déconnecter
                   </button>
                 </div>
@@ -328,30 +333,30 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
 
       {/* Command Palette */}
       {searchOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 sm:px-0">
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 sm:px-0">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
-          <div className="relative w-full max-w-lg bg-[var(--card)] rounded-2xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center px-4 py-3 border-b border-[var(--border)]">
-              <Search className="w-5 h-5 text-[var(--muted-foreground)] mr-3 flex-shrink-0" />
+          <div className="relative w-full max-w-lg bg-[var(--card)] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center px-3 py-2.5 border-b border-[var(--border)]">
+              <Search className="w-4 h-4 text-[var(--muted-foreground)] mr-2.5 flex-shrink-0" />
               <input
                 type="text"
-                className="flex-1 bg-transparent border-0 focus:ring-0 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] text-base outline-none"
-                placeholder="Rechercher des réservations, clients..."
+                className="flex-1 bg-transparent border-0 focus:ring-0 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] text-sm outline-none"
+                placeholder={t.searchPlaceholder}
                 autoFocus
               />
-              <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)] ml-3">
-                <span className="text-xs">⌘</span>K
+              <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)] ml-2.5">
+                <span className="text-[10px]">⌘</span>K
               </kbd>
             </div>
-            <div className="max-h-80 overflow-y-auto p-2">
-              <div className="px-3 py-2 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">{t.commandPalette}</div>
-              <button onClick={() => { router.push("/dashboard/bookings"); setSearchOpen(false); }} className="w-full flex items-center px-3 py-2.5 text-sm text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-xl transition-colors">
+            <div className="max-h-72 overflow-y-auto p-1.5">
+              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">{t.commandPalette}</div>
+              <button onClick={() => { router.push("/dashboard/bookings"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
                 {t.goToBookings}
               </button>
-              <button onClick={() => { router.push("/dashboard/residences"); setSearchOpen(false); }} className="w-full flex items-center px-3 py-2.5 text-sm text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-xl transition-colors">
+              <button onClick={() => { router.push("/dashboard/residences"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
                 {t.goToResidences}
               </button>
-              <button onClick={() => { router.push("/dashboard/accounting"); setSearchOpen(false); }} className="w-full flex items-center px-3 py-2.5 text-sm text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-xl transition-colors">
+              <button onClick={() => { router.push("/dashboard/accounting"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
                 {t.goToAccounting}
               </button>
             </div>

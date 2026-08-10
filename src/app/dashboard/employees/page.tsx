@@ -9,21 +9,37 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { getRoleLabel, getPlanLimits, formatDate } from "@/lib/utils";
-import { Users, Loader2, Phone, Trash2, CheckCircle2, Clock, UserPlus, Search, Copy, Share2, Check, ExternalLink, MessageSquare } from "lucide-react";
-import type { User } from "@/types/database";
+import { Users, Loader2, Phone, Trash2, CheckCircle2, Clock, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History } from "lucide-react";
+import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
+
+// Map userId → affectation temporaire active (si elle existe)
+type TempAssignmentMap = Record<string, { accommodation_id: string; end_date: string; is_different_site: boolean }>;
 
 export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
+  const [currentAdminId, setCurrentAdminId] = useState("");
   const [employees, setEmployees] = useState<User[]>([]);
+  const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
+  const [tempAssignments, setTempAssignments] = useState<TempAssignmentMap>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [tenantId, setTenantId] = useState("");
   const [plan, setPlan] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
-  const [formData, setFormData] = useState({ full_name: "", phone: "", role: "receptionniste", email: "" });
+  const [filterAcc, setFilterAcc] = useState("all");
+  const [formData, setFormData] = useState({ full_name: "", phone: "", role: "receptionniste", email: "", accommodation_id: "" });
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteData, setInviteData] = useState<{ full_name: string; phone: string; role: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  // Réaffectation
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
+  const [reassignTarget, setReassignTarget] = useState<User | null>(null);
+  const [reassignForm, setReassignForm] = useState({ accommodation_id: "", start_date: new Date().toISOString().split("T")[0], end_date: "", notes: "" });
+  const [reassignLoading, setReassignLoading] = useState(false);
+  // Historique
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<User | null>(null);
+  const [historyData, setHistoryData] = useState<(EmployeeAssignment & { accommodation?: Accommodation })[]>([]);
 
   useEffect(() => {
     loadData();
@@ -37,12 +53,13 @@ export default function EmployeesPage() {
 
       const { data: userData } = await supabase
         .from("users")
-        .select("tenant_id")
+        .select("id, tenant_id")
         .eq("auth_user_id", session.user.id)
         .single();
 
       if (!userData) return;
       setTenantId(userData.tenant_id);
+      setCurrentAdminId(userData.id);
 
       const { data: subData } = await supabase
         .from("subscriptions")
@@ -51,32 +68,82 @@ export default function EmployeesPage() {
         .single();
       if (subData) setPlan(subData.plan);
 
+      const { data: accData } = await supabase
+        .from("accommodations")
+        .select("id, name, city, tenant_id")
+        .eq("tenant_id", userData.tenant_id)
+        .order("name");
+      if (accData) setAccommodations(accData as unknown as Accommodation[]);
+
       const { data: empData } = await supabase
         .from("users")
         .select("*")
         .eq("tenant_id", userData.tenant_id)
         .order("created_at", { ascending: false });
-      if (empData) setEmployees(empData as unknown as User[]);
-} catch (err) {
-       toast.error("Impossible de charger les données. Veuillez réessayer.");
-       console.error(err);
-     } finally {
-       setLoading(false);
-     }
-   }
+      if (empData) {
+        const emps = empData as unknown as User[];
+        setEmployees(emps);
 
-    async function handleSave() {
-    if (!formData.full_name || !formData.phone) return;
+        // Charger les affectations temporaires actives pour tous les employés
+        const today = new Date().toISOString().split("T")[0];
+        const empIds = emps.map((e) => e.id);
+        if (empIds.length > 0) {
+          const { data: assignData } = await supabase
+            .from("employee_assignments")
+            .select("user_id, accommodation_id, start_date, end_date")
+            .in("user_id", empIds)
+            .lte("start_date", today)
+            .or(`end_date.is.null,end_date.gte.${today}`)
+            .order("start_date", { ascending: false });
+
+          if (assignData) {
+            // Pour chaque employé, garder la plus récente affectation active
+            const map: TempAssignmentMap = {};
+            for (const a of assignData as { user_id: string; accommodation_id: string; start_date: string; end_date: string | null }[]) {
+              if (!map[a.user_id]) {
+                const emp = emps.find((e) => e.id === a.user_id);
+                map[a.user_id] = {
+                  accommodation_id: a.accommodation_id,
+                  end_date: a.end_date || "",
+                  // "Temporaire" si end_date est définie
+                  // "Affecté" si l'établissement actif diffère de la base permanente
+                  is_different_site: emp ? (emp.accommodation_id !== a.accommodation_id) : false,
+                };
+              }
+            }
+            setTempAssignments(map);
+          }
+        }
+      }
+    } catch (err) {
+      toast.error("Impossible de charger les données. Veuillez réessayer.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!formData.full_name || !formData.phone) {
+      toast.error("Veuillez renseigner le nom et le numéro de téléphone.");
+      return;
+    }
+    if (!formData.accommodation_id) {
+      toast.error("Veuillez sélectionner l'établissement de rattachement de l'employé.");
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createClient();
       await supabase.from("users").insert({
         tenant_id: tenantId,
+        accommodation_id: formData.accommodation_id,
         role: formData.role,
         full_name: formData.full_name,
         phone: formData.phone,
         email: formData.email || null,
-        is_active: false, // S'activera à la 1re connexion
+        is_active: true, // Employé autorisé à se connecter et définir son code
+        first_login: true,
       });
 
       const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -90,7 +157,7 @@ export default function EmployeesPage() {
       });
 
       setModalOpen(false);
-      setFormData({ full_name: "", phone: "", role: "receptionniste", email: "" });
+      setFormData({ full_name: "", phone: "", role: "receptionniste", email: "", accommodation_id: "" });
       setInviteModalOpen(true);
       loadData();
     } catch (err) {
@@ -110,29 +177,132 @@ export default function EmployeesPage() {
 
   function openWhatsAppInvite(phone: string, name: string, role: string, link: string) {
     const cleanPhone = phone.replace(/[^0-9]/g, "");
-    const message = `Bonjour ${name}, votre compte Séjoura (${getRoleLabel(role)}) a été créé avec succès !\n\nPour finaliser votre inscription et définir votre mot de passe, cliquez sur ce lien :\n${link}`;
+    const message = `Bonjour ${name}, votre compte Séjoura (${getRoleLabel(role)}) a été créé avec succès !\n\nPour finaliser votre inscription et définir votre code secret, cliquez sur ce lien :\n${link}`;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
   }
 
-   async function handleDelete(id: string) {
-    if (!confirm("Supprimer cet employé ?")) return;
+  async function handleToggleActive(emp: User) {
     try {
       const supabase = createClient();
-await supabase.from("users").delete().eq("id", id);
-       loadData();
-     } catch (err) {
-       toast.error("Impossible de supprimer.");
-       console.error(err);
-     }
-   }
+      const newStatus = !emp.is_active;
+      const { error } = await supabase
+        .from("users")
+        .update({ is_active: newStatus })
+        .eq("id", emp.id);
 
-   const limits = getPlanLimits(plan);
+      if (error) throw error;
+      toast.success(newStatus ? `Accès réactivé pour ${emp.full_name}` : `Accès révoqué pour ${emp.full_name}`);
+      loadData();
+    } catch (err) {
+      toast.error("Impossible de modifier le statut de l'employé.");
+      console.error(err);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Supprimer cet employé ? L'accès lui sera immédiatement révoqué.")) return;
+    try {
+      const supabase = createClient();
+      await supabase.from("users").delete().eq("id", id);
+      toast.success("Employé supprimé avec succès.");
+      loadData();
+    } catch (err) {
+      toast.error("Impossible de supprimer.");
+      console.error(err);
+    }
+  }
+
+  function openReassign(emp: User) {
+    setReassignTarget(emp);
+    setReassignForm({
+      accommodation_id: emp.accommodation_id || "",
+      start_date: new Date().toISOString().split("T")[0],
+      end_date: "",
+      notes: "",
+    });
+    setReassignModalOpen(true);
+  }
+
+  async function handleReassign() {
+    if (!reassignTarget || !reassignForm.accommodation_id) {
+      toast.error("Veuillez sélectionner un établissement de destination.");
+      return;
+    }
+    if (reassignForm.end_date && reassignForm.end_date < reassignForm.start_date) {
+      toast.error("La date de fin doit être postérieure à la date de début.");
+      return;
+    }
+    setReassignLoading(true);
+    try {
+      const supabase = createClient();
+      const isTemporary = !!reassignForm.end_date;
+
+      // Si c'est une réaffectation permanente (pas de end_date) → mettre à jour aussi accommodation_id sur users
+      if (!isTemporary) {
+        await supabase
+          .from("users")
+          .update({ accommodation_id: reassignForm.accommodation_id })
+          .eq("id", reassignTarget.id);
+      }
+
+      // Insérer dans employee_assignments pour l'historique
+      const { error } = await supabase.from("employee_assignments").insert({
+        user_id: reassignTarget.id,
+        accommodation_id: reassignForm.accommodation_id,
+        start_date: reassignForm.start_date,
+        end_date: reassignForm.end_date || null,
+        notes: reassignForm.notes || null,
+        created_by: currentAdminId || null,
+      });
+
+      if (error) throw error;
+
+      const destAcc = accommodations.find((a) => a.id === reassignForm.accommodation_id);
+      const destName = destAcc?.name || "l'établissement sélectionné";
+
+      if (isTemporary) {
+        toast.success(`${reassignTarget.full_name} est affecté temporairement à « ${destName} » jusqu'au ${formatDate(reassignForm.end_date)}.`);
+      } else {
+        toast.success(`${reassignTarget.full_name} est maintenant rattaché à « ${destName} » de façon permanente.`);
+      }
+
+      setReassignModalOpen(false);
+      setReassignTarget(null);
+      loadData();
+    } catch (err) {
+      toast.error("Impossible d'effectuer la réaffectation.");
+      console.error(err);
+    } finally {
+      setReassignLoading(false);
+    }
+  }
+
+  async function openHistory(emp: User) {
+    setHistoryTarget(emp);
+    setHistoryData([]);
+    setHistoryModalOpen(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("employee_assignments")
+        .select(`*, accommodation:accommodations(id, name, city)`)
+        .eq("user_id", emp.id)
+        .order("start_date", { ascending: false })
+        .limit(20);
+      if (data) setHistoryData(data as unknown as (EmployeeAssignment & { accommodation?: Accommodation })[]);
+    } catch {
+      toast.error("Impossible de charger l'historique.");
+    }
+  }
+
+  const limits = getPlanLimits(plan);
   const adminCount = employees.filter((e) => e.role === "admin_residence").length;
   const recepCount = employees.filter((e) => e.role === "receptionniste").length;
   const menagereCount = employees.filter((e) => e.role === "menagere").length;
 
   const filteredEmployees = employees.filter((emp) => {
     if (filterRole !== "all" && emp.role !== filterRole) return false;
+    if (filterAcc !== "all" && emp.accommodation_id !== filterAcc) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -147,16 +317,21 @@ await supabase.from("users").delete().eq("id", id);
   if (loading && employees.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div
+      style={{
+        backgroundColor: "var(--main-bg, transparent)",
+      }}
+      className="space-y-3 animate-fade-in p-1 rounded-xl transition-colors duration-200"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Employés</h1>
+          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Employés</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{employees.length} employé{employees.length > 1 ? "s" : ""}</p>
         </div>
         <Button onClick={() => setModalOpen(true)}>
@@ -166,51 +341,61 @@ await supabase.from("users").delete().eq("id", id);
 
       {/* Limites du plan */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4 border-t-4 border-t-indigo-500 dark:border-t-indigo-400">
+        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400">Admins</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Admins</p>
               <p className="text-xl font-bold text-slate-900 dark:text-white">{adminCount} / {limits.maxAdmins === 999 ? "∞" : limits.maxAdmins}</p>
             </div>
-            <Users className="w-5 h-5 text-indigo-500" />
+            <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
         </Card>
-        <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400">Réceptionnistes</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Réceptionnistes</p>
               <p className="text-xl font-bold text-slate-900 dark:text-white">{recepCount} / {limits.maxReceptionnists === 999 ? "∞" : limits.maxReceptionnists}</p>
             </div>
-            <Users className="w-5 h-5 text-blue-500" />
+            <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
         </Card>
-        <Card className="p-4 border-t-4 border-t-purple-500 dark:border-t-purple-400">
+        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400">Ménagères</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">{menagereCount} {limits.hasCleaningModule ? `/ ${limits.maxReceptionnists === 999 ? "∞" : limits.maxReceptionnists}` : "(Pro requis)"}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">Ménagères</p>
+               <p className="text-xl font-bold text-slate-900 dark:text-white">{menagereCount}{limits.hasCleaningModule ? ` / ${limits.maxReceptionnists === 999 ? "∞" : limits.maxReceptionnists}` : ""}</p>
             </div>
-            <Users className="w-5 h-5 text-purple-500" />
+            <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
         </Card>
       </div>
 
-      {/* Barre de recherche & filtre */}
+      {/* Barre de recherche & filtres */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[250px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
             placeholder="Rechercher par nom, téléphone, email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
           />
         </div>
         <select
+          value={filterAcc}
+          onChange={(e) => setFilterAcc(e.target.value)}
+          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+        >
+          <option value="all">Tous les établissements</option>
+          {accommodations.map((acc) => (
+            <option key={acc.id} value={acc.id}>{acc.name} {acc.city ? `(${acc.city})` : ""}</option>
+          ))}
+        </select>
+        <select
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
         >
           <option value="all">Tous les rôles</option>
           <option value="admin_residence">Administrateur</option>
@@ -224,58 +409,100 @@ await supabase.from("users").delete().eq("id", id);
         <Card className="p-12 text-center">
           <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun employé</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Ajoutez votre premier employé</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ajoutez votre premier employé</p>
           <Button onClick={() => setModalOpen(true)}>
             <UserPlus className="w-4 h-4" /> Ajouter
           </Button>
         </Card>
       ) : (
-        <Card className="overflow-hidden border-t-4 border-t-orange-500 dark:border-t-orange-400">
+        <Card className="overflow-hidden border-t-4 border-t-[var(--primary-color,#0C1C33)]">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Nom</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Rôle</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Téléphone</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Statut</th>
-                  <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Créé le</th>
-                  <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Nom</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Rôle</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Établissement</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Téléphone</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Statut</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Créé le</th>
+                  <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {filteredEmployees.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white text-sm font-semibold">
-                          {emp.full_name.charAt(0)}
+                {filteredEmployees.map((emp) => {
+                  const assignedAcc = accommodations.find((a) => a.id === emp.accommodation_id);
+                  const tempAss = tempAssignments[emp.id];
+                  const currentActiveAcc = tempAss ? accommodations.find((a) => a.id === tempAss.accommodation_id) : assignedAcc;
+
+                  return (
+                    <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold">
+                            {emp.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">{emp.full_name}</p>
+                            {emp.email && <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{emp.email}</p>}
+                          </div>
                         </div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">{emp.full_name}</p>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={emp.role === "admin_residence" ? "info" : emp.role === "menagere" ? "purple" : "default"}>
-                        {getRoleLabel(emp.role)}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                        <Phone className="w-4 h-4 text-slate-400" />
-                        {emp.phone}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      {emp.is_active ? (
-                        <Badge variant="success"><CheckCircle2 className="w-3 h-3" /> Actif</Badge>
-                      ) : (
-                        <Badge variant="warning"><Clock className="w-3 h-3" /> En attente</Badge>
-                      )}
-                    </td>
-                    <td className="p-4 text-sm text-slate-500">{formatDate(emp.created_at)}</td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {!emp.is_active && (
+                      </td>
+                      <td className="p-3">
+                        <Badge variant={emp.role === "admin_residence" ? "info" : emp.role === "menagere" ? "theme" : "default"}>
+                          {getRoleLabel(emp.role)}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                            <Building2 className="w-4 h-4 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+                            <span>{currentActiveAcc ? currentActiveAcc.name : "Tous les établissements"}</span>
+                          </div>
+                          {tempAss && tempAss.end_date && (
+                            <Badge variant="warning" className="text-[10px] gap-1 px-1.5 py-0.5">
+                              <CalendarDays className="w-3 h-3" />
+                              Temporaire jusqu'au {formatDate(tempAss.end_date)}
+                            </Badge>
+                          )}
+                          {tempAss && !tempAss.end_date && tempAss.is_different_site && (
+                            <Badge variant="info" className="text-[10px] gap-1 px-1.5 py-0.5">
+                              <ArrowLeftRight className="w-3 h-3" />
+                              Affecté (Nouveau site)
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                          <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
+                          {emp.phone}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        {emp.is_active ? (
+                          <Badge variant="success"><CheckCircle2 className="w-3 h-3" /> Actif</Badge>
+                        ) : (
+                          <Badge variant="error"><Ban className="w-3 h-3" /> Accès révoqué</Badge>
+                        )}
+                      </td>
+                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{formatDate(emp.created_at)}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openReassign(emp)}
+                            className="p-2 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                            title="Changer d'établissement / Réaffecter"
+                          >
+                            <ArrowLeftRight className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openHistory(emp)}
+                            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Historique des affectations"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => {
                               const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -289,20 +516,33 @@ await supabase.from("users").delete().eq("id", id);
                               setInviteModalOpen(true);
                             }}
                             className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                            title="Partager le lien d'invitation"
+                            title="Partager le lien d'accès"
                           >
                             <Share2 className="w-4 h-4" />
                           </button>
-                        )}
-                        {emp.role !== "admin_residence" && (
-                          <button onClick={() => handleDelete(emp.id)} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Supprimer l'employé">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {emp.role !== "admin_residence" && (
+                            <>
+                              <button
+                                onClick={() => handleToggleActive(emp)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  emp.is_active
+                                    ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                    : "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                }`}
+                                title={emp.is_active ? "Révoquer l'accès" : "Réactiver l'accès"}
+                              >
+                                {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                              </button>
+                              <button onClick={() => handleDelete(emp.id)} className="p-2 rounded-lg text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors" title="Supprimer l'employé">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -310,24 +550,40 @@ await supabase.from("users").delete().eq("id", id);
       )}
 
       {/* Info activation */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800">
-        <Phone className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/20">
+        <Phone className="w-5 h-5 text-[var(--primary-color,#0C1C33)] flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium text-indigo-800 dark:text-indigo-300">Activation des employés</p>
-          <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
-            Les employés reçoivent leur numéro de téléphone comme identifiant. Ils doivent créer leur mot de passe lors de leur première connexion via la page "Première connexion".
+          <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Activation & Mobilité des employés</p>
+          <p className="text-xs text-[var(--primary-color,#0C1C33)]/80 mt-1">
+            Chaque employé accède au dashboard de sa résidence d'affectation active. Vous pouvez réaffecter un employé de façon permanente ou fixer des dates de début/fin pour un remplacement temporaire.
           </p>
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal d'ajout d'employé */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Ajouter un employé">
-        <div className="space-y-4">
-          <Input label="Nom complet" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="Aminata Traoré" />
-          <Input label="Téléphone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+225 07 00 00 00 00" icon={<Phone className="w-5 h-5" />} />
+        <div className="space-y-3">
+          <Input label="Nom complet *" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="Aminata Traoré" required />
+          <Input label="Téléphone *" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+225 07 00 00 00 00" icon={<Phone className="w-5 h-5" />} required />
           <Input label="Email (optionnel)" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="aminata@residence.com" />
+          
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Rôle</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Établissement (Résidence) *</label>
+            <select
+              value={formData.accommodation_id}
+              onChange={(e) => setFormData({ ...formData, accommodation_id: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
+            >
+              <option value="">Sélectionner une résidence</option>
+              {accommodations.map((acc) => (
+                <option key={acc.id} value={acc.id}>{acc.name} {acc.city ? `(${acc.city})` : ""}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Rôle *</label>
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
@@ -335,16 +591,131 @@ await supabase.from("users").delete().eq("id", id);
             >
               <option value="receptionniste">Réceptionniste</option>
               <option value="menagere" disabled={!limits.hasCleaningModule}>
-                Ménagère {limits.hasCleaningModule ? "" : "(Plan Pro requis)"}
+                Ménagère
               </option>
             </select>
           </div>
+
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSave} loading={loading}>Ajouter</Button>
           </div>
         </div>
       </Modal>
+
+      {/* Modal Réaffecter un employé */}
+      {reassignTarget && (
+        <Modal
+          open={reassignModalOpen}
+          onClose={() => setReassignModalOpen(false)}
+          title={`Réaffecter ${reassignTarget.full_name}`}
+          description="Changer l'établissement de travail ou programmer un déplacement temporaire."
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nouvel établissement de destination *</label>
+              <select
+                value={reassignForm.accommodation_id}
+                onChange={(e) => setReassignForm({ ...reassignForm, accommodation_id: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Sélectionner un établissement</option>
+                {accommodations.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} {acc.city ? `(${acc.city})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Date de début *</label>
+                <input
+                  type="date"
+                  value={reassignForm.start_date}
+                  onChange={(e) => setReassignForm({ ...reassignForm, start_date: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">
+                  Date de fin <span className="font-normal text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">(Optionnelle)</span>
+                </label>
+                <input
+                  type="date"
+                  value={reassignForm.end_date}
+                  onChange={(e) => setReassignForm({ ...reassignForm, end_date: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">
+              💡 <span className="font-semibold">Remarque :</span> Si la date de fin est laissée vide, l'affectation sera permanente. Si elle est renseignée, l'employé retournera automatiquement à son site de base à l'expiration.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Raison / Notes (Optionnel)</label>
+              <Input
+                placeholder="Remplacement vacances, renfort weekend..."
+                value={reassignForm.notes}
+                onChange={(e) => setReassignForm({ ...reassignForm, notes: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setReassignModalOpen(false)}>
+                Annuler
+              </Button>
+              <Button className="flex-1" onClick={handleReassign} loading={reassignLoading}>
+                Valider la réaffectation
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Historique des affectations */}
+      {historyTarget && (
+        <Modal
+          open={historyModalOpen}
+          onClose={() => setHistoryModalOpen(false)}
+          title={`Historique des affectations - ${historyTarget.full_name}`}
+        >
+          <div className="space-y-3">
+            {historyData.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 text-center py-6">Aucun historique d'affectation enregistré.</p>
+            ) : (
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {historyData.map((item) => (
+                  <div key={item.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold text-slate-900 dark:text-white">
+                        {item.accommodation?.name || "Établissement inconnu"}
+                      </span>
+                      {item.end_date ? (
+                        <Badge variant="warning" className="text-[10px]">Temporaire</Badge>
+                      ) : (
+                        <Badge variant="info" className="text-[10px]">Permanente</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      <span>Du {formatDate(item.start_date)}</span>
+                      {item.end_date ? <span>au {formatDate(item.end_date)}</span> : <span>(En cours / Définitif)</span>}
+                    </div>
+                    {item.notes && <p className="text-xs text-slate-600 dark:text-slate-300 italic pt-1">« {item.notes} »</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button variant="outline" className="w-full mt-2" onClick={() => setHistoryModalOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal d'invitation généré */}
       {inviteData && (
@@ -354,24 +725,24 @@ await supabase.from("users").delete().eq("id", id);
           title="🎉 Employé enregistré !"
           description="Transmettez ce lien à l'employé pour qu'il puisse finaliser son inscription."
         >
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 space-y-2">
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700 space-y-2">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Employé :</span>
+                <span className="text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Employé :</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{inviteData.full_name}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Téléphone reconnu :</span>
+                <span className="text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Téléphone reconnu :</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{inviteData.phone}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-500">Rôle :</span>
+                <span className="text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Rôle :</span>
                 <Badge variant="purple">{getRoleLabel(inviteData.role)}</Badge>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-2">Lien d'activation généré</label>
+              <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase mb-2">Lien d'activation généré</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"

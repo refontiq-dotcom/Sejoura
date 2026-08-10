@@ -34,7 +34,7 @@ export function DashboardSkeletons() {
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
         <div className="lg:col-span-7 p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-96">
           <Skeleton className="w-48 h-6 mb-6" />
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex items-center gap-4">
                 <Skeleton className="w-10 h-10 rounded-full" />

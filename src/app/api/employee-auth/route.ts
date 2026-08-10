@@ -18,10 +18,10 @@ export async function POST(request: Request) {
     // Nettoyage des chiffres du téléphone pour comparaison robuste
     const digitsOnly = phone.replace(/[^0-9]/g, "");
 
-    // Recherche de l'employé dans la table users
+    // Recherche de l'employé dans la table users — whitelist des colonnes
     const { data: allUsers, error: searchErr } = await admin
       .from("users")
-      .select("*");
+      .select("id, full_name, phone, email, role, auth_user_id, is_active, activated_at, tenant_id");
 
     if (searchErr || !allUsers) {
       return NextResponse.json(

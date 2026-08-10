@@ -17,7 +17,12 @@ export type SubscriptionStatus =
   | "suspended"
   | "cancelled";
 
-export type SubscriptionPlan = "standard" | "pro" | "enterprise";
+export type SubscriptionPlan =
+  | "free"
+  | "standard"
+  | "essentiel"
+  | "enterprise"
+  | "entreprise";
 
 export type BookingStatus =
   | "confirmed"
@@ -49,6 +54,8 @@ export type ExpenseCategory =
   | "taxes"
   | "other";
 
+export type InvoiceStatus = "draft" | "sent" | "paid" | "partial" | "cancelled";
+
 // ----------------------------------------------------------------------------
 // Tables
 // ----------------------------------------------------------------------------
@@ -63,6 +70,10 @@ export interface Tenant {
   city: string | null;
   address: string | null;
   logo_url: string | null;
+  theme_color?: string | null;
+  primary_color?: string | null;
+  default_currency?: string | null;
+  default_currency_symbol?: string | null;
   is_suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -90,6 +101,7 @@ export interface Subscription {
 export interface User {
   id: string;
   tenant_id: string | null;
+  accommodation_id: string | null;
   auth_user_id: string | null;
   role: UserRole;
   full_name: string;
@@ -104,6 +116,21 @@ export interface User {
   updated_at: string;
 }
 
+export interface EmployeeAssignment {
+  id: string;
+  user_id: string;
+  accommodation_id: string;
+  start_date: string;       // DATE — ISO format YYYY-MM-DD
+  end_date: string | null;  // null = affectation permanente
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  // Relations optionnelles (via join)
+  accommodation?: Accommodation;
+  user?: User;
+}
+
+
 export interface Accommodation {
   id: string;
   tenant_id: string;
@@ -112,11 +139,35 @@ export interface Accommodation {
   address: string | null;
   city: string | null;
   country: string;
+  currency: string;
+  currency_symbol: string;
+  phone_code: string;
+  language: string;
   latitude: number | null;
   longitude: number | null;
   contact_phone: string | null;
   total_rooms: number;
   is_active: boolean;
+  is_boosted: boolean;
+  boost_expires_at: string | null;
+  is_permanently_boosted?: boolean;
+  boost_express_expires_at?: string | null;
+  boost_express_price_paid?: number | null;
+  logo_url?: string | null;
+  theme_color?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalApiKey {
+  id: string;
+  tenant_id: string;
+  name: string;
+  api_key: string;
+  scopes: string[];
+  is_active: boolean;
+  expires_at: string | null;
+  last_used_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +192,22 @@ export interface Room {
   floor: number | null;
   status: RoomStatus;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrouvetouListing {
+  id: string;
+  unit_id: string;
+  establishment_id: string;
+  is_published: boolean;
+  public_title: string | null;
+  public_description: string | null;
+  featured_images: string[];
+  amenities_badges: string[];
+  direct_whatsapp: string | null;
+  views_count: number;
+  whatsapp_clicks_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -234,6 +301,23 @@ export interface Expense {
   amount: number;
   expense_date: string;
   receipt_url: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  invoice_number: string;
+  amount: number;
+  tax_amount: number;
+  total_amount: number;
+  status: InvoiceStatus;
+  pdf_url: string | null;
+  sent_at: string | null;
+  sent_to: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -428,6 +512,11 @@ export interface Database {
         Insert: Omit<Expense, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Expense, "id" | "created_at" | "updated_at">>;
       };
+      invoices: {
+        Row: Invoice;
+        Insert: Omit<Invoice, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Invoice, "id" | "created_at" | "updated_at">>;
+      };
       audit_logs: {
         Row: AuditLog;
         Insert: Omit<AuditLog, "id" | "created_at">;
@@ -511,6 +600,10 @@ export interface Database {
       request_mid_stay_cleaning: {
         Args: { p_booking_id: string; p_user_id: string };
         Returns: CleaningTask;
+      };
+      generate_invoice: {
+        Args: { p_booking_id: string; p_user_id: string; p_invoice_number: string };
+        Returns: Invoice;
       };
     };
   };

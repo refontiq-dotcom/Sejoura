@@ -14,7 +14,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-[color:var(--color-primary)] text-[color:var(--color-primary-foreground)] hover:brightness-110 focus:ring-[color:var(--color-primary)] shadow-sm",
+    "bg-[var(--primary-color,#0C1C33)] text-[var(--primary-foreground,#ffffff)] hover:opacity-90 hover:bg-[var(--primary-hover,#162a47)] focus:ring-[var(--primary-color)] shadow-sm",
   secondary:
     "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600",
   outline:
@@ -28,10 +28,10 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: "h-9 px-3 text-sm rounded-lg gap-1.5",
-  md: "h-10 px-4 text-sm rounded-xl gap-2",
-  lg: "h-12 px-6 text-base rounded-xl gap-2",
-  icon: "h-10 w-10 rounded-xl",
+  sm: "h-7 px-2.5 text-[11px] rounded-md",
+  md: "h-8 px-3 text-xs rounded-md",
+  lg: "h-9 px-4 text-sm rounded-lg",
+  icon: "h-8 w-8 rounded-md",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -40,7 +40,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+        className={`inline-flex items-center justify-center font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:ring-offset-2 dark:focus:ring-offset-slate-800 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}

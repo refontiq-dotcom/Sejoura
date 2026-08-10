@@ -6,5 +6,5 @@ export default function RegisterPage({
   searchParams: { next?: string };
 }) {
   const next = searchParams.next ? `?next=${encodeURIComponent(searchParams.next)}` : "";
-  redirect(`/login${next}`);
+  redirect(`/${next}`);
 }

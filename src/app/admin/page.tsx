@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
 import { formatFCFA, formatDate, getPlanLabel } from "@/lib/utils";
 import { Shield, Building2, Users, CreditCard, AlertTriangle, Loader2, CheckCircle2, XCircle, MoreHorizontal } from "lucide-react";
+import { LOGIN_ROUTE } from "@/lib/routes";
 import type { Tenant, Subscription } from "@/types/database";
 
 export default function SuperAdminPage() {
@@ -33,7 +34,7 @@ export default function SuperAdminPage() {
         .single();
 
       if (!userData || userData.role !== "super_admin") {
-        window.location.href = "/login";
+        window.location.href = LOGIN_ROUTE;
         return;
       }
 
@@ -82,7 +83,7 @@ export default function SuperAdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
@@ -94,7 +95,7 @@ export default function SuperAdminPage() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-6">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-2xl bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
           <Shield className="w-6 h-6 text-white" />
         </div>
         <div>
@@ -117,7 +118,7 @@ export default function SuperAdminPage() {
           <p className="text-xs text-slate-400">Suspendues</p>
         </Card>
         <Card className="p-4">
-          <p className="text-2xl font-bold text-indigo-600">{formatFCFA(totalRevenue)}</p>
+          <p className="text-2xl font-bold text-[var(--primary-color,#0C1C33)]">{formatFCFA(totalRevenue)}</p>
           <p className="text-xs text-slate-400">Derniers paiements</p>
         </Card>
       </div>
@@ -149,7 +150,7 @@ export default function SuperAdminPage() {
                       <p className="text-xs text-slate-400">{t.contact_email}</p>
                     </td>
                     <td className="p-4">
-                      <Badge variant={sub?.plan === "pro" ? "info" : sub?.plan === "enterprise" ? "purple" : "default"}>
+                      <Badge variant={sub?.plan === "enterprise" ? "theme" : "default"}>
                         {getPlanLabel(sub?.plan || "standard")}
                       </Badge>
                     </td>
@@ -186,7 +187,7 @@ export default function SuperAdminPage() {
         title="Confirmer la suspension"
         description="L'entreprise passera en lecture seule"
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20">
             <AlertTriangle className="w-6 h-6 text-red-600" />
             <p className="text-sm text-red-700 dark:text-red-300">Cette action désactivera tous les utilisateurs et bloquera l'accès en écriture.</p>

@@ -13,9 +13,9 @@ export default function CGUPage() {
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-          <Link href="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Retour à la connexion
+            Retour au portail
           </Link>
           <span className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400">Séjoura by Refontiq</span>
         </div>

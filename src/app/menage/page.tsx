@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/utils";
 import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { getActiveAssignmentId } from "@/lib/assignments";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
 export default function MenagePage() {
@@ -28,14 +29,18 @@ export default function MenagePage() {
 
       const { data: userData } = await supabase
         .from("users")
-        .select("id, tenant_id")
+        .select("id, tenant_id, accommodation_id")
         .eq("auth_user_id", session.user.id)
         .single();
 
       if (!userData) return;
       setUserId(userData.id);
 
-      const { data: taskData } = await supabase
+      // Résoudre l'établissement actif pour la ménagère
+      const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
+
+      // Filtrer par résidence d'affectation active
+      let taskQuery = supabase
         .from("cleaning_tasks")
         .select(`
           *,
@@ -44,6 +49,12 @@ export default function MenagePage() {
         `)
         .eq("tenant_id", userData.tenant_id)
         .order("created_at", { ascending: false });
+
+      if (activeAccId) {
+        taskQuery = taskQuery.eq("accommodation_id", activeAccId);
+      }
+
+      const { data: taskData } = await taskQuery;
 
       if (taskData) {
         setTasks(taskData as unknown as (CleaningTask & { room: Room; accommodation: Accommodation })[]);
@@ -98,13 +109,13 @@ export default function MenagePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4 text-center">
@@ -129,7 +140,7 @@ export default function MenagePage() {
             onClick={() => setFilter(f.key)}
             className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
               filter === f.key
-                ? "bg-indigo-600 text-white shadow-md"
+                ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-md"
                 : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300"
             }`}
           >
