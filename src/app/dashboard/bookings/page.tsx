@@ -123,6 +123,16 @@ export default function BookingsPage() {
     loadInitData();
   }, []);
 
+  // Ouvre automatiquement la modal de nouvelle réservation si ?new=1 est dans l'URL
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("new=1") && !loading) {
+      openAddModal();
+      // Nettoyer l'URL pour éviter de rouvrir la modal au refresh
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   async function loadInitData() {
     try {
       const supabase = createClient();

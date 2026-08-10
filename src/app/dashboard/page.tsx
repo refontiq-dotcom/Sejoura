@@ -37,7 +37,7 @@ import { useCurrency } from "@/hooks/use-currency";
 import { convertXofTo, getCurrencyDecimals } from "@/lib/currencyConverter";
 import { createClient } from "@/lib/supabase/client";
 import { DashboardSkeletons } from "@/components/ui/skeletons";
-import { AlertCircle, PlusCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, PlusCircle, RefreshCw, Plus } from "lucide-react";
 import type { Booking, Client, Room, RoomType } from "@/types/database";
 
 // ============================================================================
@@ -576,6 +576,7 @@ export default function DashboardPage() {
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenueData[]>([]);
   const [trendPercentage, setTrendPercentage] = useState(0);
   const [userId, setUserId] = useState<string>("");
+  const [userRole, setUserRole] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
@@ -598,7 +599,7 @@ export default function DashboardPage() {
 
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("id, tenant_id")
+          .select("id, tenant_id, role")
           .eq("auth_user_id", sessionData.session.user.id)
           .maybeSingle();
 
@@ -610,6 +611,7 @@ export default function DashboardPage() {
         }
 
         setUserId(userData.id);
+        setUserRole(userData.role || "");
 
         const tenantId = userData.tenant_id;
         const now = new Date();
@@ -863,6 +865,7 @@ export default function DashboardPage() {
   const todayStr = toLocalISODate(new Date());
   const isToday = selectedDate === todayStr;
   const isPastDate = selectedDate < todayStr;
+  const isReceptionniste = userRole === "receptionniste";
   const formattedSelectedDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
@@ -938,7 +941,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-3 animate-fade-in">
+    <div className={isReceptionniste ? "space-y-2 animate-fade-in" : "space-y-3 animate-fade-in"}>
       {/* 0. SÉLECTEUR DE DATE (discret) */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 dark:text-slate-500">
@@ -952,6 +955,16 @@ export default function DashboardPage() {
                 : "· Activités à venir"}
           </span>
         </div>
+
+        {isReceptionniste && (
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => router.push("/dashboard/bookings?new=1")}
+          >
+            <Plus className="w-4 h-4" /> Réservation rapide
+          </Button>
+        )}
 
         <div className="flex items-center gap-1.5">
           <button
@@ -986,124 +999,182 @@ export default function DashboardPage() {
       </div>
 
       {/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Taux d'occupation */}
-        <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+      {isReceptionniste ? (
+        /* ── Vue Réceptionniste : 4 KPIs compacts et opérationnels ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          {/* KPI: Arrivées prévues */}
+          <Card className="p-3 border-l-4 border-l-emerald-500 dark:border-l-emerald-400">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
+                <LogIn className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
               </div>
-              <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
-            </div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">{"Taux d'occupation"}</p>
-            <p className="text-3xl font-extrabold text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
-          </div>
-          <div className="mt-3">
-            <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1.5">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
-                style={{ width: `${kpis.occupancyRate}%` }}
-              />
-            </div>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Pourcentage de chambres occupées</p>
-          </div>
-        </Card>
-
-        {/* KPI 2: Encaissements du jour */}
-        <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
-              </div>
-              <Badge variant="success">{currency.code}</Badge>
-            </div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Encaissements</p>
-            <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
-               {formatAmountOnly(kpis.dailyRevenue, currency.code)}
-            </p>
-          </div>
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
-            {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
-          </p>
-        </Card>
-
-        {/* KPI 3: Entrées / Sorties prévues */}
-        <Card className="p-4 border-t-4 border-t-orange-500 dark:border-t-orange-400 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                <LogIn className="w-6 h-6 text-orange-700 dark:text-orange-300" />
-              </div>
-              <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
-            </div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Mouvements</p>
-            <div className="flex items-center justify-between pt-1">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
-                </div>
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Arrivées</p>
-              </div>
-              <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
-                </div>
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Départs</p>
+                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.expectedCheckins}</p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Arrivées prévues</p>
               </div>
             </div>
-          </div>
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
-            {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
-          </p>
-        </Card>
+          </Card>
 
-        {/* KPI 4: État Ménage */}
-        <Card className="p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
+          {/* KPI: Départs prévus */}
+          <Card className="p-3 border-l-4 border-l-orange-500 dark:border-l-orange-400">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+                <LogOut className="w-4 h-4 text-orange-700 dark:text-orange-300" />
               </div>
-              <Badge variant="theme">Ménage</Badge>
-            </div>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">État du ménage</p>
-            <div className="flex items-center justify-between pt-1">
               <div>
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
-                </div>
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">À nettoyer</p>
-              </div>
-              <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
-                </div>
-                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Prêtes</p>
+                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.expectedCheckouts}</p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Départs prévus</p>
               </div>
             </div>
-          </div>
-          <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">Statut de propreté des chambres</p>
-        </Card>
-      </div>
+          </Card>
 
-      {/* 2. CONTENEUR PRINCIPAL GAUCHE (70%) + 3. CONTENEUR SECONDAIRE DROITE (30%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
-        {/* Tableau des mouvements (70%) */}
-        <Card className="lg:col-span-7 overflow-hidden bg-[var(--card)] border-t-4 border-t-blue-500 dark:border-t-blue-400">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          {/* KPI: Chambres à nettoyer */}
+          <Card className="p-3 border-l-4 border-l-amber-500 dark:border-l-amber-400">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-amber-700 dark:text-amber-300" />
+              </div>
+              <div>
+                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.cleaningPending}</p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Chambres à nettoyer</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* KPI: Taux d'occupation */}
+          <Card className="p-3 border-l-4 border-l-blue-500 dark:border-l-blue-400">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-4 h-4 text-blue-700 dark:text-blue-300" />
+              </div>
+              <div>
+                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.occupancyRate}%</p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Taux d'occupation</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : (
+        /* ── Vue Admin : 4 KPIs d'origine (inchangée) ── */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI 1: Taux d'occupation */}
+          <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400 flex flex-col justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+                </div>
+                <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">{"Taux d'occupation"}</p>
+              <p className="text-3xl font-extrabold text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
+            </div>
+            <div className="mt-3">
+              <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1.5">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
+                  style={{ width: `${kpis.occupancyRate}%` }}
+                />
+              </div>
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Pourcentage de chambres occupées</p>
+            </div>
+          </Card>
+
+          {/* KPI 2: Encaissements du jour */}
+          <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                  <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+                </div>
+                <Badge variant="success">{currency.code}</Badge>
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Encaissements</p>
+              <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                 {formatAmountOnly(kpis.dailyRevenue, currency.code)}
+              </p>
+            </div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+              {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+            </p>
+          </Card>
+
+          {/* KPI 3: Entrées / Sorties prévues */}
+          <Card className="p-4 border-t-4 border-t-orange-500 dark:border-t-orange-400 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                  <LogIn className="w-6 h-6 text-orange-700 dark:text-orange-300" />
+                </div>
+                <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Mouvements</p>
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Arrivées</p>
+                </div>
+                <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Départs</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+              {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
+            </p>
+          </Card>
+
+          {/* KPI 4: État Ménage */}
+          <Card className="p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
+                </div>
+                <Badge variant="theme">Ménage</Badge>
+              </div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">État du ménage</p>
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">À nettoyer</p>
+                </div>
+                <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Prêtes</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">Statut de propreté des chambres</p>
+          </Card>
+        </div>
+      )}
+
+      {/* 2. CONTENEUR PRINCIPAL — Mouvements du jour */}
+      {isReceptionniste ? (
+        /* ── Vue Réceptionniste : Mouvements en pleine largeur avec actions rapides ── */
+        <Card className="overflow-hidden bg-[var(--card)]">
+          <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
               </h2>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-0.5">
                 {isToday
                   ? "Arrivées et départs prévus aujourd'hui"
                   : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
@@ -1119,27 +1190,27 @@ export default function DashboardPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Client
                   </th>
-                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Logement
                   </th>
-                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Heure
                   </th>
-                  <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                     Paiement
                   </th>
-                  <th className="text-right p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Action
+                  <th className="text-right p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
                 {movements.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
+                    <td colSpan={5} className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
                       {isToday
                         ? "Aucun mouvement prévu aujourd'hui"
                         : isPastDate
@@ -1151,73 +1222,75 @@ export default function DashboardPage() {
                   movements.map((m) => (
                   <tr
                     key={m.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
-                    onClick={() => setDrawerMovement(m)}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
                   >
-                     <td className="p-3">
-                       <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                     <td className="p-2.5">
+                       <div className="flex items-center gap-2.5">
+                         <div className="w-7 h-7 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                            {m.clientName.charAt(0)}
                          </div>
                          <div>
                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
                              {m.clientName}
                            </p>
-                           <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.bookingCode}</p>
+                           <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{m.bookingCode}</p>
                          </div>
                        </div>
                      </td>
-                     <td className="p-3">
+                     <td className="p-2.5">
                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
                          Ch. {m.roomNumber}
                        </p>
-                       <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.roomType}</p>
+                       <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{m.roomType}</p>
                      </td>
-                     <td className="p-3">
-                      <div className="flex items-center gap-2">
+                     <td className="p-2.5">
+                      <div className="flex items-center gap-1.5">
                         {m.movementType === "check_in" ? (
-                          <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          <LogIn className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         ) : (
-                          <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          <LogOut className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                         )}
                         <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.time}</span>
                       </div>
                     </td>
-                    <td className="p-4">
-                      <div className="flex flex-col gap-1">
+                    <td className="p-2.5">
+                      <div className="flex flex-col gap-0.5">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
                         >
                           {getPaymentStatusLabel(m.paymentStatus)}
                         </span>
-                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                        <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
                           {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
                         </span>
                       </div>
                     </td>
-                    <td className="p-4 text-right">
-                      {isPastDate ||
-                      !(
-                        (m.movementType === "check_in" && m.bookingStatus === "confirmed") ||
-                        (m.movementType === "check_out" && m.bookingStatus === "checked_in")
-                      ) ? (
-                        <Badge variant={m.bookingStatus === "checked_out" ? "success" : m.bookingStatus === "cancelled" ? "error" : "info"}>
-                          {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
-                        </Badge>
-                      ) : (
+                    <td className="p-2.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!isPastDate &&
+                          ((m.movementType === "check_in" && m.bookingStatus === "confirmed") ||
+                            (m.movementType === "check_out" && m.bookingStatus === "checked_in")) && (
+                          <Button
+                            variant={m.movementType === "check_in" ? "primary" : "secondary"}
+                            size="sm"
+                            loading={actionLoading === m.id}
+                            disabled={actionLoading === m.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMovementAction(m.id, m.movementType);
+                            }}
+                          >
+                            {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                          </Button>
+                        )}
                         <Button
-                          variant={m.movementType === "check_in" ? "primary" : "secondary"}
+                          variant="ghost"
                           size="sm"
-                          loading={actionLoading === m.id}
-                          disabled={actionLoading === m.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMovementAction(m.id, m.movementType);
-                          }}
+                          onClick={() => setDrawerMovement(m)}
                         >
-                          {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                          Détails
                         </Button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 )))}
@@ -1225,41 +1298,174 @@ export default function DashboardPage() {
             </table>
           </div>
         </Card>
+      ) : (
+        /* ── Vue Admin : 70% mouvements + 30% donut (inchangée) ── */
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
+          {/* Tableau des mouvements (70%) */}
+          <Card className="lg:col-span-7 overflow-hidden bg-[var(--card)] border-t-4 border-t-blue-500 dark:border-t-blue-400">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
+                </h2>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+                  {isToday
+                    ? "Arrivées et départs prévus aujourd'hui"
+                    : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
+                Voir tout
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
 
-        {/* Donut Chart — État du parc (30%) */}
-        <Card className="lg:col-span-3 p-4 bg-[var(--card)] border-t-4 border-t-[var(--primary-color,#0C1C33)]">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-            État du parc
-          </h2>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-4">
-            Répartition en temps réel
-          </p>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Logement
+                    </th>
+                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Heure
+                    </th>
+                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Paiement
+                    </th>
+                    <th className="text-right p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                  {movements.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
+                        {isToday
+                          ? "Aucun mouvement prévu aujourd'hui"
+                          : isPastDate
+                            ? "Aucune activité enregistrée pour cette date"
+                            : "Aucune activité prévue pour cette date"}
+                      </td>
+                    </tr>
+                  ) : (
+                    movements.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
+                      onClick={() => setDrawerMovement(m)}
+                    >
+                       <td className="p-3">
+                         <div className="flex items-center gap-3">
+                           <div className="w-8 h-8 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                             {m.clientName.charAt(0)}
+                           </div>
+                           <div>
+                             <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                               {m.clientName}
+                             </p>
+                             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.bookingCode}</p>
+                           </div>
+                         </div>
+                       </td>
+                       <td className="p-3">
+                         <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                           Ch. {m.roomNumber}
+                         </p>
+                         <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{m.roomType}</p>
+                       </td>
+                       <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {m.movementType === "check_in" ? (
+                            <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          )}
+                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{m.time}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
+                          >
+                            {getPaymentStatusLabel(m.paymentStatus)}
+                          </span>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        {isPastDate ||
+                        !(
+                          (m.movementType === "check_in" && m.bookingStatus === "confirmed") ||
+                          (m.movementType === "check_out" && m.bookingStatus === "checked_in")
+                        ) ? (
+                          <Badge variant={m.bookingStatus === "checked_out" ? "success" : m.bookingStatus === "cancelled" ? "error" : "info"}>
+                            {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant={m.movementType === "check_in" ? "primary" : "secondary"}
+                            size="sm"
+                            loading={actionLoading === m.id}
+                            disabled={actionLoading === m.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMovementAction(m.id, m.movementType);
+                            }}
+                          >
+                            {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
 
-          <DonutChart data={roomStatusData} />
+          {/* Donut Chart — État du parc (30%) */}
+          <Card className="lg:col-span-3 p-4 bg-[var(--card)] border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+              État du parc
+            </h2>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-4">
+              Répartition en temps réel
+            </p>
 
-          {/* Légende */}
-          <div className="mt-4 space-y-2.5">
-            {roomStatusData.map((item) => (
-              <div key={item.status} className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
-                  />
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {getRoomStatusLabel(item.status)}
+            <DonutChart data={roomStatusData} />
+
+            {/* Légende */}
+            <div className="mt-4 space-y-2.5">
+              {roomStatusData.map((item) => (
+                <div key={item.status} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
+                    />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {getRoomStatusLabel(item.status)}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">
+                    {item.count}
                   </span>
                 </div>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
 
-      {!canAccessPlanFeature(plan, "advancedAccounting") && (
+      {!isReceptionniste && !canAccessPlanFeature(plan, "advancedAccounting") && (
         <Card className="p-4 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -1271,29 +1477,31 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 4. CONTENEUR INFÈRIEUR — Graphique linéaire des recettes */}
-      <Card className="p-4 bg-[var(--card)] border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Suivi des recettes mensuelles
-            </h2>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
-              Évolution des encaissements (en {currency.symbol})
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
-              <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                {trendPercentage >= 0 ? "+" : ""}{trendPercentage.toFixed(1)}%
-              </span>
+      {/* 4. CONTENEUR INFÉRIEUR — Graphique linéaire des recettes (réservé aux admins) */}
+      {!isReceptionniste && (
+        <Card className="p-4 bg-[var(--card)] border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Suivi des recettes mensuelles
+              </h2>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+                Évolution des encaissements (en {currency.symbol})
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                  {trendPercentage >= 0 ? "+" : ""}{trendPercentage.toFixed(1)}%
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
-      </Card>
+          <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
+        </Card>
+      )}
       {drawerMovement && (
         <ClientDrawer
           movement={drawerMovement}
