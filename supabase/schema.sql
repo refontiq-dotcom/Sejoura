@@ -274,12 +274,21 @@ CREATE TABLE room_types (
   description     TEXT,
   base_price      INTEGER NOT NULL,        -- Prix de base en FCFA
   capacity        INTEGER NOT NULL DEFAULT 2, -- Nombre de personnes
-  amenities       JSONB DEFAULT '[]'::jsonb, -- Liste des équipements
+  amenities       JSONB DEFAULT '[]'::jsonb, -- Liste des équipements (Commodités)
+  surface_m2      DOUBLE PRECISION,        -- Superficie en m² (optionnel)
+  is_listed_on_trouvetou BOOLEAN NOT NULL DEFAULT FALSE, -- Interrupteur Visibilité Trouvetou
+  featured_images TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], -- Photos diffusées sur Trouvetou
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Règle de sécurité : pas de diffusion Trouvetou sans au moins une photo
+  CONSTRAINT chk_trouvetou_requires_photo
+    CHECK (is_listed_on_trouvetou = FALSE OR cardinality(featured_images) > 0)
 );
 
 CREATE INDEX idx_room_types_accommodation ON room_types(accommodation_id);
+CREATE INDEX idx_room_types_trouvetou_listed
+  ON room_types(is_listed_on_trouvetou)
+  WHERE (is_listed_on_trouvetou = TRUE);
 
 -- ----------------------------------------------------------------------------
 -- 7. TABLE: rooms (Chambres individuelles)
@@ -1878,6 +1887,7 @@ ORDER BY b.check_in_time, b.check_out_time;
 --   - 'receipts'     : Justificatifs de dépenses
 --   - 'invoices'     : Factures PDF générées
 --   - 'avatars'      : Avatars des utilisateurs
+--   - 'room-photos'  : Photos des chambres diffusées sur Trouvetou
 
 -- Politiques de storage (à exécuter après création des buckets)
 -- Bucket 'logos': seul l'admin du tenant peut uploader son logo

@@ -36,6 +36,8 @@ export default function ResidencesPage() {
     language: "fr",
     contact_phone: "",
     image_url: "",
+    latitude: "",
+    longitude: "",
   });
 
   useEffect(() => {
@@ -126,6 +128,8 @@ export default function ResidencesPage() {
       language: "fr",
       contact_phone: "+225 ",
       image_url: "",
+      latitude: "",
+      longitude: "",
     });
     setModalOpen(true);
   }
@@ -143,6 +147,8 @@ export default function ResidencesPage() {
       language: acc.language || "fr",
       contact_phone: acc.contact_phone || "",
       image_url: (acc as any).image_url || "",
+      latitude: acc.latitude != null ? acc.latitude.toString() : "",
+      longitude: acc.longitude != null ? acc.longitude.toString() : "",
     });
     setModalOpen(true);
   }
@@ -194,6 +200,8 @@ export default function ResidencesPage() {
             language: formData.language,
             contact_phone: formData.contact_phone,
             image_url: formData.image_url || null,
+            latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+            longitude: formData.longitude ? parseFloat(formData.longitude) : null,
           } as any)
           .eq("id", editingResidence.id);
       } else {
@@ -211,6 +219,8 @@ export default function ResidencesPage() {
             language: formData.language,
             contact_phone: formData.contact_phone,
             image_url: formData.image_url || null,
+            latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+            longitude: formData.longitude ? parseFloat(formData.longitude) : null,
           } as any);
       }
 
@@ -478,6 +488,12 @@ export default function ResidencesPage() {
           </div>
 
           <Input label="URL de l'image (optionnelle)" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />
+
+          {/* Coordonnées GPS (pour le bouton Itinéraire Trouvetou) */}
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Latitude (optionnel)" type="number" step="any" value={formData.latitude} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} placeholder="5.3453170" />
+            <Input label="Longitude (optionnel)" type="number" step="any" value={formData.longitude} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} placeholder="-4.0082560" />
+          </div>
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>

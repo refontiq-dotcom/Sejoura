@@ -2,9 +2,45 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Cache simple en mémoire (TTL 60s) pour le portail public.
+// Réduit la charge Supabase sur les pics de consultation. Le cache est
+// invalidé naturellement par le TTL ; on peut forcer un rafraîchissement
+// avec ?no_cache=1.
+// ──────────────────────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 60_000;
+const cache = new Map<string, { expiresAt: number; response: NextResponse }>();
+
+function cacheKey(searchParams: URLSearchParams): string {
+  const params = new URLSearchParams(searchParams);
+  params.delete("no_cache");
+  return params.toString();
+}
+
+function getCached(key: string): NextResponse | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.response;
+}
+
+function setCached(key: string, response: NextResponse): void {
+  cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, response });
+  if (cache.size > 200) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/trouvetou/listings
 // API publique Trouvetou — retourne les fiches publiées triées par boost_priority
 // Tri : priorité 2 (Permanent/Entreprise) → 1 (Express/Essentiel) → 0 (Standard)
+// Master gate : seules les chambres dont le type a l'interrupteur Trouvetou ON
+//              ET au moins une photo remontent (is_listed_on_trouvetou = true).
+// Filtres : ?city=...&check_in=...&check_out=...&amenities=wifi,climatisation
 // ──────────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
@@ -12,6 +48,16 @@ export async function GET(request: Request) {
     const city     = searchParams.get("city");
     const checkIn  = searchParams.get("check_in");
     const checkOut = searchParams.get("check_out");
+    const amenitiesParam = searchParams.get("amenities");
+    const requestedAmenities = amenitiesParam
+      ? amenitiesParam.split(",").map((a) => a.trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const skipCache = searchParams.get("no_cache") === "1";
+    if (!skipCache) {
+      const cached = getCached(cacheKey(searchParams));
+      if (cached) return cached;
+    }
 
     const admin = createAdminClient();
 
@@ -40,7 +86,10 @@ export async function GET(request: Request) {
             name,
             base_price,
             capacity,
-            amenities
+            amenities,
+            surface_m2,
+            is_listed_on_trouvetou,
+            featured_images
           )
         ),
         accommodations (
@@ -49,6 +98,8 @@ export async function GET(request: Request) {
           city,
           country,
           address,
+          latitude,
+          longitude,
           currency,
           currency_symbol,
           contact_phone,
@@ -70,12 +121,35 @@ export async function GET(request: Request) {
       return NextResponse.json({ listings: [], total: 0 });
     }
 
-    // 2. Filtre de ville
-    let filteredListings = listings;
+    // 2. Filtres : master gate Trouvetou (interrupteur ON + photo), ville, équipements
+    let filteredListings = listings.filter((l) => {
+      const room     = Array.isArray(l.rooms) ? l.rooms[0] : l.rooms;
+      const roomType = room && (Array.isArray(room.room_types) ? room.room_types[0] : room.room_types);
+
+      // Master gate : interrupteur ON obligatoire
+      if (roomType?.is_listed_on_trouvetou !== true) return false;
+
+      const images = roomType?.featured_images && roomType.featured_images.length > 0
+        ? roomType.featured_images
+        : (l.featured_images || []);
+      if (images.length === 0) return false;
+
+      return true;
+    });
+
     if (city) {
       filteredListings = filteredListings.filter((l) => {
         const acc = Array.isArray(l.accommodations) ? l.accommodations[0] : l.accommodations;
         return acc?.city?.toLowerCase() === city.toLowerCase();
+      });
+    }
+
+    if (requestedAmenities.length > 0) {
+      filteredListings = filteredListings.filter((l) => {
+        const room     = Array.isArray(l.rooms) ? l.rooms[0] : l.rooms;
+        const roomType = room && (Array.isArray(room.room_types) ? room.room_types[0] : room.room_types);
+        const roomAmenities = (roomType?.amenities || []).map((a: string) => a.toLowerCase());
+        return requestedAmenities.every((a) => roomAmenities.includes(a));
       });
     }
 
@@ -142,6 +216,11 @@ export async function GET(request: Request) {
       const isBooked  = occupiedRoomSet.has(item.unit_id) || room?.status === "occupied";
       const isAvailable = !isBooked;
 
+      // Photos : source prioritaire = photos du type de chambre (room_types.featured_images)
+      const images = roomType?.featured_images && roomType.featured_images.length > 0
+        ? roomType.featured_images
+        : (item.featured_images || []);
+
       return {
         id: item.id,
         public_title:       item.public_title       || roomType?.name || `Logement ${room?.room_number || ""}`,
@@ -150,14 +229,17 @@ export async function GET(request: Request) {
         currency:           acc?.currency_symbol     || "FCFA",
         status_label:       isAvailable ? "Disponible" : "Non disponible",
         is_available:       isAvailable,
-        featured_images:    item.featured_images    || [],
+        featured_images:    images,
         amenities_badges:   item.amenities_badges   || roomType?.amenities || [],
         whatsapp:           item.direct_whatsapp    || acc?.contact_phone  || "",
+        surface_m2:         roomType?.surface_m2     ?? null,
         establishment: {
           id:            acc?.id,
           name:          acc?.name,
           city:          acc?.city,
           address:       acc?.address,
+          latitude:      acc?.latitude,
+          longitude:     acc?.longitude,
           is_boosted:    isBoostActive,
           boost_type:    boostType,
           boost_priority: boostPriority,
@@ -184,7 +266,14 @@ export async function GET(request: Request) {
     // Nettoyage du champ interne avant réponse
     const cleanedResults = results.map(({ _boost_priority: _, ...rest }) => rest);
 
-    return NextResponse.json({ listings: cleanedResults, total: cleanedResults.length });
+    const response = NextResponse.json({ listings: cleanedResults, total: cleanedResults.length });
+    response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+
+    if (!skipCache) {
+      setCached(cacheKey(searchParams), response);
+    }
+
+    return response;
   } catch (error) {
     console.error("GET /api/v1/external/trouvetou/listings error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

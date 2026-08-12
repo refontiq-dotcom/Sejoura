@@ -1,13 +1,26 @@
+import { describe, it, expect } from "vitest";
 import { normalizePlan, canAccessFeature, getPlanPrice } from "../src/lib/subscription-plans";
 
-const assert = (condition: boolean, message: string) => {
-  if (!condition) throw new Error(message);
-};
+describe("subscription-plans", () => {
+  it("normalise les noms de plans", () => {
+    expect(normalizePlan("ESSENTIEL")).toBe("essentiel");
+    expect(normalizePlan("ENTREPRISE")).toBe("entreprise");
+    expect(normalizePlan("ENTERPRISE")).toBe("entreprise");
+    expect(normalizePlan("standard")).toBe("essentiel");
+    expect(normalizePlan("free")).toBe("free");
+    expect(normalizePlan(null)).toBe("free");
+  });
 
-assert(normalizePlan("ESSENTIEL") === "essentiel", "Le plan essentiel doit être normalisé");
-assert(normalizePlan("ENTREPRISE") === "entreprise", "Le plan entreprise doit être normalisé");
-assert(canAccessFeature("essentiel", "accounting") === false, "Le plan essentiel ne doit pas avoir accès à la compta avancée");
-assert(canAccessFeature("entreprise", "externalApi") === true, "Le plan entreprise doit avoir accès à l’API externe");
-assert(getPlanPrice("essentiel") === 15000, "Le prix de l’offre essentiel doit être 15000 FCFA");
+  it("fixe les prix des offres payantes", () => {
+    expect(getPlanPrice("essentiel")).toBe(15000);
+    expect(getPlanPrice("entreprise")).toBe(55000);
+    expect(getPlanPrice("free")).toBe(0);
+  });
 
-console.log("subscription plan tests passed");
+  it("réserve l'API externe et le boost Trouvetou à l'Entreprise", () => {
+    expect(canAccessFeature("externalApi", "essentiel")).toBe(false);
+    expect(canAccessFeature("externalApi", "entreprise")).toBe(true);
+    expect(canAccessFeature("trouvetouBoost", "essentiel")).toBe(false);
+    expect(canAccessFeature("trouvetouBoost", "entreprise")).toBe(true);
+  });
+});

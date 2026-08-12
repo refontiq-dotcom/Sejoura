@@ -9,7 +9,8 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { formatAmount, getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
-import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye } from "lucide-react";
+import { ROOM_AMENITIES } from "@/lib/amenities";
+import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, ImagePlus, Store, Check, X } from "lucide-react";
 import type { Accommodation, RoomType, Room } from "@/types/database";
 
 export default function ResidenceDetailPage() {
@@ -30,9 +31,11 @@ export default function ResidenceDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{ type: "room" | "type" | "residence"; id: string; name: string } | null>(null);
 
-  const [residenceForm, setResidenceForm] = useState({ name: "", address: "", city: "", contact_phone: "" });
+  const [residenceForm, setResidenceForm] = useState({ name: "", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
-  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "" });
+  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[] });
+  const [newTypeImageUrl, setNewTypeImageUrl] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
   const [roomNumberError, setRoomNumberError] = useState("");
@@ -82,6 +85,8 @@ export default function ResidenceDetailPage() {
         address: accData.address || "",
         city: accData.city || "",
         contact_phone: accData.contact_phone || "",
+        latitude: accData.latitude != null ? accData.latitude.toString() : "",
+        longitude: accData.longitude != null ? accData.longitude.toString() : "",
       });
 
       const { data: typesData } = await supabase
@@ -141,6 +146,8 @@ export default function ResidenceDetailPage() {
       address: residence!.address || "",
       city: residence!.city || "",
       contact_phone: residence!.contact_phone || "",
+      latitude: residence!.latitude != null ? residence!.latitude.toString() : "",
+      longitude: residence!.longitude != null ? residence!.longitude.toString() : "",
     });
     setResidenceModalOpen(true);
   }
@@ -157,6 +164,8 @@ export default function ResidenceDetailPage() {
           address: residenceForm.address,
           city: residenceForm.city,
           contact_phone: residenceForm.contact_phone,
+          latitude: residenceForm.latitude ? parseFloat(residenceForm.latitude) : null,
+          longitude: residenceForm.longitude ? parseFloat(residenceForm.longitude) : null,
         })
         .eq("id", residence!.id);
 
@@ -166,6 +175,8 @@ export default function ResidenceDetailPage() {
         address: residenceForm.address,
         city: residenceForm.city,
         contact_phone: residenceForm.contact_phone,
+        latitude: residenceForm.latitude ? parseFloat(residenceForm.latitude) : null,
+        longitude: residenceForm.longitude ? parseFloat(residenceForm.longitude) : null,
       });
       setResidenceModalOpen(false);
       toast.success("Établissement modifié");
@@ -267,14 +278,89 @@ export default function ResidenceDetailPage() {
 
   function openAddTypeModal() {
     setEditingType(null);
-    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId });
+    setNewTypeImageUrl("");
+    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] });
     setTypeModalOpen(true);
   }
 
   function openEditTypeModal(rt: RoomType) {
     setEditingType(rt);
-    setTypeForm({ name: rt.name, description: rt.description || "", base_price: rt.base_price.toString(), capacity: rt.capacity.toString(), accommodation_id: rt.accommodation_id });
+    setNewTypeImageUrl("");
+    setTypeForm({
+      name: rt.name,
+      description: rt.description || "",
+      base_price: rt.base_price.toString(),
+      capacity: rt.capacity.toString(),
+      accommodation_id: rt.accommodation_id,
+      amenities: rt.amenities || [],
+      surface_m2: rt.surface_m2 ? rt.surface_m2.toString() : "",
+      is_listed_on_trouvetou: rt.is_listed_on_trouvetou,
+      featured_images: rt.featured_images || [],
+    });
     setTypeModalOpen(true);
+  }
+
+  function toggleTypeAmenity(amenity: string) {
+    setTypeForm((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter((a) => a !== amenity)
+        : [...prev.amenities, amenity],
+    }));
+  }
+
+  function addTypeImage() {
+    const url = newTypeImageUrl.trim();
+    if (!url) return;
+    setTypeForm((prev) => ({ ...prev, featured_images: [...prev.featured_images, url] }));
+    setNewTypeImageUrl("");
+  }
+
+  function removeTypeImage(index: number) {
+    setTypeForm((prev) => ({ ...prev, featured_images: prev.featured_images.filter((_, i) => i !== index) }));
+  }
+
+  async function uploadTypeImage(file: File) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La photo dépasse la taille maximale de 5 Mo.");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Session expirée. Reconnectez-vous.");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await fetch("/api/v1/trouvetou/upload-photo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Impossible d'uploader la photo.");
+        return;
+      }
+      setTypeForm((prev) => ({ ...prev, featured_images: [...prev.featured_images, data.url] }));
+      toast.success("Photo ajoutée");
+    } catch {
+      toast.error("Erreur lors de l'upload de la photo.");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function toggleTrouvetouListing() {
+    if (!typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
+      toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
+      return;
+    }
+    setTypeForm((prev) => ({ ...prev, is_listed_on_trouvetou: !prev.is_listed_on_trouvetou }));
   }
 
   async function saveType() {
@@ -282,25 +368,49 @@ export default function ResidenceDetailPage() {
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
+    if (typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
+      toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createClient();
+      const surface_m2 = typeForm.surface_m2 ? parseFloat(typeForm.surface_m2) : null;
+      let typeId = editingType?.id || "";
       if (editingType) {
         await supabase.from("room_types").update({
           name: typeForm.name,
           description: typeForm.description,
           base_price: parseInt(typeForm.base_price),
           capacity: parseInt(typeForm.capacity),
+          amenities: typeForm.amenities,
+          surface_m2,
+          is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
+          featured_images: typeForm.featured_images,
         }).eq("id", editingType.id);
       } else {
-        await supabase.from("room_types").insert({
+        const { data: created, error: insertError } = await supabase.from("room_types").insert({
           accommodation_id: typeForm.accommodation_id,
           name: typeForm.name,
           description: typeForm.description,
           base_price: parseInt(typeForm.base_price),
           capacity: parseInt(typeForm.capacity),
-        });
+          amenities: typeForm.amenities,
+          surface_m2,
+          is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
+          featured_images: typeForm.featured_images,
+        }).select("id").single();
+        if (insertError) throw insertError;
+        typeId = created?.id || "";
       }
+
+      // Synchronisation Trouvetou : l'interrupteur du type pilote la fiche publique.
+      // Déclenchée côté serveur (route dédiée) pour une logique transactionnelle
+      // et rejouable, sans boucle de requêtes côté client.
+      if (typeId) {
+        await syncTrouvetouForType(typeId);
+      }
+
       setTypeModalOpen(false);
       loadData();
       toast.success(editingType ? "Type de chambre modifié" : "Type de chambre créé");
@@ -309,6 +419,31 @@ export default function ResidenceDetailPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function syncTrouvetouForType(typeId: string) {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const res = await fetch("/api/v1/trouvetou/sync-type", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ roomTypeId: typeId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || "Impossible de synchroniser la visibilité Trouvetou.");
+      }
+    } catch (err) {
+      console.error("syncTrouvetouForType error:", err);
+      toast.error("Erreur lors de la synchronisation Trouvetou.");
     }
   }
 
@@ -410,6 +545,32 @@ export default function ResidenceDetailPage() {
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{rt.name}</p>
                 <p className="text-base font-bold text-[var(--primary-color,#0C1C33)] mt-0.5">{formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</p>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{rt.capacity} personne{rt.capacity > 1 ? "s" : ""}</p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {rt.surface_m2 ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">
+                      <Ruler className="w-3 h-3" /> {rt.surface_m2} m²
+                    </span>
+                  ) : null}
+                  {rt.is_listed_on_trouvetou ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[10px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                      <Store className="w-3 h-3" /> Trouvetou
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                      Hors Trouvetou
+                    </span>
+                  )}
+                </div>
+                {rt.amenities.length > 0 && (
+                  <div className="flex flex-wrap gap-0.5 mt-1.5">
+                    {rt.amenities.slice(0, 3).map((a) => (
+                      <span key={a} className="px-1 py-px rounded bg-slate-50 dark:bg-slate-700/50 text-[10px] text-slate-500 dark:text-slate-400">{a}</span>
+                    ))}
+                    {rt.amenities.length > 3 && (
+                      <span className="px-1 py-px rounded text-[10px] text-slate-400 dark:text-slate-500">+{rt.amenities.length - 3}</span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -504,6 +665,10 @@ export default function ResidenceDetailPage() {
             <Input label="Adresse" value={residenceForm.address} onChange={(e) => setResidenceForm({ ...residenceForm, address: e.target.value })} placeholder="Cocody Riviera 2" />
             <Input label="Ville" value={residenceForm.city} onChange={(e) => setResidenceForm({ ...residenceForm, city: e.target.value })} placeholder="Abidjan" />
             <Input label="Téléphone de contact" value={residenceForm.contact_phone} onChange={(e) => setResidenceForm({ ...residenceForm, contact_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <Input label="Latitude (optionnel)" type="number" step="any" value={residenceForm.latitude} onChange={(e) => setResidenceForm({ ...residenceForm, latitude: e.target.value })} placeholder="5.3453170" />
+              <Input label="Longitude (optionnel)" type="number" step="any" value={residenceForm.longitude} onChange={(e) => setResidenceForm({ ...residenceForm, longitude: e.target.value })} placeholder="-4.0082560" />
+            </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setResidenceModalOpen(false)}>Annuler</Button>
               <Button className="flex-1" onClick={handleSaveResidence} loading={loading}>Enregistrer</Button>
@@ -575,6 +740,109 @@ export default function ResidenceDetailPage() {
               <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
               <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
             </div>
+            <Input label="Superficie en m² (optionnelle)" type="number" value={typeForm.surface_m2} onChange={(e) => setTypeForm({ ...typeForm, surface_m2: e.target.value })} placeholder="25" min="0" />
+
+            {/* Commodités */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Commodités</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {ROOM_AMENITIES.map((amenity) => {
+                  const checked = typeForm.amenities.includes(amenity);
+                  return (
+                    <button
+                      key={amenity}
+                      type="button"
+                      onClick={() => toggleTypeAmenity(amenity)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-left text-xs transition-colors ${
+                        checked
+                          ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-slate-900 dark:text-white"
+                          : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      }`}
+                    >
+                      <span className={`flex items-center justify-center w-3.5 h-3.5 rounded border ${checked ? "bg-[var(--primary-color,#0C1C33)] border-[var(--primary-color,#0C1C33)]" : "border-slate-300 dark:border-slate-500"}`}>
+                        {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                      </span>
+                      {amenity}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Visibilité Trouvetou */}
+            <div className={`rounded-lg border p-3 space-y-2.5 ${typeForm.is_listed_on_trouvetou ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-600"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-white">
+                    <Store className="w-3.5 h-3.5" /> Diffusion Trouvetou
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Afficher ce type de chambre sur le portail Trouvetou (si l&apos;abonnement est actif)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleTrouvetouListing}
+                  className={`relative w-10 h-5.5 shrink-0 rounded-full transition-colors ${typeForm.is_listed_on_trouvetou ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
+                  style={{ height: 22 }}
+                  aria-pressed={typeForm.is_listed_on_trouvetou}
+                >
+                  <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${typeForm.is_listed_on_trouvetou ? "left-5.5" : "left-0.5"}`} style={{ width: 18, height: 18, top: 2 }} />
+                </button>
+              </div>
+
+              {/* Photos pour Trouvetou */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Photos de la chambre (requises pour la diffusion)</label>
+                {typeForm.featured_images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {typeForm.featured_images.map((img, index) => (
+                      <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 dark:border-slate-600">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeTypeImage(index)}
+                          className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white"
+                          title="Retirer cette photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
+                  <Button type="button" variant="outline" size="sm" onClick={addTypeImage}>
+                    <ImagePlus className="w-4 h-4" /> Ajouter
+                  </Button>
+                </div>
+                <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+                  {uploadingImage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-4 h-4" />
+                  )}
+                  {uploadingImage ? "Upload en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP — max 5 Mo)"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                    className="hidden"
+                    disabled={uploadingImage}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadTypeImage(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {!typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0 && (
+                  <p className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)}>Annuler</Button>
               <Button className="flex-1" onClick={saveType} loading={loading}>{editingType ? "Enregistrer" : "Créer"}</Button>

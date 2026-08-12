@@ -40,6 +40,9 @@ interface UnitListing {
   base_price: number;
   capacity: number;
   amenities: string[];
+  surface_m2: number | null;
+  is_listed_on_trouvetou: boolean;
+  featured_images: string[];
   listing: {
     id: string;
     is_published: boolean;
@@ -298,6 +301,12 @@ export default function TrouvetouDashboardPage() {
 
   useEffect(() => { fetchData(); }, []);
 
+  async function getAccessToken(): Promise<string | null> {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }
+
   async function fetchData() {
     setLoading(true);
     try {
@@ -314,7 +323,9 @@ export default function TrouvetouDashboardPage() {
       if (!user?.tenant_id) return;
       setTenantId(user.tenant_id);
 
-      const res = await fetch(`/api/v1/trouvetou/listings?tenantId=${user.tenant_id}`);
+      const res = await fetch(`/api/v1/trouvetou/listings?tenantId=${user.tenant_id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       const data = await res.json();
 
       if (res.ok) {
@@ -339,17 +350,37 @@ export default function TrouvetouDashboardPage() {
     setSavingUnitId(unit.id);
     const newPublished = !unit.listing?.is_published;
     try {
+      if (newPublished) {
+        const images = unit.featured_images.length > 0
+          ? unit.featured_images
+          : (unit.listing?.featured_images || []);
+        if (!unit.is_listed_on_trouvetou) {
+          toast.error("Activez d'abord l'interrupteur Trouvetou sur le type de chambre (section Établissements).");
+          return;
+        }
+        if (images.length === 0) {
+          toast.error("Ajoutez au moins une photo au type de chambre pour publier sur Trouvetou.");
+          return;
+        }
+      }
       const res = await fetch("/api/v1/trouvetou/listings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await getAccessToken()}`,
+        },
         body: JSON.stringify({
           unit_id:             unit.id,
           establishment_id:    unit.accommodation_id,
           is_published:        newPublished,
           public_title:        unit.listing?.public_title || null,
           public_description:  unit.listing?.public_description || null,
-          featured_images:     unit.listing?.featured_images || [],
-          amenities_badges:    unit.listing?.amenities_badges || unit.amenities || [],
+          featured_images:     unit.listing?.featured_images?.length
+            ? unit.listing.featured_images
+            : unit.featured_images || [],
+          amenities_badges:    unit.listing?.amenities_badges?.length
+            ? unit.listing.amenities_badges
+            : unit.amenities || [],
           direct_whatsapp:     unit.listing?.direct_whatsapp || null,
         }),
       });
@@ -371,8 +402,7 @@ export default function TrouvetouDashboardPage() {
     }
   }
 
-  function openEditModal(unit: UnitListing) {
-    setSelectedUnit(unit);
+  function openEditModal(unit: UnitListing) {    setSelectedUnit(unit);
     setFormTitle(unit.listing?.public_title || `${unit.room_type_name} - Chambre ${unit.room_number}`);
     setFormDescription(unit.listing?.public_description || "");
     setFormBadges(unit.listing?.amenities_badges?.length ? unit.listing.amenities_badges : [...unit.amenities]);
@@ -404,7 +434,10 @@ export default function TrouvetouDashboardPage() {
     try {
       const res = await fetch("/api/v1/trouvetou/listings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await getAccessToken()}`,
+        },
         body: JSON.stringify({
           unit_id:             selectedUnit.id,
           establishment_id:    selectedUnit.accommodation_id,
@@ -886,6 +919,25 @@ export default function TrouvetouDashboardPage() {
                         <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">{title}</h3>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 line-clamp-2">{desc}</p>
+                    </div>
+
+                    {/* Superficie + Interrupteur maître */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {unit.surface_m2 != null && (
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                          {unit.surface_m2} m²
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${
+                          unit.is_listed_on_trouvetou
+                            ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                            : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+                        }`}
+                        title="Interrupteur du type de chambre (Établissements)"
+                      >
+                        {unit.is_listed_on_trouvetou ? "Interrupteur ON" : "Interrupteur OFF"}
+                      </span>
                     </div>
 
                     {/* Badges équipements */}

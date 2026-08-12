@@ -180,6 +180,9 @@ export interface RoomType {
   base_price: number;
   capacity: number;
   amenities: string[];
+  surface_m2: number | null;
+  is_listed_on_trouvetou: boolean;
+  featured_images: string[];
   created_at: string;
   updated_at: string;
 }

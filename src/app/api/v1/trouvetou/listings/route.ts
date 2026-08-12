@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
 import type { Accommodation, TrouvetouListing } from "@/types/database";
 
 type RoomWithType = {
@@ -8,8 +8,8 @@ type RoomWithType = {
   room_number: string;
   status: string;
   room_types:
-    | { id: string; name: string; base_price: number; capacity: number; amenities: string[] }
-    | { id: string; name: string; base_price: number; capacity: number; amenities: string[] }[]
+    | { id: string; name: string; base_price: number; capacity: number; amenities: string[]; surface_m2: number | null; is_listed_on_trouvetou: boolean; featured_images: string[] }
+    | { id: string; name: string; base_price: number; capacity: number; amenities: string[]; surface_m2: number | null; is_listed_on_trouvetou: boolean; featured_images: string[] }[]
     | null;
 };
 
@@ -26,7 +26,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "tenantId est requis" }, { status: 400 });
     }
 
-    const admin = createAdminClient();
+    const admin = getServerAdmin();
+
+    // Authentification + vérification que le tenant demandé appartient à l'appelant
+    const user = await getServerUser(admin, request);
+    if (!user) {
+      return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+    }
+    if (!user.tenantId || user.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
+    }
 
     // 1. Récupérer l'abonnement
     const { data: subscription } = await admin
@@ -121,7 +130,10 @@ export async function GET(request: Request) {
           name,
           base_price,
           capacity,
-          amenities
+          amenities,
+          surface_m2,
+          is_listed_on_trouvetou,
+          featured_images
         )
       `)
       .in("accommodation_id", accIds);
@@ -168,6 +180,9 @@ export async function GET(request: Request) {
         base_price: roomTypeObj?.base_price || 0,
         capacity: roomTypeObj?.capacity || 2,
         amenities: roomTypeObj?.amenities || [],
+        surface_m2: roomTypeObj?.surface_m2 ?? null,
+        is_listed_on_trouvetou: roomTypeObj?.is_listed_on_trouvetou ?? false,
+        featured_images: roomTypeObj?.featured_images || [],
         listing: listing
           ? {
               id: listing.id,
@@ -226,7 +241,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const admin = createAdminClient();
+    const admin = getServerAdmin();
+
+    // Authentification + vérification que l'établissement appartient à l'appelant
+    const user = await getServerUser(admin, request);
+    if (!user) {
+      return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
+    }
+
+    const { data: accommodation } = await admin
+      .from("accommodations")
+      .select("tenant_id")
+      .eq("id", establishment_id)
+      .maybeSingle();
+
+    if (!accommodation) {
+      return NextResponse.json({ error: "Établissement introuvable." }, { status: 404 });
+    }
+    if (!user.tenantId || accommodation.tenant_id !== user.tenantId) {
+      return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
+    }
+
+    const { data: unit } = await admin
+      .from("rooms")
+      .select("accommodation_id")
+      .eq("id", unit_id)
+      .maybeSingle();
+    if (!unit || unit.accommodation_id !== establishment_id) {
+      return NextResponse.json(
+        { error: "La chambre ne correspond pas à l'établissement." },
+        { status: 400 }
+      );
+    }
 
     const payload = {
       unit_id,

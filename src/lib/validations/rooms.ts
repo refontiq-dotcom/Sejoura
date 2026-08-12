@@ -16,6 +16,17 @@ export const roomTypeSchema = z.object({
   base_price: z.number().int().nonnegative("Prix invalide"),
   capacity: z.number().int().positive("Capacité invalide").default(2),
   amenities: z.array(z.string()).default([]),
+  surface_m2: z.number().positive("Surface invalide").nullable().optional(),
+  is_listed_on_trouvetou: z.boolean().default(false),
+  featured_images: z.array(z.string()).default([]),
+}).superRefine((data, ctx) => {
+  if (data.is_listed_on_trouvetou && data.featured_images.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["featured_images"],
+      message: "Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.",
+    });
+  }
 });
 
 export type RoomFormData = z.infer<typeof roomSchema>;
