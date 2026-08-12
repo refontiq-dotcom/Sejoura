@@ -1,18 +1,61 @@
 "use client";
 
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { formatFCFA, formatDate, getExpenseCategoryLabel, canAccessPlanFeature } from "@/lib/utils";
+import {
+  formatDate,
+  getExpenseCategoryLabel,
+  getPaymentMethodLabel,
+  canAccessPlanFeature,
+} from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useRouter } from "next/navigation";
-import { Wallet, Plus, Loader2, TrendingUp, TrendingDown, ScrollText, Download, ArrowUpDown, ArrowUp, ArrowDown, Receipt, ExternalLink, Eye, MessageSquare, Lock, Sparkles } from "lucide-react";
-import type { Expense, AuditLog, Payment, Invoice } from "@/types/database";
+import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
+import {
+  Wallet,
+  Plus,
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  ScrollText,
+  Download,
+  Receipt,
+  Eye,
+  Lock,
+  Sparkles,
+  RefreshCw,
+  Search,
+  Users,
+  User,
+  Phone,
+  Pencil,
+  Trash2,
+  Banknote,
+  Smartphone,
+  Building,
+  Coins,
+  Calendar,
+  FileText,
+  MessageSquare,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowLeftRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  History,
+  Landmark,
+  Zap,
+  Wrench,
+  Package,
+  Megaphone,
+} from "lucide-react";
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
   draft: "Brouillon",
@@ -22,31 +65,455 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
   cancelled: "Annulée",
 };
 
+const EXPENSE_CATEGORIES = [
+  "salaries",
+  "utilities",
+  "maintenance",
+  "supplies",
+  "marketing",
+  "rent",
+  "taxes",
+  "other",
+];
+
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  salaries: Users,
+  utilities: Zap,
+  maintenance: Wrench,
+  supplies: Package,
+  marketing: Megaphone,
+  rent: Building,
+  taxes: Landmark,
+  other: Coins,
+};
+
+type TabKey = "overview" | "revenue" | "expenses" | "invoices" | "audit" | "clients";
+type PeriodKey = "today" | "7d" | "month" | "30d" | "12m" | "custom";
+
+interface EnrichedPayment extends Payment {
+  operation_type?: string;
+  accommodation_id?: string | null;
+  booking?: {
+    booking_code: string;
+    client_name: string;
+    room_number: string;
+    total_amount: number;
+    payment_status: string;
+  } | null;
+}
+
+interface EnrichedInvoice extends Invoice {
+  booking?: { booking_code: string; client_name: string } | null;
+}
+
+interface ClientWithStats extends Client {
+  bookings: Booking[];
+  stayCount: number;
+  nights: number;
+  totalSpent: number;
+  paid: number;
+  balance: number;
+}
+
+type BookingBriefRow = {
+  id: string;
+  booking_code: string;
+  total_amount: number;
+  payment_status: string;
+  client: { full_name: string }[] | null;
+  room: { room_number: string }[] | null;
+};
+
+type InvoiceBookingRow = {
+  id: string;
+  booking_code: string;
+  client: { full_name: string }[] | null;
+};
+
+type ClientWithBookingsRow = Omit<Client, "bookings"> & {
+  bookings: Booking[] | null;
+};
+
+// ============================================================================
+// Helpers de dates & périodes
+// ============================================================================
+
+function isoDate(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+function todayISO(): string {
+  return isoDate(new Date());
+}
+
+function daysAgoISO(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return isoDate(d);
+}
+
+function monthStartISO(): string {
+  const d = new Date();
+  d.setDate(1);
+  return isoDate(d);
+}
+
+function monthsAgoStartISO(n: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - (n - 1));
+  d.setDate(1);
+  return isoDate(d);
+}
+
+function addDaysISO(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return isoDate(d);
+}
+
+function monthKey(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "short" });
+}
+
+function inRange(iso: string, start: string, end: string): boolean {
+  const day = iso.slice(0, 10);
+  return day >= start && day <= end;
+}
+
+const PERIOD_PRESETS: { key: PeriodKey; label: string }[] = [
+  { key: "today", label: "Aujourd'hui" },
+  { key: "7d", label: "7 jours" },
+  { key: "month", label: "Ce mois" },
+  { key: "30d", label: "30 jours" },
+  { key: "12m", label: "12 mois" },
+  { key: "custom", label: "Personnalisé" },
+];
+
+function defaultRange(key: PeriodKey): { start: string; end: string } {
+  switch (key) {
+    case "today":
+      return { start: todayISO(), end: todayISO() };
+    case "7d":
+      return { start: daysAgoISO(6), end: todayISO() };
+    case "month":
+      return { start: monthStartISO(), end: todayISO() };
+    case "30d":
+      return { start: daysAgoISO(29), end: todayISO() };
+    case "12m":
+      return { start: monthsAgoStartISO(12), end: todayISO() };
+    default:
+      return { start: daysAgoISO(29), end: todayISO() };
+  }
+}
+
+// ============================================================================
+// Sous-composants (KPIs, graphiques, sélecteur de période)
+// ============================================================================
+
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone = "primary",
+  delta,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: "primary" | "green" | "red" | "amber" | "blue";
+  delta?: number | null;
+}) {
+  const tones: Record<string, { box: string; icon: string; bar: string }> = {
+    primary: {
+      box: "bg-[var(--primary-light,#F0F4FF)]",
+      icon: "text-[var(--primary-color,#0C1C33)]",
+      bar: "bg-[var(--primary-color,#0C1C33)]",
+    },
+    green: { box: "bg-green-100 dark:bg-green-900/30", icon: "text-green-600 dark:text-green-400", bar: "bg-green-500" },
+    red: { box: "bg-red-100 dark:bg-red-900/30", icon: "text-red-600 dark:text-red-400", bar: "bg-red-500" },
+    amber: { box: "bg-amber-100 dark:bg-amber-900/30", icon: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" },
+    blue: { box: "bg-blue-100 dark:bg-blue-900/30", icon: "text-blue-600 dark:text-blue-400", bar: "bg-blue-500" },
+  };
+  const t = tones[tone];
+  const positive = delta != null && delta >= 0;
+  return (
+    <Card className="p-3 relative overflow-hidden">
+      <div className={`absolute top-0 left-0 right-0 h-1 ${t.bar}`} />
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${t.box}`}>
+          <Icon className={`w-5 h-5 ${t.icon}`} />
+        </div>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
+        {delta != null && (
+          <span
+            className={`ml-auto inline-flex items-center gap-0.5 text-xs font-bold ${
+              positive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {positive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+            {Math.abs(delta).toFixed(1)}%
+          </span>
+        )}
+      </div>
+      <p className="text-xl font-bold text-slate-900 dark:text-white">{value}</p>
+      {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
+    </Card>
+  );
+}
+
+function CashFlowChart({
+  data,
+  fmt,
+}: {
+  data: { month: string; revenue: number; expenses: number }[];
+  fmt: (amount: number) => string;
+}) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const width = 760;
+  const height = 240;
+  const padL = 72;
+  const padR = 14;
+  const padT = 14;
+  const padB = 30;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const max = Math.max(...data.flatMap((d) => [d.revenue, d.expenses]), 0) || 1;
+
+  if (data.length === 0) {
+    return (
+      <div className="h-56 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500">
+        Aucune donnée sur la période
+      </div>
+    );
+  }
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+    const y = padT + innerH - t * innerH;
+    return { y, value: Math.round(t * max) };
+  });
+
+  const groupW = innerW / data.length;
+  const barW = Math.min(20, groupW * 0.3);
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+        {gridLines.map((g, i) => (
+          <g key={i}>
+            <line x1={padL} y1={g.y} x2={width - padR} y2={g.y} stroke="currentColor" strokeWidth="1" className="text-slate-200 dark:text-slate-700" strokeDasharray="4 4" />
+            <text x={padL - 8} y={g.y + 4} textAnchor="end" className="text-[10px] fill-slate-400">
+              {fmt(g.value).replace(/[^\d\s.]/g, "").trim()}
+            </text>
+          </g>
+        ))}
+
+        {data.map((d, i) => {
+          const cx = padL + i * groupW + groupW / 2;
+          const hR = (d.revenue / max) * innerH;
+          const hE = (d.expenses / max) * innerH;
+          const yR = padT + innerH - hR;
+          const yE = padT + innerH - hE;
+          const opacity = hovered == null || hovered === i ? 1 : 0.35;
+          return (
+            <g
+              key={d.month}
+              className="cursor-pointer"
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <rect x={padL + i * groupW} y={padT} width={groupW} height={innerH} fill="transparent" />
+              <rect x={cx - barW - 2} y={yR} width={barW} height={Math.max(hR, 1)} rx="3" fill="#0C1C33" opacity={opacity} />
+              <rect x={cx + 2} y={yE} width={barW} height={Math.max(hE, 1)} rx="3" fill="#ef4444" opacity={opacity} />
+              <text x={cx} y={height - 8} textAnchor="middle" className="text-[10px] fill-slate-500">
+                {monthLabel(d.month)}
+              </text>
+              {hovered === i && (
+                <g>
+                  <rect x={Math.min(cx - 56, width - 130)} y={padT - 2} width="118" height="46" rx="8" fill="#0C1C33" opacity="0.95" />
+                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 14} className="text-[10px] fill-white">
+                    Recettes : {fmt(d.revenue)}
+                  </text>
+                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 30} className="text-[10px] fill-white">
+                    Dépenses : {fmt(d.expenses)}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="flex items-center justify-center gap-5 text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-[#0C1C33]" /> Recettes
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-red-500" /> Dépenses
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CategoryBreakdown({
+  items,
+  fmt,
+}: {
+  items: { category: string; amount: number }[];
+  fmt: (amount: number) => string;
+}) {
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const sorted = [...items].sort((a, b) => b.amount - a.amount).filter((i) => i.amount > 0);
+  if (sorted.length === 0) {
+    return (
+      <div className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
+        Aucune dépense sur la période
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {sorted.map((it) => {
+        const pct = total > 0 ? (it.amount / total) * 100 : 0;
+        const Icon = CATEGORY_ICONS[it.category] || Coins;
+        return (
+          <div key={it.category}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+                <Icon className="w-3.5 h-3.5 text-slate-400" />
+                {getExpenseCategoryLabel(it.category)}
+              </span>
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                {fmt(it.amount)}
+                <span className="ml-2 text-xs font-normal text-slate-400">{pct.toFixed(0)}%</span>
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div className="h-full rounded-full bg-[var(--primary-color,#0C1C33)]" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PeriodSelector({
+  startDate,
+  endDate,
+  onChange,
+  onPreset,
+  preset,
+}: {
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
+  onPreset: (key: PeriodKey) => void;
+  preset: PeriodKey;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl p-1">
+        {PERIOD_PRESETS.map((p) => (
+          <button
+            key={p.key}
+            onClick={() => onPreset(p.key)}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              preset === p.key
+                ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2">
+        <Calendar className="w-4 h-4 text-slate-400" />
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => onChange(e.target.value, endDate)}
+          className="text-xs bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
+        />
+        <span className="text-xs text-slate-400">→</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => onChange(startDate, e.target.value)}
+          className="text-xs bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Page principale
+// ============================================================================
+
 export default function AccountingPage() {
   const router = useRouter();
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<EnrichedPayment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [invoiceSort, setInvoiceSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" } | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "expenses" | "revenue" | "invoices" | "audit">("overview");
-  const [userId, setUserId] = useState("");
+  const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [accommodations, setAccommodations] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [usersById, setUsersById] = useState<Record<string, string>>({});
+
   const [tenantId, setTenantId] = useState("");
+  const [userId, setUserId] = useState("");
   const [plan, setPlan] = useState("standard");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [expenseSort, setExpenseSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" } | null>(null);
-  const [revenueSort, setRevenueSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" } | null>(null);
-  
-  const [formData, setFormData] = useState({
+
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [preset, setPreset] = useState<PeriodKey>("month");
+  const [startDate, setStartDate] = useState(() => defaultRange("month").start);
+  const [endDate, setEndDate] = useState(() => defaultRange("month").end);
+
+  // Filtres
+  const [revenueMethod, setRevenueMethod] = useState("all");
+  const [revenueType, setRevenueType] = useState("all");
+  const [revenueSearch, setRevenueSearch] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("all");
+  const [expenseSearch, setExpenseSearch] = useState("");
+  const [invoiceStatus, setInvoiceStatus] = useState("all");
+  const [clientSearch, setClientSearch] = useState("");
+
+  // Tri
+  const [expenseSort, setExpenseSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" }>({
+    key: "date",
+    direction: "desc",
+  });
+  const [revenueSort, setRevenueSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" }>({
+    key: "date",
+    direction: "desc",
+  });
+
+  // Modals
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null);
+
+  const [expenseForm, setExpenseForm] = useState({
     category: "utilities",
     description: "",
     amount: "",
-    expense_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0],
+    expense_date: todayISO(),
+    accommodation_id: "",
   });
 
   useEffect(() => {
@@ -65,231 +532,452 @@ export default function AccountingPage() {
         .eq("auth_user_id", session.user.id)
         .single();
 
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData?.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
-
       if (!userData) return;
       setUserId(userData.id);
       setTenantId(userData.tenant_id);
 
-      const { data: expData } = await supabase
-        .from("expenses")
-        .select("*")
+      const { data: subData } = await supabase
+        .from("subscriptions")
+        .select("plan")
         .eq("tenant_id", userData.tenant_id)
-        .order("expense_date", { ascending: false })
-        .limit(50);
-      if (expData) setExpenses(expData as unknown as Expense[]);
+        .single();
+      if (subData) setPlan(subData.plan);
 
-      const { data: payData } = await supabase
-        .from("payments")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id)
-        .order("payment_date", { ascending: false })
-        .limit(50);
-      if (payData) setPayments(payData as unknown as Payment[]);
+      const tid = userData.tenant_id;
 
-      const { data: logData } = await supabase
-        .from("audit_logs")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (logData) setAuditLogs(logData as unknown as AuditLog[]);
+      const [exp, pay, log, inv, acc, usersRes] = await Promise.all([
+        supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300),
+        supabase.from("payments").select("*").eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
+        supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(120),
+        supabase.from("invoices").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
+        supabase.from("accommodations").select("id, name").eq("tenant_id", tid).order("name"),
+        supabase.from("users").select("id, full_name").eq("tenant_id", tid),
+      ]);
 
-       const { data: invData } = await supabase
-         .from("invoices")
-         .select("*")
-         .eq("tenant_id", userData.tenant_id)
-         .order("created_at", { ascending: false })
-         .limit(50);
-       if (invData) setInvoices(invData as unknown as Invoice[]);
-
-      const { data: bookingData } = await supabase
-        .from("bookings")
-        .select(`
-          id,
-          booking_code,
-          client:clients(full_name)
-        `)
-        .eq("tenant_id", userData.tenant_id)
-        .limit(200);
-      if (bookingData) {
-        const enriched = (bookingData as any[]).map((b) => ({
-          id: b.id,
-          booking_code: b.booking_code,
-          client: Array.isArray(b.client) ? b.client[0] : b.client,
-        }));
-        setBookings(enriched);
+      if (exp.data) setExpenses(exp.data as unknown as Expense[]);
+      if (log.data) setAuditLogs(log.data as unknown as AuditLog[]);
+      if (acc.data) setAccommodations(acc.data as { id: string; name: string }[]);
+      if (usersRes.data) {
+        const map: Record<string, string> = {};
+        (usersRes.data as { id: string; full_name: string }[]).forEach((u) => (map[u.id] = u.full_name));
+        setUsersById(map);
       }
-} catch (err) {
-       toast.error("Impossible de charger les données. Veuillez réessayer.");
-       console.error(err);
-     } finally {
-       setLoading(false);
-     }
-   }
 
-   async function handleSave() {
-    if (!formData.description || !formData.amount) return;
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      await supabase.from("expenses").insert({
-        tenant_id: tenantId,
-        category: formData.category,
-        description: formData.description,
-        amount: parseInt(formData.amount),
-        expense_date: formData.expense_date,
-        created_by: userId,
+      // Enrichir les paiements avec les infos de réservation
+      const payData = (pay.data as Payment[] | null) || [];
+      const enrichedPayments: EnrichedPayment[] = payData.map((p) => ({ ...p }));
+      const bookingIds = [...new Set(payData.filter((p) => p.booking_id).map((p) => p.booking_id as string))];
+      const bookingById: Record<string, { booking_code: string; total_amount: number; payment_status: string; client_name: string; room_number: string }> = {};
+      if (bookingIds.length > 0) {
+        const { data: bk } = await supabase
+          .from("bookings")
+          .select("id, booking_code, total_amount, payment_status, client:clients(full_name), room:rooms(room_number)")
+          .in("id", bookingIds);
+        if (bk) {
+          (bk as BookingBriefRow[]).forEach((b) => {
+            bookingById[b.id] = {
+              booking_code: b.booking_code,
+              total_amount: b.total_amount,
+              payment_status: b.payment_status,
+              client_name: b.client?.[0]?.full_name || "—",
+              room_number: b.room?.[0]?.room_number || "—",
+            };
+          });
+        }
+      }
+      enrichedPayments.forEach((p) => {
+        if (p.booking_id && bookingById[p.booking_id]) {
+          p.booking = bookingById[p.booking_id];
+        }
       });
-      setModalOpen(false);
-       setFormData({ category: "utilities", description: "", amount: "", expense_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0] });
-      loadData();
+      setPayments(enrichedPayments);
+
+      // Enrichir les factures avec les infos de réservation
+      const invData = (inv.data as Invoice[] | null) || [];
+      const invBookingIds = [...new Set(invData.map((i) => i.booking_id))];
+      const invBookingById: Record<string, { booking_code: string; client_name: string }> = {};
+      if (invBookingIds.length > 0) {
+        const { data: ibk } = await supabase
+          .from("bookings")
+          .select("id, booking_code, client:clients(full_name)")
+          .in("id", invBookingIds);
+        if (ibk) {
+          (ibk as InvoiceBookingRow[]).forEach((b) => {
+            invBookingById[b.id] = {
+              booking_code: b.booking_code,
+              client_name: b.client?.[0]?.full_name || "—",
+            };
+          });
+        }
+      }
+      setInvoices(
+        invData.map((i) => ({
+          ...i,
+          booking: i.booking_id ? invBookingById[i.booking_id] : undefined,
+        }))
+      );
+
+      // Réservations pour les créances
+      const { data: bkAll } = await supabase
+        .from("bookings")
+        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date")
+        .eq("tenant_id", tid)
+        .order("check_in_date", { ascending: false })
+        .limit(300);
+      if (bkAll) setBookings(bkAll as unknown as Booking[]);
+
+      // Clients pour le CRM
+      const { data: clData } = await supabase
+        .from("clients")
+        .select(`
+          *,
+          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status)
+        `)
+        .eq("tenant_id", tid)
+        .order("created_at", { ascending: false })
+        .limit(400);
+
+      if (clData) {
+        const stats: ClientWithStats[] = (clData as ClientWithBookingsRow[]).map((c) => {
+          const bks = (c.bookings || []) as Booking[];
+          const nights = bks.reduce((s, b) => s + (b.nights_count || 0), 0);
+          const totalSpent = bks.reduce((s, b) => s + (b.total_amount || 0), 0);
+          const paid = bks.reduce((s, b) => s + (b.amount_paid || 0), 0);
+          const balance = bks.reduce(
+            (s, b) =>
+              s +
+              (b.status === "confirmed" || b.status === "checked_in" ? (b.total_amount || 0) - (b.amount_paid || 0) : 0),
+            0
+          );
+          return {
+            ...c,
+            bookings: bks,
+            stayCount: bks.length,
+            nights,
+            totalSpent,
+            paid,
+            balance,
+          } as ClientWithStats;
+        });
+        setClients(stats);
+      }
     } catch (err) {
-      toast.error("Impossible d'enregistrer les modifications.");
+      toast.error("Impossible de charger les données. Veuillez réessayer.");
       console.error(err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
-  const filteredExpenses = expenses.filter((e) => {
-    if (startDate && e.expense_date < startDate) return false;
-    if (endDate && e.expense_date > endDate) return false;
-    return true;
-  }).sort((a, b) => {
-    if (!expenseSort) return 0;
-    const aVal = expenseSort.key === "date" ? a.expense_date : a.amount;
-    const bVal = expenseSort.key === "date" ? b.expense_date : b.amount;
-    if (aVal < bVal) return expenseSort.direction === "asc" ? -1 : 1;
-    if (aVal > bVal) return expenseSort.direction === "asc" ? 1 : -1;
-    return 0;
-  });
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadData();
+    toast.success("Données actualisées");
+  }
 
-  const filteredPayments = payments.filter((p) => {
-    if (startDate && p.payment_date < startDate) return false;
-    if (endDate && p.payment_date > endDate) return false;
-    return true;
-  }).sort((a, b) => {
-    if (!revenueSort) return 0;
-    const aVal = revenueSort.key === "date" ? a.payment_date : a.amount;
-    const bVal = revenueSort.key === "date" ? b.payment_date : b.amount;
-    if (aVal < bVal) return revenueSort.direction === "asc" ? -1 : 1;
-    if (aVal > bVal) return revenueSort.direction === "asc" ? 1 : -1;
-    return 0;
-   });
+  // ============================================================================
+  // Données filtrées
+  // ============================================================================
 
-   // Build a lookup of bookings for invoice display
-   const bookingsById: Record<string, any> = {};
-   bookings.forEach((b: any) => {
-     bookingsById[b.id] = b;
-   });
+  const filteredExpenses = useMemo(() => {
+    return expenses
+      .filter((e) => inRange(e.expense_date, startDate, endDate))
+      .filter((e) => (expenseCategory === "all" ? true : e.category === expenseCategory))
+      .filter((e) => (expenseSearch ? e.description.toLowerCase().includes(expenseSearch.toLowerCase()) : true))
+      .sort((a, b) => {
+        const aVal = expenseSort.key === "date" ? a.expense_date : a.amount;
+        const bVal = expenseSort.key === "date" ? b.expense_date : b.amount;
+        return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * (expenseSort.direction === "asc" ? 1 : -1);
+      });
+  }, [expenses, startDate, endDate, expenseCategory, expenseSearch, expenseSort]);
 
-   const filteredInvoices = invoices.filter((inv) => {
-     const booking = bookingsById[inv.booking_id];
-     if (!booking) return false;
-     if (startDate && new Date(booking.check_in_date) < new Date(startDate)) return false;
-     if (endDate && new Date(booking.check_in_date) > new Date(endDate)) return false;
-     return true;
-   }).sort((a, b) => {
-     if (!invoiceSort) return 0;
-     const aVal = invoiceSort.key === "date" ? a.created_at : a.total_amount;
-     const bVal = invoiceSort.key === "date" ? b.created_at : b.total_amount;
-     if (aVal < bVal) return invoiceSort.direction === "asc" ? -1 : 1;
-     if (aVal > bVal) return invoiceSort.direction === "asc" ? 1 : -1;
-     return 0;
-   });
+  const filteredPayments = useMemo(() => {
+    return payments
+      .filter((p) => inRange(p.payment_date, startDate, endDate))
+      .filter((p) => (revenueMethod === "all" ? true : p.payment_method === revenueMethod))
+      .filter((p) => (revenueType === "all" ? true : (p.operation_type || "booking") === revenueType))
+      .filter((p) => {
+        if (!revenueSearch) return true;
+        const q = revenueSearch.toLowerCase();
+        const ref = (p.reference || "").toLowerCase();
+        const bk = (p.booking?.booking_code || "").toLowerCase();
+        const cl = (p.booking?.client_name || "").toLowerCase();
+        const notes = (p.notes || "").toLowerCase();
+        return ref.includes(q) || bk.includes(q) || cl.includes(q) || notes.includes(q);
+      })
+      .sort((a, b) => {
+        const aVal = revenueSort.key === "date" ? a.payment_date : a.amount;
+        const bVal = revenueSort.key === "date" ? b.payment_date : b.amount;
+        return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * (revenueSort.direction === "asc" ? 1 : -1);
+      });
+  }, [payments, startDate, endDate, revenueMethod, revenueType, revenueSearch, revenueSort]);
 
-   const invoicesBookings: Record<string, any> = {};
-   invoices.forEach((inv) => {
-     const booking = bookingsById[inv.booking_id];
-     if (booking) {
-       invoicesBookings[inv.booking_id] = {
-         booking_code: booking.booking_code,
-         client: booking.client,
-       };
-     }
-   });
+  const filteredInvoices = useMemo(() => {
+    return invoices
+      .filter((inv) => inRange(inv.created_at, startDate, endDate))
+      .filter((inv) => (invoiceStatus === "all" ? true : inv.status === invoiceStatus));
+  }, [invoices, startDate, endDate, invoiceStatus]);
 
-   const totalRevenue = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netProfit = totalRevenue - totalExpenses;
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients;
+    const q = clientSearch.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.full_name.toLowerCase().includes(q) ||
+        (c.phone || "").toLowerCase().includes(q) ||
+        (c.email || "").toLowerCase().includes(q)
+    );
+  }, [clients, clientSearch]);
+
+  // ============================================================================
+  // KPIs
+  // ============================================================================
+
+  const totalRevenue = filteredPayments.filter((p) => p.amount > 0).reduce((s, p) => s + p.amount, 0);
+  const cashOut = Math.abs(filteredPayments.filter((p) => p.amount < 0).reduce((s, p) => s + p.amount, 0));
+  const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+  const netProfit = totalRevenue - totalExpenses - cashOut;
+  const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+  // Période précédente (comparaison)
+  const prevRange = useMemo(() => {
+    const days = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000;
+    return { start: addDaysISO(startDate, -(Math.round(days) + 1)), end: addDaysISO(startDate, -1) };
+  }, [startDate, endDate]);
+
+  const prevRevenue = useMemo(
+    () => payments.filter((p) => p.amount > 0 && inRange(p.payment_date, prevRange.start, prevRange.end)).reduce((s, p) => s + p.amount, 0),
+    [payments, prevRange]
+  );
+  const prevExpenses = useMemo(
+    () => expenses.filter((e) => inRange(e.expense_date, prevRange.start, prevRange.end)).reduce((s, e) => s + e.amount, 0),
+    [expenses, prevRange]
+  );
+
+  const revenueDelta = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : null;
+  const expenseDelta = prevExpenses > 0 ? ((totalExpenses - prevExpenses) / prevExpenses) * 100 : null;
+
+  const byMethod = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredPayments.filter((p) => p.amount > 0).forEach((p) => (map[p.payment_method] = (map[p.payment_method] || 0) + p.amount));
+    return map;
+  }, [filteredPayments]);
+
+  const receivable = useMemo(
+    () =>
+      bookings
+        .filter((b) => (b.status === "confirmed" || b.status === "checked_in") && (b.total_amount - b.amount_paid) > 0)
+        .reduce((s, b) => s + (b.total_amount - b.amount_paid), 0),
+    [bookings]
+  );
+
+  const monthlySeries = useMemo(() => {
+    const now = new Date();
+    const series: { month: string; revenue: number; expenses: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      series.push({ month: monthKey(isoDate(d)), revenue: 0, expenses: 0 });
+    }
+    payments.forEach((p) => {
+      const k = monthKey(p.payment_date);
+      const s = series.find((x) => x.month === k);
+      if (s) s.revenue += p.amount > 0 ? p.amount : 0;
+    });
+    expenses.forEach((e) => {
+      const k = monthKey(e.expense_date);
+      const s = series.find((x) => x.month === k);
+      if (s) s.expenses += e.amount;
+    });
+    return series;
+  }, [payments, expenses]);
+
+  const categoryBreakdown = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredExpenses.forEach((e) => (map[e.category] = (map[e.category] || 0) + e.amount));
+    return Object.entries(map).map(([category, amount]) => ({ category, amount }));
+  }, [filteredExpenses]);
+
+  const hasAccess = canAccessPlanFeature(plan, "advancedAccounting");
+
+  // ============================================================================
+  // Actions métier
+  // ============================================================================
+
+  function openNewExpense() {
+    setEditingExpense(null);
+    setExpenseForm({
+      category: "utilities",
+      description: "",
+      amount: "",
+      expense_date: todayISO(),
+      accommodation_id: "",
+    });
+    setExpenseModalOpen(true);
+  }
+
+  function openEditExpense(exp: Expense) {
+    setEditingExpense(exp);
+    setExpenseForm({
+      category: exp.category,
+      description: exp.description,
+      amount: String(exp.amount),
+      expense_date: exp.expense_date,
+      accommodation_id: exp.accommodation_id || "",
+    });
+    setExpenseModalOpen(true);
+  }
+
+  async function handleSaveExpense() {
+    if (!expenseForm.description.trim()) {
+      toast.error("Veuillez indiquer une description.");
+      return;
+    }
+    const amount = parseInt(expenseForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error("Le montant doit être supérieur à 0.");
+      return;
+    }
+    if (!expenseForm.expense_date) {
+      toast.error("Veuillez choisir une date.");
+      return;
+    }
+    setSavingExpense(true);
+    try {
+      const supabase = createClient();
+      const payload = {
+        tenant_id: tenantId,
+        category: expenseForm.category,
+        description: expenseForm.description.trim(),
+        amount,
+        expense_date: expenseForm.expense_date,
+        accommodation_id: expenseForm.accommodation_id || null,
+        created_by: userId,
+      };
+      if (editingExpense) {
+        const { error } = await supabase.from("expenses").update(payload).eq("id", editingExpense.id);
+        if (error) throw error;
+        toast.success("Dépense modifiée");
+      } else {
+        const { error } = await supabase.from("expenses").insert(payload);
+        if (error) throw error;
+        toast.success("Dépense enregistrée");
+      }
+      setExpenseModalOpen(false);
+      loadData();
+    } catch (err) {
+      toast.error("Impossible d'enregistrer la dépense : " + ((err as Error)?.message || "erreur"));
+    } finally {
+      setSavingExpense(false);
+    }
+  }
+
+  async function handleDeleteExpense() {
+    if (!deletingExpense) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("expenses").delete().eq("id", deletingExpense.id);
+      if (error) throw error;
+      toast.success("Dépense supprimée");
+      setDeletingExpense(null);
+      loadData();
+    } catch (err) {
+      toast.error("Impossible de supprimer : " + ((err as Error)?.message || "erreur"));
+    }
+  }
+
+  // ============================================================================
+  // Exports CSV
+  // ============================================================================
+
+  function downloadCSV(filename: string, headers: string[], rows: (string | number)[][]) {
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   function exportExpensesCSV() {
     if (filteredExpenses.length === 0) return;
-    const headers = ["Date", "Catégorie", "Description", "Montant"];
-    const rows = filteredExpenses.map(e => [
-      e.expense_date,
-      getExpenseCategoryLabel(e.category),
-      e.description,
-      e.amount
-    ]);
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `depenses_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Export CSV réussi");
-  }
-
-  function exportInvoicesCSV() {
-    if (filteredInvoices.length === 0) return;
-    const headers = ["N° Facture", "Date", "Client", "Réservation", "Sous-total", "TVA", "Total", "Statut"];
-    const rows = filteredInvoices.map(inv => {
-      const booking = invoicesBookings[inv.booking_id];
-      return [
-        inv.invoice_number,
-        formatDate(inv.created_at),
-        booking?.client?.full_name || "",
-        booking?.booking_code || "",
-        inv.amount,
-        inv.tax_amount,
-        inv.total_amount,
-        inv.status
-      ];
-    });
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `factures_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(
+      `depenses_${startDate}_${endDate}.csv`,
+      ["Date", "Catégorie", "Description", "Établissement", "Montant"],
+      filteredExpenses.map((e) => [
+        e.expense_date,
+        getExpenseCategoryLabel(e.category),
+        e.description,
+        accommodations.find((a) => a.id === e.accommodation_id)?.name || "",
+        e.amount,
+      ])
+    );
     toast.success("Export CSV réussi");
   }
 
   function exportRevenueCSV() {
     if (filteredPayments.length === 0) return;
-    const headers = ["Date", "Référence", "Méthode", "Montant"];
-    const rows = filteredPayments.map(p => [
-      p.payment_date,
-      p.reference || "",
-      p.payment_method,
-      p.amount
-    ]);
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `recettes_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCSV(
+      `recettes_${startDate}_${endDate}.csv`,
+      ["Date", "Réservation", "Client", "Méthode", "Référence", "Type", "Montant"],
+      filteredPayments.map((p) => [
+        p.payment_date,
+        p.booking?.booking_code || "",
+        p.booking?.client_name || (p.notes || ""),
+        getPaymentMethodLabel(p.payment_method),
+        p.reference || "",
+        p.operation_type === "manual_out" ? "Sortie de caisse" : p.operation_type === "manual_in" ? "Entrée de caisse" : "Paiement",
+        p.amount,
+      ])
+    );
     toast.success("Export CSV réussi");
   }
 
-  const hasAccess = canAccessPlanFeature(plan, "advancedAccounting");
+  function exportInvoicesCSV() {
+    if (filteredInvoices.length === 0) return;
+    downloadCSV(
+      `factures_${startDate}_${endDate}.csv`,
+      ["N° Facture", "Date", "Client", "Réservation", "Sous-total", "TVA", "Total", "Statut"],
+      filteredInvoices.map((inv) => [
+        inv.invoice_number,
+        formatDate(inv.created_at),
+        inv.booking?.client_name || "",
+        inv.booking?.booking_code || "",
+        inv.amount,
+        inv.tax_amount,
+        inv.total_amount,
+        INVOICE_STATUS_LABELS[inv.status] || inv.status,
+      ])
+    );
+    toast.success("Export CSV réussi");
+  }
+
+  function exportClientsCSV() {
+    if (filteredClients.length === 0) return;
+    downloadCSV(
+      `clients_${todayISO()}.csv`,
+      ["Nom", "Téléphone", "Email", "Nationalité", "Séjours", "Nuits", "CA total", "Encaissé", "Solde dû"],
+      filteredClients.map((c) => [
+        c.full_name,
+        c.phone || "",
+        c.email || "",
+        c.nationality || "",
+        c.stayCount,
+        c.nights,
+        c.totalSpent,
+        c.paid,
+        c.balance,
+      ])
+    );
+    toast.success("Export CSV réussi");
+  }
+
+  // ============================================================================
+  // Rendu
+  // ============================================================================
 
   if (loading && expenses.length === 0 && payments.length === 0 && invoices.length === 0) {
     return (
@@ -299,9 +987,18 @@ export default function AccountingPage() {
     );
   }
 
+  const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
+    { key: "overview", label: "Vue d'ensemble", icon: Wallet },
+    { key: "revenue", label: "Recettes", icon: TrendingUp, badge: filteredPayments.length },
+    { key: "expenses", label: "Dépenses", icon: TrendingDown, badge: filteredExpenses.length },
+    { key: "invoices", label: "Factures", icon: Receipt, badge: filteredInvoices.length },
+    { key: "audit", label: "Journal", icon: ScrollText },
+    { key: "clients", label: "Clients (CRM)", icon: Users, badge: filteredClients.length },
+  ];
+
   return (
     <div className="space-y-3 animate-fade-in relative">
-      {!hasAccess && !loading && (
+      {!hasAccess && (
         <Card className="p-4 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
@@ -309,7 +1006,9 @@ export default function AccountingPage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Module comptabilité avancée</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">Ce module est réservé à la formule Entreprise. Passez à la formule Entreprise pour suivre les dépenses, charges et bénéfices nets.</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Ce module est réservé à la formule Entreprise : dépenses, charges, recettes, factures, journal d&apos;audit et suivi client.
+              </p>
             </div>
             <Button size="sm" onClick={() => router.push("/dashboard/subscription")}>
               <Sparkles className="w-4 h-4" /> Débloquer avec le plan Entreprise
@@ -319,292 +1018,537 @@ export default function AccountingPage() {
       )}
 
       <div className={!hasAccess ? "opacity-60 pointer-events-none" : ""}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* En-tête */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Comptabilité</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">Dépenses, recettes et traçabilité</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Recettes, dépenses, factures, créances et suivi client
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Du</span>
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none w-28"
-            />
-            <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">au</span>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none w-28"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="md" onClick={handleRefresh} loading={refreshing} className="gap-2">
+              <RefreshCw className="w-4 h-4" /> Actualiser
+            </Button>
+            <Button onClick={openNewExpense} className="gap-2">
+              <Plus className="w-4 h-4" /> Nouvelle dépense
+            </Button>
           </div>
-          <Button onClick={() => setModalOpen(true)}>
-            <Plus className="w-4 h-4" /> Nouvelle dépense
-          </Button>
+        </div>
+
+        {/* Sélecteur de période */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-wrap">
+          <PeriodSelector
+            startDate={startDate}
+            endDate={endDate}
+            preset={preset}
+            onChange={(s, e) => {
+              setStartDate(s);
+              setEndDate(e);
+              if (s <= e) setPreset("custom");
+            }}
+            onPreset={(key) => {
+              const r = defaultRange(key);
+              setPreset(key);
+              setStartDate(r.start);
+              setEndDate(r.end);
+            }}
+          />
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            {filteredPayments.length} paiements · {filteredExpenses.length} dépenses · {filteredInvoices.length} factures
+          </p>
         </div>
 
         {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-3">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Total recettes</p>
-          </div>
-          <p className="text-lg font-semibold text-slate-900 dark:text-white">{fmt(totalRevenue)}</p>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-red-600" />
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Total dépenses</p>
-          </div>
-          <p className="text-lg font-semibold text-slate-900 dark:text-white">{fmt(totalExpenses)}</p>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Bénéfice net</p>
-          </div>
-          <p className={`text-lg font-semibold ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-            {fmt(netProfit)}
-          </p>
-        </Card>
-      </div>
-
-      {/* Onglets */}
-      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl w-fit">
-        {[
-          { key: "overview", label: "Vue d'ensemble", icon: Wallet },
-          { key: "expenses", label: "Dépenses", icon: TrendingDown },
-          { key: "revenue", label: "Recettes", icon: TrendingUp },
-          { key: "invoices", label: "Factures", icon: Receipt },
-          { key: "audit", label: "Journal d'audit", icon: ScrollText },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === tab.key
-                  ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-sm"
-                  : "text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Vue d'ensemble */}
-      {activeTab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="p-3">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Dernières dépenses</h2>
-            {filteredExpenses.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Aucune dépense enregistrée</p>
-            ) : (
-              <div className="space-y-3">
-                {filteredExpenses.slice(0, 5).map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{exp.description}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{getExpenseCategoryLabel(exp.category)} • {formatDate(exp.expense_date)}</p>
-                    </div>
-                    <p className="text-sm font-bold text-red-600">{fmt(exp.amount)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card className="p-3">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Dernières recettes</h2>
-            {filteredPayments.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Aucune recette enregistrée</p>
-            ) : (
-              <div className="space-y-3">
-                {filteredPayments.slice(0, 5).map((pay) => (
-                  <div key={pay.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Paiement</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{formatDate(pay.payment_date)} • {pay.reference || "—"}</p>
-                    </div>
-                    <p className="text-sm font-bold text-green-600">{fmt(pay.amount)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard
+            icon={TrendingUp}
+            label="Recettes"
+            value={fmt(totalRevenue)}
+            sub={`${Object.values(byMethod).filter((v) => v > 0).length} mode(s) de paiement`}
+            tone="green"
+            delta={revenueDelta}
+          />
+          <KpiCard
+            icon={TrendingDown}
+            label="Dépenses"
+            value={fmt(totalExpenses)}
+            sub={cashOut > 0 ? `dont ${fmt(cashOut)} de sorties de caisse` : "charges de la période"}
+            tone="red"
+            delta={expenseDelta}
+          />
+          <KpiCard
+            icon={Wallet}
+            label="Bénéfice net"
+            value={fmt(netProfit)}
+            sub={totalRevenue > 0 ? `marge ${margin.toFixed(1)}%` : "sur la période"}
+            tone="primary"
+          />
+          <KpiCard
+            icon={AlertTriangle}
+            label="Créances clients"
+            value={fmt(receivable)}
+            sub={`${bookings.filter((b) => (b.status === "confirmed" || b.status === "checked_in") && b.total_amount > b.amount_paid).length} réservation(s) impayée(s)`}
+            tone="amber"
+          />
         </div>
-      )}
 
-      {/* Dépenses */}
-      {activeTab === "expenses" && (
-        <Card className="overflow-hidden">
-          <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
-            <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2" disabled={filteredExpenses.length === 0}>
-              <Download className="w-4 h-4" /> Exporter CSV
-            </Button>
-          </div>
-          {filteredExpenses.length === 0 ? (
-            <div className="p-12 text-center">
-              <TrendingDown className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Aucune dépense</p>
-              <Button onClick={() => setModalOpen(true)}><Plus className="w-4 h-4" /> Ajouter</Button>
+        {/* Répartition par mode de paiement */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {[
+            { method: "cash", label: "Espèces", icon: Banknote },
+            { method: "wave", label: "Wave", icon: Smartphone },
+            { method: "pi_spi", label: "Pi-SPI", icon: Smartphone },
+            { method: "bank", label: "Virement", icon: Building },
+            { method: "other", label: "Autre", icon: Coins },
+          ].map(({ method, label, icon: Icon }) => {
+            const val = byMethod[method] || 0;
+            return (
+              <Card key={method} className="p-2.5 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 truncate">{label}</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{val > 0 ? fmt(val) : "—"}</p>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Onglets */}
+        <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-slate-700/50 rounded-xl overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  active
+                    ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+                {tab.badge != null && tab.badge > 0 && (
+                  <span
+                    className={`px-1.5 py-px rounded-full text-[10px] font-bold ${
+                      active ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ============ VUE D'ENSEMBLE ============ */}
+        {activeTab === "overview" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <Card className="p-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-green-600" /> Flux de trésorerie (12 mois)
+                </h2>
+                <CashFlowChart data={monthlySeries} fmt={fmt} />
+              </Card>
+              <Card className="p-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <TrendingDown className="w-4 h-4 text-red-600" /> Répartition des dépenses
+                </h2>
+                <CategoryBreakdown items={categoryBreakdown} fmt={fmt} />
+              </Card>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Description</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Catégorie</th>
-                    <th 
-                      className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      onClick={() => setExpenseSort({ key: "date", direction: expenseSort?.key === "date" && expenseSort.direction === "asc" ? "desc" : "asc" })}
-                    >
-                      Date
-                      {expenseSort?.key === "date" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
-                    </th>
-                    <th 
-                      className="text-right p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      onClick={() => setExpenseSort({ key: "amount", direction: expenseSort?.key === "amount" && expenseSort.direction === "asc" ? "desc" : "asc" })}
-                    >
-                      Montant
-                      {expenseSort?.key === "amount" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {filteredExpenses.map((exp) => (
-                    <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                      <td className="p-4 text-sm font-medium text-slate-900 dark:text-white">{exp.description}</td>
-                      <td className="p-3"><Badge variant="default">{getExpenseCategoryLabel(exp.category)}</Badge></td>
-                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{formatDate(exp.expense_date)}</td>
-                      <td className="p-4 text-right text-sm font-bold text-red-600">{fmt(exp.amount)}</td>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <Card className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Dernières dépenses</h2>
+                  <button
+                    onClick={() => setActiveTab("expenses")}
+                    className="text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                  >
+                    Tout voir →
+                  </button>
+                </div>
+                {filteredExpenses.length === 0 ? (
+                  <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Aucune dépense sur la période</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredExpenses.slice(0, 5).map((exp) => (
+                      <div key={exp.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{exp.description}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            {getExpenseCategoryLabel(exp.category)} • {formatDate(exp.expense_date)}
+                          </p>
+                        </div>
+                        <p className="text-sm font-bold text-red-600 flex-shrink-0">{fmt(exp.amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Dernières recettes</h2>
+                  <button
+                    onClick={() => setActiveTab("revenue")}
+                    className="text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                  >
+                    Tout voir →
+                  </button>
+                </div>
+                {filteredPayments.length === 0 ? (
+                  <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-8">Aucune recette sur la période</p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredPayments.slice(0, 5).map((pay) => (
+                      <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                            {pay.booking?.client_name || "Opération de caisse"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            {getPaymentMethodLabel(pay.payment_method)} • {formatDate(pay.payment_date)}
+                          </p>
+                        </div>
+                        <p className={`text-sm font-bold ${pay.amount < 0 ? "text-red-600" : "text-green-600"} flex-shrink-0`}>
+                          {pay.amount < 0 ? "-" : ""}
+                          {fmt(Math.abs(pay.amount))}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ============ RECETTES ============ */}
+        {activeTab === "revenue" && (
+          <Card className="overflow-hidden">
+            <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex flex-col lg:flex-row gap-2 lg:items-center bg-white dark:bg-slate-800">
+              <div className="flex gap-2 flex-wrap items-center">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher (client, réf, réservation)"
+                    value={revenueSearch}
+                    onChange={(e) => setRevenueSearch(e.target.value)}
+                    className="pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] w-56"
+                  />
+                </div>
+                <select
+                  value={revenueMethod}
+                  onChange={(e) => setRevenueMethod(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+                >
+                  <option value="all">Tous les modes</option>
+                  <option value="cash">Espèces</option>
+                  <option value="wave">Wave</option>
+                  <option value="pi_spi">Pi-SPI</option>
+                  <option value="bank">Virement</option>
+                  <option value="other">Autre</option>
+                </select>
+                <select
+                  value={revenueType}
+                  onChange={(e) => setRevenueType(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+                >
+                  <option value="all">Tous les types</option>
+                  <option value="booking">Paiements réservation</option>
+                  <option value="manual_in">Entrées de caisse</option>
+                  <option value="manual_out">Sorties de caisse</option>
+                </select>
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/shift")} className="gap-1.5">
+                  <ArrowLeftRight className="w-3.5 h-3.5" /> Caisse du jour
+                </Button>
+              </div>
+              <div className="lg:ml-auto">
+                <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2" disabled={filteredPayments.length === 0}>
+                  <Download className="w-4 h-4" /> Exporter CSV
+                </Button>
+              </div>
+            </div>
+
+            {filteredPayments.length === 0 ? (
+              <div className="p-12 text-center">
+                <TrendingUp className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune recette sur la période</p>
+                <Button size="sm" onClick={() => router.push("/dashboard/shift")}>
+                  <ArrowLeftRight className="w-4 h-4" /> Encaisser depuis la caisse
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th
+                        className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer"
+                        onClick={() =>
+                          setRevenueSort({ key: "date", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
+                        }
+                      >
+                        Date {revenueSort.key === "date" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
+                      </th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Client / Opération</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Méthode</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Référence</th>
+                      <th
+                        className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer"
+                        onClick={() =>
+                          setRevenueSort({ key: "amount", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
+                        }
+                      >
+                        Montant {revenueSort.key === "amount" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Recettes */}
-      {activeTab === "revenue" && (
-        <Card className="overflow-hidden">
-          <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
-            <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2" disabled={filteredPayments.length === 0}>
-              <Download className="w-4 h-4" /> Exporter CSV
-            </Button>
-          </div>
-          {filteredPayments.length === 0 ? (
-            <div className="p-12 text-center">
-              <TrendingUp className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Aucune recette enregistrée</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th 
-                      className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      onClick={() => setRevenueSort({ key: "date", direction: revenueSort?.key === "date" && revenueSort.direction === "asc" ? "desc" : "asc" })}
-                    >
-                      Date
-                      {revenueSort?.key === "date" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
-                    </th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Référence</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Méthode</th>
-                    <th 
-                      className="text-right p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      onClick={() => setRevenueSort({ key: "amount", direction: revenueSort?.key === "amount" && revenueSort.direction === "asc" ? "desc" : "asc" })}
-                    >
-                      Montant
-                      {revenueSort?.key === "amount" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {filteredPayments.map((pay) => (
-                    <tr key={pay.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                      <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{formatDate(pay.payment_date)}</td>
-                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{pay.reference || "—"}</td>
-                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 capitalize">{pay.payment_method}</td>
-                      <td className="p-4 text-right text-sm font-bold text-green-600">{fmt(pay.amount)}</td>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    {filteredPayments.map((pay) => {
+                      const isOut = pay.amount < 0;
+                      return (
+                        <tr key={pay.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                          <td className="p-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(pay.payment_date)}</td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              {pay.booking?.booking_code && (
+                                <span className="font-mono text-[11px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                                  {pay.booking.booking_code}
+                                </span>
+                              )}
+                              <span className="text-sm font-medium text-slate-900 dark:text-white">
+                                {pay.booking?.client_name || (pay.notes ? pay.notes : "Opération de caisse")}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <Badge variant={isOut ? "error" : "info"}>{getPaymentMethodLabel(pay.payment_method)}</Badge>
+                          </td>
+                          <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{pay.reference || "—"}</td>
+                          <td className={`p-3 text-right text-sm font-bold ${isOut ? "text-red-600" : "text-green-600"}`}>
+                            {isOut ? "-" : ""}
+                            {fmt(Math.abs(pay.amount))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 dark:border-slate-600">
+                      <td colSpan={4} className="p-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Total recettes nettes
+                      </td>
+                      <td className="p-3 text-right text-base font-bold text-slate-900 dark:text-white">
+                        {fmt(filteredPayments.reduce((s, p) => s + p.amount, 0))}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-       )}
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
 
-       {/* Factures */}
-       {activeTab === "invoices" && (
-         <Card className="overflow-hidden">
-           <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex justify-end bg-white dark:bg-slate-800">
-            <Button variant="outline" size="sm" onClick={exportInvoicesCSV} className="gap-2" disabled={filteredInvoices.length === 0}>
-              <Download className="w-4 h-4" /> Exporter CSV
-            </Button>
-          </div>
-          {filteredInvoices.length === 0 ? (
-            <div className="p-12 text-center">
-              <Receipt className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Aucune facture</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Les factures sont générées depuis la page Réservations.</p>
+        {/* ============ DÉPENSES ============ */}
+        {activeTab === "expenses" && (
+          <Card className="overflow-hidden">
+            <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex flex-col lg:flex-row gap-2 lg:items-center bg-white dark:bg-slate-800">
+              <div className="flex gap-2 flex-wrap items-center">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher une dépense"
+                    value={expenseSearch}
+                    onChange={(e) => setExpenseSearch(e.target.value)}
+                    className="pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] w-56"
+                  />
+                </div>
+                <select
+                  value={expenseCategory}
+                  onChange={(e) => setExpenseCategory(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+                >
+                  <option value="all">Toutes les catégories</option>
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {getExpenseCategoryLabel(cat)}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" size="sm" onClick={openNewExpense} className="gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Ajouter
+                </Button>
+              </div>
+              <div className="lg:ml-auto">
+                <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2" disabled={filteredExpenses.length === 0}>
+                  <Download className="w-4 h-4" /> Exporter CSV
+                </Button>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700">
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">N° Facture</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Date</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Client</th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Réservation</th>
-                    <th
-                      className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      onClick={() => setInvoiceSort({ key: "amount", direction: invoiceSort?.key === "amount" && invoiceSort.direction === "asc" ? "desc" : "asc" })}
-                    >
-                      Montant
-                      {invoiceSort?.key === "amount" ? (invoiceSort.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block text-indigo-600" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block text-indigo-600" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
-                    </th>
-                    <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Statut</th>
-                    <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {filteredInvoices.map((inv) => {
-                    const booking = invoicesBookings[inv.booking_id];
-                    return (
+
+            {filteredExpenses.length === 0 ? (
+              <div className="p-12 text-center">
+                <TrendingDown className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucune dépense sur la période</p>
+                <Button onClick={openNewExpense}>
+                  <Plus className="w-4 h-4" /> Enregistrer une dépense
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Description</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Catégorie</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Établissement</th>
+                      <th
+                        className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer"
+                        onClick={() => setExpenseSort({ key: "date", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
+                      >
+                        Date {expenseSort.key === "date" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
+                      </th>
+                      <th
+                        className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase cursor-pointer"
+                        onClick={() => setExpenseSort({ key: "amount", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
+                      >
+                        Montant {expenseSort.key === "amount" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
+                      </th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    {filteredExpenses.map((exp) => (
+                      <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 group">
+                        <td className="p-3 text-sm font-medium text-slate-900 dark:text-white">{exp.description}</td>
+                        <td className="p-3">
+                          <Badge variant="theme">{getExpenseCategoryLabel(exp.category)}</Badge>
+                        </td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">
+                          {accommodations.find((a) => a.id === exp.accommodation_id)?.name || "—"}
+                        </td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(exp.expense_date)}</td>
+                        <td className="p-3 text-right text-sm font-bold text-red-600">{fmt(exp.amount)}</td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => openEditExpense(exp)}
+                              title="Modifier"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-[var(--primary-color,#0C1C33)] hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingExpense(exp)}
+                              title="Supprimer"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 dark:border-slate-600">
+                      <td colSpan={4} className="p-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Total dépenses
+                      </td>
+                      <td className="p-3 text-right text-base font-bold text-red-600">
+                        {fmt(filteredExpenses.reduce((s, e) => s + e.amount, 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ============ FACTURES ============ */}
+        {activeTab === "invoices" && (
+          <Card className="overflow-hidden">
+            <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-2 sm:items-center bg-white dark:bg-slate-800">
+              <select
+                value={invoiceStatus}
+                onChange={(e) => setInvoiceStatus(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+              >
+                <option value="all">Tous les statuts</option>
+                {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <div className="sm:ml-auto">
+                <Button variant="outline" size="sm" onClick={exportInvoicesCSV} className="gap-2" disabled={filteredInvoices.length === 0}>
+                  <Download className="w-4 h-4" /> Exporter CSV
+                </Button>
+              </div>
+            </div>
+
+            {filteredInvoices.length === 0 ? (
+              <div className="p-12 text-center">
+                <Receipt className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Aucune facture sur la période</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  Les factures sont générées depuis la page Réservations.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">N° Facture</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Date</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Client</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Réservation</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Sous-total</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">TVA</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Total TTC</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Statut</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    {filteredInvoices.map((inv) => (
                       <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                        <td className="p-4 text-sm font-medium text-slate-900 dark:text-white">{inv.invoice_number}</td>
-                        <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{formatDate(inv.created_at)}</td>
-                        <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{booking?.client?.full_name || "—"}</td>
-                        <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{booking?.booking_code || "—"}</td>
-                        <td className="p-4 text-right text-sm font-bold text-slate-900 dark:text-white">{fmt(inv.total_amount)}</td>
-                        <td className="p-3"><Badge variant={inv.status === "paid" ? "success" : inv.status === "sent" ? "default" : inv.status === "draft" ? "info" : "error"}>{INVOICE_STATUS_LABELS[inv.status] || inv.status}</Badge></td>
+                        <td className="p-3 text-sm font-medium text-slate-900 dark:text-white">{inv.invoice_number}</td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatDate(inv.created_at)}</td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{inv.booking?.client_name || "—"}</td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{inv.booking?.booking_code || "—"}</td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{fmt(inv.amount)}</td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{fmt(inv.tax_amount)}</td>
+                        <td className="p-3 text-right text-sm font-bold text-slate-900 dark:text-white">{fmt(inv.total_amount)}</td>
+                        <td className="p-3">
+                          <Badge variant={inv.status === "paid" ? "success" : inv.status === "sent" ? "default" : inv.status === "draft" ? "info" : inv.status === "partial" ? "warning" : "error"}>
+                            {INVOICE_STATUS_LABELS[inv.status] || inv.status}
+                          </Badge>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-1 justify-end">
                             {inv.pdf_url && (
                               <button
                                 onClick={() => window.open(inv.pdf_url || "", "_blank")}
                                 title="Voir la facture PDF"
-                                className="p-1.5 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]"
+                                className="p-1.5 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] transition-colors"
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
@@ -614,7 +1558,7 @@ export default function AccountingPage() {
                                 href={inv.pdf_url}
                                 download={`Facture_${inv.invoice_number}.pdf`}
                                 title="Télécharger la facture"
-                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                               >
                                 <Download className="w-4 h-4" />
                               </a>
@@ -622,70 +1566,379 @@ export default function AccountingPage() {
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-       )}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
 
-      {/* Journal d'audit */}
-      {activeTab === "audit" && (
-        <Card className="p-3">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Journal d'audit</h2>
-          {auditLogs.length === 0 ? (
-            <div className="text-center py-8">
-              <ScrollText className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Aucune action enregistrée</p>
+        {/* ============ JOURNAL D'AUDIT ============ */}
+        {activeTab === "audit" && (
+          <Card className="p-3">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <History className="w-4 h-4 text-slate-500" /> Journal d&apos;audit
+              </h2>
+              <span className="text-xs text-slate-400">{auditLogs.length} entrées</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {auditLogs.map((log) => (
-                <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
-                  <div className="w-8 h-8 rounded-lg bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center flex-shrink-0">
-                    <ScrollText className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
+            {auditLogs.length === 0 ? (
+              <div className="text-center py-8">
+                <ScrollText className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">Aucune action enregistrée</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center flex-shrink-0">
+                      <ScrollText className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white capitalize">{log.action.replace(/_/g, " ")}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {log.entity_type} {log.entity_id ? `#${log.entity_id.substring(0, 8)}` : ""} • {usersById[log.user_id || ""] || "Système"} • {formatDate(log.created_at)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">{log.action}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {log.entity_type} #{log.entity_id?.substring(0, 8)} • {formatDate(log.created_at)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ============ CLIENTS (CRM) ============ */}
+        {activeTab === "clients" && (
+          <Card className="overflow-hidden">
+            <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row gap-2 sm:items-center bg-white dark:bg-slate-800">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un client (nom, téléphone, email)"
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={exportClientsCSV} className="gap-2" disabled={filteredClients.length === 0}>
+                <Download className="w-4 h-4" /> Exporter CSV
+              </Button>
             </div>
-          )}
-        </Card>
-       )}
+
+            {filteredClients.length === 0 ? (
+              <div className="p-12 text-center">
+                <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">Aucun client enregistré</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Les clients apparaissent dès la première réservation</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Client</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Contact</th>
+                      <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Séjours</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">CA total</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Encaissé</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Solde dû</th>
+                      <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                    {filteredClients.map((c) => (
+                      <tr
+                        key={c.id}
+                        onClick={() => setSelectedClient(c)}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
+                      >
+                        <td className="p-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center font-bold text-xs text-[var(--primary-color,#0C1C33)] flex-shrink-0">
+                              {c.full_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-slate-900 dark:text-white">{c.full_name}</p>
+                              <p className="text-xs text-slate-400">
+                                {c.nationality || ""} {c.nationality && c.id_type ? "•" : ""} {c.id_type || ""}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            {c.phone && (
+                              <p className="flex items-center gap-1">
+                                <Phone className="w-3 h-3" /> {c.phone}
+                              </p>
+                            )}
+                            {c.email && <p className="truncate max-w-[180px]">{c.email}</p>}
+                          </div>
+                        </td>
+                        <td className="p-3 text-sm text-slate-500 dark:text-slate-400">
+                          {c.stayCount} séjour{c.stayCount > 1 ? "s" : ""} · {c.nights} nuit{c.nights > 1 ? "s" : ""}
+                        </td>
+                        <td className="p-3 text-right text-sm font-semibold text-slate-900 dark:text-white">{fmt(c.totalSpent)}</td>
+                        <td className="p-3 text-right text-sm text-green-600">{fmt(c.paid)}</td>
+                        <td className="p-3 text-right">
+                          {c.balance > 0 ? (
+                            <span className="text-sm font-bold text-red-600">{fmt(c.balance)}</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> À jour
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center justify-end gap-1">
+                            {c.phone && (
+                              <a
+                                href={`https://wa.me/${c.phone.replace(/[^+\d]/g, "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Contacter sur WhatsApp"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </a>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedClient(c);
+                              }}
+                              title="Voir le dossier client"
+                              className="p-1.5 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
 
-      {/* Modal dépense */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Nouvelle dépense">
+      {/* ============ MODAL DÉPENSE ============ */}
+      <Modal
+        open={expenseModalOpen}
+        onClose={() => setExpenseModalOpen(false)}
+        title={editingExpense ? "Modifier la dépense" : "Nouvelle dépense"}
+        description="Enregistrez une charge avec sa catégorie et sa date"
+      >
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Catégorie</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              Catégorie
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {EXPENSE_CATEGORIES.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat] || Coins;
+                const active = expenseForm.category === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setExpenseForm({ ...expenseForm, category: cat })}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      active
+                        ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]"
+                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {getExpenseCategoryLabel(cat)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <Input
+            label="Description"
+            value={expenseForm.description}
+            onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+            placeholder="Ex : Achat de produits d'entretien"
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Montant (FCFA)"
+              type="number"
+              min={0}
+              value={expenseForm.amount}
+              onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+              placeholder="5000"
+            />
+            <Input
+              label="Date"
+              type="date"
+              value={expenseForm.expense_date}
+              onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              Établissement (optionnel)
+            </label>
             <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+              value={expenseForm.accommodation_id}
+              onChange={(e) => setExpenseForm({ ...expenseForm, accommodation_id: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
             >
-              {["salaries", "utilities", "maintenance", "supplies", "marketing", "rent", "taxes", "other"].map((cat) => (
-                <option key={cat} value={cat}>{getExpenseCategoryLabel(cat)}</option>
+              <option value="">Tous (charges générales)</option>
+              {accommodations.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
           </div>
-          <Input label="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Achat de produits d'entretien" />
-          <Input label="Montant (FCFA)" type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} placeholder="5000" />
-          <Input label="Date" type="date" value={formData.expense_date} onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })} />
+
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
-            <Button className="flex-1" onClick={handleSave} loading={loading}>Enregistrer</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setExpenseModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button className="flex-1" onClick={handleSaveExpense} loading={savingExpense}>
+              {editingExpense ? "Enregistrer les modifications" : "Enregistrer"}
+            </Button>
+          </div>
         </div>
+      </Modal>
+
+      {/* ============ MODAL SUPPRESSION ============ */}
+      <Modal
+        open={!!deletingExpense}
+        onClose={() => setDeletingExpense(null)}
+        title="Supprimer cette dépense ?"
+        description="Cette action est irréversible."
+      >
+        <div className="space-y-3">
+          {deletingExpense && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-300">
+                <span className="font-semibold">{deletingExpense.description}</span> — {fmt(deletingExpense.amount)} du {formatDate(deletingExpense.expense_date)}
+              </p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeletingExpense(null)}>
+              Annuler
+            </Button>
+            <Button variant="destructive" className="flex-1" onClick={handleDeleteExpense}>
+              <Trash2 className="w-4 h-4" /> Supprimer
+            </Button>
+          </div>
         </div>
-       </Modal>
-      </div>
+      </Modal>
+
+      {/* ============ MODAL CLIENT (CRM) ============ */}
+      <Modal
+        open={!!selectedClient}
+        onClose={() => setSelectedClient(null)}
+        title={selectedClient?.full_name || "Client"}
+        description="Dossier client — historique et situation comptable"
+        size="lg"
+      >
+        {selectedClient && (
+          <div className="space-y-4">
+            {/* Coordonnées */}
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedClient.phone && (
+                <a
+                  href={`https://wa.me/${selectedClient.phone.replace(/[^+\d]/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs font-medium hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                </a>
+              )}
+              {selectedClient.phone && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-600 dark:text-slate-300">
+                  <Phone className="w-3.5 h-3.5" /> {selectedClient.phone}
+                </span>
+              )}
+              {selectedClient.email && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-600 dark:text-slate-300">
+                  <FileText className="w-3.5 h-3.5" /> {selectedClient.email}
+                </span>
+              )}
+              {selectedClient.nationality && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-xs text-slate-600 dark:text-slate-300">
+                  <User className="w-3.5 h-3.5" /> {selectedClient.nationality}
+                </span>
+              )}
+            </div>
+
+            {/* Chiffres clés */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                <p className="text-[11px] text-slate-400">Séjours</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedClient.stayCount}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+                <p className="text-[11px] text-slate-400">Nuits</p>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{selectedClient.nights}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20">
+                <p className="text-[11px] text-slate-400">Encaissé</p>
+                <p className="text-lg font-bold text-green-600">{fmt(selectedClient.paid)}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                <p className="text-[11px] text-slate-400">Solde dû</p>
+                <p className={`text-lg font-bold ${selectedClient.balance > 0 ? "text-red-600" : "text-green-600"}`}>
+                  {selectedClient.balance > 0 ? fmt(selectedClient.balance) : "À jour"}
+                </p>
+              </div>
+            </div>
+
+            {/* Historique des réservations */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2">
+                Réservations ({selectedClient.bookings.length})
+              </h3>
+              {selectedClient.bookings.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">Aucune réservation</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {selectedClient.bookings.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">
+                          {b.booking_code}
+                          <span className="ml-2 text-xs font-normal text-slate-400">
+                            {formatDate(b.check_in_date)} → {formatDate(b.check_out_date)}
+                          </span>
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={b.payment_status === "paid" ? "success" : b.payment_status === "partial" ? "warning" : "error"}>
+                          {b.payment_status === "paid" ? "Soldé" : b.payment_status === "partial" ? "Partiel" : b.payment_status === "refunded" ? "Remboursé" : "Impayé"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
+

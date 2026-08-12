@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Sparkles, LogOut, Building2 } from "lucide-react";
+import { Loader2, Sparkles, LogOut } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import { Moon, Sun } from "lucide-react";
@@ -86,18 +86,21 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
 
-      <main className="p-4 pb-20">{children}</main>
+      <main className="p-4 pb-28">{children}</main>
 
-      {/* Bottom nav mobile */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
-        <div className="flex items-center justify-around py-2">
-          <button className="flex flex-col items-center gap-0.5 px-4 py-1 text-[var(--primary-color,#0C1C33)] font-semibold">
+      {/* Bottom nav mobile — barre flottante ergonomique */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-4">
+        <div className="max-w-md mx-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg flex items-center justify-around p-1.5">
+          <button className="flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl text-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] font-semibold min-w-[64px] active:scale-95 transition-transform">
             <Sparkles className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Tâches</span>
+            <span className="text-[11px] font-medium">Tâches</span>
           </button>
-          <button onClick={handleLogout} className="flex flex-col items-center gap-0.5 px-4 py-1 text-slate-400">
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 min-w-[64px] active:scale-95 transition-all"
+          >
             <LogOut className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Quitter</span>
+            <span className="text-[11px] font-medium">Quitter</span>
           </button>
         </div>
       </nav>
