@@ -259,6 +259,22 @@ export function getPlanLabel(plan: string): string {
 }
 
 /**
+ * Retourne le libellé d'un statut d'abonnement (paiement semi-automatisé)
+ */
+export function getSubscriptionStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: "En attente de validation",
+    active: "Actif",
+    expired: "Expiré",
+    trial: "Essai gratuit",
+    overdue: "En retard",
+    suspended: "Suspendu",
+    cancelled: "Annulé",
+  };
+  return labels[status] || status;
+}
+
+/**
  * Retourne le libellé d'une méthode de paiement
  */
 export function getPaymentMethodLabel(method: string): string {

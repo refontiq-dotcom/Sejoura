@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizePlan, canAccessFeature, getPlanPrice } from "../src/lib/subscription-plans";
+import { normalizePlan, canAccessFeature, getPlanPrice, getWavePayLink } from "../src/lib/subscription-plans";
 
 describe("subscription-plans", () => {
   it("normalise les noms de plans", () => {
@@ -22,5 +22,17 @@ describe("subscription-plans", () => {
     expect(canAccessFeature("externalApi", "entreprise")).toBe(true);
     expect(canAccessFeature("trouvetouBoost", "essentiel")).toBe(false);
     expect(canAccessFeature("trouvetouBoost", "entreprise")).toBe(true);
+  });
+
+  it("fournit les liens de paiement Wave par forfait", () => {
+    expect(getWavePayLink("essentiel")).toBe(
+      "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000"
+    );
+    expect(getWavePayLink("entreprise")).toBe(
+      "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000"
+    );
+    expect(getWavePayLink("standard")).toBe(getWavePayLink("essentiel"));
+    expect(getWavePayLink("enterprise")).toBe(getWavePayLink("entreprise"));
+    expect(getWavePayLink("free")).toBe("");
   });
 });

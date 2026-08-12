@@ -1,13 +1,39 @@
-# 🚀 Mes Projets (Monorepo)
+# Séjoura — Plateforme de gestion de résidences meublées
 
-Hub centralisé regroupant l'ensemble de mes applications.
+## 🧾 Paiement d'abonnement Wave
 
-## 📁 Projets
-- **[Séjoura](./sejoura)** : Plateforme de gestion de résidences meublées.
+Deux flux coexistent pour le paiement des abonnements :
 
-## 🧾 Séjoura — configuration Wave Checkout
+### 1. Flux semi-automatisé par lien Wave (recommandé)
 
-Pour activer le paiement d'abonnement via Wave dans Séjoura, ajouter dans `sejoura/.env.local` :
+Le gérant paie via un lien Wave direct, puis notifie l'administrateur qui valide
+manuellement l'activation.
+
+Déroulé :
+
+1. Sur la page `/dashboard/subscription`, le gérant choisit son forfait
+   (Essentiel 15 000 FCFA ou Entreprise 55 000 FCFA) et clique sur
+   « Payer via Wave » (lien `https://pay.wave.com/...` ouvert dans un nouvel onglet).
+2. Une fois le paiement effectué, il clique sur « J'ai effectué le paiement,
+   notifier l'administrateur » : la route `POST /api/subscription/notify-payment`
+   passe l'abonnement en `subscription_status = 'pending'` et crée une demande
+   dans `subscription_payment_requests` + une notification Super Admin.
+3. Sur la page `/admin`, le Super Admin voit un bandeau d'alerte et la section
+   « Gestion des Abonnements » (validations en attente). En cliquant sur
+   « Valider l'abonnement », la RPC `validate_subscription_payment` active
+   l'abonnement (+30 jours), débloque les interrupteurs et réactive les
+   utilisateurs de l'établissement.
+
+Migration correspondante : `supabase/migrations/20260812_subscription_manual_payment_flow.sql`
+(idempotente, à appliquer via `npm run db:push` avec `DATABASE_URL`).
+
+Pour maintenir l'état `expired`, appeler périodiquement la fonction
+`sync_subscription_statuses()` (cron Supabase / edge function) : elle bascule en
+`expired` + soft lock les abonnements dont `subscription_end_date` est dépassée.
+
+### 2. Flux automatisé via API Wave Checkout (existant)
+
+Optionnel, si la clé API Wave est disponible :
 
 ```env
 WAVE_API_KEY=sk_live_...
@@ -17,7 +43,7 @@ WAVE_WEBHOOK_SECRET=whsec_...
 - `WAVE_API_KEY` : clé API Wave côté serveur uniquement
 - `WAVE_WEBHOOK_SECRET` : secret utilisé pour vérifier les webhooks Wave
 
-### Webhook Wave
+#### Webhook Wave
 
 En production, enregistrer l'URL suivante dans le portail Wave Business Portal :
 
@@ -25,5 +51,15 @@ En production, enregistrer l'URL suivante dans le portail Wave Business Portal :
 https://<votre-domaine>/api/webhooks/wave
 ```
 
-Cette route reçoit les événements `checkout.session.completed` et met à jour l'abonnement uniquement après vérification de la signature Wave.
+Cette route reçoit les événements `checkout.session.completed` et met à jour
+l'abonnement uniquement après vérification de la signature Wave.
 
+### Variables Supabase requises
+
+Pour les deux flux, le projet lit :
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```

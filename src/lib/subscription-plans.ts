@@ -1,5 +1,17 @@
 export type SubscriptionTier = "essentiel" | "entreprise" | "free";
 
+// Liens de paiement Wave (paiement semi-automatisé) pour chaque formule
+export const WAVE_PAY_LINKS: Record<string, string> = {
+  essentiel: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000",
+  entreprise: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000",
+  standard: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000",
+  enterprise: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000",
+};
+
+export function getWavePayLink(plan?: string | null): string {
+  return WAVE_PAY_LINKS[normalizePlan(plan ?? "free")] ?? "";
+}
+
 export function normalizePlan(plan?: string | null): SubscriptionTier {
   const normalized = (plan || "").toLowerCase();
   if (normalized === "essentiel" || normalized === "essential" || normalized === "standard") return "essentiel";

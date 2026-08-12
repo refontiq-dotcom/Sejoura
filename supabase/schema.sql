@@ -23,6 +23,8 @@ DROP VIEW IF EXISTS v_daily_movements CASCADE;
 -- Fonctions (DROP IF EXISTS pour toutes les fonctions SECURITY DEFINER)
 DROP FUNCTION IF EXISTS request_mid_stay_cleaning(UUID, UUID) CASCADE;
 DROP FUNCTION IF EXISTS generate_invoice(UUID, UUID, TEXT) CASCADE;
+DROP FUNCTION IF EXISTS validate_subscription_payment(UUID) CASCADE;
+DROP FUNCTION IF EXISTS sync_subscription_statuses() CASCADE;
 DROP FUNCTION IF EXISTS reactivate_tenant(UUID) CASCADE;
 DROP FUNCTION IF EXISTS suspend_tenant(UUID, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS check_cleaning_alerts() CASCADE;
@@ -61,6 +63,7 @@ DROP TABLE IF EXISTS room_types CASCADE;
 DROP TABLE IF EXISTS accommodations CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS subscriptions CASCADE;
+DROP TABLE IF EXISTS subscription_payment_requests CASCADE;
 DROP TABLE IF EXISTS tenants CASCADE;
 
 -- ----------------------------------------------------------------------------
@@ -211,6 +214,10 @@ CREATE TABLE subscriptions (
   last_payment_at    TIMESTAMPTZ,
   last_payment_amount INTEGER,
   is_soft_locked     BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Paiement semi-automatisé (lien Wave + validation Super Admin)
+  subscription_status TEXT NOT NULL DEFAULT 'active'
+    CHECK (subscription_status IN ('pending', 'active', 'expired')),
+  subscription_end_date TIMESTAMPTZ,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(tenant_id)
@@ -241,6 +248,30 @@ CREATE INDEX idx_users_phone ON users(phone);
 CREATE INDEX idx_users_tenant ON users(tenant_id);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_auth ON users(auth_user_id);
+
+-- ----------------------------------------------------------------------------
+-- 4b. TABLE: subscription_payment_requests (Traçabilité paiements manuels Wave)
+-- Le gérant déclare son paiement via le lien Wave ; le Super Admin valide.
+-- ----------------------------------------------------------------------------
+CREATE TABLE subscription_payment_requests (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  subscription_id UUID REFERENCES subscriptions(id) ON DELETE CASCADE,
+  plan            TEXT NOT NULL,                 -- 'essentiel' | 'entreprise'
+  amount          INTEGER NOT NULL,              -- Montant en FCFA (XOF)
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'validated', 'rejected')),
+  requested_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  validated_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  validated_at    TIMESTAMPTZ,
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_sub_payment_req_tenant ON subscription_payment_requests(tenant_id);
+CREATE INDEX idx_sub_payment_req_status ON subscription_payment_requests(status);
+CREATE INDEX idx_sub_payment_req_created ON subscription_payment_requests(created_at DESC);
 
 -- ----------------------------------------------------------------------------
 -- 5. TABLE: accommodations (Résidences / Hébergements)
@@ -667,6 +698,9 @@ CREATE TRIGGER trigger_tenants_updated BEFORE UPDATE ON tenants
 CREATE TRIGGER trigger_subscriptions_updated BEFORE UPDATE ON subscriptions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER trigger_sub_payment_req_updated BEFORE UPDATE ON subscription_payment_requests
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER trigger_users_updated BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -810,6 +844,7 @@ CREATE TRIGGER trigger_log_price_change
 -- Activer RLS sur toutes les tables
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subscription_payment_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accommodations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_types ENABLE ROW LEVEL SECURITY;
@@ -870,6 +905,24 @@ CREATE POLICY "subscriptions_update_own_admin" ON subscriptions
 
 CREATE POLICY "subscriptions_insert_own" ON subscriptions
   FOR INSERT WITH CHECK (tenant_id = get_current_user_tenant_id());
+
+-- ----------------------------------------------------------------------------
+-- 23b-bis. POLITIQUES RLS — subscription_payment_requests
+-- ----------------------------------------------------------------------------
+CREATE POLICY "sub_payment_req_select_super_admin" ON subscription_payment_requests
+  FOR SELECT USING (is_super_admin());
+
+CREATE POLICY "sub_payment_req_select_own" ON subscription_payment_requests
+  FOR SELECT USING (tenant_id = get_current_user_tenant_id());
+
+CREATE POLICY "sub_payment_req_insert_admin" ON subscription_payment_requests
+  FOR INSERT WITH CHECK (
+    tenant_id = get_current_user_tenant_id()
+    AND get_current_user_role() = 'admin_residence'
+  );
+
+CREATE POLICY "sub_payment_req_update_super_admin" ON subscription_payment_requests
+  FOR UPDATE USING (is_super_admin());
 
 -- ----------------------------------------------------------------------------
 -- 23c. POLITIQUES RLS — users
@@ -1655,6 +1708,116 @@ BEGIN
   WHERE tenant_id = p_tenant_id;
 
   RETURN v_tenant;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ----------------------------------------------------------------------------
+-- 34a. FONCTION: Valider une demande de paiement d'abonnement (Super Admin)
+-- Utilisée pour le flux semi-automatisé Wave : le gérant paie via le lien
+-- Wave, notifie l'administrateur, puis le Super Admin valide manuellement.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION validate_subscription_payment(p_request_id UUID)
+RETURNS subscription_payment_requests AS $$
+DECLARE
+  v_request subscription_payment_requests;
+  v_subscription_id UUID;
+  v_end_date TIMESTAMPTZ;
+  v_admin_user_id UUID;
+  v_tenant_id UUID;
+BEGIN
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seul le Super Admin peut valider un paiement d''abonnement';
+  END IF;
+
+  SELECT * INTO v_request
+  FROM subscription_payment_requests
+  WHERE id = p_request_id AND status = 'pending'
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'REQUEST_NOT_FOUND: Demande de paiement introuvable ou déjà traitée';
+  END IF;
+
+  v_tenant_id := v_request.tenant_id;
+
+  SELECT id INTO v_subscription_id
+  FROM subscriptions
+  WHERE tenant_id = v_tenant_id
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_subscription_id IS NULL THEN
+    RAISE EXCEPTION 'SUBSCRIPTION_NOT_FOUND: Aucun abonnement trouvé pour cet établissement';
+  END IF;
+
+  -- Date de fin : prolongation de 30 jours à compter d'aujourd'hui
+  v_end_date := NOW() + INTERVAL '30 days';
+
+  -- Activation de l'abonnement + déblocage des interrupteurs
+  UPDATE subscriptions
+  SET
+    subscription_status   = 'active',
+    subscription_end_date = v_end_date,
+    status                = 'active',
+    is_soft_locked        = FALSE,
+    current_period_start  = NOW(),
+    current_period_end    = v_end_date,
+    plan                  = v_request.plan::subscription_plan,
+    monthly_price         = v_request.amount,
+    payment_method        = 'wave',
+    last_payment_at       = NOW(),
+    last_payment_amount   = v_request.amount
+  WHERE id = v_subscription_id;
+
+  -- Réactiver les utilisateurs de l'établissement le cas échéant
+  UPDATE users SET is_active = TRUE WHERE tenant_id = v_tenant_id;
+
+  -- Marquer la demande comme validée
+  SELECT id INTO v_admin_user_id
+  FROM users
+  WHERE auth_user_id = auth.uid() AND role = 'super_admin'
+  LIMIT 1;
+
+  UPDATE subscription_payment_requests
+  SET
+    status       = 'validated',
+    validated_by = v_admin_user_id,
+    validated_at = NOW()
+  WHERE id = p_request_id
+  RETURNING * INTO v_request;
+
+  -- Notification pour le gérant de l'établissement
+  INSERT INTO notifications (tenant_id, user_id, title, message, type, link)
+  VALUES (
+    v_tenant_id,
+    NULL,
+    'Abonnement activé',
+    'Votre abonnement a été validé par l''administrateur. Merci pour votre paiement.',
+    'success',
+    '/dashboard/subscription'
+  );
+
+  RETURN v_request;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ----------------------------------------------------------------------------
+-- 34b. FONCTION: Marquer automatiquement les abonnements expirés
+-- À appeler périodiquement (cron / edge function) pour passer les abonnements
+-- dont la date de fin est dépassée en 'expired' (soft lock).
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION sync_subscription_statuses()
+RETURNS INTEGER AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  UPDATE subscriptions
+  SET subscription_status = 'expired', is_soft_locked = TRUE
+  WHERE subscription_status = 'active'
+    AND subscription_end_date IS NOT NULL
+    AND subscription_end_date < NOW();
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

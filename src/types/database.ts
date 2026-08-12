@@ -94,6 +94,29 @@ export interface Subscription {
   last_payment_at: string | null;
   last_payment_amount: number | null;
   is_soft_locked: boolean;
+  // Paiement semi-automatisé (lien Wave + validation Super Admin)
+  subscription_status?: "pending" | "active" | "expired" | null;
+  subscription_end_date?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Demande de paiement d'abonnement déclarée par le gérant après un paiement
+ * effectué via un lien Wave (pay.wave.com). Le Super Admin la valide
+ * manuellement pour activer l'abonnement.
+ */
+export interface SubscriptionPaymentRequest {
+  id: string;
+  tenant_id: string;
+  subscription_id: string | null;
+  plan: string;
+  amount: number;
+  status: "pending" | "validated" | "rejected";
+  requested_by: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -470,6 +493,11 @@ export interface Database {
         Insert: Omit<Subscription, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Subscription, "id" | "created_at" | "updated_at">>;
       };
+      subscription_payment_requests: {
+        Row: SubscriptionPaymentRequest;
+        Insert: Omit<SubscriptionPaymentRequest, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<SubscriptionPaymentRequest, "id" | "created_at" | "updated_at">>;
+      };
       users: {
         Row: User;
         Insert: Omit<User, "id" | "created_at" | "updated_at">;
@@ -607,6 +635,14 @@ export interface Database {
       generate_invoice: {
         Args: { p_booking_id: string; p_user_id: string; p_invoice_number: string };
         Returns: Invoice;
+      };
+      validate_subscription_payment: {
+        Args: { p_request_id: string };
+        Returns: SubscriptionPaymentRequest;
+      };
+      sync_subscription_statuses: {
+        Args: Record<string, never>;
+        Returns: number;
       };
     };
   };
