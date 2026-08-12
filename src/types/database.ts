@@ -116,6 +116,7 @@ export interface SubscriptionPaymentRequest {
   requested_by: string | null;
   validated_by: string | null;
   validated_at: string | null;
+  sender_phone: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

@@ -227,6 +227,7 @@ export default function SuperAdminPage() {
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Établissement</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Plan</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Montant payé</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">N° Wave</th>
                     <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Demandé le</th>
                     <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
                   </tr>
@@ -249,6 +250,9 @@ export default function SuperAdminPage() {
                       </td>
                       <td className="p-4">
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{formatFCFA(req.amount)}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{req.sender_phone || "—"}</p>
                       </td>
                       <td className="p-4 text-sm text-slate-500">{formatDate(req.created_at)}</td>
                       <td className="p-4 text-right">

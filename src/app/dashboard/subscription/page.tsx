@@ -6,18 +6,47 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { getPlanPrice, getPlanLabel, formatDate, getPlanLimits, getSubscriptionStatusLabel } from "@/lib/utils";
+import { getPlanPrice, getPlanLabel, formatDate, getSubscriptionStatusLabel } from "@/lib/utils";
 import { normalizePlan, getWavePayLink } from "@/lib/subscription-plans";
 import { useCurrency } from "@/hooks/use-currency";
-import { Check, Zap, Crown, Loader2, CreditCard, AlertCircle, Clock, ExternalLink, ShieldCheck } from "lucide-react";
+import {
+  Check,
+  Zap,
+  Crown,
+  Loader2,
+  CreditCard,
+  AlertCircle,
+  Clock,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 import type { Subscription } from "@/types/database";
+
+// Icône stylisée de l'application Wave (bloc bleu + W)
+function WaveIcon({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-[#1C3AA9] text-white ${className}`}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 17 L8 7 L10.5 14.5 L13 7 L16 17" />
+      </svg>
+    </span>
+  );
+}
 
 export default function SubscriptionPage() {
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [confirmPlan, setConfirmPlan] = useState<string | null>(null);
+  const [senderPhone, setSenderPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [notifying, setNotifying] = useState(false);
   const [now] = useState(() => Date.now());
 
@@ -54,9 +83,20 @@ export default function SubscriptionPage() {
     return () => clearTimeout(t);
   }, []);
 
-  // Le gérant déclare son paiement Wave : le statut passe en 'pending'
-  // et une notification de validation est envoyée au Super Admin.
-  async function handleNotifyPayment(plan: string) {
+  function openPayment(plan: string) {
+    setSenderPhone("");
+    setPhoneError("");
+    setConfirmPlan(plan);
+  }
+
+  // Soumission du paiement : le statut passe en 'pending' (activation rapide).
+  async function handleSubmitPayment() {
+    const digitsOnly = senderPhone.replace(/\D/g, "");
+    if (!digitsOnly || digitsOnly.length < 8) {
+      setPhoneError("Veuillez renseigner le numéro Wave ayant envoyé le paiement.");
+      return;
+    }
+
     setNotifying(true);
     try {
       const res = await fetch("/api/subscription/notify-payment", {
@@ -64,18 +104,20 @@ export default function SubscriptionPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan: confirmPlan, phone: senderPhone }),
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error || "Impossible de signaler le paiement.");
+        throw new Error(data?.error || "Impossible de soumettre la demande.");
       }
       if (data.alreadyPending) {
         toast.info("Votre demande de validation est déjà en attente.");
       } else {
-        toast.success("Votre paiement a été signalé. L'administrateur va valider votre abonnement.");
+        toast.success("Demande envoyée ! L'administrateur va vérifier votre paiement Wave.");
       }
       setConfirmPlan(null);
+      setSenderPhone("");
+      setPhoneError("");
       loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion.");
@@ -97,9 +139,10 @@ export default function SubscriptionPage() {
     {
       key: "essentiel",
       name: "Essentiel",
+      tagline: "Pour bien démarrer",
       price: getPlanPrice("essentiel"),
       icon: Zap,
-      color: "blue",
+      iconClasses: "bg-blue-100 dark:bg-blue-900/30 text-blue-600",
       features: [
         "1 établissement maximum",
         "10 unités maximum (chambres ou appartements)",
@@ -107,14 +150,14 @@ export default function SubscriptionPage() {
         "Réservations, check-in/out et reçus PDF",
         "Vitrine Trouvetou et Boost Express",
       ],
-      limits: getPlanLimits("essentiel"),
     },
     {
       key: "entreprise",
       name: "Entreprise",
+      tagline: "Pour les établissements qui se développent",
       price: getPlanPrice("entreprise"),
       icon: Crown,
-      color: "gold",
+      iconClasses: "bg-purple-100 dark:bg-purple-900/30 text-purple-600",
       features: [
         "Établissements & unités illimités",
         "Comptabilité avancée et bénéfice net réel",
@@ -122,7 +165,6 @@ export default function SubscriptionPage() {
         "API Séjoura export / webhooks",
         "Rôles sur mesure et support dédié",
       ],
-      limits: getPlanLimits("entreprise"),
     },
   ];
 
@@ -135,27 +177,43 @@ export default function SubscriptionPage() {
   const dateExpired = !!endDate && !isPending && new Date(endDate).getTime() < now;
   const isExpired = subStatus === "expired" || isLocked || dateExpired;
 
+  const pendingBadge = (
+    <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-3">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+      </span>
+      <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
+        ⏳ Activation en cours de traitement (Sous 15 minutes)
+      </span>
+    </div>
+  );
+
+  const confirmPrice = getPlanPrice(confirmPlan ?? "");
+  const confirmLabel = getPlanLabel(confirmPlan ?? "");
+  const waveUrl = getWavePayLink(confirmPlan ?? "");
+
   return (
-    <div className="space-y-3 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Abonnement</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Gérez votre plan et vos paiements Wave</p>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white">Abonnement</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Choisissez votre formule et payez en toute simplicité via Wave</p>
       </div>
 
       {/* Statut actuel */}
-      <Card className={`p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)] ${isExpired ? "border-red-300 dark:border-red-800" : isPending ? "border-amber-300 dark:border-amber-800" : ""}`}>
+      <Card className={`p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] ${isExpired ? "border-red-300 dark:border-red-800" : isPending ? "border-amber-300 dark:border-amber-800" : ""}`}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-              currentPlan === "entreprise" ? "bg-yellow-100 dark:bg-yellow-900/30" :
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+              currentPlan === "entreprise" ? "bg-purple-100 dark:bg-purple-900/30" :
               "bg-blue-100 dark:bg-blue-900/30"
             }`}>
-              {currentPlan === "entreprise" ? <Crown className="w-7 h-7 text-yellow-600" /> :
+              {currentPlan === "entreprise" ? <Crown className="w-7 h-7 text-purple-600" /> :
                <Zap className="w-7 h-7 text-blue-600" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Plan {getPlanLabel(currentPlan)}</h2>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Plan {getPlanLabel(currentPlan)}</h2>
                 {isTrial && <Badge variant="info">Essai gratuit</Badge>}
                 {isPending && <Badge variant="warning"><Clock className="w-3 h-3" /> {getSubscriptionStatusLabel("pending")}</Badge>}
                 {!isPending && isExpired && <Badge variant="error"><AlertCircle className="w-3 h-3" /> {getSubscriptionStatusLabel("expired")}</Badge>}
@@ -181,12 +239,15 @@ export default function SubscriptionPage() {
 
       {/* Bannière : paiement en attente de validation */}
       {isPending && (
-        <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="relative flex h-3 w-3 shrink-0 mt-1">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+          </span>
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Validation en attente</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              {"Nous avons bien reçu votre notification de paiement. L'administrateur validera votre abonnement sous peu. Vos fonctionnalités seront débloquées automatiquement après validation."}
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Activation en cours de traitement (Sous 15 minutes)</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              {"Votre paiement Wave est en cours de vérification. L'administrateur validera votre abonnement sous peu et vos fonctionnalités seront débloquées automatiquement."}
             </p>
           </div>
         </div>
@@ -194,124 +255,165 @@ export default function SubscriptionPage() {
 
       {/* Bannière : abonnement expiré */}
       {isExpired && !isPending && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800 dark:text-red-300">Abonnement expiré</p>
-            <p className="text-xs text-red-600 dark:text-red-400">
-              {"Votre abonnement a expiré. Réglez votre paiement via le lien Wave puis notifiez l'administrateur pour retrouver l'accès complet."}
+            <p className="text-sm font-semibold text-red-800 dark:text-red-300">Abonnement expiré</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+              {"Votre abonnement a expiré. Réglez votre paiement via Wave ci-dessous puis soumettez-le pour retrouver l'accès complet."}
             </p>
           </div>
         </div>
       )}
 
       {/* Plans */}
-      <div id="plans-section" className="grid grid-cols-1 md:grid-cols-2 gap-4 scroll-mt-4">
+      <div id="plans-section" className="grid grid-cols-1 md:grid-cols-2 gap-6 scroll-mt-4">
         {plans.map((plan) => {
           const isCurrent = currentPlan === plan.key;
           const Icon = plan.icon;
-          const waveUrl = getWavePayLink(plan.key);
+          const isHighlight = plan.key === "entreprise";
           return (
-            <Card
+            <div
               key={plan.key}
-              className={`p-3 relative border-t-4 ${
-                plan.color === "blue" ? "border-t-blue-500 dark:border-t-blue-400" :
-                "border-t-[var(--primary-color,#0C1C33)]"
-              } ${isCurrent ? "border-2 border-[var(--primary-color,#0C1C33)]" : ""} ${plan.key === "entreprise" ? "ring-2 ring-amber-200 dark:ring-amber-800" : ""}`}
+              className={`relative flex flex-col rounded-2xl bg-white dark:bg-slate-800 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl ${
+                isHighlight
+                  ? "border-2 border-purple-600 dark:border-purple-500 shadow-lg shadow-purple-200 dark:shadow-purple-900/30 hover:shadow-purple-300/60"
+                  : "border border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-slate-300/50"
+              }`}
             >
-              {plan.key === "entreprise" && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge variant="theme">Le plus choisi</Badge>
+              {isHighlight && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-purple-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-300">
+                  🔥 Le plus populaire
                 </div>
               )}
+
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{plan.name}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{plan.tagline}</p>
+                </div>
+                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${plan.iconClasses}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-baseline gap-1">
+                <span className="text-4xl font-extrabold text-slate-900 dark:text-white">{fmt(plan.price)}</span>
+                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/mois</span>
+              </div>
+
               {isCurrent && !isExpired && (
-                <div className="absolute -top-3 right-4">
+                <div className="mt-3">
                   <Badge variant="success"><Check className="w-3 h-3" /> Plan actuel</Badge>
                 </div>
               )}
 
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
-                plan.color === "blue" ? "bg-blue-100 dark:bg-blue-900/30" : "bg-[var(--primary-light,#F0F4FF)]"
-              }`}>
-                <Icon className={`w-6 h-6 ${
-                  plan.color === "blue" ? "text-blue-600" : "text-[var(--primary-color,#0C1C33)]"
-                }`} />
-              </div>
-
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{plan.name}</h3>
-              <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
-                {fmt(plan.price)}
-                <span className="text-sm font-normal text-slate-400 dark:text-slate-500">/mois</span>
-              </p>
-
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-6 flex-1 space-y-3">
                 {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <Check className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                    {feature}
+                  <li key={i} className="flex items-start gap-3">
+                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                      isHighlight ? "bg-purple-100 dark:bg-purple-900/40" : "bg-emerald-100 dark:bg-emerald-900/40"
+                    }`}>
+                      <Check className={`h-3 w-3 ${isHighlight ? "text-purple-600" : "text-emerald-600"}`} />
+                    </span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              <div className="mt-4 space-y-2">
-                {/* Lien de paiement Wave (semi-automatisé) */}
-                <a
-                  href={waveUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 w-full h-8 px-3 text-xs font-medium rounded-md bg-[var(--primary-color,#0C1C33)] text-[var(--primary-foreground,#ffffff)] hover:opacity-90 transition-all shadow-sm"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Payer {fmt(plan.price)} via Wave
-                </a>
-                {/* Confirmation après paiement -> notifie le Super Admin */}
+              {isPending ? (
+                pendingBadge
+              ) : (
                 <Button
-                  variant="outline"
-                  className="w-full"
-                  loading={notifying && confirmPlan === plan.key}
-                  disabled={isPending}
-                  onClick={() => setConfirmPlan(plan.key)}
+                  variant={isHighlight ? "purple" : "primary"}
+                  size="lg"
+                  className="mt-6 w-full"
+                  onClick={() => openPayment(plan.key)}
                 >
-                  <ShieldCheck className="w-4 h-4" />
-                  {isPending ? "Validation en attente" : "J'ai effectué le paiement, notifier l'administrateur"}
+                  <Smartphone className="w-4 h-4" />
+                  Payer via Wave
                 </Button>
-              </div>
-            </Card>
+              )}
+            </div>
           );
         })}
       </div>
 
-      {/* Modal de confirmation du paiement */}
+      {/* Paiement Wave — Confirmation moderne */}
       <Modal
         open={!!confirmPlan}
         onClose={() => setConfirmPlan(null)}
-        title="Confirmer votre paiement"
-        description={`Plan ${getPlanLabel(confirmPlan ?? "")} — ${fmt(getPlanPrice(confirmPlan ?? ""))}/mois`}
+        title="Paiement Wave sécurisé"
+        description="Réglez votre abonnement en 3 étapes rapides"
       >
-        <div className="space-y-3">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/20">
-            <ShieldCheck className="w-5 h-5 text-[var(--primary-color,#0C1C33)] shrink-0 mt-0.5" />
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              Avez-vous bien effectué le paiement de {fmt(getPlanPrice(confirmPlan ?? ""))} sur l&apos;application Wave ?
-              Votre abonnement passera en attente de validation et l&apos;administrateur sera notifié.
+        <div className="space-y-4">
+          {/* Récapitulatif plan / montant */}
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 p-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Plan {confirmLabel}</p>
+              <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">
+                {fmt(confirmPrice)}
+                <span className="text-sm font-normal text-slate-400 dark:text-slate-500">/mois</span>
+              </p>
+            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10">
+              <WaveIcon className="h-6 w-6 rounded-lg" />
+            </div>
+          </div>
+
+          {/* Accès au lien Wave */}
+          <div>
+            <a
+              href={waveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1C3AA9] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#162C85] hover:shadow-blue-900/30"
+            >
+              <WaveIcon className="bg-white/15" />
+              Payer avec l&apos;application Wave
+            </a>
+            <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+              Le lien s&apos;ouvre dans un nouvel onglet. Réglez exactement {fmt(confirmPrice)} sur Wave, puis revenez ici.
             </p>
           </div>
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/30 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Plan</span>
-              <span className="font-medium text-slate-900 dark:text-white">{getPlanLabel(confirmPlan ?? "")}</span>
+
+          {/* Vérification du transfert */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Vérification du transfert</p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 dark:text-slate-400">Montant payé</span>
-              <span className="font-bold text-[var(--primary-color,#0C1C33)]">{fmt(getPlanPrice(confirmPlan ?? ""))}</span>
-            </div>
+            <Input
+              label="Numéro de téléphone Wave expéditeur"
+              placeholder="+225 07 00 00 00 00"
+              value={senderPhone}
+              error={phoneError}
+              icon={<Smartphone className="h-4 w-4" />}
+              onChange={(e) => {
+                setSenderPhone(e.target.value);
+                if (phoneError) setPhoneError("");
+              }}
+              inputMode="tel"
+              autoComplete="tel"
+            />
+            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+              Le numéro qui a envoyé l&apos;argent est transmis à l&apos;administrateur pour accélérer la validation de votre abonnement.
+            </p>
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setConfirmPlan(null)}>Annuler</Button>
-            <Button className="flex-1" loading={notifying} onClick={() => confirmPlan && handleNotifyPayment(confirmPlan)}>
-              <Check className="w-4 h-4" /> Confirmer le paiement
-            </Button>
-          </div>
+
+          {/* Action principale */}
+          <Button
+            variant="purple"
+            size="lg"
+            className="w-full"
+            loading={notifying}
+            disabled={!confirmPlan}
+            onClick={handleSubmitPayment}
+          >
+            <Sparkles className="w-4 h-4" />
+            Soumettre pour activation rapide
+            <ArrowRight className="w-4 h-4" />
+          </Button>
         </div>
       </Modal>
     </div>

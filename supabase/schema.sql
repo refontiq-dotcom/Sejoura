@@ -264,6 +264,7 @@ CREATE TABLE subscription_payment_requests (
   requested_by    UUID REFERENCES users(id) ON DELETE SET NULL,
   validated_by    UUID REFERENCES users(id) ON DELETE SET NULL,
   validated_at    TIMESTAMPTZ,
+  sender_phone    TEXT,                 -- Numéro Wave expéditeur du paiement
   notes           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()

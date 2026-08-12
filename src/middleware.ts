@@ -78,12 +78,37 @@ export async function middleware(req: NextRequest) {
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
-    // Révocation immédiate si le compte est désactivé ou supprimé par l'employeur
-    if (!dbUser || dbUser.is_active === false) {
+    // Compte désactivé par l'employeur : révocation immédiate
+    if (dbUser && dbUser.is_active === false) {
       await supabase.auth.signOut();
       const redirectUrl = new URL("/employee-login", req.url);
       redirectUrl.searchParams.set("error", "revoked");
       return NextResponse.redirect(redirectUrl);
+    }
+
+    // Profil absent de la table `users`.
+    //  - Compte employé supprimé par l'employeur → révocation immédiate.
+    //  - Gérant fraîchement inscrit (étape 1 validée) : le profil n'est créé
+    //    qu'à l'étape 2 (onboarding /api/register) → on laisse passer uniquement
+    //    /dashboard pour qu'il puisse terminer la configuration de son espace.
+    if (!dbUser) {
+      const email = (user.email || "").toLowerCase();
+      const metaRole = user.user_metadata?.role;
+      const isEmployeeAccount =
+        email.includes("@employe.sejoura.com") ||
+        metaRole === "receptionniste" ||
+        metaRole === "menagere";
+
+      if (isEmployeeAccount) {
+        await supabase.auth.signOut();
+        const redirectUrl = new URL("/employee-login", req.url);
+        redirectUrl.searchParams.set("error", "revoked");
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      if (isDashboard && pathname !== "/dashboard") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
     }
 
     const role = dbUser?.role;

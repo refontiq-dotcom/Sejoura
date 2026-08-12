@@ -8,17 +8,19 @@ const ALLOWED_PLANS = ["essentiel", "entreprise", "standard", "enterprise"];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/subscription/notify-payment
-// Le gérant a effectué son paiement via le lien Wave (pay.wave.com) et clique
-// sur « J'ai effectué le paiement, notifier l'administrateur ».
+// Le gérant a effectué son paiement via le lien Wave (pay.wave.com) et soumet
+// « Soumettre pour activation rapide » avec son numéro Wave expéditeur.
 //
 // Effets :
 //   1. subscription_status -> 'pending' sur l'abonnement de l'établissement
 //   2. Création d'une demande de paiement (subscription_payment_requests)
+//      avec le numéro Wave expéditeur (sender_phone)
 //   3. Notification visuelle pour le Super Admin (validation à faire)
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const plan = typeof body.plan === "string" ? body.plan : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
 
   if (!ALLOWED_PLANS.includes(plan)) {
     return NextResponse.json({ error: "Plan invalide." }, { status: 400 });
@@ -27,6 +29,14 @@ export async function POST(request: Request) {
   const amount = getPlanPrice(plan);
   if (amount <= 0) {
     return NextResponse.json({ error: "Montant invalide pour ce plan." }, { status: 400 });
+  }
+
+  const digitsOnly = phone.replace(/\D/g, "");
+  if (!digitsOnly || digitsOnly.length < 8) {
+    return NextResponse.json(
+      { error: "Veuillez renseigner le numéro Wave ayant servi au paiement." },
+      { status: 400 }
+    );
   }
 
   const supabase = await createClient();
@@ -100,6 +110,7 @@ export async function POST(request: Request) {
       amount,
       status: "pending",
       requested_by: userData.id,
+      sender_phone: phone,
       notes: "Paiement déclaré par le gérant après paiement via lien Wave",
     })
     .select()
@@ -118,7 +129,7 @@ export async function POST(request: Request) {
     tenant_id: userData.tenant_id,
     user_id: null,
     title: "Nouvelle demande de validation d'abonnement",
-    message: `${companyName} a déclaré un paiement Wave pour la formule ${getPlanLabel(plan)} (${amount} FCFA). Validez l'abonnement.`,
+    message: `${companyName} a déclaré un paiement Wave pour la formule ${getPlanLabel(plan)} (${amount} FCFA) depuis le numéro ${phone}. Validez l'abonnement.`,
     type: "warning",
     link: "/admin",
   });

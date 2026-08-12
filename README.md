@@ -14,18 +14,25 @@ Déroulé :
 1. Sur la page `/dashboard/subscription`, le gérant choisit son forfait
    (Essentiel 15 000 FCFA ou Entreprise 55 000 FCFA) et clique sur
    « Payer via Wave » (lien `https://pay.wave.com/...` ouvert dans un nouvel onglet).
-2. Une fois le paiement effectué, il clique sur « J'ai effectué le paiement,
-   notifier l'administrateur » : la route `POST /api/subscription/notify-payment`
-   passe l'abonnement en `subscription_status = 'pending'` et crée une demande
-   dans `subscription_payment_requests` + une notification Super Admin.
+2. Une fois le paiement effectué, il revient dans la modal et saisit le
+   numéro Wave expéditeur puis clique sur « Soumettre pour activation rapide » :
+   la route `POST /api/subscription/notify-payment` passe l'abonnement en
+   `subscription_status = 'pending'` et crée une demande dans
+   `subscription_payment_requests` (avec le numéro expéditeur) + une
+   notification Super Admin.
 3. Sur la page `/admin`, le Super Admin voit un bandeau d'alerte et la section
-   « Gestion des Abonnements » (validations en attente). En cliquant sur
-   « Valider l'abonnement », la RPC `validate_subscription_payment` active
-   l'abonnement (+30 jours), débloque les interrupteurs et réactive les
-   utilisateurs de l'établissement.
+   « Gestion des Abonnements » (validations en attente, avec le numéro Wave du
+   gérant pour vérifier le transfert). En cliquant sur « Valider l'abonnement »,
+   la RPC `validate_subscription_payment` active l'abonnement (+30 jours),
+   débloque les interrupteurs et réactive les utilisateurs de l'établissement.
 
-Migration correspondante : `supabase/migrations/20260812_subscription_manual_payment_flow.sql`
-(idempotente, à appliquer via `npm run db:push` avec `DATABASE_URL`).
+Migrations correspondantes :
+- `supabase/migrations/20260812_subscription_manual_payment_flow.sql`
+  (table `subscription_payment_requests`, RLS, RPC `validate_subscription_payment`)
+- `supabase/migrations/20260813_subscription_payment_sender_phone.sql`
+  (colonne `sender_phone` sur `subscription_payment_requests`)
+
+Idempotentes, à appliquer via `npm run db:push` avec `DATABASE_URL`.
 
 Pour maintenir l'état `expired`, appeler périodiquement la fonction
 `sync_subscription_statuses()` (cron Supabase / edge function) : elle bascule en
