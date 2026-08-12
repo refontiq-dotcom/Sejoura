@@ -18,6 +18,19 @@ import { useCurrency } from "@/hooks/use-currency";
 import { useRouter } from "next/navigation";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
   Wallet,
   Plus,
   Loader2,
@@ -55,6 +68,7 @@ import {
   Wrench,
   Package,
   Megaphone,
+  PieChart as PieChartIcon,
 } from "lucide-react";
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
@@ -65,16 +79,45 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
   cancelled: "Annulée",
 };
 
-const EXPENSE_CATEGORIES = [
-  "salaries",
-  "utilities",
-  "maintenance",
-  "supplies",
-  "marketing",
-  "rent",
-  "taxes",
-  "other",
+const EXPENSE_CATEGORY_GROUPS: { group: string; items: { value: string; hint?: string }[] }[] = [
+  {
+    group: "Charges",
+    items: [
+      { value: "utilities", hint: "CIE, SODECI, Internet" },
+      { value: "rent", hint: "Loyer du local" },
+      { value: "taxes", hint: "Taxes & impôts" },
+    ],
+  },
+  {
+    group: "Opérationnel",
+    items: [
+      { value: "supplies", hint: "Blanchisserie, Produits d'entretien" },
+      { value: "maintenance", hint: "Maintenance & réparations" },
+      { value: "marketing", hint: "Marketing & publicité" },
+    ],
+  },
+  {
+    group: "Personnel",
+    items: [{ value: "salaries", hint: "Salaire, Avance, Prime" }],
+  },
+  {
+    group: "Autre sortie de caisse",
+    items: [{ value: "other", hint: "Autre dépense / sortie de caisse" }],
+  },
 ];
+
+const EXPENSE_CATEGORIES = EXPENSE_CATEGORY_GROUPS.flatMap((g) => g.items.map((i) => i.value));
+
+const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
+  salaries: "#0C1C33",
+  utilities: "#3b82f6",
+  maintenance: "#f59e0b",
+  supplies: "#10b981",
+  marketing: "#8b5cf6",
+  rent: "#c2944e",
+  taxes: "#ef4444",
+  other: "#64748b",
+};
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   salaries: Users,
@@ -404,6 +447,158 @@ function CategoryBreakdown({
   );
 }
 
+function compactAmount(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (abs >= 1000) return (n / 1000).toFixed(0).replace(/\.0$/, "") + "k";
+  return String(n);
+}
+
+function DailyCashFlowChart({
+  data,
+  fmt,
+}: {
+  data: { date: string; label: string; entrées: number; sorties: number }[];
+  fmt: (amount: number) => string;
+}) {
+  const hasData = data.some((d) => d.entrées > 0 || d.sorties > 0);
+  if (!hasData) {
+    return (
+      <div className="h-72 flex items-center justify-center text-sm text-slate-400 dark:text-slate-500">
+        Aucune donnée sur la période
+      </div>
+    );
+  }
+  return (
+    <div className="w-full h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={28}
+          />
+          <YAxis
+            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            width={52}
+            tickFormatter={compactAmount}
+          />
+          <Tooltip
+            formatter={(value, name) => [fmt(Number(value)), String(name)]}
+            labelFormatter={(label) => `Jour du ${String(label)}`}
+            contentStyle={{
+              borderRadius: 12,
+              border: "1px solid #e2e8f0",
+              fontSize: 12,
+              boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
+            }}
+          />
+          <Legend
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 12, color: "#64748b" }}
+          />
+          <Line
+            type="monotone"
+            dataKey="entrées"
+            name="Entrées (Recettes)"
+            stroke="#16a34a"
+            strokeWidth={2.5}
+            dot={{ r: 2.5, strokeWidth: 0, fill: "#16a34a" }}
+            activeDot={{ r: 5 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="sorties"
+            name="Sorties (Dépenses)"
+            stroke="#ef4444"
+            strokeWidth={2.5}
+            dot={{ r: 2.5, strokeWidth: 0, fill: "#ef4444" }}
+            activeDot={{ r: 5 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function CategoryPie({
+  items,
+  fmt,
+}: {
+  items: { category: string; amount: number }[];
+  fmt: (amount: number) => string;
+}) {
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const sorted = [...items].sort((a, b) => b.amount - a.amount).filter((i) => i.amount > 0);
+
+  if (sorted.length === 0) {
+    return (
+      <div className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">
+        Aucune dépense sur la période
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6">
+      <div className="relative w-48 h-48 flex-shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={sorted}
+              dataKey="amount"
+              nameKey="category"
+              innerRadius={55}
+              outerRadius={85}
+              paddingAngle={3}
+              stroke="none"
+            >
+              {sorted.map((entry) => (
+                <Cell key={entry.category} fill={EXPENSE_CATEGORY_COLORS[entry.category] || "#64748b"} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value, name) => [fmt(Number(value)), getExpenseCategoryLabel(String(name))]}
+              contentStyle={{
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+                fontSize: 12,
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <p className="text-xl font-bold text-slate-900 dark:text-white">{fmt(total)}</p>
+          <p className="text-[10px] uppercase tracking-wide text-slate-400">Total</p>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full space-y-2">
+        {sorted.map((it) => {
+          const pct = total > 0 ? (it.amount / total) * 100 : 0;
+          const color = EXPENSE_CATEGORY_COLORS[it.category] || "#64748b";
+          return (
+            <div key={it.category} className="flex items-center gap-2.5">
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className="text-sm text-slate-700 dark:text-slate-300 flex-1 truncate">
+                {getExpenseCategoryLabel(it.category)}
+              </span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">{fmt(it.amount)}</span>
+              <span className="text-xs text-slate-400 w-10 text-right">{pct.toFixed(0)}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PeriodSelector({
   startDate,
   endDate,
@@ -515,6 +710,8 @@ export default function AccountingPage() {
     expense_date: todayISO(),
     accommodation_id: "",
   });
+
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -737,7 +934,8 @@ export default function AccountingPage() {
   const totalRevenue = filteredPayments.filter((p) => p.amount > 0).reduce((s, p) => s + p.amount, 0);
   const cashOut = Math.abs(filteredPayments.filter((p) => p.amount < 0).reduce((s, p) => s + p.amount, 0));
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
-  const netProfit = totalRevenue - totalExpenses - cashOut;
+  const totalOutflows = totalExpenses + cashOut;
+  const netProfit = totalRevenue - totalOutflows;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
   // Période précédente (comparaison)
@@ -754,9 +952,16 @@ export default function AccountingPage() {
     () => expenses.filter((e) => inRange(e.expense_date, prevRange.start, prevRange.end)).reduce((s, e) => s + e.amount, 0),
     [expenses, prevRange]
   );
+  const prevOutflows = useMemo(
+    () =>
+      payments
+        .filter((p) => p.amount < 0 && inRange(p.payment_date, prevRange.start, prevRange.end))
+        .reduce((s, p) => s + Math.abs(p.amount), 0) + prevExpenses,
+    [payments, prevExpenses, prevRange]
+  );
 
   const revenueDelta = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : null;
-  const expenseDelta = prevExpenses > 0 ? ((totalExpenses - prevExpenses) / prevExpenses) * 100 : null;
+  const expenseDelta = prevOutflows > 0 ? ((totalOutflows - prevOutflows) / prevOutflows) * 100 : null;
 
   const byMethod = useMemo(() => {
     const map: Record<string, number> = {};
@@ -798,6 +1003,34 @@ export default function AccountingPage() {
     return Object.entries(map).map(([category, amount]) => ({ category, amount }));
   }, [filteredExpenses]);
 
+  const dailySeries = useMemo(() => {
+    const map: Record<string, { entrées: number; sorties: number }> = {};
+    let cursor = startDate;
+    let guard = 0;
+    while (cursor <= endDate && guard < 4000) {
+      map[cursor] = { entrées: 0, sorties: 0 };
+      const [y, m, d] = cursor.split("-").map(Number);
+      cursor = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().split("T")[0];
+      guard++;
+    }
+    filteredPayments.forEach((p) => {
+      const k = p.payment_date.slice(0, 10);
+      if (map[k]) {
+        if (p.amount > 0) map[k].entrées += p.amount;
+        else map[k].sorties += Math.abs(p.amount);
+      }
+    });
+    filteredExpenses.forEach((e) => {
+      if (map[e.expense_date]) map[e.expense_date].sorties += e.amount;
+    });
+    return Object.entries(map).map(([date, v]) => ({
+      date,
+      label: `${date.slice(8, 10)}/${date.slice(5, 7)}`,
+      entrées: v.entrées,
+      sorties: v.sorties,
+    }));
+  }, [filteredPayments, filteredExpenses, startDate, endDate]);
+
   const hasAccess = canAccessPlanFeature(plan, "advancedAccounting");
 
   // ============================================================================
@@ -829,6 +1062,10 @@ export default function AccountingPage() {
   }
 
   async function handleSaveExpense() {
+    if (!expenseForm.category) {
+      toast.error("Veuillez choisir une catégorie.");
+      return;
+    }
     if (!expenseForm.description.trim()) {
       toast.error("Veuillez indiquer une description.");
       return;
@@ -975,6 +1212,37 @@ export default function AccountingPage() {
     toast.success("Export CSV réussi");
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    try {
+      const res = await fetch("/api/accounting/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start: startDate, end: endDate }),
+      });
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast.error(errData?.error || "Impossible de générer le rapport PDF.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `rapport-financier_${startDate}_${endDate}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Rapport financier PDF généré");
+    } catch (err) {
+      console.error(err);
+      toast.error("Impossible de générer le rapport PDF.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   // ============================================================================
   // Rendu
   // ============================================================================
@@ -1072,8 +1340,14 @@ export default function AccountingPage() {
           <KpiCard
             icon={TrendingDown}
             label="Dépenses"
-            value={fmt(totalExpenses)}
-            sub={cashOut > 0 ? `dont ${fmt(cashOut)} de sorties de caisse` : "charges de la période"}
+            value={fmt(totalOutflows)}
+            sub={
+              totalExpenses > 0 && cashOut > 0
+                ? `charges ${fmt(totalExpenses)} · sorties de caisse ${fmt(cashOut)}`
+                : cashOut > 0
+                  ? `dont ${fmt(cashOut)} de sorties de caisse`
+                  : "charges de la période"
+            }
             tone="red"
             delta={expenseDelta}
           />
@@ -1151,6 +1425,18 @@ export default function AccountingPage() {
         {/* ============ VUE D'ENSEMBLE ============ */}
         {activeTab === "overview" && (
           <div className="space-y-3">
+            <Card className="p-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ArrowLeftRight className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Entrées vs Sorties (jour par jour)
+                </h2>
+                <span className="text-xs text-slate-400">
+                  {formatDate(startDate)} → {formatDate(endDate)}
+                </span>
+              </div>
+              <DailyCashFlowChart data={dailySeries} fmt={fmt} />
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <Card className="p-3">
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
@@ -1274,7 +1560,10 @@ export default function AccountingPage() {
                   <ArrowLeftRight className="w-3.5 h-3.5" /> Caisse du jour
                 </Button>
               </div>
-              <div className="lg:ml-auto">
+              <div className="lg:ml-auto flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2">
+                  <FileText className="w-4 h-4" /> Rapport Financier PDF
+                </Button>
                 <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2" disabled={filteredPayments.length === 0}>
                   <Download className="w-4 h-4" /> Exporter CSV
                 </Button>
@@ -1363,7 +1652,17 @@ export default function AccountingPage() {
 
         {/* ============ DÉPENSES ============ */}
         {activeTab === "expenses" && (
-          <Card className="overflow-hidden">
+          <div className="space-y-3">
+            {categoryBreakdown.length > 0 && (
+              <Card className="p-3">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <PieChartIcon className="w-4 h-4 text-red-600" /> Où va le budget (par catégorie)
+                </h2>
+                <CategoryPie items={categoryBreakdown} fmt={fmt} />
+              </Card>
+            )}
+
+            <Card className="overflow-hidden">
             <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex flex-col lg:flex-row gap-2 lg:items-center bg-white dark:bg-slate-800">
               <div className="flex gap-2 flex-wrap items-center">
                 <div className="relative">
@@ -1392,7 +1691,10 @@ export default function AccountingPage() {
                   <Plus className="w-3.5 h-3.5" /> Ajouter
                 </Button>
               </div>
-              <div className="lg:ml-auto">
+              <div className="lg:ml-auto flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2">
+                  <FileText className="w-4 h-4" /> Rapport Financier PDF
+                </Button>
                 <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2" disabled={filteredExpenses.length === 0}>
                   <Download className="w-4 h-4" /> Exporter CSV
                 </Button>
@@ -1478,6 +1780,7 @@ export default function AccountingPage() {
               </div>
             )}
           </Card>
+          </div>
         )}
 
         {/* ============ FACTURES ============ */}
@@ -1737,28 +2040,38 @@ export default function AccountingPage() {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Catégorie
+              Catégorie <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {EXPENSE_CATEGORIES.map((cat) => {
-                const Icon = CATEGORY_ICONS[cat] || Coins;
-                const active = expenseForm.category === cat;
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setExpenseForm({ ...expenseForm, category: cat })}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                      active
-                        ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]"
-                        : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {getExpenseCategoryLabel(cat)}
-                  </button>
-                );
-              })}
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+              {EXPENSE_CATEGORY_GROUPS.map((g) => (
+                <div key={g.group}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">{g.group}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {g.items.map((item) => {
+                      const Icon = CATEGORY_ICONS[item.value] || Coins;
+                      const active = expenseForm.category === item.value;
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => setExpenseForm({ ...expenseForm, category: item.value })}
+                          className={`flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                            active
+                              ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]"
+                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Icon className="w-4 h-4" />
+                            {getExpenseCategoryLabel(item.value)}
+                          </span>
+                          {item.hint && <span className="text-[10px] font-normal text-slate-400">{item.hint}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
