@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { Building2, MapPin, Home, Loader2 } from "lucide-react";
+import { Building2, MapPin, Home, Loader2, User, Phone, Globe2, Check } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
+import { createClient } from "@/lib/supabase/client";
+import { SUPPORTED_COUNTRIES } from "@/lib/countries";
+import { getCitiesForCountry } from "@/lib/cities";
 
 interface OnboardingModalProps {
   userId: string;
@@ -15,15 +18,57 @@ interface OnboardingModalProps {
 }
 
 export function OnboardingModal({ userId, email, fullName, userRole, onComplete }: OnboardingModalProps) {
+  const { lang } = useLanguage();
+  const t = translations[lang].onboarding;
+  const [formFullName, setFormFullName] = useState(fullName || "");
+  const [residenceName, setResidenceName] = useState("");
+  const [residenceType, setResidenceType] = useState("bnb");
+  const [residenceLocation, setResidenceLocation] = useState("");
+  const [country, setCountry] = useState("Côte d'Ivoire");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const cityRef = useRef<HTMLDivElement>(null);
+
+  // Fermer l'autocomplétion ville lors d'un clic extérieur
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (cityRef.current && !cityRef.current.contains(e.target as Node)) {
+        setCityOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   if (userRole && userRole !== "admin_residence") {
     return null;
   }
-  const { lang } = useLanguage();
-  const t = translations[lang].onboarding;
-  const [residenceName, setResidenceName] = useState("");
-  const [residenceType, setResidenceType] = useState("");
-  const [residenceLocation, setResidenceLocation] = useState("");
-  const [loading, setLoading] = useState(false);
+
+  function handleCountryChange(countryName: string) {
+    setCountry(countryName);
+    setResidenceLocation("");
+    setCityOpen(false);
+    const matched = SUPPORTED_COUNTRIES.find((c) => c.name === countryName);
+    if (matched) {
+      // Pré-remplir l'indicatif téléphonique si le champ est vide
+      // ou s'il ne commence pas déjà par le bon indicatif.
+      setPhone((prev) =>
+        prev && prev.trim() !== "" && !prev.startsWith(matched.phoneCode)
+          ? `${matched.phoneCode} `
+          : prev && prev.trim() !== ""
+            ? prev
+            : `${matched.phoneCode} `
+      );
+    }
+  }
+
+  const cities = getCitiesForCountry(country);
+  const cityQuery = residenceLocation.trim().toLowerCase();
+  const hasExactCityMatch = cities.some((c) => c.toLowerCase() === cityQuery);
+  const filteredCities = cities.filter(
+    (c) => c.toLowerCase().includes(cityQuery) && c.toLowerCase() !== cityQuery
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,12 +83,13 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
         body: JSON.stringify({
           userId,
           email,
-          fullName,
+          fullName: formFullName,
           residenceName,
           residenceType,
           residenceLocation,
-          phone: "",
-          plan: "standard",
+          country,
+          phone,
+          plan: "free",
         }),
       });
 
@@ -52,6 +98,24 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
         toast.error(data.error || t.error);
         setLoading(false);
         return;
+      }
+
+      // Synchroniser les métadonnées du compte avec les informations saisies
+      try {
+        const supabase = createClient();
+        await supabase.auth.updateUser({
+          data: {
+            role: "admin_residence",
+            full_name: formFullName,
+            residence_name: residenceName,
+            residence_type: residenceType,
+            residence_location: residenceLocation,
+            country,
+            phone,
+          },
+        });
+      } catch {
+        // Non bloquant : les métadonnées ne sont qu'un cache des infos de profil
       }
 
       toast.success(t.success);
@@ -63,13 +127,18 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
     }
   }
 
+  const inputClass =
+    "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm";
+  const labelClass =
+    "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop blur & dark overlay */}
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700">
+      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
         {/* Beautiful organic header */}
         <div className="relative bg-[var(--primary-color,#0C1C33)] p-6 text-white text-center">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -91,7 +160,23 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className={labelClass}>
+                <User className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
+                {t.fullName} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                autoComplete="off"
+                value={formFullName}
+                onChange={(e) => setFormFullName(e.target.value)}
+                placeholder="ex: Jean Kouassi"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
                 <Home className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceName} <span className="text-red-500">*</span>
               </label>
@@ -101,40 +186,112 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
                 autoComplete="off"
                 value={residenceName}
                 onChange={(e) => setResidenceName(e.target.value)}
-                placeholder="ex: Hôtel Les Acacias"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
+                placeholder="ex: Résidence Riviera Luxe"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className={labelClass}>
                 <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceType} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 required
                 autoComplete="off"
                 value={residenceType}
                 onChange={(e) => setResidenceType(e.target.value)}
-                placeholder="ex: Appartements meublés, 5 unités"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
-              />
+                className={inputClass}
+              >
+                <option value="bnb">{t.typeBnb}</option>
+                <option value="hotel">{t.typeHotel}</option>
+              </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <label className={labelClass}>
                 <MapPin className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceLocation} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+              <div className="relative" ref={cityRef}>
+                <input
+                  type="text"
+                  required
+                  autoComplete="off"
+                  value={residenceLocation}
+                  onChange={(e) => {
+                    setResidenceLocation(e.target.value);
+                    setCityOpen(true);
+                  }}
+                  onFocus={() => setCityOpen(true)}
+                  placeholder="ex: Cocody, Abidjan"
+                  className={inputClass}
+                />
+                {cityOpen && (residenceLocation.trim() !== "" || filteredCities.length > 0) && (
+                  <ul className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg max-h-48 overflow-y-auto py-1">
+                    {filteredCities.slice(0, 8).map((city) => (
+                      <li key={city}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-3.5 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between gap-2"
+                          onClick={() => {
+                            setResidenceLocation(city);
+                            setCityOpen(false);
+                          }}
+                        >
+                          <span>{city}</span>
+                          <Check className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)] shrink-0" />
+                        </button>
+                      </li>
+                    ))}
+                    {residenceLocation.trim() !== "" && !hasExactCityMatch && (
+                      <li className="border-t border-slate-100 dark:border-slate-700">
+                        <button
+                          type="button"
+                          className="w-full text-left px-3.5 py-2 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          onClick={() => setCityOpen(false)}
+                        >
+                          {t.useCity.replace("{city}", residenceLocation)}
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                <Globe2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
+                {t.country} <span className="text-red-500">*</span>
+              </label>
+              <select
                 required
                 autoComplete="off"
-                value={residenceLocation}
-                onChange={(e) => setResidenceLocation(e.target.value)}
-                placeholder="ex: Cocody, Abidjan"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm"
+                value={country}
+                onChange={(e) => handleCountryChange(e.target.value)}
+                className={inputClass}
+              >
+                {SUPPORTED_COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.name}>
+                    {c.flag} {c.name} ({c.phoneCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                <Phone className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
+                {t.phone}
+              </label>
+              <input
+                type="tel"
+                autoComplete="off"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+225 00 00 00 00 00"
+                className={inputClass}
               />
             </div>
           </div>

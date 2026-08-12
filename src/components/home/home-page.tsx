@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,12 +10,10 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { PasswordStrength } from "@/components/auth/password-strength";
 import { toast } from "sonner";
 import {
-  Hotel,
   Menu,
   X,
   Moon,
   Sun,
-  ShieldCheck,
   Lock,
   Eye,
   EyeOff,
@@ -27,10 +25,12 @@ import {
   Users,
   BarChart3,
   CreditCard,
-  Globe,
   Server,
   Palette,
   MessageCircle,
+  DoorOpen,
+  Sparkles,
+  Store,
 } from "lucide-react";
 
 type Lang = "fr" | "en";
@@ -39,7 +39,7 @@ const messages: Record<Lang, Record<string, string>> = {
   fr: {
     // Header
     navFeatures: "Fonctionnalités",
-    navModules: "Modules & Innovations",
+    navModules: "Fonctions Entreprise",
     navPricing: "Tarifs",
     navFaq: "FAQ",
     contactTeam: "Contacter l'équipe",
@@ -62,16 +62,9 @@ const messages: Record<Lang, Record<string, string>> = {
     rememberMe: "Se souvenir de moi",
     forgotPassword: "Mot de passe oublié ?",
     loginBtn: "Se connecter",
-    establishmentName: "Nom de l'établissement",
-    establishmentType: "Type d'établissement",
-    typeBnb: "Résidence Meublée (BnB)",
-    typeHotel: "Hôtel",
-    fullName: "Nom complet",
-    city: "Ville / Localisation",
-    phone: "Téléphone",
     confirmPassword: "Confirmer le mot de passe",
     signUpBtn: "S'inscrire (Essai gratuit)",
-    noCardRequired: "Sans carte bancaire requise.",
+    noCardRequired: "Sans carte bancaire requise. 1 mois offert.",
     acceptTerms: "J'accepte les",
     terms: "CGU",
     privateInfo: "Vos informations restent privées",
@@ -85,8 +78,7 @@ const messages: Record<Lang, Record<string, string>> = {
     passwordShort: "Le mot de passe doit comporter au moins 6 caractères.",
     passwordMismatch: "Les mots de passe ne correspondent pas.",
     termsError: "Vous devez accepter les conditions d'utilisation.",
-    fullNameRequired: "Le nom complet est requis.",
-    cityRequired: "La ville est requise.",
+    verifyEmail: "Compte créé ! Vérifiez votre e-mail pour activer votre compte.",
     loginError: "Adresse e-mail ou mot de passe incorrect.",
     signupError: "Une erreur est survenue lors de l'inscription.",
     generalError: "Une erreur est survenue. Veuillez réessayer.",
@@ -102,13 +94,13 @@ const messages: Record<Lang, Record<string, string>> = {
     themeToggle: "Changer le thème",
     menuToggle: "Ouvrir le menu",
     features: "Fonctionnalités",
-    modules: "Modules & Innovations",
+    modules: "Fonctions Entreprise",
     pricing: "Tarifs",
     faq: "FAQ",
   },
   en: {
     navFeatures: "Features",
-    navModules: "Modules & Innovations",
+    navModules: "Entreprise Features",
     navPricing: "Pricing",
     navFaq: "FAQ",
     contactTeam: "Contact Team",
@@ -129,16 +121,9 @@ const messages: Record<Lang, Record<string, string>> = {
     rememberMe: "Remember me",
     forgotPassword: "Forgot password?",
     loginBtn: "Sign in",
-    establishmentName: "Establishment name",
-    establishmentType: "Establishment type",
-    typeBnb: "Furnished Residence (BnB)",
-    typeHotel: "Hotel",
-    fullName: "Full name",
-    city: "City / Location",
-    phone: "Phone",
     confirmPassword: "Confirm password",
     signUpBtn: "Sign up (Free trial)",
-    noCardRequired: "No credit card required.",
+    noCardRequired: "No credit card required. 1 month free.",
     acceptTerms: "I accept the",
     terms: "Terms",
     privateInfo: "Your information stays private",
@@ -149,8 +134,7 @@ const messages: Record<Lang, Record<string, string>> = {
     passwordShort: "Password must be at least 6 characters.",
     passwordMismatch: "Passwords do not match.",
     termsError: "You must accept the terms and conditions.",
-    fullNameRequired: "Full name is required.",
-    cityRequired: "City is required.",
+    verifyEmail: "Account created! Check your email to activate your account.",
     loginError: "Incorrect email or password.",
     signupError: "An error occurred during registration.",
     generalError: "An error occurred. Please try again.",
@@ -165,7 +149,7 @@ const messages: Record<Lang, Record<string, string>> = {
     themeToggle: "Toggle theme",
     menuToggle: "Open menu",
     features: "Features",
-    modules: "Modules & Innovations",
+    modules: "Entreprise Features",
     pricing: "Pricing",
     faq: "FAQ",
   },
@@ -186,17 +170,18 @@ export function HomePage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionName>(null);
-  const [mounted, setMounted] = useState(false);
+
+  // Hydration-safe detection du montage côté client (SSR)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Form state
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [establishmentName, setEstablishmentName] = useState("");
-  const [establishmentType, setEstablishmentType] = useState("bnb");
-  const [city, setCity] = useState("");
-  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -204,19 +189,12 @@ export function HomePage() {
     email?: string;
     password?: string;
     confirmPassword?: string;
-    fullName?: string;
-    city?: string;
   }>({});
 
   // Modal focus trap refs
   const modalRef = useRef<HTMLDivElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-
-  // Mount skip link after hydration to avoid SSR mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Close modal on Escape
   useEffect(() => {
@@ -360,11 +338,9 @@ export function HomePage() {
     clearErrors();
 
     const newErrors: typeof errors = {};
-    if (!fullName.trim()) newErrors.fullName = t.fullNameRequired;
     if (!isValidEmail(email)) newErrors.email = t.emailInvalid;
     if (password.length < 6) newErrors.password = t.passwordShort;
     if (password !== confirmPassword) newErrors.confirmPassword = t.passwordMismatch;
-    if (!city.trim()) newErrors.city = t.cityRequired;
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -381,16 +357,12 @@ export function HomePage() {
 
     try {
       const supabase = createClient();
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName,
-            residence_name: establishmentName,
-            residence_type: establishmentType,
-            residence_location: city,
-            phone: phone,
+            role: "admin_residence",
           },
         },
       });
@@ -401,39 +373,23 @@ export function HomePage() {
         return;
       }
 
-      if (authData.user) {
-        // Call the register API to create tenant, subscription, accommodation, and user profile
-        try {
-          await fetch("/api/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email,
-              fullName,
-              residenceName: establishmentName,
-              residenceType: establishmentType,
-              residenceLocation: city,
-              phone,
-              plan: "standard",
-            }),
-          });
-        } catch {
-          // Registration API might fail if session isn't ready yet; user can retry later
-        }
-
+      if (data.session) {
+        // Compte créé et connecté : l'étape 2 (configuration de l'établissement)
+        // s'affiche automatiquement dans le tableau de bord.
         toast.success(t.signupSuccess);
-        setFullName("");
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setEstablishmentName("");
-        setCity("");
-        setPhone("");
-        setAgreeTerms(false);
-        setErrors({});
-        setMode("login");
         setLoading(false);
+        setTimeout(() => router.push("/dashboard"), 800);
+        return;
       }
+
+      // Confirmation par e-mail requise
+      toast.success(t.verifyEmail);
+      setPassword("");
+      setConfirmPassword("");
+      setAgreeTerms(false);
+      setErrors({});
+      setMode("login");
+      setLoading(false);
     } catch {
       toast.error(t.generalError);
       setLoading(false);
@@ -456,6 +412,14 @@ export function HomePage() {
                 lang === "fr"
                   ? "Enregistrez chaque réservation et voyez en un coup d'œil qui arrive, qui part, et quelles chambres sont libres."
                   : "Record each reservation and see at a glance who arrives, who leaves, and which rooms are available.",
+            },
+            {
+              icon: DoorOpen,
+              title: lang === "fr" ? "Check-in / Check-out" : "Check-in / Check-out",
+              desc:
+                lang === "fr"
+                  ? "Accueillez vos clients à l'arrivée, enregistrez leur pièce d'identité et finalisez le départ en quelques secondes."
+                  : "Welcome your clients on arrival, record their ID and complete the departure in a few seconds.",
             },
             {
               icon: Wallet,
@@ -486,8 +450,8 @@ export function HomePage() {
               title: lang === "fr" ? "Gestion des équipes" : "Team management",
               desc:
                 lang === "fr"
-                  ? "Organisez les horaires de votre personnel (qui travaille quand) sans confusion ni oubli."
-                  : "Organize your staff schedules without confusion or forgetting.",
+                  ? "Créez des comptes pour vos réceptionnistes et ménagères : chacun se connecte avec un code personnel."
+                  : "Create accounts for your receptionists and cleaners: each one signs in with a personal PIN.",
             },
             {
               icon: BarChart3,
@@ -509,30 +473,44 @@ export function HomePage() {
             </li>
           ))}
         </ul>
+        <p className="text-xs text-slate-500 dark:text-[#a0a0a0] border-t border-slate-200 dark:border-[#404040] pt-3">
+          {lang === "fr"
+            ? "Ménage automatique et vitrine Trouvetou : inclus avec le plan Entreprise."
+            : "Automatic cleaning and the Trouvetou showcase: included with the Entreprise plan."}
+        </p>
       </div>
     ),
     Modules: (
       <div className="space-y-3">
         <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
-          {lang === "fr" ? "Fonctions avancées (Plan Enterprise)" : "Advanced features (Enterprise Plan)"}
+          {lang === "fr" ? "Fonctions avancées (Plan Entreprise)" : "Advanced features (Entreprise Plan)"}
         </h4>
         <ul className="space-y-3 text-sm">
           {[
             {
-              icon: CreditCard,
-              title: lang === "fr" ? "Paiement en ligne automatique" : "Automatic online payment",
+              icon: Building2,
+              title:
+                lang === "fr" ? "Établissements illimités" : "Unlimited establishments",
               desc:
                 lang === "fr"
-                  ? "Vos clients paient directement par Mobile Money ou Wave depuis leur téléphone, et l'argent est enregistré automatiquement dans Séjoura."
-                  : "Your clients pay directly via Mobile Money or Wave from their phone, automatically recorded in Séjoura.",
+                  ? "Gérez plusieurs résidences ou hôtels : les chiffres de tous vos établissements se retrouvent sur un seul écran."
+                  : "Manage several residences or hotels: all your establishments' figures appear on one screen.",
             },
             {
-              icon: Globe,
-              title: lang === "fr" ? "Moteur de réservation en ligne" : "Online booking engine",
+              icon: Sparkles,
+              title: lang === "fr" ? "Module Ménage automatique" : "Automatic cleaning",
               desc:
                 lang === "fr"
-                  ? "Un bouton ou un lien « Réserver » à ajouter sur votre site déjà existant."
-                  : "A \"Book\" button or link to add to your existing website.",
+                  ? "Le départ d'un client crée automatiquement la tâche de nettoyage, partagée entre vos ménagères jusqu'à la remise en service de la chambre."
+                  : "A client checkout automatically creates the cleaning task, shared among your cleaners until the room is ready again.",
+            },
+            {
+              icon: Store,
+              title: lang === "fr" ? "Vitrine Trouvetou" : "Trouvetou showcase",
+              desc:
+                lang === "fr"
+                  ? "Publiez vos logements sur Trouvetou et recevez les demandes de réservation directement sur WhatsApp."
+                  : "Publish your units on Trouvetou and receive booking requests directly on WhatsApp.",
             },
             {
               icon: Server,
@@ -547,26 +525,16 @@ export function HomePage() {
               title: lang === "fr" ? "Marque blanche" : "White label",
               desc:
                 lang === "fr"
-                  ? "Vos clients voient votre logo et vos couleurs, jamais le nom « Séjoura »."
-                  : "Your clients see your logo and colors, never the name \"Séjoura\".",
+                  ? "Personnalisez l'application avec votre logo et vos couleurs pour vos équipes et vos clients."
+                  : "Customize the app with your logo and colors for your teams and clients.",
             },
             {
-              icon: Building2,
-              title:
-                lang === "fr" ? "Vue multi-établissements" : "Multi-establishment overview",
+              icon: CreditCard,
+              title: lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment",
               desc:
                 lang === "fr"
-                  ? "Si vous gérez plusieurs résidences ou hôtels, voyez les chiffres de tous vos établissements sur un seul écran."
-                  : "If you manage multiple residences or hotels, see all your establishments' figures on one screen.",
-            },
-            {
-              icon: ShieldCheck,
-              title:
-                lang === "fr" ? "Sécurité aux normes bancaires (UMOA)" : "Bank-grade security (UMOA)",
-              desc:
-                lang === "fr"
-                  ? "Vos transactions respectent les mêmes règles de sécurité que les banques de la région."
-                  : "Your transactions follow the same security rules as regional banks.",
+                  ? "Réglez votre abonnement en ligne par Wave depuis votre téléphone, sans carte bancaire."
+                  : "Pay your subscription online by Wave from your phone, no credit card required.",
             },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3">
@@ -587,14 +555,22 @@ export function HomePage() {
         <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
           {lang === "fr" ? "Des tarifs simples. Zéro piège." : "Simple pricing. No tricks."}
         </h4>
+        <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300 mb-5">
+          <Check className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            {lang === "fr"
+              ? "1 mois offert à l'inscription, sans carte bancaire. Annulable à tout moment."
+              : "1 month free at signup, no credit card required. Cancel anytime."}
+          </span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Standard */}
+          {/* Essentiel */}
           <div className="bg-slate-50 dark:bg-[#262626]/60 p-6 rounded-2xl border border-slate-200 dark:border-[#404040]">
             <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl">
-              {lang === "fr" ? "Standard" : "Standard"}
+              {lang === "fr" ? "Essentiel" : "Essentiel"}
             </h5>
             <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
-              {lang === "fr" ? "5 établissements maximum" : "Up to 5 establishments"}
+              {lang === "fr" ? "1 établissement maximum" : "Up to 1 establishment"}
             </p>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
               15 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
@@ -606,25 +582,25 @@ export function HomePage() {
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "10 unités maximum" : "Up to 10 units"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Réservations et check-in/out" : "Reservations and check-in/out"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Comptabilité de base" : "Basic accounting"}
               </li>
-              <li className="flex items-start">
-                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Support par email" : "Email support"}
-              </li>
             </ul>
           </div>
-          {/* Enterprise */}
+          {/* Entreprise */}
           <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border-2 border-blue-500 shadow-lg shadow-blue-100 dark:shadow-blue-900/20 relative">
             <span className="absolute -top-3 left-6 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
               {lang === "fr" ? "Le plus choisi" : "Most chosen"}
             </span>
             <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl mt-1">
-              Enterprise
+              Entreprise
             </h5>
             <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
               {lang === "fr" ? "Établissements illimités & API" : "Unlimited establishments & API"}
@@ -639,15 +615,15 @@ export function HomePage() {
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Module ménage & statistiques avancées" : "Cleaning module & advanced statistics"}
+                {lang === "fr" ? "Module ménage automatique & vitrine Trouvetou" : "Automatic cleaning & Trouvetou showcase"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Passerelles Wave & PI-SPI" : "Wave & PI-SPI gateways"}
+                {lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Marque blanche, API & WhatsApp Business" : "White label, API & WhatsApp Business"}
+                {lang === "fr" ? "Marque blanche, API & notifications WhatsApp" : "White label, API & WhatsApp notifications"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
@@ -680,25 +656,32 @@ export function HomePage() {
                   : "No. Séjoura charges no fees to start. You only pay your monthly subscription.",
             },
             {
-              q: lang === "fr" ? "Différence entre les deux offres ?" : "Difference between the two plans?",
+              q: lang === "fr" ? "L'essai gratuit dure combien de temps ?" : "How long is the free trial?",
               a:
                 lang === "fr"
-                  ? "Le plan Standard (15 000 FCFA/mois) convient jusqu'à 5 établissements avec 1 admin et 1 réceptionniste. Le plan Enterprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage, les statistiques avancées, les passerelles de paiement Wave & PI-SPI, la marque blanche, l'API WhatsApp Business et un support dédié 24/7."
-                  : "The Standard plan (15,000 FCFA/month) suits up to 5 establishments with 1 admin and 1 receptionist. The Enterprise plan (55,000 FCFA/month) adds unlimited establishments, cleaning module, advanced statistics, Wave & PI-SPI payment gateways, white label, WhatsApp Business API and dedicated 24/7 support.",
+                  ? "1 mois offert dès l'inscription, sans carte bancaire et sans engagement. À la fin de l'essai, vous choisissez l'offre Essentiel (15 000 FCFA/mois) ou Entreprise (55 000 FCFA/mois)."
+                  : "1 month free at signup, no credit card and no commitment. At the end of the trial, you choose Essentiel (15,000 XOF/month) or Entreprise (55,000 XOF/month).",
+            },
+            {
+              q: lang === "fr" ? "Différence entre les offres ?" : "Difference between the plans?",
+              a:
+                lang === "fr"
+                  ? "Le plan Essentiel (15 000 FCFA/mois) convient jusqu'à 1 établissement avec 1 admin et 1 réceptionniste. Le plan Entreprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage automatique, la vitrine Trouvetou, le paiement en ligne Wave, la marque blanche, l'accès API et un support dédié 24/7."
+                  : "The Essentiel plan (15,000 XOF/month) suits up to 1 establishment with 1 admin and 1 receptionist. The Entreprise plan (55,000 XOF/month) adds unlimited establishments, automatic cleaning, the Trouvetou showcase, Wave online payment, white label, API access and dedicated 24/7 support.",
             },
             {
               q: lang === "fr" ? "Comment mes clients paient-ils ?" : "How do my clients pay?",
               a:
                 lang === "fr"
-                  ? "Avec le plan Standard : en espèces ou par Mobile Money directement avec vous. Avec le plan Enterprise : directement en ligne par Mobile Money ou Wave, encaissé et suivi automatiquement."
-                  : "With Standard: in cash or via Mobile Money directly with you. With Enterprise: directly online via Mobile Money or Wave, automatically collected and tracked.",
+                  ? "Vos clients paient en espèces ou par Mobile Money (Orange, MTN, Moov, Wave) directement avec vous — vous enregistrez le paiement dans Séjoura en un clic. Le paiement en ligne par vos clients arrivera bientôt avec le plan Entreprise."
+                  : "Your clients pay in cash or via Mobile Money (Orange, MTN, Moov, Wave) directly with you — you record the payment in Séjoura in one click. Online payment by your clients is coming soon with the Entreprise plan.",
             },
             {
               q: lang === "fr" ? "Ai-je besoin d'un site web ?" : "Do I need a website?",
               a:
                 lang === "fr"
-                  ? "Non. Séjoura fonctionne même sans site web. Si vous avez déjà un site, on peut y ajouter un simple bouton de réservation."
-                  : "No. Séjoura works even without a website. If you have one, we can add a simple booking button.",
+                  ? "Non. Séjoura fonctionne même sans site web. Avec le plan Entreprise, votre site peut se connecter à Séjoura pour vérifier les disponibilités et créer des réservations."
+                  : "No. Séjoura works even without a website. With the Entreprise plan, your site can connect to Séjoura to check availability and create bookings.",
             },
             {
               q: lang === "fr" ? "Mes données sont-elles en sécurité ?" : "Is my data safe?",
@@ -1121,119 +1104,11 @@ export function HomePage() {
                     {t.createAccount}
                   </h2>
                   <form onSubmit={handleSignUp} className="space-y-2.5 mt-2" noValidate>
-                    <div>
-                      <label
-                        htmlFor="signup-fullname"
-                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
-                      >
-                        {t.fullName}
-                      </label>
-                      <input
-                        id="signup-fullname"
-                        name="fullName"
-                        type="text"
-                        autoComplete="name"
-                        required
-                        value={fullName}
-                        onChange={(e) => {
-                          setFullName(e.target.value);
-                          clearErrors();
-                        }}
-                        placeholder="Jean Kouassi"
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
-                          errors.fullName
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-slate-200 dark:border-[#404040]"
-                        }`}
-                      />
-                      {errors.fullName && (
-                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.fullName}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="signup-establishment"
-                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
-                      >
-                        {t.establishmentName}
-                      </label>
-                      <input
-                        id="signup-establishment"
-                        name="establishmentName"
-                        type="text"
-                        required
-                        value={establishmentName}
-                        onChange={(e) => setEstablishmentName(e.target.value)}
-                        placeholder={lang === "fr" ? "Ex: Résidence Riviera Luxe" : "Ex: Riviera Luxe Residence"}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="signup-type"
-                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
-                      >
-                        {t.establishmentType}
-                      </label>
-                      <select
-                        id="signup-type"
-                        name="establishmentType"
-                        required
-                        value={establishmentType}
-                        onChange={(e) => setEstablishmentType(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
-                      >
-                        <option value="bnb">{t.typeBnb}</option>
-                        <option value="hotel">{t.typeHotel}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="signup-city"
-                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
-                      >
-                        {t.city}
-                      </label>
-                      <input
-                        id="signup-city"
-                        name="city"
-                        type="text"
-                        autoComplete="address-level2"
-                        required
-                        value={city}
-                        onChange={(e) => {
-                          setCity(e.target.value);
-                          clearErrors();
-                        }}
-                        placeholder={lang === "fr" ? "Ex: Abidjan" : "Ex: Abidjan"}
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
-                          errors.city
-                            ? "border-red-400 dark:border-red-500"
-                            : "border-slate-200 dark:border-[#404040]"
-                        }`}
-                      />
-                      {errors.city && (
-                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.city}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="signup-phone"
-                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
-                      >
-                        {t.phone}
-                      </label>
-                      <input
-                        id="signup-phone"
-                        name="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+225 00 00 00 00 00"
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all"
-                      />
-                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0]">
+                      {lang === "fr"
+                        ? "Étape 1 sur 2 — créez votre compte, puis configurez votre établissement."
+                        : "Step 1 of 2 — create your account, then set up your establishment."}
+                    </p>
                     <div>
                       <label
                         htmlFor="signup-email"

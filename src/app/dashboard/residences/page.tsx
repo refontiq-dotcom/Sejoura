@@ -111,7 +111,7 @@ export default function ResidencesPage() {
     if (!plan) return;
     const limits = getPlanLimits(plan);
     if (limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations) {
-      toast.error(`Votre plan ${getPlanLabel(plan)} est limité à ${limits.maxAccommodations} établissement${limits.maxAccommodations > 1 ? "s" : ""}. Passez au plan Pro pour des établissements illimités.`);
+      toast.error(`Votre plan ${getPlanLabel(plan)} est limité à ${limits.maxAccommodations} établissement${limits.maxAccommodations > 1 ? "s" : ""}. Passez au plan Entreprise pour des établissements illimités.`);
       return;
     }
     setEditingResidence(null);
@@ -277,7 +277,7 @@ export default function ResidencesPage() {
           <Lock className="w-5 h-5 text-orange-600 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-orange-800 dark:text-orange-300">Limite du plan {getPlanLabel(plan)} atteinte</p>
-            <p className="text-xs text-orange-600 dark:text-orange-400">Passez au plan Pro pour des établissements illimités.</p>
+            <p className="text-xs text-orange-600 dark:text-orange-400">Passez au plan Entreprise pour des établissements illimités.</p>
           </div>
           <Button size="sm" variant="primary" onClick={() => router.push("/dashboard/subscription")}>Mettre à niveau</Button>
         </div>
