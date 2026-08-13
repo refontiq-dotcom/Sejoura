@@ -222,7 +222,7 @@ function ClientDrawer({
             <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
               <BedDouble className="w-3.5 h-3.5" /> Séjour
             </h3>
-            <div className="p-4 rounded-xl bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/20 space-y-3 dark:bg-slate-700/50 dark:border-slate-600">
+            <div className="p-4 rounded-xl bg-[var(--primary-muted)] border border-[var(--primary-color)]/20 space-y-3">
               <div className="flex justify-between">
                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambre</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">Ch. {movement.roomNumber}</span>
@@ -924,7 +924,7 @@ export default function DashboardPage() {
   if (!hasAccommodations) {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-3 animate-fade-in">
-        <div className="w-20 h-20 rounded-full bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center mb-2">
+        <div className="w-20 h-20 rounded-full bg-[var(--primary-muted)] flex items-center justify-center mb-2">
           <Sparkles className="w-10 h-10 text-[var(--primary-color,#0C1C33)]" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white text-center">Bienvenue sur Séjoura !</h2>
@@ -990,7 +990,7 @@ export default function DashboardPage() {
           {!isToday && (
             <button
               onClick={() => handleDateChange(toLocalISODate(new Date()))}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] transition-colors"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
             >
               {"Aujourd'hui"}
             </button>
@@ -1136,7 +1136,7 @@ export default function DashboardPage() {
           <Card className="p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
                   <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
                 </div>
                 <Badge variant="theme">Ménage</Badge>
@@ -1168,8 +1168,8 @@ export default function DashboardPage() {
       {/* 2. CONTENEUR PRINCIPAL — Mouvements du jour */}
       {isReceptionniste ? (
         /* ── Vue Réceptionniste : Mouvements en pleine largeur avec actions rapides ── */
-        <Card className="overflow-hidden bg-[var(--card)]">
-          <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <Card className="overflow-hidden">
+          <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
@@ -1189,8 +1189,8 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Client
                   </th>
                   <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -1207,7 +1207,7 @@ export default function DashboardPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+              <tbody className="divide-y divide-[var(--border)]">
                 {movements.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
@@ -1222,7 +1222,7 @@ export default function DashboardPage() {
                   movements.map((m) => (
                   <tr
                     key={m.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors"
+                    className="hover:bg-[var(--surface-hover)] transition-colors"
                   >
                      <td className="p-2.5">
                        <div className="flex items-center gap-2.5">
@@ -1302,8 +1302,8 @@ export default function DashboardPage() {
         /* ── Vue Admin : 70% mouvements + 30% donut (inchangée) ── */
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
           {/* Tableau des mouvements (70%) */}
-          <Card className="lg:col-span-7 overflow-hidden bg-[var(--card)] border-t-4 border-t-blue-500 dark:border-t-blue-400">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <Card className="lg:col-span-7 overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                   {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
@@ -1323,8 +1323,8 @@ export default function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                    <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Client
                     </th>
                     <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -1341,7 +1341,7 @@ export default function DashboardPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                <tbody className="divide-y divide-[var(--border)]">
                   {movements.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
@@ -1356,7 +1356,7 @@ export default function DashboardPage() {
                     movements.map((m) => (
                     <tr
                       key={m.id}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
+                      className="hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
                       onClick={() => setDrawerMovement(m)}
                     >
                        <td className="p-3">
@@ -1432,7 +1432,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Donut Chart — État du parc (30%) */}
-          <Card className="lg:col-span-3 p-4 bg-[var(--card)] border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+          <Card className="lg:col-span-3 p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
               État du parc
             </h2>
@@ -1479,7 +1479,7 @@ export default function DashboardPage() {
 
       {/* 4. CONTENEUR INFÉRIEUR — Graphique linéaire des recettes (réservé aux admins) */}
       {!isReceptionniste && (
-        <Card className="p-4 bg-[var(--card)] border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
+        <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">

@@ -130,7 +130,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       {/* Bottom nav mobile — barre flottante ergonomique */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-4">
         <div className="max-w-md mx-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg flex items-center justify-around p-1.5">
-          <button className="flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl text-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] font-semibold min-w-[64px] active:scale-95 transition-transform">
+          <button className="flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl text-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] font-semibold min-w-[64px] active:scale-95 transition-transform">
             <Sparkles className="w-5 h-5" />
             <span className="text-[11px] font-medium">Tâches</span>
           </button>

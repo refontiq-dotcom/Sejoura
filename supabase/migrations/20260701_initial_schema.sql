@@ -1745,10 +1745,9 @@ BEGIN
     RAISE EXCEPTION 'UNAUTHORIZED: Vous n''êtes pas autorisé à générer une facture pour cette réservation';
   END IF;
 
-  -- Calcul automatique des montants (sans calcul manuel)
-  -- Le total est déjà calculé lors de la création de la réservation : total_amount = negotiated_price * nights_count
-  -- On applique une TVA de 10 % (configurable)
-  v_tax := ROUND(v_booking.total_amount * 0.10);
+  -- Le prix de réservation est le montant contractuel final. On ne lui ajoute
+  -- aucune taxe implicite : paiement, facture et solde restent ainsi cohérents.
+  v_tax := 0;
 
   -- Créer l'enregistrement de facture
   INSERT INTO invoices (
@@ -1768,7 +1767,7 @@ BEGIN
     p_invoice_number,
     v_booking.total_amount,
     v_tax,
-    v_booking.total_amount + v_tax,
+    v_booking.total_amount,
     'draft',
     p_user_id,
     NOW(),
@@ -1789,7 +1788,7 @@ BEGIN
       'booking_id', v_booking.id,
       'total_amount', v_booking.total_amount,
       'tax_amount', v_tax,
-      'invoice_total', v_booking.total_amount + v_tax
+      'invoice_total', v_booking.total_amount
     ),
     NOW()
   );

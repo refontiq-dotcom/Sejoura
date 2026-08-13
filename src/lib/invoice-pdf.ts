@@ -15,8 +15,10 @@ export interface TaxRate {
 }
 
 export const DEFAULT_TAX_RATE: TaxRate = {
+  // Les factures historiques peuvent contenir une TVA à 10 %. Les nouvelles
+  // factures n'ajoutent plus de taxe implicite (tax_amount = 0).
   label: "TVA (10%)",
-  rate: 0.1,
+  rate: 0,
 };
 
 /**
@@ -319,13 +321,14 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .text("Sous-total :", 352, subY, { width: 100, align: "right" })
     .text(fmt(invoice.amount), col3Right + padX, subY, { width: totalW - padX * 2, align: "right" });
 
-  // --- Taxe ---
-  rowTop += 16;
   const taxAmount = invoice.tax_amount || 0;
-  const taxY = rowTop + (12 - 9) / 2;
-  doc
-    .text(DEFAULT_TAX_RATE.label, 352, taxY, { width: 100, align: "right" })
-    .text(fmt(taxAmount), col3Right + padX, taxY, { width: totalW - padX * 2, align: "right" });
+  if (taxAmount > 0) {
+    rowTop += 16;
+    const taxY = rowTop + (12 - 9) / 2;
+    doc
+      .text(DEFAULT_TAX_RATE.label, 352, taxY, { width: 100, align: "right" })
+      .text(fmt(taxAmount), col3Right + padX, taxY, { width: totalW - padX * 2, align: "right" });
+  }
 
   // --- Total ---
   rowTop += 16;

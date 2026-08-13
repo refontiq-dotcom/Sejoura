@@ -2,280 +2,163 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateInvoicePdf, generateInvoiceNumber } from "@/lib/invoice-pdf";
-import type { Invoice, BookingWithRelations, Tenant } from "@/types/database";
+import type { BookingWithRelations, Invoice, Tenant } from "@/types/database";
+
+const INVOICE_BUCKET = "invoices";
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+function isLegacyPublicUrl(value: string | null) {
+  return Boolean(value?.startsWith("http://") || value?.startsWith("https://"));
+}
+
+async function getInvoiceAccessUrl(admin: ReturnType<typeof createAdminClient>, pdfPath: string | null) {
+  if (!pdfPath) return null;
+  if (isLegacyPublicUrl(pdfPath)) return pdfPath;
+
+  const { data, error } = await admin.storage
+    .from(INVOICE_BUCKET)
+    .createSignedUrl(pdfPath, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) throw new Error(error?.message || "Impossible de créer le lien sécurisé du PDF.");
+  return data.signedUrl;
+}
+
+async function getAuthorizedUser() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Vous devez être connecté.", status: 401 as const };
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .select("id, tenant_id, role, is_active")
+    .eq("auth_user_id", session.user.id)
+    .single();
+
+  if (error || !user?.tenant_id || !user.is_active) {
+    return { error: "Impossible de retrouver votre compte.", status: 400 as const };
+  }
+  if (user.role !== "admin_residence" && user.role !== "receptionniste") {
+    return { error: "Accès réservé à la réception et aux administrateurs.", status: 403 as const };
+  }
+  return { user };
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const bookingId = typeof body.bookingId === "string" ? body.bookingId : "";
+    if (!bookingId) return NextResponse.json({ error: "ID de réservation requis." }, { status: 400 });
 
-    if (!bookingId) {
-      return NextResponse.json(
-        { error: "ID de réservation requis." },
-        { status: 400 }
-      );
-    }
-
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json(
-        { error: "Vous devez être connecté pour générer une facture." },
-        { status: 401 }
-      );
-    }
-
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id, tenant_id")
-      .eq("auth_user_id", session.user.id)
-      .single();
-
-    if (userError || !userData?.tenant_id) {
-      return NextResponse.json(
-        { error: "Impossible de retrouver votre compte." },
-        { status: 400 }
-      );
-    }
-
+    const authorization = await getAuthorizedUser();
+    if ("error" in authorization) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
+    const { user } = authorization;
     const admin = createAdminClient();
 
-    // Vérifier qu'une facture n'existe pas déjà pour cette réservation
-    const { data: existingInvoice } = await admin
-      .from("invoices")
-      .select("id, pdf_url, invoice_number")
-      .eq("booking_id", bookingId)
-      .eq("tenant_id", userData.tenant_id)
-      .maybeSingle();
-
-    if (existingInvoice?.pdf_url) {
-      return NextResponse.json({
-        invoice: existingInvoice,
-        alreadyGenerated: true,
-      });
-    }
-
-    // Récupérer la réservation avec toutes les relations nécessaires
     const { data: booking, error: bookingError } = await admin
       .from("bookings")
-      .select(`
-        *,
-        client:clients(*),
-        room:rooms(*, room_type:room_types(*)),
-        accommodation:accommodations(*)
-      `)
+      .select("*, client:clients(*), room:rooms(*, room_type:room_types(*)), accommodation:accommodations(*)")
       .eq("id", bookingId)
-      .eq("tenant_id", userData.tenant_id)
+      .eq("tenant_id", user.tenant_id)
       .single();
 
-    if (bookingError || !booking) {
-      return NextResponse.json(
-        { error: "Réservation introuvable." },
-        { status: 404 }
-      );
+    if (bookingError || !booking) return NextResponse.json({ error: "Réservation introuvable." }, { status: 404 });
+    if (!["confirmed", "checked_in", "checked_out"].includes(booking.status)) {
+      return NextResponse.json({ error: "Une facture ne peut être générée que pour une réservation confirmée ou réalisée." }, { status: 409 });
     }
 
-    const enrichedBooking: BookingWithRelations = {
-      ...booking,
-      room_type: (booking.room as any)?.room_type,
-      accommodation: (booking as any).accommodation,
-    };
+    const { data: tenant, error: tenantError } = await admin.from("tenants").select("*").eq("id", user.tenant_id).single();
+    if (tenantError || !tenant) return NextResponse.json({ error: "Impossible de récupérer les informations de l'entreprise." }, { status: 400 });
 
-    // Récupérer les informations du tenant
-    const { data: tenant, error: tenantError } = await admin
-      .from("tenants")
-      .select("*")
-      .eq("id", userData.tenant_id)
-      .single();
-
-    if (tenantError || !tenant) {
-      return NextResponse.json(
-        { error: "Impossible de récupérer les informations de l'entreprise." },
-        { status: 400 }
-      );
-    }
-
-    // Générer un numéro de facture unique (avec retry en cas de race condition)
-    let invoiceNumber = "";
-    let invoice: Invoice | null = null;
-    let invoiceError: any = null;
-    const maxRetries = 3;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const { count } = await admin
-        .from("invoices")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", userData.tenant_id);
-
-      invoiceNumber = generateInvoiceNumber(
-        userData.tenant_id,
-        (count || 0) + 1 + attempt
-      );
-
-      const { data: invoiceData, error: rpcError } = await admin.rpc(
-        "generate_invoice",
-        {
-          p_booking_id: bookingId,
-          p_user_id: userData.id,
-          p_invoice_number: invoiceNumber,
-        }
-      );
-
-      if (invoiceData) {
-        invoice = invoiceData as unknown as Invoice;
-        invoiceError = null;
-        break;
-      }
-
-      invoiceError = rpcError;
-      // Si l'erreur est une violation d'unicité, on réessaye avec le numéro suivant
-      if (rpcError?.message?.includes("duplicate") || rpcError?.code === "23505") {
-        continue;
-      }
-      break;
-    }
-
-    if (invoiceError || !invoice) {
-      return NextResponse.json(
-        { error: "Erreur lors de la création de la facture: " + (invoiceError?.message || "inconnue") },
-        { status: 500 }
-      );
-    }
-
-    // Vérifier que le bucket 'invoices' existe avant upload
-    const { data: buckets } = await admin.storage.listBuckets();
-    const bucketExists = (buckets || []).some((b: any) => b.id === "invoices" || b.name === "invoices");
-    if (!bucketExists) {
-      return NextResponse.json(
-        { error: "Le stockage des factures n'est pas configuré (bucket 'invoices' absent). Veuillez contacter l'administrateur." },
-        { status: 500 }
-      );
-    }
-
-    // Générer le PDF
-    const pdfBuffer = await generateInvoicePdf({
-      tenant: tenant as unknown as Tenant,
-      booking: enrichedBooking,
-      invoice,
-    });
-
-    // Uploader le PDF dans Supabase Storage (bucket 'invoices')
-    const fileName = `${invoice.invoice_number.replace(/\//g, "-")}_${bookingId}.pdf`;
-    const { error: uploadError } = await admin.storage
+    let { data: invoice } = await admin
       .from("invoices")
-      .upload(fileName, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: true,
+      .select("*")
+      .eq("booking_id", bookingId)
+      .eq("tenant_id", user.tenant_id)
+      .maybeSingle();
+
+    if (!invoice) {
+      const { count } = await admin.from("invoices").select("*", { count: "exact", head: true }).eq("tenant_id", user.tenant_id);
+      const invoiceNumber = generateInvoiceNumber(user.tenant_id, (count || 0) + 1);
+      const { data, error } = await admin.rpc("generate_invoice", {
+        p_booking_id: bookingId,
+        p_user_id: user.id,
+        p_invoice_number: invoiceNumber,
       });
 
-    if (uploadError) {
-      return NextResponse.json(
-        { error: "Erreur lors de l'upload du PDF: " + uploadError.message },
-        { status: 500 }
-      );
+      if (data) invoice = data as unknown as Invoice;
+      if (error && !invoice) {
+        // La contrainte unique protège les clics simultanés : on réutilise alors
+        // la facture créée par l'autre requête au lieu d'en créer une deuxième.
+        const { data: concurrentInvoice } = await admin
+          .from("invoices")
+          .select("*")
+          .eq("booking_id", bookingId)
+          .eq("tenant_id", user.tenant_id)
+          .maybeSingle();
+        if (concurrentInvoice) invoice = concurrentInvoice as Invoice;
+        else return NextResponse.json({ error: `Erreur lors de la création de la facture: ${error.message}` }, { status: 500 });
+      }
     }
 
-    // Vérifier que le fichier est bien accessible publiquement
-    const { data: urlData } = admin.storage
-      .from("invoices")
-      .getPublicUrl(fileName);
+    if (!invoice) return NextResponse.json({ error: "Impossible de préparer la facture." }, { status: 500 });
 
-    const pdfUrl = urlData?.publicUrl || "";
+    let storedPdfPath = invoice.pdf_url;
+    const hadPdf = Boolean(storedPdfPath);
+    if (!storedPdfPath) {
+      const { data: buckets } = await admin.storage.listBuckets();
+      if (!(buckets || []).some((bucket) => bucket.id === INVOICE_BUCKET)) {
+        return NextResponse.json({ error: "Le stockage des factures n'est pas configuré." }, { status: 500 });
+      }
 
-    if (!pdfUrl) {
-      return NextResponse.json(
-        { error: "Impossible de générer l'URL publique du PDF." },
-        { status: 500 }
-      );
+      const enrichedBooking: BookingWithRelations = {
+        ...booking,
+        room_type: (booking.room as { room_type?: BookingWithRelations["room_type"] } | null)?.room_type,
+        accommodation: booking.accommodation,
+      } as BookingWithRelations;
+      const pdfBuffer = await generateInvoicePdf({ tenant: tenant as Tenant, booking: enrichedBooking, invoice });
+      const objectPath = `${user.tenant_id}/${bookingId}/${invoice.id}.pdf`;
+      const { error: uploadError } = await admin.storage.from(INVOICE_BUCKET).upload(objectPath, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+      if (uploadError && !/already exists/i.test(uploadError.message)) {
+        return NextResponse.json({ error: `Erreur lors de l'upload du PDF: ${uploadError.message}` }, { status: 500 });
+      }
+
+      const { error: updateError } = await admin.from("invoices").update({ pdf_url: objectPath }).eq("id", invoice.id);
+      if (updateError) return NextResponse.json({ error: `PDF créé mais non rattaché à la facture: ${updateError.message}` }, { status: 500 });
+      storedPdfPath = objectPath;
+      invoice = { ...invoice, pdf_url: objectPath };
     }
 
-    // Mettre à jour l'invoice avec l'URL du PDF
-    const { error: updateError } = await admin
-      .from("invoices")
-      .update({ pdf_url: pdfUrl })
-      .eq("id", invoice.id);
-
-    if (updateError) {
-      console.error("Erreur lors de la mise à jour de l'URL du PDF:", updateError);
-      return NextResponse.json(
-        { error: "Erreur lors de l'enregistrement du PDF: " + updateError.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      invoice: { ...invoice, pdf_url: pdfUrl },
-      alreadyGenerated: false,
-    });
-  } catch (err: any) {
+    const accessUrl = await getInvoiceAccessUrl(admin, storedPdfPath);
+    return NextResponse.json({ invoice: { ...invoice, pdf_url: accessUrl }, alreadyGenerated: hadPdf });
+  } catch (err) {
     console.error("generate_invoice error:", err);
-    const detail = err?.message ? `: ${err.message}` : ".";
-    return NextResponse.json(
-      { error: `Une erreur est survenue lors de la génération de la facture${detail}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Une erreur est survenue lors de la génération de la facture." }, { status: 500 });
   }
 }
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const bookingId = searchParams.get("bookingId");
-
-    if (!bookingId) {
-      return NextResponse.json(
-        { error: "ID de réservation requis." },
-        { status: 400 }
-      );
-    }
-
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      return NextResponse.json(
-        { error: "Vous devez être connecté." },
-        { status: 401 }
-      );
-    }
-
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("id, tenant_id")
-      .eq("auth_user_id", session.user.id)
-      .single();
-
-    if (userError || !userData?.tenant_id) {
-      return NextResponse.json(
-        { error: "Impossible de retrouver votre compte." },
-        { status: 400 }
-      );
-    }
+    const bookingId = new URL(request.url).searchParams.get("bookingId");
+    if (!bookingId) return NextResponse.json({ error: "ID de réservation requis." }, { status: 400 });
+    const authorization = await getAuthorizedUser();
+    if ("error" in authorization) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
 
     const admin = createAdminClient();
-
     const { data: invoice, error } = await admin
       .from("invoices")
       .select("*")
       .eq("booking_id", bookingId)
-      .eq("tenant_id", userData.tenant_id)
-      .order("created_at", { ascending: false })
+      .eq("tenant_id", authorization.user.tenant_id)
       .maybeSingle();
+    if (error) return NextResponse.json({ error: "Erreur lors de la récupération de la facture." }, { status: 500 });
+    if (!invoice) return NextResponse.json({ invoice: null });
 
-    if (error) {
-      return NextResponse.json(
-        { error: "Erreur lors de la récupération de la facture." },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ invoice });
+    const accessUrl = await getInvoiceAccessUrl(admin, invoice.pdf_url);
+    return NextResponse.json({ invoice: { ...invoice, pdf_url: accessUrl } });
   } catch (err) {
     console.error("get invoice error:", err);
-    return NextResponse.json(
-      { error: "Une erreur est survenue." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Une erreur est survenue." }, { status: 500 });
   }
 }

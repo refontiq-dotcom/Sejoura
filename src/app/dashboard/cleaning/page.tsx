@@ -484,7 +484,7 @@ export default function CleaningPage() {
 
         {/* Vue d'ensemble : qui travaille */}
         {stats.activeMaids > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/10 text-xs text-slate-600 dark:text-slate-300">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--primary-muted)] border border-[var(--primary-color)]/10 text-xs text-slate-600 dark:text-slate-300">
             <Users className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
             <span>
               <strong className="text-slate-900 dark:text-white">{stats.activeMaids}</strong> ménagère{stats.activeMaids > 1 ? "s" : ""} actuellement en intervention sur {stats.active} tâche{stats.active > 1 ? "s" : ""}
@@ -535,7 +535,7 @@ export default function CleaningPage() {
                                 ? "bg-green-100 dark:bg-green-900/30"
                                 : active
                                 ? "bg-blue-100 dark:bg-blue-900/30"
-                                : "bg-[var(--primary-light,#F0F4FF)]"
+                                : "bg-[var(--primary-muted)]"
                             }`}>
                               <BedDouble className={`w-5 h-5 ${
                                 overdue

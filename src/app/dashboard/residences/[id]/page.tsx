@@ -528,7 +528,7 @@ export default function ResidenceDetailPage() {
             {currentTypes.map((rt) => (
               <div key={rt.id} className="p-2.5 rounded-md border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow">
                 <div className="flex items-start justify-between mb-1.5">
-                  <div className="w-8 h-8 rounded-md bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-md bg-[var(--primary-muted)] flex items-center justify-center">
                     <Tag className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
                   </div>
                   {!isReadOnly && (
@@ -755,7 +755,7 @@ export default function ResidenceDetailPage() {
                       onClick={() => toggleTypeAmenity(amenity)}
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-left text-xs transition-colors ${
                         checked
-                          ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-slate-900 dark:text-white"
+                          ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] text-slate-900 dark:text-white"
                           : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
                       }`}
                     >

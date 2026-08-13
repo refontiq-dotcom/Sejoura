@@ -2058,7 +2058,7 @@ export default function AccountingPage() {
                           onClick={() => setExpenseForm({ ...expenseForm, category: item.value })}
                           className={`flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                             active
-                              ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]"
+                              ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]"
                               : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                           }`}
                         >

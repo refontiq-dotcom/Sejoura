@@ -316,7 +316,7 @@ export default function SuperAdminPage() {
 
       {/* ── Gestion des entreprises ──────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
           <Building2 className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
         </div>
         <div>

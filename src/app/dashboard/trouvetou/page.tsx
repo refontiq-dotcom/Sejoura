@@ -614,7 +614,7 @@ export default function TrouvetouDashboardPage() {
         </div>
 
         <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
+          <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
             <Building2 className="w-6 h-6" />
           </div>
           <div>
@@ -632,7 +632,7 @@ export default function TrouvetouDashboardPage() {
           {/* Compteur simple pour ESSENTIEL */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-              <div className="p-3.5 rounded-xl bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)]">
+              <div className="p-3.5 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]">
                 <Building2 className="w-6 h-6" />
               </div>
               <div>

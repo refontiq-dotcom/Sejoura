@@ -114,7 +114,7 @@ export default function DashboardLayout({
           const provisionalUser = {
             id: "",
             auth_user_id: session.user.id,
-            role: (metadataRole || (isEmployeeEmail ? "receptionniste" : "admin_residence")) as any,
+            role: (metadataRole || (isEmployeeEmail ? "receptionniste" : "admin_residence")) as User["role"],
             full_name: session.user.user_metadata?.full_name || session.user.email || "Utilisateur",
             phone: "",
             email: session.user.email || "",
@@ -226,18 +226,21 @@ export default function DashboardLayout({
   }, [router]);
 
   const activeTheme = getSidebarThemeStyles(themeColor, theme === "dark");
+  // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
+  // pour garantir un contraste suffisant sur fond sombre
+  const dynamicPrimaryColor = theme === "dark" ? "#C2944E" : activeTheme.sidebarBg;
 
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.style.setProperty("--sidebar-bg", activeTheme.sidebarBg);
       document.documentElement.style.setProperty("--main-bg", activeTheme.mainBg);
-      document.documentElement.style.setProperty("--primary-color", activeTheme.sidebarBg);
+      document.documentElement.style.setProperty("--primary-color", dynamicPrimaryColor);
       document.documentElement.style.setProperty("--primary-light", activeTheme.mainBg);
       document.documentElement.style.setProperty("--primary-hover", activeTheme.hoverBg);
       document.documentElement.style.setProperty("--card-bg", activeTheme.cardBg);
       document.documentElement.style.setProperty("--card-border", activeTheme.cardBorder);
     }
-  }, [activeTheme.sidebarBg, activeTheme.mainBg, activeTheme.hoverBg, activeTheme.cardBg, activeTheme.cardBorder]);
+  }, [activeTheme.sidebarBg, activeTheme.mainBg, activeTheme.hoverBg, activeTheme.cardBg, activeTheme.cardBorder, dynamicPrimaryColor]);
 
   function handleOnboardingComplete() {
     setNeedsOnboarding(false);
@@ -264,7 +267,7 @@ export default function DashboardLayout({
         backgroundColor: activeTheme.mainBg,
         ["--sidebar-bg" as string]: activeTheme.sidebarBg,
         ["--main-bg" as string]: activeTheme.mainBg,
-        ["--primary-color" as string]: activeTheme.sidebarBg,
+        ["--primary-color" as string]: dynamicPrimaryColor,
         ["--primary-light" as string]: activeTheme.mainBg,
         ["--primary-hover" as string]: activeTheme.hoverBg,
         ["--card-bg" as string]: activeTheme.cardBg,

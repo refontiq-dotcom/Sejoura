@@ -329,12 +329,15 @@ export default function BookingsPage() {
       }
     }
 
-    function handleDownloadInvoice(invoice: Invoice) {
-      if (!invoice.pdf_url) {
-        toast.error("Aucun PDF disponible pour cette facture.");
-        return;
+    async function handleDownloadInvoice(invoice: Invoice) {
+      try {
+        const response = await fetch(`/api/invoice/generate?bookingId=${encodeURIComponent(invoice.booking_id)}`);
+        const result = await response.json();
+        if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
+        window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
       }
-      window.open(invoice.pdf_url, "_blank");
     }
 
     function openSendInvoiceModal(invoice: Invoice) {
@@ -803,7 +806,7 @@ export default function BookingsPage() {
                   <span className="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">{dayNum}</span>
                   <div className="space-y-1">
                     {dayBookings.slice(0, 2).map(b => (
-                      <div key={b.id} className="text-[10px] p-1 rounded bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] font-medium truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
+                      <div key={b.id} className="text-[10px] p-1 rounded bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] font-medium truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
                         {b.client?.full_name || "Réservation"}
                       </div>
                     ))}
@@ -908,7 +911,7 @@ export default function BookingsPage() {
                         <button 
                           onClick={() => copyStayLink(b.booking_code)} 
                           title="Copier le lien d'accès au séjour" 
-                          className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]"
+                          className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
@@ -925,7 +928,7 @@ export default function BookingsPage() {
                             <button 
                               onClick={() => handleGenerateInvoice(b)} 
                               title="Générer une facture PDF" 
-                              className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]"
+                              className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]"
                             >
                               <Receipt className="w-4 h-4" />
                             </button>
@@ -942,7 +945,7 @@ export default function BookingsPage() {
                           </button>
                         )}
                         {b.status === "checked_in" && (
-                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)]">
+                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]">
                             <Sparkles className="w-4 h-4" />
                           </button>
                         )}
@@ -1099,7 +1102,7 @@ export default function BookingsPage() {
                               </button>
                               <button
                                 onClick={() => copyStayLink(bk.booking_code)}
-                                className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-light,#F0F4FF)] text-xs flex items-center gap-1 font-medium"
+                                className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] text-xs flex items-center gap-1 font-medium"
                                 title="Copier le lien"
                               >
                                 <Copy className="w-3.5 h-3.5" /> Copier
@@ -1300,7 +1303,7 @@ export default function BookingsPage() {
         description="Une tâche de ménage sera envoyée dans le pool des ménagères"
       >
         <div className="space-y-3">
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] border border-[var(--primary-color)]/20">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] border border-[var(--primary-color)]/20">
             <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Ménage en cours de séjour</p>
@@ -1427,15 +1430,15 @@ export default function BookingsPage() {
                 placeholder="client@example.com"
               />
               <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                La facture sera marquée comme "Envoyée" dans le système.
-                Un lien de téléchargement peut être partagé via WhatsApp.
+                Aucun e-mail n’est envoyé automatiquement. Cette action enregistre seulement
+                le destinataire et le statut ; partagez ensuite le lien sécurisé via votre canal habituel.
               </p>
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1" onClick={closeSendInvoiceModal}>
                   Annuler
                 </Button>
                 <Button className="flex-1" onClick={() => handleSendInvoice(invoiceToSend)}>
-                  Confirmer l'envoi
+                  Marquer comme envoyée
                 </Button>
               </div>
             </div>

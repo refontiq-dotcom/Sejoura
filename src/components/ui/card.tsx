@@ -11,14 +11,10 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-none transition-all",
-          hover && "hover:shadow-md",
+          "rounded-lg border border-[var(--card-border,var(--border))] bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-sm)] transition-all",
+          hover && "hover:shadow-[var(--shadow-md)] hover:bg-[var(--surface-hover)]",
           className
         )}
-        style={{
-          backgroundColor: "var(--card-bg, var(--card, #ffffff))",
-          borderColor: "var(--card-border, var(--border, #e2e8f0))",
-        }}
         {...props}
       >
         {children}
@@ -34,7 +30,7 @@ export const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     return (
       <div
         ref={ref}
-        className={`p-3 border-b border-[var(--border)] ${className}`}
+        className={cn("p-3 border-b border-[var(--border)]", className)}
         {...props}
       >
         {children}
@@ -50,7 +46,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadi
     return (
       <h3
         ref={ref}
-        className={`text-sm font-semibold text-[var(--foreground)] ${className}`}
+        className={cn("text-sm font-semibold text-[var(--foreground)]", className)}
         {...props}
       >
         {children}
@@ -66,7 +62,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<H
     return (
       <p
         ref={ref}
-        className={`text-[11px] font-medium text-[var(--muted-foreground)] mt-0.5 ${className}`}
+        className={cn("text-[11px] font-medium text-[var(--foreground-muted)] mt-0.5", className)}
         {...props}
       >
         {children}
@@ -80,7 +76,7 @@ CardDescription.displayName = "CardDescription";
 export const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className = "", children, ...props }, ref) => {
     return (
-      <div ref={ref} className={`p-3 ${className}`} {...props}>
+      <div ref={ref} className={cn("p-3", className)} {...props}>
         {children}
       </div>
     );
@@ -94,7 +90,7 @@ export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
     return (
       <div
         ref={ref}
-        className={`p-3 border-t border-[var(--border)] ${className}`}
+        className={cn("p-3 border-t border-[var(--border)]", className)}
         {...props}
       >
         {children}

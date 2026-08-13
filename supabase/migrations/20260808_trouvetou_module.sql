@@ -101,6 +101,7 @@ SELECT
   is_boosted                                                 AS is_legacy_boosted,
   boost_expires_at                                           AS legacy_boost_expires_at,
   boost_express_expires_at,
+  boost_express_price_paid,
   (boost_express_expires_at IS NOT NULL
    AND boost_express_expires_at > NOW())                     AS is_express_boost_active,
   (
@@ -113,7 +114,13 @@ SELECT
     WHEN boost_express_expires_at IS NOT NULL AND boost_express_expires_at > NOW() THEN 1
     WHEN is_boosted = TRUE AND (boost_expires_at IS NULL OR boost_expires_at > NOW()) THEN 1
     ELSE 0
-  END                                                        AS boost_priority
+  END                                                        AS boost_priority,
+  CASE
+    WHEN is_permanently_boosted = TRUE                                             THEN 'permanent'
+    WHEN boost_express_expires_at IS NOT NULL AND boost_express_expires_at > NOW() THEN 'express'
+    WHEN is_boosted = TRUE AND (boost_expires_at IS NULL OR boost_expires_at > NOW()) THEN 'legacy'
+    ELSE 'none'
+  END                                                        AS boost_type
 FROM accommodations;
 
 COMMENT ON VIEW trouvetou_boost_status

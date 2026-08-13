@@ -550,7 +550,7 @@ export default function EmployeesPage() {
       )}
 
       {/* Info activation */}
-      <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--primary-light,#F0F4FF)] border border-[var(--primary-color)]/20">
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--primary-muted)] border border-[var(--primary-color)]/20">
         <Phone className="w-5 h-5 text-[var(--primary-color,#0C1C33)] flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Activation & Mobilité des employés</p>

@@ -314,7 +314,7 @@ export default function MenagePage() {
               onClick={() => setFilter(key)}
               className={`p-3 rounded-2xl border text-center transition-all active:scale-95 ${
                 active
-                  ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-light,#F0F4FF)] shadow-sm"
+                  ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] shadow-sm"
                   : `bg-white dark:bg-slate-800 ${cls}`
               }`}
             >
@@ -395,7 +395,7 @@ export default function MenagePage() {
                           ? "bg-green-100 dark:bg-green-900/30"
                           : isMine
                           ? "bg-blue-100 dark:bg-blue-900/30"
-                          : "bg-[var(--primary-light,#F0F4FF)]"
+                          : "bg-[var(--primary-muted)]"
                       }`}
                     >
                       <BedDouble

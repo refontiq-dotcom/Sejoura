@@ -36,6 +36,17 @@ function isValidHex(color: string | null | undefined): color is string {
   return Boolean(color && /^#[0-9a-f]{6}$/i.test(color.trim()));
 }
 
+/**
+ * Calcule la couleur d'accent adaptée au mode sombre.
+ * En mode sombre, on utilise la couleur dorée Séjoura (#C2944E) comme couleur primaire
+ * pour garantir un contraste suffisant sur fond sombre.
+ */
+function getDarkModePrimaryColor(sidebarBg: string): string {
+  // En mode sombre, la couleur primaire doit être claire pour être visible sur fond sombre
+  // On utilise la couleur dorée Séjoura par défaut
+  return "#C2944E";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
   const [primaryColor, setPrimaryColorState] = useState<string>("#0C1C33");
@@ -104,22 +115,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         root.classList.remove("dark");
       }
       const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : "#0C1C33";
-      const contrast = getContrastColor(safePrimaryColor);
-      root.style.setProperty("--color-primary", safePrimaryColor);
-      root.style.setProperty("--primary", safePrimaryColor);
+      const isDark = theme === "dark";
+      const dynamicPrimary = isDark ? getDarkModePrimaryColor(safePrimaryColor) : safePrimaryColor;
+      const contrast = getContrastColor(dynamicPrimary);
+      root.style.setProperty("--color-primary", dynamicPrimary);
+      root.style.setProperty("--primary", dynamicPrimary);
       root.style.setProperty("--color-primary-foreground", contrast);
       root.style.setProperty("--primary-foreground", contrast);
-      
+
       if (themeColor) {
         const isCustomHex = themeColor.startsWith("#") &&
           themeColor.trim().length === 7 &&
           !THEME_PRESETS.some((p) => p.sidebarBg.toLowerCase() === themeColor!.trim().toLowerCase());
         const sidebarBg = isCustomHex ? themeColor.trim() : getThemePresetById(themeColor).sidebarBg;
         const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : getThemePresetById(themeColor).contentBg;
+
+        // En mode sombre, on adapte les couleurs dynamiques :
+        // - --primary-color devient la couleur dorée pour être visible sur fond sombre
+        // - --primary-light devient le fond sombre de la page
+        const isDark = theme === "dark";
+        const dynamicPrimary = isDark ? getDarkModePrimaryColor(sidebarBg) : sidebarBg;
+        const dynamicLight = isDark ? "#090D16" : contentBg;
+
         root.style.setProperty("--sidebar-bg", sidebarBg);
-        root.style.setProperty("--main-bg", theme === "dark" ? "#090D16" : contentBg);
-        root.style.setProperty("--primary-color", sidebarBg);
-        root.style.setProperty("--primary-light", contentBg);
+        root.style.setProperty("--main-bg", dynamicLight);
+        root.style.setProperty("--primary-color", dynamicPrimary);
+        root.style.setProperty("--primary-light", dynamicLight);
         localStorage.setItem("theme_color", themeColor);
         localStorage.setItem("sejoura-theme-color", themeColor);
       } else {

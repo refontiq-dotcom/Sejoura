@@ -76,26 +76,26 @@ export function Modal({
 
       {/* Modal */}
       <div
-        className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-slate-800 rounded-lg shadow-2xl animate-modal-in max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-xl)] animate-modal-in max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
         {(title || description) && (
-          <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
+          <div className="p-3 border-b border-[var(--border)] flex items-start justify-between">
             <div>
               {title && (
-                <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+                <h2 className="text-base font-semibold text-[var(--foreground)]">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-[11px] text-[var(--foreground-muted)] mt-0.5">
                   {description}
                 </p>
               )}
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="p-1 rounded-md text-[var(--foreground-subtle)] hover:bg-[var(--surface-hover)] transition-colors"
               aria-label="Fermer"
             >
               <X className="w-3.5 h-3.5" />
@@ -107,7 +107,7 @@ export function Modal({
         {!title && !description && (
           <button
             onClick={onClose}
-            className="absolute top-2.5 right-2.5 p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors z-10"
+            className="absolute top-2.5 right-2.5 p-1 rounded-md text-[var(--foreground-subtle)] hover:bg-[var(--surface-hover)] transition-colors z-10"
             aria-label="Fermer"
           >
             <X className="w-3.5 h-3.5" />

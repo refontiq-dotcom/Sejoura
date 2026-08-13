@@ -2,72 +2,189 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ============================================
+   DESIGN TOKENS SÉMANTIQUES — Séjoura
+   Approche "design tokens" comme les grandes applications SaaS
+   (Linear, Vercel, Stripe, GitHub) :
+   - Toutes les surfaces passent par des variables sémantiques
+   - Le mode sombre/clair = simple changement de valeurs
+   - Aucune couleur hardcodée dans les composants
+   ============================================ */
+
 :root {
-  /* Charte Graphique Officielle Séjoura (Août 2026) */
+  /* ── Charte Graphique Officielle Séjoura ── */
   --sejoura-navy: #0C1C33;
   --sejoura-gold: #C2944E;
   --sejoura-white: #FFFFFF;
 
+  /* ── Surfaces (hiérarchie visuelle) ── */
   --background: #F4F6FC;
   --background-gradient-start: #F4F6FC;
   --background-gradient-end: #EEF2F9;
+  --surface: #FFFFFF;              /* Cartes, conteneurs principaux */
+  --surface-hover: #F8FAFC;        /* Hover sur cartes */
+  --surface-active: #F1F5F9;       /* Éléments actifs */
+  --surface-muted: #F1F5F9;        /* Fonds secondaires (table headers, etc.) */
+  --surface-elevated: #FFFFFF;     /* Modals, drawers, popovers */
+  --surface-sunken: #F4F6FC;       /* Fonds en retrait (inputs, etc.) */
+
+  /* ── Bordures ── */
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-subtle: #EEF2F7;
+
+  /* ── Texte ── */
   --foreground: #0C1C33;
-  --card: #ffffff;
-  --card-foreground: #0C1C33;
-  --sidebar: #0C1C33;
-  --sidebar-foreground: #ffffff;
-  --sidebar-active: #C2944E;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
+  --foreground-muted: #475569;
+  --foreground-subtle: #94A3B8;
+  --foreground-inverse: #FFFFFF;
+
+  /* ── Couleurs fonctionnelles ── */
   --primary: #0C1C33;
-  --primary-foreground: #ffffff;
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #162A47;
+  --primary-muted: #E8EDF5;
+  --primary-muted-foreground: #0C1C33;
   --secondary: #C2944E;
+  --secondary-foreground: #FFFFFF;
   --accent: #C2944E;
-  --muted: #f1f5f9;
-  --muted-hover: #e2e8f0;
+  --accent-foreground: #FFFFFF;
+  --muted: #F1F5F9;
+  --muted-hover: #E2E8F0;
   --muted-foreground: #475569;
-  --destructive: #ef4444;
-  --success: #10b981;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --success-foreground: #FFFFFF;
   --warning: #C2944E;
+  --warning-foreground: #FFFFFF;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+
+  /* ── Sidebar ── */
+  --sidebar: #0C1C33;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-muted: #94A3B8;
+  --sidebar-active: #C2944E;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+
+  /* ── Inputs ── */
+  --input-bg: #FFFFFF;
+  --input-border: #CBD5E1;
+  --input-placeholder: #94A3B8;
+
+  /* ── Focus / Ring ── */
   --ring: #C2944E;
+  --ring-offset: #FFFFFF;
+
+  /* ── Ombres ── */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+
+  /* ── Divers ── */
   --radius: 0.625rem;
-  --card-bg: #ffffff;
-  --card-border: #e2e8f0;
+  --radius-sm: 0.375rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ── Variables dynamiques (définies par le thème tenant) ── */
+  --card-bg: #FFFFFF;
+  --card-border: #E2E8F0;
+  --main-bg: #F4F6FC;
+  --primary-color: #0C1C33;
+  --primary-light: #F0F4FF;
+  --primary-hover: #162A47;
+  --sidebar-bg: #0C1C33;
 }
 
 .dark {
+  /* ── Charte Graphique Officielle Séjoura ── */
   --sejoura-navy: #0C1C33;
   --sejoura-gold: #C2944E;
   --sejoura-white: #FFFFFF;
 
+  /* ── Surfaces (hiérarchie visuelle) ── */
   --background: #090D16;
   --background-gradient-start: #090D16;
   --background-gradient-end: #0F172A;
-  --foreground: #f8fafc;
-  --card: #131C2E;
-  --card-foreground: #f8fafc;
-  --sidebar: #07101e;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-active: #C2944E;
+  --surface: #131C2E;              /* Cartes, conteneurs principaux */
+  --surface-hover: #1A2438;        /* Hover sur cartes */
+  --surface-active: #1E293B;       /* Éléments actifs */
+  --surface-muted: #0F172A;        /* Fonds secondaires (table headers, etc.) */
+  --surface-elevated: #1A2438;     /* Modals, drawers, popovers */
+  --surface-sunken: #0B1120;       /* Fonds en retrait (inputs, etc.) */
+
+  /* ── Bordures ── */
   --border: #1E293B;
-  --input: #1E293B;
+  --border-strong: #334155;
+  --border-subtle: #16213A;
+
+  /* ── Texte ── */
+  --foreground: #F8FAFC;
+  --foreground-muted: #94A3B8;
+  --foreground-subtle: #64748B;
+  --foreground-inverse: #0C1C33;
+
+  /* ── Couleurs fonctionnelles ── */
   --primary: #C2944E;
   --primary-foreground: #0C1C33;
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --primary-hover: #D4A55E;
+  --primary-muted: #1E293B;
+  --primary-muted-foreground: #C2944E;
   --secondary: #334155;
+  --secondary-foreground: #F8FAFC;
   --accent: #C2944E;
+  --accent-foreground: #0C1C33;
   --muted: #0F172A;
   --muted-hover: #1E293B;
-  --muted-foreground: #94a3b8;
-  --destructive: #dc2626;
-  --success: #22c55e;
+  --muted-foreground: #94A3B8;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --success: #22C55E;
+  --success-foreground: #0C1C33;
   --warning: #C2944E;
+  --warning-foreground: #0C1C33;
+  --info: #3B82F6;
+  --info-foreground: #FFFFFF;
+
+  /* ── Sidebar ── */
+  --sidebar: #07101E;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-muted: #64748B;
+  --sidebar-active: #C2944E;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+
+  /* ── Inputs ── */
+  --input-bg: #0B1120;
+  --input-border: #334155;
+  --input-placeholder: #64748B;
+
+  /* ── Focus / Ring ── */
   --ring: #C2944E;
+  --ring-offset: #090D16;
+
+  /* ── Ombres (plus subtiles en sombre) ── */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.2);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.2);
+
+  /* ── Divers ── */
+  --radius: 0.625rem;
+  --radius-sm: 0.375rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ── Variables dynamiques (définies par le thème tenant) ── */
   --card-bg: #131C2E;
   --card-border: #1E293B;
+  --main-bg: #090D16;
+  --primary-color: #0C1C33;
+  --primary-light: #090D16;
+  --primary-hover: #162A47;
+  --sidebar-bg: #07101E;
 }
 
 @theme inline {
@@ -75,24 +192,48 @@
   --color-sejoura-gold: #C2944E;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-active: var(--sidebar-active);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
   --color-border: var(--border);
-  --color-input: var(--input);
+  --color-border-strong: var(--border-strong);
+  --color-border-subtle: var(--border-subtle);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-foreground-inverse: var(--foreground-inverse);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-muted: var(--primary-muted);
+  --color-primary-muted-foreground: var(--primary-muted-foreground);
   --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
   --color-muted-hover: var(--muted-hover);
   --color-muted-foreground: var(--muted-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+  --color-input-placeholder: var(--input-placeholder);
   --color-ring: var(--ring);
+  --color-ring-offset: var(--ring-offset);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius: var(--radius);
@@ -160,13 +301,13 @@ html {
 /* Le module comptabilité conserve ses niveaux visuels, mais s'appuie désormais
    sur les tokens de l'application au lieu d'imposer une interface Zinc sombre. */
 .accounting-panel {
-  background: var(--card) !important;
+  background: var(--surface) !important;
   border-color: var(--border) !important;
 }
 
-.accounting-panel [class*="bg-zinc-950"] { background-color: var(--card) !important; }
-.accounting-panel [class*="bg-zinc-900"] { background-color: var(--muted) !important; }
-.accounting-panel [class*="bg-zinc-800"] { background-color: var(--muted-hover) !important; }
+.accounting-panel [class*="bg-zinc-950"] { background-color: var(--surface) !important; }
+.accounting-panel [class*="bg-zinc-900"] { background-color: var(--surface-muted) !important; }
+.accounting-panel [class*="bg-zinc-800"] { background-color: var(--surface-active) !important; }
 .accounting-panel [class*="border-zinc-"],
 .accounting-panel [class*="divide-zinc-"] { border-color: var(--border) !important; }
 .accounting-panel [class*="text-zinc-100"],
@@ -174,7 +315,7 @@ html {
 .accounting-panel [class*="text-white"] { color: var(--foreground) !important; }
 .accounting-panel [class*="text-zinc-300"],
 .accounting-panel [class*="text-zinc-400"],
-.accounting-panel [class*="text-zinc-500"] { color: var(--muted-foreground) !important; }
+.accounting-panel [class*="text-zinc-500"] { color: var(--foreground-muted) !important; }
 
 /* Effet de découpe arrondie pour le menu actif de la sidebar */
 .sidebar-active-item {
@@ -305,7 +446,7 @@ html {
    Sonner Toaster — Glassmorphism SaaS
    ============================================ */
 .toaster-group {
-  --normal-bg: var(--card);
+  --normal-bg: var(--surface);
   --normal-border: var(--border);
   --normal-text: var(--foreground);
   --success-bg: #064e3b;

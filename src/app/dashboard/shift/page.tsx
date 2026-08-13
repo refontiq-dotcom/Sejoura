@@ -57,7 +57,7 @@ const METHOD_LABELS: Record<string, { label: string; icon: React.ComponentType<{
 const METHOD_COLORS: Record<string, string> = {
   cash: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
   wave: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
-  pi_spi: "bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] font-semibold",
+  pi_spi: "bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)] font-semibold",
   bank: "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
   other: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
 };
@@ -275,7 +275,7 @@ export default function ShiftPage() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Mon Shift / Caisse</h1>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--primary-light,#F0F4FF)] text-[var(--primary-color,#0C1C33)] border border-[var(--primary-color)]/20">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)] border border-[var(--primary-color)]/20">
               <Clock className="w-3 h-3" />
               {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
             </span>
@@ -309,8 +309,8 @@ export default function ShiftPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)] col-span-1 md:col-span-1">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl bg-[var(--primary-light,#F0F4FF)] flex items-center justify-center">
-              <Wallet className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
+            <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
+              <Wallet className="w-6 h-6 text-[var(--primary-muted-foreground)]" />
             </div>
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wide font-medium">Total Caisse</p>

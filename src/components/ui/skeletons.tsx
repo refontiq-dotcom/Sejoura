@@ -3,7 +3,7 @@ import React from "react";
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-slate-200 dark:bg-slate-700 ${className}`}
+      className={`animate-pulse rounded-md bg-[var(--surface-active)] ${className}`}
       {...props}
     />
   );
@@ -11,7 +11,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 
 export function KPICardSkeleton() {
   return (
-    <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+    <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-sm)]">
       <div className="flex items-center justify-between mb-4">
         <Skeleton className="w-12 h-12 rounded-xl" />
         <Skeleton className="w-16 h-6 rounded-full" />
@@ -32,7 +32,7 @@ export function DashboardSkeletons() {
         <KPICardSkeleton />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-        <div className="lg:col-span-7 p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-96">
+        <div className="lg:col-span-7 p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-sm)] h-96">
           <Skeleton className="w-48 h-6 mb-6" />
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -46,7 +46,7 @@ export function DashboardSkeletons() {
             ))}
           </div>
         </div>
-        <div className="lg:col-span-3 p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm h-96 flex flex-col items-center justify-center">
+        <div className="lg:col-span-3 p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-sm)] h-96 flex flex-col items-center justify-center">
           <Skeleton className="w-48 h-48 rounded-full" />
         </div>
       </div>
