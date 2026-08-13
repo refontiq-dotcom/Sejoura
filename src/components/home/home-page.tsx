@@ -184,13 +184,13 @@ export function HomePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
     confirmPassword?: string;
   }>({});
-  const [remember, setRemember] = useState(false);
 
   // Modal focus trap refs
   const modalRef = useRef<HTMLDivElement>(null);
@@ -251,19 +251,13 @@ export function HomePage() {
     };
   }, [activeSection, mobileMenuOpen]);
 
-  // Pré-remplissage de l'e-mail si « Se souvenir de moi » a été coché
+  // Prefill email if "remember me" was checked previously
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("sejoura-remember-email");
-      if (saved) {
-        // Lecture unique d'une préférence persistée au montage (système externe : localStorage)
-        /* eslint-disable react-hooks/set-state-in-effect */
-        setEmail(saved);
-        setRemember(true);
-        /* eslint-enable react-hooks/set-state-in-effect */
-      }
-    } catch {
-      // localStorage indisponible : on ignore
+    const savedEmail = localStorage.getItem("sejoura-remember-email");
+    if (savedEmail) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEmail(savedEmail);
+      setRemember(true);
     }
   }, []);
 
@@ -341,14 +335,10 @@ export function HomePage() {
       }
 
       toast.success(t.loginSuccess);
-      try {
-        if (remember) {
-          localStorage.setItem("sejoura-remember-email", email);
-        } else {
-          localStorage.removeItem("sejoura-remember-email");
-        }
-      } catch {
-        // localStorage indisponible : on ignore
+      if (remember) {
+        localStorage.setItem("sejoura-remember-email", email);
+      } else {
+        localStorage.removeItem("sejoura-remember-email");
       }
       setEmail("");
       setPassword("");
@@ -426,7 +416,7 @@ export function HomePage() {
   const modalContent: Record<string, React.ReactNode> = {
     Fonctionnalités: (
       <div className="space-y-3">
-        <h4 className="font-bold text-[#0C1C33] dark:text-[#C2944E] text-base mb-3 border-b-2 border-[#C2944E] pb-2">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
           {lang === "fr" ? "Le quotidien simplifié" : "Simplified daily life"}
         </h4>
         <ul className="space-y-3 text-sm">
@@ -489,8 +479,8 @@ export function HomePage() {
             },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#0C1C33]/10 dark:bg-[#0C1C33]/50 flex items-center justify-center shrink-0">
-                <item.icon className="w-4 h-4 text-[#0C1C33] dark:text-white" />
+              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <item.icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
                 <strong className="text-slate-900 dark:text-[#e8e8e8]">{item.title} :</strong>{" "}
@@ -508,7 +498,7 @@ export function HomePage() {
     ),
     Modules: (
       <div className="space-y-3">
-        <h4 className="font-bold text-[#0C1C33] dark:text-[#C2944E] text-base mb-3 border-b-2 border-[#C2944E] pb-2">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
           {lang === "fr" ? "Fonctions avancées (Plan Entreprise)" : "Advanced features (Entreprise Plan)"}
         </h4>
         <ul className="space-y-3 text-sm">
@@ -564,8 +554,8 @@ export function HomePage() {
             },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-[#C2944E]/20 dark:bg-[#C2944E]/25 flex items-center justify-center shrink-0">
-                <item.icon className="w-4 h-4 text-[#0C1C33] dark:text-[#C2944E]" />
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                <item.icon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
                 <strong className="text-slate-900 dark:text-[#e8e8e8]">{item.title} :</strong>{" "}
@@ -578,11 +568,11 @@ export function HomePage() {
     ),
     Tarifs: (
       <div className="space-y-5">
-        <h4 className="font-bold text-[#0C1C33] dark:text-[#C2944E] text-base mb-3 border-b-2 border-[#C2944E] pb-2">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
           {lang === "fr" ? "Des tarifs simples. Zéro piège." : "Simple pricing. No tricks."}
         </h4>
-        <div className="flex items-start gap-2 bg-[#C2944E]/10 dark:bg-[#C2944E]/15 border border-[#C2944E]/50 rounded-xl px-4 py-3 text-sm text-[#0C1C33] dark:text-[#C2944E] mb-5">
-          <Check className="w-4 h-4 mt-0.5 shrink-0 text-[#C2944E]" />
+        <div className="flex items-start gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300 mb-5">
+          <Check className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
             {lang === "fr"
               ? "1 mois offert à l'inscription, sans carte bancaire. Annulable à tout moment."
@@ -598,61 +588,61 @@ export function HomePage() {
             <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
               {lang === "fr" ? "1 établissement maximum" : "Up to 1 establishment"}
             </p>
-            <div className="text-3xl font-black text-[#0C1C33] dark:text-[#C2944E] mb-4">
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
               15 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "1 admin + 1 réceptionniste" : "1 admin + 1 receptionist"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "10 unités maximum" : "Up to 10 units"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Réservations et check-in/out" : "Reservations and check-in/out"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Comptabilité de base" : "Basic accounting"}
               </li>
             </ul>
           </div>
           {/* Entreprise */}
-          <div className="bg-[#0C1C33] p-6 rounded-2xl border-2 border-[#C2944E] shadow-lg shadow-[#0C1C33]/30 relative">
-            <span className="absolute -top-3 left-6 bg-[#C2944E] text-[#0C1C33] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border-2 border-blue-500 shadow-lg shadow-blue-100 dark:shadow-blue-900/20 relative">
+            <span className="absolute -top-3 left-6 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
               {lang === "fr" ? "Le plus choisi" : "Most chosen"}
             </span>
-            <h5 className="font-black text-white text-xl mt-1">
+            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl mt-1">
               Entreprise
             </h5>
-            <p className="text-[#C2944E]/90 text-xs mb-4">
+            <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
               {lang === "fr" ? "Établissements illimités & API" : "Unlimited establishments & API"}
             </p>
-            <div className="text-3xl font-black text-[#C2944E] mb-4">
-              55 000 F <span className="text-xs font-semibold text-[#C2944E]/70">/mois</span>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
+              55 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
             </div>
-            <ul className="text-sm space-y-3 text-slate-200">
+            <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Établissements & utilisateurs illimités" : "Unlimited establishments & users"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Module ménage automatique & vitrine Trouvetou" : "Automatic cleaning & Trouvetou showcase"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Marque blanche, API & notifications WhatsApp" : "White label, API & WhatsApp notifications"}
               </li>
               <li className="flex items-start">
-                <Check className="w-4 h-4 text-[#C2944E] mt-0.5 mr-2 shrink-0" />
+                <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Rapports consolidés & support dédié 24/7" : "Consolidated reports & dedicated 24/7 support"}
               </li>
             </ul>
@@ -662,7 +652,7 @@ export function HomePage() {
     ),
     FAQ: (
       <div className="space-y-3">
-        <h4 className="font-bold text-[#0C1C33] dark:text-[#C2944E] text-base mb-4 border-b-2 border-[#C2944E] pb-2">
+        <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-4 border-b border-slate-200 dark:border-[#404040] pb-2">
           {lang === "fr" ? "Questions fréquentes" : "Frequently asked questions"}
         </h4>
         <div className="space-y-3 text-sm">
@@ -763,17 +753,17 @@ export function HomePage() {
   ];
 
   return (
-    <div className="relative h-screen flex flex-col text-[#0C1C33] dark:text-white overflow-hidden">
-      {/* Full-screen panoramic background with light overlay (charte : blanc dominant) */}
+    <div className="relative h-screen flex flex-col text-white overflow-hidden">
+      {/* Full-screen panoramic background with dark overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
-        <div className="absolute inset-0 bg-gradient-to-br from-white/95 via-white/90 to-white/85 backdrop-blur-sm dark:from-black/75 dark:via-black/60 dark:to-black/70" />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
       </div>
 
       {/* Skip link for accessibility - rendered after client mount to avoid hydration mismatch */}
       {mounted && (
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-[#0C1C33] focus:text-white focus:rounded-lg focus:text-sm"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm"
         >
           {lang === "fr" ? "Aller au contenu principal" : "Skip to main content"}
         </a>
@@ -786,23 +776,23 @@ export function HomePage() {
           <Image
             src="/logo-sejoura.png"
             alt="Séjoura"
-            width={140}
-            height={40}
-            className="object-contain h-9 w-auto"
+            width={200}
+            height={64}
+            className="object-contain h-14 w-auto brightness-0 invert"
             priority
           />
         </div>
 
         {/* Desktop Navigation */}
         <nav
-          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-[#0C1C33]/85 dark:text-white/80 bg-white/80 dark:bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-[#0C1C33]/10 dark:border-white/20 shadow-lg"
+          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-white/80 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-lg"
           aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
         >
           {navItems.map((item) => (
             <button
               key={item.section}
               onClick={() => openSection(item.section)}
-              className="hover:text-[#C2944E] dark:hover:text-white transition-colors"
+              className="hover:text-white transition-colors"
             >
               {item.label}
             </button>
@@ -814,7 +804,7 @@ export function HomePage() {
           {/* Language toggle */}
           <button
             onClick={toggleLang}
-            className="px-2.5 py-2 rounded-lg text-[10px] font-medium bg-white/80 dark:bg-white/10 backdrop-blur-md text-[#0C1C33] dark:text-white/80 border border-[#0C1C33]/10 dark:border-white/20 hover:bg-[#C2944E]/15 dark:hover:bg-white/20 transition-colors"
+            className="px-2.5 py-2 rounded-lg text-[10px] font-medium bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
             aria-label={t.langLabel}
           >
             {lang === "fr" ? "FR" : "EN"}
@@ -823,9 +813,10 @@ export function HomePage() {
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg bg-white/80 dark:bg-white/10 backdrop-blur-md text-[#0C1C33] dark:text-white/80 border border-[#0C1C33]/10 dark:border-white/20 hover:bg-[#C2944E]/15 dark:hover:bg-white/20 transition-colors"
+            className="p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.themeToggle}
           >
-            {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-[#C2944E]" />}
+            {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
           </button>
 
           {/* WhatsApp contact */}
@@ -833,7 +824,7 @@ export function HomePage() {
             href="https://wa.me/2250100372900"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex px-4 py-2.5 bg-[#0C1C33] hover:bg-[#C2944E] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
+            className="hidden sm:flex px-4 py-2.5 bg-[#25D366] hover:bg-[#1DA851] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
           >
             <MessageCircle className="w-4 h-4" />
             {t.contactTeam}
@@ -842,7 +833,7 @@ export function HomePage() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg bg-white/80 dark:bg-white/10 backdrop-blur-md text-[#0C1C33] dark:text-white/80 border border-[#0C1C33]/10 dark:border-white/20 hover:bg-[#C2944E]/15 dark:hover:bg-white/20 transition-colors"
+            className="md:hidden p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
             aria-label={t.menuToggle}
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
@@ -881,7 +872,7 @@ export function HomePage() {
                 <button
                   key={item.section}
                   onClick={() => openSection(item.section)}
-                  className="text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 dark:text-[#c0c0c0] bg-slate-50 dark:bg-[#262626] hover:bg-[#C2944E]/10 dark:hover:bg-[#C2944E]/20 hover:text-[#0C1C33] dark:hover:text-[#C2944E] transition-colors"
+                  className="text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 dark:text-[#c0c0c0] bg-slate-50 dark:bg-[#262626] hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-colors"
                 >
                   {item.label}
                 </button>
@@ -890,7 +881,7 @@ export function HomePage() {
                 href="https://wa.me/2250100372900"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 px-4 py-3 bg-[#0C1C33] hover:bg-[#C2944E] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
+                className="mt-4 px-4 py-3 bg-[#25D366] hover:bg-[#1DA851] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
               >
                 <MessageCircle className="w-4 h-4" />
                 {t.contactTeam}
@@ -909,19 +900,19 @@ export function HomePage() {
           {/* Left side — Hero text on panoramic background */}
           <div className="relative lg:flex-1 flex flex-col justify-center text-white">
             <div className="space-y-3 max-w-lg">
-              <span className="inline-block px-3.5 py-1 bg-[#0C1C33]/10 border border-[#C2944E]/60 rounded-full text-[11px] font-bold text-[#0C1C33] uppercase tracking-widest backdrop-blur-md dark:bg-white/20 dark:border-white/30 dark:text-white">
+              <span className="inline-block px-3.5 py-1 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-white uppercase tracking-widest backdrop-blur-md">
                 {t.badge}
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#0C1C33] leading-tight tracking-tight drop-shadow-sm dark:text-white">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
                 {t.heroTitle}
               </h1>
-              <p className="text-slate-700 dark:text-blue-100 text-sm font-light leading-relaxed">
+              <p className="text-blue-100 text-sm font-light leading-relaxed">
                 {t.heroSubtitle}
               </p>
 
               {/* App preview card */}
               <div className="pt-2">
-                <div className="bg-white/80 dark:bg-white/10 border border-[#0C1C33]/10 dark:border-white/20 p-3 rounded-2xl backdrop-blur-md flex items-center gap-4 shadow-lg">
+                <div className="bg-white/10 border border-white/20 p-3 rounded-2xl backdrop-blur-md flex items-center gap-4 shadow-lg">
                   <div className="relative w-16 h-12 rounded-xl overflow-hidden shadow shrink-0">
                     <Image
                       src="https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=300&auto=format&fit=crop"
@@ -932,8 +923,8 @@ export function HomePage() {
                     />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-[#0C1C33] dark:text-white">{t.dashboardPreview}</p>
-                    <p className="text-[11px] text-slate-600 dark:text-blue-200">{t.dashboardPreviewDesc}</p>
+                    <p className="text-xs font-bold text-white">{t.dashboardPreview}</p>
+                    <p className="text-[11px] text-blue-200">{t.dashboardPreviewDesc}</p>
                   </div>
                 </div>
               </div>
@@ -954,7 +945,7 @@ export function HomePage() {
                   onClick={() => setMode("login")}
                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
                     mode === "login"
-                      ? "bg-[#0C1C33] text-white shadow-md"
+                      ? "bg-blue-600 text-white shadow-md"
                       : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
                   }`}
                   role="tab"
@@ -967,7 +958,7 @@ export function HomePage() {
                   onClick={() => setMode("signup")}
                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
                     mode === "signup"
-                      ? "bg-[#0C1C33] text-white shadow-md"
+                      ? "bg-blue-600 text-white shadow-md"
                       : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
                   }`}
                   role="tab"
@@ -1004,7 +995,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="contact@sejoura.com"
-                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-[#C2944E] transition-all ${
+                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.email
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1035,7 +1026,7 @@ export function HomePage() {
                             clearErrors();
                           }}
                           placeholder="••••••••"
-                          className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-[#C2944E] transition-all ${
+                          className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                             errors.password
                               ? "border-red-400 dark:border-red-500"
                               : "border-slate-200 dark:border-[#404040]"
@@ -1062,13 +1053,13 @@ export function HomePage() {
                           name="remember"
                           checked={remember}
                           onChange={(e) => setRemember(e.target.checked)}
-                          className="rounded border-slate-300 text-[#0C1C33] focus:ring-[#C2944E] mr-1.5 w-3 h-3 cursor-pointer"
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3 h-3 cursor-pointer"
                         />
                         {t.rememberMe}
                       </label>
                       <Link
                         href="/auth/forgot-password"
-                        className="text-[#0C1C33] font-bold hover:text-[#C2944E] dark:text-blue-300 dark:hover:text-white transition-colors"
+                        className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       >
                         {t.forgotPassword}
                       </Link>
@@ -1077,7 +1068,7 @@ export function HomePage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-3 px-4 bg-[#0C1C33] hover:bg-[#C2944E] text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1155,7 +1146,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="contact@sejoura.com"
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-[#C2944E] transition-all ${
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.email
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1186,7 +1177,7 @@ export function HomePage() {
                             clearErrors();
                           }}
                           placeholder="••••••••"
-                          className={`w-full px-3 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-[#C2944E] transition-all ${
+                          className={`w-full px-3 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                             errors.password
                               ? "border-red-400 dark:border-red-500"
                               : "border-slate-200 dark:border-[#404040]"
@@ -1226,7 +1217,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="••••••••"
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-[#C2944E] transition-all ${
+                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.confirmPassword
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1245,11 +1236,11 @@ export function HomePage() {
                         type="checkbox"
                         checked={agreeTerms}
                         onChange={(e) => setAgreeTerms(e.target.checked)}
-                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-[#0C1C33] focus:ring-[#C2944E] bg-white dark:bg-[#262626]"
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]"
                       />
                       <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0] group-hover:text-slate-900 dark:group-hover:text-[#e8e8e8] transition-colors">
                         {t.acceptTerms}{" "}
-                        <Link href="/cgu" className="text-[#0C1C33] dark:text-[#C2944E] underline underline-offset-2 hover:text-[#C2944E] dark:hover:text-white transition-colors">
+                        <Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
                           {t.terms}
                         </Link>
                       </span>
@@ -1258,7 +1249,7 @@ export function HomePage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full mt-1 py-2.5 px-4 bg-[#0C1C33] hover:bg-[#C2944E] text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full mt-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1320,7 +1311,7 @@ export function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-6 text-xs text-[#0C1C33]/70 dark:text-white/75 space-y-2 px-4">
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-6 text-xs text-white/75 space-y-2 px-4">
         <p>{t.footerRights}</p>
       </footer>
 
@@ -1355,7 +1346,7 @@ export function HomePage() {
             <div className="mt-8 pt-4 border-t border-slate-100 dark:border-[#333333] flex justify-end">
               <button
                 onClick={() => setActiveSection(null)}
-                className="px-5 py-2.5 bg-[#0C1C33] text-white font-bold rounded-xl text-xs hover:bg-[#C2944E] transition-colors shadow-md"
+                className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition-colors shadow-md"
               >
                 {t.closeModal}
               </button>
