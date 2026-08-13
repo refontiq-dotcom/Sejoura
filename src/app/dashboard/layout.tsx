@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { OnboardingStatusResponse } from "@/app/api/auth/onboarding-status/route";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
@@ -36,6 +37,21 @@ export default function DashboardLayout({
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  // L'étape 2 (onboarding) est décidée côté serveur via le client admin
+  // (service_role) pour être insensible aux politiques RLS du navigateur.
+  // En cas d'échec, on ne force JAMAIS l'onboarding : le tableau de bord
+  // gère lui-même l'état "aucun établissement".
+  async function fetchOnboardingStatus(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/auth/onboarding-status");
+      if (!res.ok) return false;
+      const data = (await res.json()) as OnboardingStatusResponse;
+      return Boolean(data.needsOnboarding);
+    } catch {
+      return false;
+    }
+  }
 
   useEffect(() => {
     const handleResize = () => {
@@ -112,8 +128,6 @@ export default function DashboardLayout({
           }
         }
 
-        const isEmployee = isEmployeeEmail || metadataRole === "menagere" || metadataRole === "receptionniste" || userData?.role === "menagere" || userData?.role === "receptionniste";
-
         if (!userData) {
           const provisionalUser = {
             id: "",
@@ -134,8 +148,9 @@ export default function DashboardLayout({
           };
           setUser(provisionalUser as unknown as User);
           setAuthUserId(session.user.id);
-          // L'onboarding ne doit s'afficher QUE pour les véritables administrateurs créateurs d'espace
-          setNeedsOnboarding(!isEmployee);
+          // L'onboarding ne doit s'afficher QUE pour les véritables administrateurs
+          // créateurs d'espace : la décision fiable vient du serveur (service_role).
+          setNeedsOnboarding(await fetchOnboardingStatus());
           setLoading(false);
           return;
         }
@@ -213,20 +228,12 @@ export default function DashboardLayout({
             setPlan(subData.plan);
             setMonthlyPrice(subData.monthly_price || 0);
           }
-
-          // Le tenant seul ne suffit pas : une inscription interrompue pouvait
-          // laisser un gérant sans établissement, ce qui doit relancer l'étape 2.
-          const { data: accommodation } = await supabase
-            .from("accommodations")
-            .select("id")
-            .eq("tenant_id", userData.tenant_id)
-            .limit(1)
-            .maybeSingle();
-          setNeedsOnboarding(userData.role === "admin_residence" && !accommodation);
-        } else {
-          // L'onboarding est strictement réservé au rôle admin_residence (propriétaires/gestionnaires)
-          setNeedsOnboarding(!isEmployee && userData.role === "admin_residence");
         }
+
+        // Le tenant seul ne suffit pas pour décider si l'étape 2 est terminée :
+        // la présence d'un établissement est vérifiée côté serveur (service_role)
+        // pour ne jamais renvoyer un compte déjà configuré vers l'onboarding.
+        setNeedsOnboarding(await fetchOnboardingStatus());
 
         setLoading(false);
       } catch {
@@ -258,6 +265,12 @@ export default function DashboardLayout({
     setNeedsOnboarding(false);
     toast.success("Bienvenue ! Votre espace est prêt.");
     window.location.reload();
+  }
+
+  // L'utilisateur peut fermer l'étape 2 et continuer plus tard : on lève le
+  // blocage. Le tableau de bord gère lui-même l'état "aucun établissement".
+  function handleOnboardingDismiss() {
+    setNeedsOnboarding(false);
   }
 
   if (loading) {
@@ -327,6 +340,7 @@ export default function DashboardLayout({
           fullName={user?.full_name || ""}
           userRole={user?.role}
           onComplete={handleOnboardingComplete}
+          onClose={handleOnboardingDismiss}
         />
       )}
     </div>

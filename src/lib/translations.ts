@@ -82,6 +82,10 @@ export const translations = {
       success: "Établissement créé avec succès !",
       error: "Une erreur est survenue lors de la configuration.",
       freePlanNotice: "Plan Free offert pendant 1 mois, sans carte bancaire. Passez ensuite à l'offre Essentiel (15 000 FCFA/mois) ou Entreprise (55 000 FCFA/mois).",
+      close: "Fermer",
+      skip: "Continuer plus tard",
+      signOut: "Se déconnecter",
+      signOutHint: "Vous serez redirigé vers la page de connexion.",
     },
     dashboard: {
       title: "Tableau de bord",
@@ -522,6 +526,10 @@ export const translations = {
       success: "Establishment created successfully!",
       error: "An error occurred during setup.",
       freePlanNotice: "Free plan offered for 1 month, no credit card required. Then switch to Essentiel (15,000 XOF/month) or Entreprise (55,000 XOF/month).",
+      close: "Close",
+      skip: "Continue later",
+      signOut: "Sign out",
+      signOutHint: "You will be redirected to the login page.",
     },
     dashboard: {
       title: "Dashboard",

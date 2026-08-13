@@ -308,7 +308,7 @@ export function HomePage() {
 
     try {
       const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -319,9 +319,10 @@ export function HomePage() {
         return;
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // Utilise la session renvoyée par signInWithPassword : un appel
+      // getSession() immédiat peut renvoyer null pendant que les cookies
+      // se propagent, ce qui dégradait la navigation post-connexion.
+      const session = authData.session;
       let targetRoute = "/dashboard";
       if (session) {
         const { data: userData } = await supabase

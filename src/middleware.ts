@@ -74,7 +74,7 @@ export async function middleware(req: NextRequest) {
   if (user) {
     const { data: dbUser } = await supabase
       .from("users")
-      .select("id, tenant_id, is_active, role, first_login")
+      .select("id, is_active, role")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -114,23 +114,11 @@ export async function middleware(req: NextRequest) {
     const role = dbUser?.role;
     const isEmployee = role === "receptionniste" || role === "menagere";
 
-    // Un espace est finalisé seulement lorsqu'un tenant ET au moins un
-    // établissement existent. Un ancien onboarding interrompu peut avoir créé
-    // le profil/tenant sans résidence : il doit reprendre l'étape 2.
-    let onboardingIncomplete = false;
-    if (dbUser?.role === "admin_residence" && dbUser.tenant_id) {
-      const { data: accommodation } = await supabase
-        .from("accommodations")
-        .select("id")
-        .eq("tenant_id", dbUser.tenant_id)
-        .limit(1)
-        .maybeSingle();
-      onboardingIncomplete = !accommodation;
-    }
-
-    if (onboardingIncomplete && isDashboard && pathname !== "/dashboard") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
+    // Note : la détection d'un onboarding incomplet (étape 2) est désormais
+    // décidée côté serveur dans l'API /api/auth/onboarding-status (service_role),
+    // puis affichée par le layout du tableau de bord. Aucune redirection n'est
+    // faite ici : une lecture `accommodations` bloquée par RLS ne doit jamais
+    // renvoyer un compte déjà configuré vers un état d'installation.
 
     // ── CLOISONNEMENT DES RÔLES ──
     // Un employé ne doit JAMAIS accéder aux routes admin

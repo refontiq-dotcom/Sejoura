@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { Building2, MapPin, Home, Loader2, User, Phone, Globe2, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, MapPin, Home, Loader2, User, Phone, Globe2, Check, X, LogOut } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { createClient } from "@/lib/supabase/client";
 import { SUPPORTED_COUNTRIES } from "@/lib/countries";
 import { getCitiesForCountry } from "@/lib/cities";
+import { LOGIN_ROUTE } from "@/lib/routes";
 
 interface OnboardingModalProps {
   userId: string;
@@ -15,11 +17,13 @@ interface OnboardingModalProps {
   fullName: string;
   userRole?: string;
   onComplete: () => void;
+  onClose?: () => void;
 }
 
-export function OnboardingModal({ userId, email, fullName, userRole, onComplete }: OnboardingModalProps) {
+export function OnboardingModal({ userId, email, fullName, userRole, onComplete, onClose }: OnboardingModalProps) {
   const { lang } = useLanguage();
   const t = translations[lang].onboarding;
+  const router = useRouter();
   const [formFullName, setFormFullName] = useState(fullName || "");
   const [residenceName, setResidenceName] = useState("");
   const [residenceType, setResidenceType] = useState("bnb");
@@ -127,6 +131,18 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
     }
   }
 
+  // Permet de quitter l'étape 2 sans être bloqué : déconnexion propre
+  // et retour à la page de connexion.
+  async function handleSignOut() {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Non bloquant : on redirige quoi qu'il arrive
+    }
+    router.push(LOGIN_ROUTE);
+  }
+
   const inputClass =
     "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:border-transparent transition-all text-sm";
   const labelClass =
@@ -144,6 +160,16 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-[-50%] left-[-10%] w-48 h-48 rounded-full bg-white blur-2xl animate-pulse" />
           </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t.close}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <div className="inline-flex p-3 rounded-full bg-white/10 mb-3 backdrop-blur-md shadow-inner">
             <Home className="w-6 h-6 text-white" />
           </div>
@@ -321,6 +347,32 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
               t.continue
             )}
           </button>
+
+          {/* Sortie de l'étape 2 : on ne doit jamais être bloqué ici */}
+          <div className="pt-2 pb-1 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-700">
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
+              >
+                {t.skip}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors disabled:opacity-50"
+            >
+              <LogOut className="w-3 h-3" />
+              {t.signOut}
+            </button>
+          </div>
+          <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 -mt-1">
+            {t.signOutHint}
+          </p>
         </form>
       </div>
     </div>
