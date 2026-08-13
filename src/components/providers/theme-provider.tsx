@@ -32,6 +32,10 @@ function getContrastColor(hex: string) {
   return luminance > 0.6 ? "#0f172a" : "#ffffff";
 }
 
+function isValidHex(color: string | null | undefined): color is string {
+  return Boolean(color && /^#[0-9a-f]{6}$/i.test(color.trim()));
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
   const [primaryColor, setPrimaryColorState] = useState<string>("#0C1C33");
@@ -39,6 +43,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // L'initialisation lit un stockage externe lors de l'hydratation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const storedTheme = localStorage.getItem("sejoura-theme") as Theme | null;
     const storedColor = localStorage.getItem("sejoura-primary-color");
@@ -53,17 +59,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setThemeState("dark");
     }
 
-    if (storedColor) {
+    if (isValidHex(storedColor)) {
       setPrimaryColorState(storedColor);
     }
 
     if (storedThemeColor) {
       setThemeColorState(storedThemeColor);
+      const isCustomHex = isValidHex(storedThemeColor) && !THEME_PRESETS.some(
+        (preset) => preset.sidebarBg.toLowerCase() === storedThemeColor.toLowerCase()
+      );
       const preset = getThemePresetById(storedThemeColor);
-      document.documentElement.style.setProperty("--sidebar-bg", preset.sidebarBg);
-      document.documentElement.style.setProperty("--main-bg", preset.contentBg);
-      document.documentElement.style.setProperty("--primary-color", preset.sidebarBg);
-      document.documentElement.style.setProperty("--primary-light", preset.contentBg);
+      const sidebarBg = isCustomHex ? storedThemeColor : preset.sidebarBg;
+      const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : preset.contentBg;
+      document.documentElement.style.setProperty("--sidebar-bg", sidebarBg);
+      document.documentElement.style.setProperty("--main-bg", contentBg);
+      document.documentElement.style.setProperty("--primary-color", sidebarBg);
+      document.documentElement.style.setProperty("--primary-light", contentBg);
     }
   }, []);
 
@@ -92,9 +103,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       } else {
         root.classList.remove("dark");
       }
-      const contrast = getContrastColor(primaryColor);
-      root.style.setProperty("--color-primary", primaryColor);
-      root.style.setProperty("--primary", primaryColor);
+      const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : "#0C1C33";
+      const contrast = getContrastColor(safePrimaryColor);
+      root.style.setProperty("--color-primary", safePrimaryColor);
+      root.style.setProperty("--primary", safePrimaryColor);
       root.style.setProperty("--color-primary-foreground", contrast);
       root.style.setProperty("--primary-foreground", contrast);
       
@@ -110,6 +122,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         root.style.setProperty("--primary-light", contentBg);
         localStorage.setItem("theme_color", themeColor);
         localStorage.setItem("sejoura-theme-color", themeColor);
+      } else {
+        root.style.removeProperty("--sidebar-bg");
+        root.style.removeProperty("--main-bg");
+        root.style.removeProperty("--primary-color");
+        root.style.removeProperty("--primary-light");
       }
 
       localStorage.setItem("sejoura-theme", theme);

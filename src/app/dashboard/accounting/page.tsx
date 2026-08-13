@@ -1293,7 +1293,7 @@ export default function AccountingPage() {
         </div>
 
         {/* Panneau Smart & Compact */}
-        <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 md:p-4 space-y-4">
+        <div className="accounting-panel mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 md:p-4 space-y-4">
           {/* Sélecteur de période */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-wrap">
             <PeriodSelector
@@ -2255,4 +2255,3 @@ export default function AccountingPage() {
     </div>
   );
 }
-

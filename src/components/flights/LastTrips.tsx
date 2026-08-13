@@ -25,21 +25,21 @@ const trips = [
 
 export function LastTrips() {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm flex flex-col h-full border border-slate-100 relative">
+    <div className="bg-[var(--card)] rounded-3xl p-6 shadow-sm flex flex-col h-full border border-[var(--border)] relative">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Last Trips</h2>
-          <p className="text-sm text-slate-400">Overview of latest month</p>
+          <h2 className="text-xl font-bold text-[var(--foreground)]">Last Trips</h2>
+          <p className="text-sm text-[var(--muted-foreground)]">Overview of latest month</p>
         </div>
-        <button className="p-2 hover:bg-slate-50 rounded-full transition-colors">
-          <MoreHorizontal className="w-5 h-5 text-slate-400" />
+        <button className="p-2 hover:bg-[var(--muted)] rounded-full transition-colors">
+          <MoreHorizontal className="w-5 h-5 text-[var(--muted-foreground)]" />
         </button>
       </div>
 
       <div className="flex-1 overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="text-slate-400 text-sm border-b border-slate-100">
+            <tr className="text-[var(--muted-foreground)] text-sm border-b border-[var(--border)]">
               <th className="pb-4 font-medium">Members</th>
               <th className="pb-4 font-medium">Flight</th>
               <th className="pb-4 font-medium">Total Members</th>
@@ -48,29 +48,29 @@ export function LastTrips() {
           </thead>
           <tbody>
             {trips.map((trip) => (
-              <tr key={trip.id} className="border-b border-slate-50 last:border-0">
+              <tr key={trip.id} className="border-b border-[var(--border)] last:border-0">
                 <td className="py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="w-10 h-10 rounded-full bg-[var(--muted)] overflow-hidden">
                       <img src={trip.avatar} alt={trip.name} className="w-full h-full object-cover" />
                     </div>
                     <div>
-                      <div className="font-semibold text-slate-800">{trip.name}</div>
-                      <div className="text-xs text-slate-400">{trip.destination}</div>
+                      <div className="font-semibold text-[var(--foreground)]">{trip.name}</div>
+                      <div className="text-xs text-[var(--muted-foreground)]">{trip.destination}</div>
                     </div>
                   </div>
                 </td>
-                <td className="py-4 text-slate-700 font-medium">{trip.flight}</td>
+                <td className="py-4 text-[var(--foreground)] font-medium">{trip.flight}</td>
                 <td className="py-4">
                   <div className="flex -space-x-2">
                     {[...Array(trip.members)].map((_, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 overflow-hidden">
+                      <div key={i} className="w-8 h-8 rounded-full border-2 border-[var(--card)] bg-[var(--muted)] overflow-hidden">
                         <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${trip.name}${i}`} alt="member" />
                       </div>
                     ))}
                   </div>
                 </td>
-                <td className="py-4 font-bold text-slate-800">{trip.price}</td>
+                <td className="py-4 font-bold text-[var(--foreground)]">{trip.price}</td>
               </tr>
             ))}
           </tbody>

@@ -35,11 +35,11 @@ export function StatCard({ title, value, type }: StatCardProps) {
   const styles = getStyles();
 
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-100 flex flex-col relative h-full">
+    <div className="bg-[var(--card)] rounded-3xl overflow-hidden shadow-sm border border-[var(--border)] flex flex-col relative h-full">
       <div className={`${styles.headerBg} h-3 w-full`} />
       <div className="p-6 flex-1 flex flex-col relative overflow-hidden">
-        <h3 className="text-slate-400 font-medium mb-1">{title}</h3>
-        <div className="text-3xl font-bold text-slate-800">{value}</div>
+        <h3 className="text-[var(--muted-foreground)] font-medium mb-1">{title}</h3>
+        <div className="text-3xl font-bold text-[var(--foreground)]">{value}</div>
         
         {/* Background icon */}
         {styles.icon}

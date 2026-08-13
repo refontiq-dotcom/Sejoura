@@ -113,7 +113,7 @@ body {
 }
 
 .dashboard-bg {
-  background-color: var(--main-bg, #f8fafc);
+  background-color: var(--main-bg, var(--background));
   background-attachment: fixed;
   min-height: 100vh;
 }
@@ -150,6 +150,31 @@ html {
 .theme-transition .dashboard-bg {
   transition: background 0.5s ease;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition *, .theme-transition .dashboard-bg {
+    transition: none !important;
+  }
+}
+
+/* Le module comptabilité conserve ses niveaux visuels, mais s'appuie désormais
+   sur les tokens de l'application au lieu d'imposer une interface Zinc sombre. */
+.accounting-panel {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.accounting-panel [class*="bg-zinc-950"] { background-color: var(--card) !important; }
+.accounting-panel [class*="bg-zinc-900"] { background-color: var(--muted) !important; }
+.accounting-panel [class*="bg-zinc-800"] { background-color: var(--muted-hover) !important; }
+.accounting-panel [class*="border-zinc-"],
+.accounting-panel [class*="divide-zinc-"] { border-color: var(--border) !important; }
+.accounting-panel [class*="text-zinc-100"],
+.accounting-panel [class*="text-zinc-200"],
+.accounting-panel [class*="text-white"] { color: var(--foreground) !important; }
+.accounting-panel [class*="text-zinc-300"],
+.accounting-panel [class*="text-zinc-400"],
+.accounting-panel [class*="text-zinc-500"] { color: var(--muted-foreground) !important; }
 
 /* Effet de découpe arrondie pour le menu actif de la sidebar */
 .sidebar-active-item {

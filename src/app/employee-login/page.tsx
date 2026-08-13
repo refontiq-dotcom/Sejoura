@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Delete, ChevronLeft, ShieldCheck, PhoneCall } from "lucide-react";
+import { Loader2, Delete, ChevronLeft, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ export default function EmployeeLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
         </div>
       }
@@ -55,7 +55,7 @@ export default function EmployeeLoginPage() {
 function EmployeeLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setPrimaryColor, primaryColor: themePrimaryColor } = useTheme();
+  const { theme, toggleTheme, setPrimaryColor, primaryColor: themePrimaryColor } = useTheme();
 
   // État machine
   const [step, setStep] = useState<Step>("phone");
@@ -72,9 +72,9 @@ function EmployeeLoginContent() {
   // Couleur dynamique de la marque de l'établissement
   const [brandColor, setBrandColor] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("sejoura-primary-color") || "#2563eb";
+      return localStorage.getItem("sejoura-primary-color") || "#0C1C33";
     }
-    return "#2563eb";
+    return "#0C1C33";
   });
 
   // Étape 2 — PIN
@@ -120,31 +120,11 @@ function EmployeeLoginContent() {
     }
   }, [step, pinStep, pin, pinConfirm]);
 
-  // Auto-avancer quand PIN complet (verify)
-  useEffect(() => {
-    if (step === "verify-pin" && pin.length === PIN_LENGTH) {
-      handlePinSubmit();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, step]);
-
-  // Auto-avancer quand PIN complet (set — étape confirmation)
-  useEffect(() => {
-    if (step === "set-pin") {
-      if (pinStep === "enter" && pin.length === PIN_LENGTH) {
-        setTimeout(() => setPinStep("confirm"), 300);
-      }
-      if (pinStep === "confirm" && pinConfirm.length === PIN_LENGTH) {
-        handleSetPinSubmit();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, pinConfirm, pinStep, step]);
-
   // ── Paramètres d'URL (Pré-remplissage et messages d'erreur) ────────────────
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam === "revoked") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPhoneError("Votre accès a été révoqué par votre employeur.");
       toast.error("Votre accès a été révoqué par votre employeur.");
     }
@@ -251,6 +231,10 @@ function EmployeeLoginContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [step, handlePhoneKey, handlePinKey, handlePhoneSubmit]);
 
+  const redirectByRole = useCallback((role: string) => {
+    window.setTimeout(() => router.push(role === "menagere" ? "/menage" : "/dashboard"), 500);
+  }, [router]);
+
   // ── Étape 2a : Définition du PIN ─────────────────────────────────────────────
   const handleSetPinSubmit = useCallback(async () => {
     if (!profile) return;
@@ -297,7 +281,7 @@ function EmployeeLoginContent() {
     } finally {
       setLoading(false);
     }
-  }, [profile, pin, pinConfirm]);
+  }, [profile, pin, pinConfirm, redirectByRole]);
 
   // ── Étape 2b : Vérification du PIN ───────────────────────────────────────────
   const handlePinSubmit = useCallback(async () => {
@@ -340,18 +324,30 @@ function EmployeeLoginContent() {
     } finally {
       setLoading(false);
     }
-  }, [profile, pin]);
+  }, [profile, pin, redirectByRole]);
 
-  // ── Redirection par rôle ──────────────────────────────────────────────────────
-  function redirectByRole(role: string) {
-    setTimeout(() => {
-      if (role === "menagere") {
-        router.push("/menage");
-      } else {
-        router.push("/dashboard");
-      }
-    }, 500);
-  }
+  // Auto-avancer quand PIN complet (verify)
+  useEffect(() => {
+    if (step === "verify-pin" && pin.length === PIN_LENGTH && !loading) {
+      // La soumission est déclenchée par la saisie complète du PIN.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void handlePinSubmit();
+    }
+  }, [handlePinSubmit, loading, pin.length, step]);
+
+  // Auto-avancer quand PIN complet (set — étape confirmation)
+  useEffect(() => {
+    if (step !== "set-pin" || loading) return;
+    if (pinStep === "enter" && pin.length === PIN_LENGTH) {
+      const timer = window.setTimeout(() => setPinStep("confirm"), 300);
+      return () => window.clearTimeout(timer);
+    }
+    if (pinStep === "confirm" && pinConfirm.length === PIN_LENGTH) {
+      // La soumission est déclenchée par la saisie complète du PIN.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void handleSetPinSubmit();
+    }
+  }, [handleSetPinSubmit, loading, pin.length, pinConfirm.length, pinStep, step]);
 
   // ── Retour étape précédente ───────────────────────────────────────────────────
   function handleBack() {
@@ -373,10 +369,10 @@ function EmployeeLoginContent() {
   }
 
   const activePin = step === "set-pin" && pinStep === "confirm" ? pinConfirm : pin;
-  const currentAccent = brandColor || themePrimaryColor || "#2563eb";
+  const currentAccent = brandColor || themePrimaryColor || "#0C1C33";
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-900 flex items-center justify-center p-3 relative font-sans select-none">
+    <div className="min-h-screen w-full overflow-hidden bg-[var(--background)] flex items-center justify-center p-3 relative font-sans select-none">
       {/* Halo lumineux dynamique basé sur la couleur de marque */}
       <div
         className="absolute w-[500px] h-[500px] rounded-full blur-[140px] opacity-25 pointer-events-none transition-all duration-700"
@@ -412,7 +408,9 @@ function EmployeeLoginContent() {
           </div>
 
           <div className="w-8 flex justify-end">
-            <ShieldCheck className="w-4 h-4 text-slate-400" />
+            <button onClick={toggleTheme} className="p-1.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}>
+              {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
+            </button>
           </div>
         </div>
 

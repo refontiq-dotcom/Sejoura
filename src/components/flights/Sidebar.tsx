@@ -9,7 +9,6 @@ import {
   Settings, 
   Map as MapIcon 
 } from "lucide-react";
-import Image from "next/image";
 
 const navItems = [
   { name: "Dashboard", icon: LayoutDashboard },
@@ -22,7 +21,7 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="w-[260px] bg-[#0A1A2F] text-white flex flex-col h-full z-10 relative">
+    <aside className="w-[260px] bg-[var(--sidebar-bg,var(--sidebar))] text-[var(--sidebar-foreground)] flex flex-col h-full z-10 relative">
       {/* Profile Section */}
       <div className="flex flex-col items-center pt-10 pb-8">
         <div className="w-20 h-20 rounded-full border-2 border-white/20 overflow-hidden mb-3">

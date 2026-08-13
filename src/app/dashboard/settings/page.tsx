@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState<string>("#2563eb");
+  const [primaryColor, setPrimaryColor] = useState<string>("#0C1C33");
   const [themeColor, setThemeColor] = useState<string>("#0C1C33");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
@@ -126,7 +126,7 @@ export default function SettingsPage() {
           if (tenantData) {
             setTenant(tenantData as unknown as Tenant);
             setLogoPreviewUrl(tenantData.logo_url || null);
-            const dbColor = tenantData.primary_color || "#2563eb";
+            const dbColor = tenantData.primary_color || "#0C1C33";
             setPrimaryColor(dbColor);
             setThemePrimaryColor(dbColor); // Sync ThemeProvider (--color-primary / --primary)
             // Charger la couleur du Sidebar depuis la DB

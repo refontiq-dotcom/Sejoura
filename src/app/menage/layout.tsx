@@ -9,7 +9,7 @@ import { LOGIN_ROUTE } from "@/lib/routes";
 
 export default function MenageLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, setPrimaryColor, setThemeColor } = useTheme();
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [tenantName, setTenantName] = useState("");
@@ -41,13 +41,15 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
         if (userData.tenant_id) {
           const { data: tenantData } = await supabase
             .from("tenants")
-            .select("company_name")
+            .select("company_name, primary_color, theme_color")
             .eq("id", userData.tenant_id)
             .single();
 
           if (tenantData?.company_name) {
             setTenantName(tenantData.company_name);
           }
+          if (tenantData?.primary_color) setPrimaryColor(tenantData.primary_color);
+          setThemeColor(tenantData?.theme_color || null);
         }
 
         setLoading(false);

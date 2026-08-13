@@ -34,11 +34,11 @@ const lineData = [
 
 export function StatisticsChart() {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col h-full">
+    <div className="bg-[var(--card)] rounded-3xl p-6 shadow-sm border border-[var(--border)] flex flex-col h-full">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-slate-800">Statistics</h2>
-        <button className="p-2 hover:bg-slate-50 rounded-full">
-          <MoreHorizontal className="w-5 h-5 text-slate-400" />
+        <h2 className="text-xl font-bold text-[var(--foreground)]">Statistics</h2>
+        <button className="p-2 hover:bg-[var(--muted)] rounded-full">
+          <MoreHorizontal className="w-5 h-5 text-[var(--muted-foreground)]" />
         </button>
       </div>
       <div className="flex-1 min-h-[200px]">
@@ -59,11 +59,11 @@ export function StatisticsChart() {
 
 export function FlightsShareChart() {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col h-full">
+    <div className="bg-[var(--card)] rounded-3xl p-6 shadow-sm border border-[var(--border)] flex flex-col h-full">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-slate-800">Flights Share</h2>
-        <button className="p-2 hover:bg-slate-50 rounded-full">
-          <MoreHorizontal className="w-5 h-5 text-slate-400" />
+        <h2 className="text-xl font-bold text-[var(--foreground)]">Flights Share</h2>
+        <button className="p-2 hover:bg-[var(--muted)] rounded-full">
+          <MoreHorizontal className="w-5 h-5 text-[var(--muted-foreground)]" />
         </button>
       </div>
       <div className="flex-1 min-h-[200px] relative">
@@ -91,14 +91,14 @@ export function FlightsShareChart() {
 
 export function FlightsScheduleChart() {
   return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col h-full relative overflow-hidden">
+    <div className="bg-[var(--card)] rounded-3xl p-6 shadow-sm border border-[var(--border)] flex flex-col h-full relative overflow-hidden">
       <div className="flex justify-between items-center mb-4 z-10">
-        <h2 className="text-xl font-bold text-slate-800">Flights Schedule</h2>
-        <button className="p-2 hover:bg-slate-50 rounded-full">
-          <MoreHorizontal className="w-5 h-5 text-slate-400" />
+        <h2 className="text-xl font-bold text-[var(--foreground)]">Flights Schedule</h2>
+        <button className="p-2 hover:bg-[var(--muted)] rounded-full">
+          <MoreHorizontal className="w-5 h-5 text-[var(--muted-foreground)]" />
         </button>
       </div>
-      <div className="absolute top-1/4 right-8 bg-white shadow-lg rounded-full px-4 py-2 text-sm font-bold text-slate-700 z-10 border border-slate-100">
+      <div className="absolute top-1/4 right-8 bg-[var(--card)] shadow-lg rounded-full px-4 py-2 text-sm font-bold text-[var(--foreground)] z-10 border border-[var(--border)]">
         3500 Passengers
       </div>
       <div className="flex-1 min-h-[200px] -mx-4 -mb-4">
