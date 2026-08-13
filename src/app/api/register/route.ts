@@ -41,59 +41,129 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
 
-    // Idempotence : si le profil existe déjà, on renvoie l'espace existant
-    // pour éviter les doublons (tenant, abonnement, établissement) en cas de
-    // double soumission ou de re-soumission après un échec réseau.
+    // Profil applicatif existant (créé par le trigger handle_new_user à
+    // l'inscription, ou par une étape 2 déjà partielle).
     const { data: existingUser } = await admin
       .from("users")
       .select("id, tenant_id")
       .eq("auth_user_id", session.user.id)
       .maybeSingle();
 
-    if (existingUser?.tenant_id) {
+    // Espace déjà en cours de création : profil rattaché à un tenant, OU tenant
+    // orphelin laissé par une tentative interrompue (rollback inabouti). On
+    // reprend l'existant pour être strictement idempotent et ne jamais violer
+    // la contrainte UNIQUE sur tenants.contact_email.
+    let tenantId = existingUser?.tenant_id ?? null;
+    if (!tenantId) {
+      const { data: orphanTenant } = await admin
+        .from("tenants")
+        .select("id")
+        .eq("contact_email", email)
+        .maybeSingle();
+      if (orphanTenant) tenantId = orphanTenant.id;
+    }
+
+    const accommodationPayload = {
+      tenant_id: tenantId,
+      name: residenceName,
+      description: residenceType,
+      address: residenceLocation,
+      city: residenceLocation,
+      country: countryName,
+      currency: countryConfig?.currency ?? "XOF",
+      currency_symbol: countryConfig?.currencySymbol ?? "FCFA",
+      phone_code: countryConfig?.phoneCode ?? "+225",
+      language: countryConfig?.defaultLang ?? "fr",
+      contact_phone: phone,
+      total_rooms: 0,
+      is_active: true,
+    };
+
+    const profilePayload = {
+      tenant_id: tenantId,
+      auth_user_id: session.user.id,
+      role: "admin_residence" as const,
+      full_name: fullName,
+      phone,
+      email,
+      is_active: true,
+      activated_at: new Date().toISOString(),
+    };
+
+    // ── Reprise idempotente : l'espace (tenant) existe déjà ──
+    if (tenantId) {
       const { data: existingAccommodation, error: accommodationLookupError } = await admin
         .from("accommodations")
         .select("id")
-        .eq("tenant_id", existingUser.tenant_id)
+        .eq("tenant_id", tenantId)
         .limit(1)
         .maybeSingle();
 
       if (accommodationLookupError) {
+        console.error("register: accommodation lookup failed", accommodationLookupError);
         return NextResponse.json({ error: "Impossible de vérifier votre établissement existant." }, { status: 500 });
       }
-      if (existingAccommodation) {
-        return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: existingAccommodation.id });
+
+      let accommodationId = existingAccommodation?.id ?? null;
+      if (!accommodationId) {
+        const { data: accommodation, error: accommodationError } = await admin
+          .from("accommodations")
+          .insert(accommodationPayload)
+          .select("id")
+          .single();
+        if (accommodationError || !accommodation) {
+          console.error("register: create accommodation failed", accommodationError);
+          return NextResponse.json({ error: "Impossible de finaliser la création de l'établissement." }, { status: 500 });
+        }
+        accommodationId = accommodation.id;
       }
 
-      // Réparation idempotente d'un onboarding interrompu : le profil et le
-      // tenant existent, seule la résidence manque.
-      const { data: accommodation, error: accommodationError } = await admin
-        .from("accommodations")
-        .insert({
-          tenant_id: existingUser.tenant_id,
-          name: residenceName,
-          description: residenceType,
-          address: residenceLocation,
-          city: residenceLocation,
-          country: countryName,
-          currency: countryConfig?.currency ?? "XOF",
-          currency_symbol: countryConfig?.currencySymbol ?? "FCFA",
-          phone_code: countryConfig?.phoneCode ?? "+225",
-          language: countryConfig?.defaultLang ?? "fr",
-          contact_phone: phone,
-          total_rooms: 0,
-          is_active: true,
-        })
+      // Abonnement manquant (tentative interrompue avant sa création) : le créer.
+      const { data: existingSub } = await admin
+        .from("subscriptions")
         .select("id")
-        .single();
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
 
-      if (accommodationError || !accommodation) {
-        return NextResponse.json({ error: "Impossible de finaliser la création de l'établissement." }, { status: 500 });
+      if (!existingSub) {
+        const plan = normalizePlan(body.plan || "free");
+        const trialEnd = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        const { error: subError } = await admin.from("subscriptions").insert({
+          tenant_id: tenantId,
+          plan,
+          status: "trial",
+          trial_ends_at: trialEnd,
+          current_period_start: new Date().toISOString(),
+          current_period_end: trialEnd,
+          monthly_price: getPlanPrice(plan),
+          is_soft_locked: false,
+        });
+        if (subError) {
+          console.error("register: recover subscription failed", subError);
+          return NextResponse.json(
+            { error: "Erreur lors de la configuration de l'abonnement. Veuillez réessayer." },
+            { status: 500 }
+          );
+        }
       }
-      return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: accommodation.id, recovered: true });
+
+      // Rattacher / réparer le profil applicatif au tenant récupéré.
+      const { error: userError } = existingUser
+        ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
+        : await admin.from("users").insert(profilePayload);
+      if (userError) {
+        console.error("register: upsert user profile failed", userError);
+        return NextResponse.json(
+          { error: "Erreur lors de la création du profil utilisateur. Veuillez réessayer." },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, tenantId, accommodationId });
     }
 
-    // 1. Create Tenant (Enterprise)
+    // ── Création complète d'un espace neuf ──
+    // 1. Tenant
     const { data: tenantData, error: tenantError } = await admin
       .from("tenants")
       .insert({
@@ -109,13 +179,14 @@ export async function POST(request: Request) {
       .single();
 
     if (tenantError || !tenantData) {
+      console.error("register: create tenant failed", tenantError);
       return NextResponse.json(
         { error: "Erreur lors de la création de l'espace. Veuillez réessayer." },
         { status: 500 }
       );
     }
 
-    // 2. Create Subscription (plan Free : essai gratuit de 1 mois)
+    // 2. Abonnement (essai gratuit de 30 jours)
     const plan = normalizePlan(body.plan || "free");
     const trialEnd = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
@@ -131,6 +202,9 @@ export async function POST(request: Request) {
     });
 
     if (subError) {
+      console.error("register: create subscription failed", subError);
+      // Nettoyage best-effort : si la suppression échoue, le tenant orphelin
+      // sera réadopté par la reprise idempotente au prochain essai.
       await admin.from("tenants").delete().eq("id", tenantData.id);
       return NextResponse.json(
         { error: "Erreur lors de la configuration de l'abonnement. Veuillez réessayer." },
@@ -138,7 +212,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Create Accommodation (First Residence)
+    // 3. Établissement (première résidence)
     const { data: accommodationData, error: accError } = await admin.from("accommodations").insert({
       tenant_id: tenantData.id,
       name: residenceName,
@@ -155,6 +229,7 @@ export async function POST(request: Request) {
     }).select("id").single();
 
     if (accError || !accommodationData) {
+      console.error("register: create accommodation failed", accError);
       await admin.from("tenants").delete().eq("id", tenantData.id);
       return NextResponse.json(
         { error: "Erreur lors de la création de l'établissement. Veuillez réessayer." },
@@ -162,23 +237,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Créer ou réparer le profil applicatif à partir de l'identité auth.uid().
-    // Aucun identifiant fourni par le navigateur n'est utilisé pour cette liaison.
-    const profilePayload = {
-      tenant_id: tenantData.id,
-      auth_user_id: session.user.id,
-      role: "admin_residence" as const,
-      full_name: fullName,
-      phone,
-      email,
-      is_active: true,
-      activated_at: now,
-    };
+    // 4. Profil applicatif
     const { error: userError } = existingUser
       ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
-      : await admin.from("users").insert(profilePayload);
+      : await admin.from("users").insert({ ...profilePayload, tenant_id: tenantData.id });
 
     if (userError) {
+      console.error("register: upsert user profile failed", userError);
       await admin.from("tenants").delete().eq("id", tenantData.id);
       return NextResponse.json(
         { error: "Erreur lors de la création du profil utilisateur. Veuillez réessayer." },
@@ -187,7 +252,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, tenantId: tenantData.id, accommodationId: accommodationData.id });
-  } catch {
+  } catch (error) {
+    console.error("register: unexpected error", error);
     return NextResponse.json(
       { error: "Une erreur interne est survenue. Veuillez réessayer plus tard." },
       { status: 500 }

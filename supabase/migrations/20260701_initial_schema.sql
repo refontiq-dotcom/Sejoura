@@ -90,10 +90,17 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Plans tarifaires
+-- NB : l'application stocke aussi les labels de formule ('free', 'essentiel',
+-- 'entreprise') utilisés par normalizePlan() et les vérifications directes
+-- (ex : subscription.plan !== 'entreprise'). Ils doivent donc être présents
+-- dans l'enum, comme c'était le cas en production avant le reset.
 DO $$ BEGIN
   CREATE TYPE subscription_plan AS ENUM (
     'standard',   -- 15 000 FCFA/mois
-    'enterprise'  -- 55 000 FCFA/mois
+    'enterprise', -- 55 000 FCFA/mois
+    'free',       -- Essai gratuit (1 mois)
+    'essentiel',  -- Formule Essentielle (15 000 FCFA/mois)
+    'entreprise'  -- Formule Entreprise (55 000 FCFA/mois)
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
