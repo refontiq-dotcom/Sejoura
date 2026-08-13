@@ -106,7 +106,7 @@ export default function SettingsPage() {
         .from("users")
         .select("id, auth_user_id, full_name, phone, email, role, tenant_id")
         .eq("auth_user_id", session.user.id)
-        .single();
+        .maybeSingle();
 
         if (userData) {
          setUser(userData as unknown as UserType);
@@ -116,7 +116,7 @@ export default function SettingsPage() {
            email: userData.email || "",
          });
 
-        if (userData.tenant_id) {
+        if (userData?.tenant_id) {
           const { data: tenantData } = await supabase
             .from("tenants")
             .select("*")

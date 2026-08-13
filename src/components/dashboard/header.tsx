@@ -53,7 +53,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
           .from("users")
           .select("tenant_id")
           .eq("auth_user_id", session.user.id)
-          .single();
+          .maybeSingle();
 
         if (!userData?.tenant_id) return;
         setTenantId(userData.tenant_id);

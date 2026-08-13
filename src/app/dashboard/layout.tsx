@@ -85,8 +85,14 @@ export default function DashboardLayout({
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
 
-        // Si l'utilisateur n'est toujours pas trouvé, on appelle l'API d'authentification serveur
-        if (!userData) {
+        const isEmployeeEmail = session.user.email?.includes("@employe.sejoura.com");
+        const metadataRole = session.user.user_metadata?.role;
+        const isEmployeeIdentity = isEmployeeEmail || metadataRole === "menagere" || metadataRole === "receptionniste";
+
+        // Cette route sert uniquement à rattacher un compte employé déjà créé
+        // par son employeur. Un nouveau gérant n'a volontairement pas encore de
+        // profil à l'étape 2 : l'appeler ici produisait un faux 404.
+        if (!userData && isEmployeeIdentity) {
           try {
             const res = await fetch("/api/employee-auth", {
               method: "POST",
@@ -106,8 +112,6 @@ export default function DashboardLayout({
           }
         }
 
-        const isEmployeeEmail = session.user.email?.includes("@employe.sejoura.com");
-        const metadataRole = session.user.user_metadata?.role;
         const isEmployee = isEmployeeEmail || metadataRole === "menagere" || metadataRole === "receptionniste" || userData?.role === "menagere" || userData?.role === "receptionniste";
 
         if (!userData) {
@@ -183,7 +187,7 @@ export default function DashboardLayout({
             .from("tenants")
             .select("company_name, logo_url, theme_color")
             .eq("id", userData.tenant_id)
-            .single();
+            .maybeSingle();
 
           if (tenantData) {
             setCompanyName(tenantData.company_name);
@@ -203,7 +207,7 @@ export default function DashboardLayout({
             .from("subscriptions")
             .select("plan, monthly_price")
             .eq("tenant_id", userData.tenant_id)
-            .single();
+            .maybeSingle();
 
           if (subData) {
             setPlan(subData.plan);
