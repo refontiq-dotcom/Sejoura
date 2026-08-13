@@ -20,7 +20,6 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      email,
       fullName,
       residenceName,
       residenceType,
@@ -29,6 +28,7 @@ export async function POST(request: Request) {
       phone = "",
     } = body;
 
+    const email = session.user.email?.trim();
     if (!email || !fullName?.trim() || !residenceName?.trim() || !residenceType?.trim() || !residenceLocation?.trim() || !country?.trim()) {
       return NextResponse.json(
         { error: "Tous les champs requis doivent être renseignés." },
@@ -46,12 +46,51 @@ export async function POST(request: Request) {
     // double soumission ou de re-soumission après un échec réseau.
     const { data: existingUser } = await admin
       .from("users")
-      .select("tenant_id")
+      .select("id, tenant_id")
       .eq("auth_user_id", session.user.id)
       .maybeSingle();
 
     if (existingUser?.tenant_id) {
-      return NextResponse.json({ success: true, tenantId: existingUser.tenant_id });
+      const { data: existingAccommodation, error: accommodationLookupError } = await admin
+        .from("accommodations")
+        .select("id")
+        .eq("tenant_id", existingUser.tenant_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (accommodationLookupError) {
+        return NextResponse.json({ error: "Impossible de vérifier votre établissement existant." }, { status: 500 });
+      }
+      if (existingAccommodation) {
+        return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: existingAccommodation.id });
+      }
+
+      // Réparation idempotente d'un onboarding interrompu : le profil et le
+      // tenant existent, seule la résidence manque.
+      const { data: accommodation, error: accommodationError } = await admin
+        .from("accommodations")
+        .insert({
+          tenant_id: existingUser.tenant_id,
+          name: residenceName,
+          description: residenceType,
+          address: residenceLocation,
+          city: residenceLocation,
+          country: countryName,
+          currency: countryConfig?.currency ?? "XOF",
+          currency_symbol: countryConfig?.currencySymbol ?? "FCFA",
+          phone_code: countryConfig?.phoneCode ?? "+225",
+          language: countryConfig?.defaultLang ?? "fr",
+          contact_phone: phone,
+          total_rooms: 0,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+
+      if (accommodationError || !accommodation) {
+        return NextResponse.json({ error: "Impossible de finaliser la création de l'établissement." }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: accommodation.id, recovered: true });
     }
 
     // 1. Create Tenant (Enterprise)
@@ -100,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Create Accommodation (First Residence)
-    const { error: accError } = await admin.from("accommodations").insert({
+    const { data: accommodationData, error: accError } = await admin.from("accommodations").insert({
       tenant_id: tenantData.id,
       name: residenceName,
       description: residenceType,
@@ -113,9 +152,9 @@ export async function POST(request: Request) {
       language: countryConfig?.defaultLang ?? "fr",
       total_rooms: 0,
       is_active: true,
-    });
+    }).select("id").single();
 
-    if (accError) {
+    if (accError || !accommodationData) {
       await admin.from("tenants").delete().eq("id", tenantData.id);
       return NextResponse.json(
         { error: "Erreur lors de la création de l'établissement. Veuillez réessayer." },
@@ -123,17 +162,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Create Profile User (Admin)
-    const { error: userError } = await admin.from("users").insert({
+    // 4. Créer ou réparer le profil applicatif à partir de l'identité auth.uid().
+    // Aucun identifiant fourni par le navigateur n'est utilisé pour cette liaison.
+    const profilePayload = {
       tenant_id: tenantData.id,
       auth_user_id: session.user.id,
-      role: "admin_residence",
+      role: "admin_residence" as const,
       full_name: fullName,
-      phone: phone,
-      email: email,
+      phone,
+      email,
       is_active: true,
       activated_at: now,
-    });
+    };
+    const { error: userError } = existingUser
+      ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
+      : await admin.from("users").insert(profilePayload);
 
     if (userError) {
       await admin.from("tenants").delete().eq("id", tenantData.id);
@@ -143,7 +186,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, tenantId: tenantData.id });
+    return NextResponse.json({ success: true, tenantId: tenantData.id, accommodationId: accommodationData.id });
   } catch {
     return NextResponse.json(
       { error: "Une erreur interne est survenue. Veuillez réessayer plus tard." },

@@ -210,7 +210,15 @@ export default function DashboardLayout({
             setMonthlyPrice(subData.monthly_price || 0);
           }
 
-          setNeedsOnboarding(false);
+          // Le tenant seul ne suffit pas : une inscription interrompue pouvait
+          // laisser un gérant sans établissement, ce qui doit relancer l'étape 2.
+          const { data: accommodation } = await supabase
+            .from("accommodations")
+            .select("id")
+            .eq("tenant_id", userData.tenant_id)
+            .limit(1)
+            .maybeSingle();
+          setNeedsOnboarding(userData.role === "admin_residence" && !accommodation);
         } else {
           // L'onboarding est strictement réservé au rôle admin_residence (propriétaires/gestionnaires)
           setNeedsOnboarding(!isEmployee && userData.role === "admin_residence");

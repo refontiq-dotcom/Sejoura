@@ -74,7 +74,7 @@ export async function middleware(req: NextRequest) {
   if (user) {
     const { data: dbUser } = await supabase
       .from("users")
-      .select("id, is_active, role, first_login")
+      .select("id, tenant_id, is_active, role, first_login")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -113,6 +113,24 @@ export async function middleware(req: NextRequest) {
 
     const role = dbUser?.role;
     const isEmployee = role === "receptionniste" || role === "menagere";
+
+    // Un espace est finalisé seulement lorsqu'un tenant ET au moins un
+    // établissement existent. Un ancien onboarding interrompu peut avoir créé
+    // le profil/tenant sans résidence : il doit reprendre l'étape 2.
+    let onboardingIncomplete = false;
+    if (dbUser?.role === "admin_residence" && dbUser.tenant_id) {
+      const { data: accommodation } = await supabase
+        .from("accommodations")
+        .select("id")
+        .eq("tenant_id", dbUser.tenant_id)
+        .limit(1)
+        .maybeSingle();
+      onboardingIncomplete = !accommodation;
+    }
+
+    if (onboardingIncomplete && isDashboard && pathname !== "/dashboard") {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
 
     // ── CLOISONNEMENT DES RÔLES ──
     // Un employé ne doit JAMAIS accéder aux routes admin
