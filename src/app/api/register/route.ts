@@ -55,12 +55,16 @@ export async function POST(request: Request) {
     // la contrainte UNIQUE sur tenants.contact_email.
     let tenantId = existingUser?.tenant_id ?? null;
     if (!tenantId) {
-      const { data: orphanTenant } = await admin
+      const { data: orphanTenants, error: orphanError } = await admin
         .from("tenants")
         .select("id")
         .eq("contact_email", email)
-        .maybeSingle();
-      if (orphanTenant) tenantId = orphanTenant.id;
+        .limit(1);
+      if (orphanError) {
+        console.error("register: orphan tenant lookup failed", orphanError);
+      } else if (orphanTenants && orphanTenants.length > 0) {
+        tenantId = orphanTenants[0].id;
+      }
     }
 
     const accommodationPayload = {
@@ -90,12 +94,27 @@ export async function POST(request: Request) {
       activated_at: new Date().toISOString(),
     };
 
+    const upsertUserProfile = async (targetTenantId: string) => {
+      const payload = { ...profilePayload, tenant_id: targetTenantId };
+      const { error: userError } = existingUser
+        ? await admin.from("users").update(payload).eq("id", existingUser.id)
+        : await admin.from("users").insert(payload);
+      if (userError) {
+        console.error("register: upsert user profile failed", userError);
+        return NextResponse.json(
+          { error: "Erreur lors de la création du profil utilisateur. Veuillez réessayer." },
+          { status: 500 }
+        );
+      }
+      return null;
+    };
+
     // ── Reprise idempotente : l'espace (tenant) existe déjà ──
-    if (tenantId) {
+    const recoverTenant = async (targetTenantId: string) => {
       const { data: existingAccommodation, error: accommodationLookupError } = await admin
         .from("accommodations")
         .select("id")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", targetTenantId)
         .limit(1)
         .maybeSingle();
 
@@ -108,7 +127,7 @@ export async function POST(request: Request) {
       if (!accommodationId) {
         const { data: accommodation, error: accommodationError } = await admin
           .from("accommodations")
-          .insert(accommodationPayload)
+          .insert({ ...accommodationPayload, tenant_id: targetTenantId })
           .select("id")
           .single();
         if (accommodationError || !accommodation) {
@@ -122,14 +141,14 @@ export async function POST(request: Request) {
       const { data: existingSub } = await admin
         .from("subscriptions")
         .select("id")
-        .eq("tenant_id", tenantId)
+        .eq("tenant_id", targetTenantId)
         .maybeSingle();
 
       if (!existingSub) {
         const plan = normalizePlan(body.plan || "free");
         const trialEnd = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
         const { error: subError } = await admin.from("subscriptions").insert({
-          tenant_id: tenantId,
+          tenant_id: targetTenantId,
           plan,
           status: "trial",
           trial_ends_at: trialEnd,
@@ -148,18 +167,16 @@ export async function POST(request: Request) {
       }
 
       // Rattacher / réparer le profil applicatif au tenant récupéré.
-      const { error: userError } = existingUser
-        ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
-        : await admin.from("users").insert(profilePayload);
-      if (userError) {
-        console.error("register: upsert user profile failed", userError);
-        return NextResponse.json(
-          { error: "Erreur lors de la création du profil utilisateur. Veuillez réessayer." },
-          { status: 500 }
-        );
-      }
+      const profileError = await upsertUserProfile(targetTenantId);
+      if (profileError) return profileError;
 
-      return NextResponse.json({ success: true, tenantId, accommodationId });
+      return { tenantId: targetTenantId, accommodationId };
+    };
+
+    if (tenantId) {
+      const result = await recoverTenant(tenantId);
+      if (result instanceof NextResponse) return result;
+      return NextResponse.json({ success: true, ...result });
     }
 
     // ── Création complète d'un espace neuf ──
@@ -179,6 +196,19 @@ export async function POST(request: Request) {
       .single();
 
     if (tenantError || !tenantData) {
+      // Si un tenant existe déjà pour cet email (course entre deux requêtes ou
+      // orphelin non détecté), on bascule sur la reprise idempotente.
+      const { data: existingTenant } = await admin
+        .from("tenants")
+        .select("id")
+        .eq("contact_email", email)
+        .limit(1)
+        .maybeSingle();
+      if (existingTenant) {
+        const result = await recoverTenant(existingTenant.id);
+        if (result instanceof NextResponse) return result;
+        return NextResponse.json({ success: true, ...result });
+      }
       console.error("register: create tenant failed", tenantError);
       return NextResponse.json(
         { error: "Erreur lors de la création de l'espace. Veuillez réessayer." },
@@ -186,12 +216,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const newTenantId = tenantData.id;
+
     // 2. Abonnement (essai gratuit de 30 jours)
     const plan = normalizePlan(body.plan || "free");
     const trialEnd = new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
     const { error: subError } = await admin.from("subscriptions").insert({
-      tenant_id: tenantData.id,
+      tenant_id: newTenantId,
       plan,
       status: "trial",
       trial_ends_at: trialEnd,
@@ -205,7 +237,7 @@ export async function POST(request: Request) {
       console.error("register: create subscription failed", subError);
       // Nettoyage best-effort : si la suppression échoue, le tenant orphelin
       // sera réadopté par la reprise idempotente au prochain essai.
-      await admin.from("tenants").delete().eq("id", tenantData.id);
+      await admin.from("tenants").delete().eq("id", newTenantId);
       return NextResponse.json(
         { error: "Erreur lors de la configuration de l'abonnement. Veuillez réessayer." },
         { status: 500 }
@@ -214,7 +246,7 @@ export async function POST(request: Request) {
 
     // 3. Établissement (première résidence)
     const { data: accommodationData, error: accError } = await admin.from("accommodations").insert({
-      tenant_id: tenantData.id,
+      tenant_id: newTenantId,
       name: residenceName,
       description: residenceType,
       address: residenceLocation,
@@ -230,7 +262,7 @@ export async function POST(request: Request) {
 
     if (accError || !accommodationData) {
       console.error("register: create accommodation failed", accError);
-      await admin.from("tenants").delete().eq("id", tenantData.id);
+      await admin.from("tenants").delete().eq("id", newTenantId);
       return NextResponse.json(
         { error: "Erreur lors de la création de l'établissement. Veuillez réessayer." },
         { status: 500 }
@@ -238,20 +270,10 @@ export async function POST(request: Request) {
     }
 
     // 4. Profil applicatif
-    const { error: userError } = existingUser
-      ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
-      : await admin.from("users").insert({ ...profilePayload, tenant_id: tenantData.id });
+    const profileError = await upsertUserProfile(newTenantId);
+    if (profileError) return profileError;
 
-    if (userError) {
-      console.error("register: upsert user profile failed", userError);
-      await admin.from("tenants").delete().eq("id", tenantData.id);
-      return NextResponse.json(
-        { error: "Erreur lors de la création du profil utilisateur. Veuillez réessayer." },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, tenantId: tenantData.id, accommodationId: accommodationData.id });
+    return NextResponse.json({ success: true, tenantId: newTenantId, accommodationId: accommodationData.id });
   } catch (error) {
     console.error("register: unexpected error", error);
     return NextResponse.json(
