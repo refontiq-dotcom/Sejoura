@@ -1654,6 +1654,10 @@ RETURNS tenants AS $$
 DECLARE
   v_tenant tenants;
 BEGIN
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seul le Super Admin peut suspendre un établissement';
+  END IF;
+
   UPDATE tenants
   SET
     is_suspended = TRUE,
@@ -1688,6 +1692,10 @@ RETURNS tenants AS $$
 DECLARE
   v_tenant tenants;
 BEGIN
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seul le Super Admin peut réactiver un établissement';
+  END IF;
+
   UPDATE tenants
   SET
     is_suspended = FALSE,

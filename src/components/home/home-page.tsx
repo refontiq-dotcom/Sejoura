@@ -191,6 +191,8 @@ export function HomePage() {
     password?: string;
     confirmPassword?: string;
   }>({});
+  const logoClicks = useRef(0);
+  const logoResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Modal focus trap refs
   const modalRef = useRef<HTMLDivElement>(null);
@@ -268,6 +270,19 @@ export function HomePage() {
   function openSection(section: SectionName) {
     setActiveSection(section);
     setMobileMenuOpen(false);
+  }
+
+  // Accès super admin masqué : 4 clics rapides sur le logo Séjoura
+  function handleLogoClick() {
+    logoClicks.current += 1;
+    if (logoResetTimer.current) clearTimeout(logoResetTimer.current);
+    logoResetTimer.current = setTimeout(() => {
+      logoClicks.current = 0;
+    }, 1200);
+    if (logoClicks.current >= 4) {
+      logoClicks.current = 0;
+      router.push("/admin");
+    }
   }
 
   async function handleGoogleAuth() {
@@ -816,14 +831,21 @@ export function HomePage() {
       <header className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center">
-          <Image
-            src="/logo-sejoura.png"
-            alt="Séjoura"
-            width={200}
-            height={64}
-            className="object-contain h-14 w-auto brightness-0 invert"
-            priority
-          />
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="cursor-pointer bg-transparent border-0 p-0"
+            aria-label="Séjoura"
+          >
+            <Image
+              src="/logo-sejoura.png"
+              alt="Séjoura"
+              width={200}
+              height={64}
+              className="object-contain h-20 w-auto brightness-0 invert"
+              priority
+            />
+          </button>
         </div>
 
         {/* Desktop Navigation */}
