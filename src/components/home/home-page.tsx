@@ -314,7 +314,25 @@ export function HomePage() {
       });
 
       if (authError) {
-        toast.error(t.loginError);
+        // Messages précis selon la cause : compte non confirmé, compte inexistant, etc.
+        const code = (authError as { code?: string }).code || "";
+        const message = (authError.message || "").toLowerCase();
+
+        if (code === "email_not_confirmed" || message.includes("email not confirmed") || message.includes("non confirmé")) {
+          toast.error(
+            lang === "fr"
+              ? "Votre e-mail n'est pas encore confirmé. Vérifiez votre boîte de réception (et vos spams)."
+              : "Your email is not confirmed yet. Check your inbox (and spam)."
+          );
+        } else if (message.includes("rate limit") || message.includes("trop de tentatives")) {
+          toast.error(
+            lang === "fr"
+              ? "Trop de tentatives récentes. Veuillez réessayer dans quelques minutes."
+              : "Too many recent attempts. Please try again in a few minutes."
+          );
+        } else {
+          toast.error(t.loginError);
+        }
         setLoading(false);
         return;
       }
@@ -385,7 +403,31 @@ export function HomePage() {
       });
 
       if (authError) {
-        toast.error(t.signupError);
+        // Afficher l'erreur réelle au lieu d'un message générique : le motif le
+        // plus courant est « un compte existe déjà » (la table auth.users n'est
+        // pas vidée par une réinitialisation du schéma public).
+        const code = (authError as { code?: string }).code || "";
+        const message = (authError.message || "").toLowerCase();
+
+        if (code === "user_already_exists" || message.includes("already registered") || message.includes("déjà")) {
+          toast.error(
+            lang === "fr"
+              ? "Un compte existe déjà avec cette adresse e-mail. Connectez-vous."
+              : "An account already exists with this email. Please sign in."
+          );
+          setMode("login");
+        } else if (message.includes("rate limit") || message.includes("trop de tentatives")) {
+          toast.error(
+            lang === "fr"
+              ? "Trop de tentatives récentes. Veuillez réessayer dans quelques minutes."
+              : "Too many recent attempts. Please try again in a few minutes."
+          );
+        } else if (message.includes("invalid email") || message.includes("e-mail invalide")) {
+          toast.error(t.emailInvalid);
+        } else {
+          console.error("Erreur inscription Supabase :", authError);
+          toast.error(t.signupError);
+        }
         setLoading(false);
         return;
       }
