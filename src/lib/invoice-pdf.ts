@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import type { BookingWithRelations, Invoice, Tenant } from "@/types/database";
 import { formatDateLong } from "@/lib/utils";
-import { formatPrice } from "@/lib/currencyConverter";
+import { convertXofTo, getCurrencyDecimals, getCurrencySymbol } from "@/lib/currencyConverter";
 
 export interface InvoicePdfData {
   tenant: Tenant;
@@ -16,10 +16,39 @@ export interface TaxRate {
 
 export const DEFAULT_TAX_RATE: TaxRate = {
   label: "TVA (10%)",
-  rate: 0.10,
+  rate: 0.1,
 };
 
+/**
+ * Caractères que la police standard Helvetica (encodage WinAnsi) ne sait pas
+ * restituer (ex : ₦ U+20A6, ₵ U+20B5). On retombe alors sur le code ISO de la
+ * devise, qui reste sans ambiguïté sur une facture (ex : "12 000,00 NGN").
+ * € (U+20AC) est toléré : il est encodé en 0x80 dans WinAnsi.
+ */
+const PDF_UNSUPPORTED_SYMBOL_RE = /[^\x00-\xFF\u20AC]/;
 
+/**
+ * Formate un montant avec des espaces de milliers normales (compatibles PDFKit).
+ * Ex : 12000 -> "12 000 FCFA"
+ * Intl.NumberFormat("fr-FR") émet des espaces insécables étroites (U+202F) mal
+ * interprétées par la police Helvetica standard du PDF ; on les normalise ici.
+ */
+function formatMoney(amount: number, currencyCode: string): string {
+  const converted = convertXofTo(amount, currencyCode);
+  const decimals = getCurrencyDecimals(currencyCode);
+  const rawSymbol = getCurrencySymbol(currencyCode);
+  const symbol = PDF_UNSUPPORTED_SYMBOL_RE.test(rawSymbol) ? currencyCode : rawSymbol;
+  const formatted = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+    .format(converted || 0)
+    .replace(/[\u202F\u00A0]/g, " ");
+  if (["$", "₦", "₵", "£", "€"].includes(symbol.trim())) {
+    return `${symbol} ${formatted}`;
+  }
+  return `${formatted} ${symbol}`;
+}
 
 export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
   const { tenant, booking, invoice } = data;
@@ -29,20 +58,19 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   const accommodation = booking.accommodation;
 
   const targetCurrency = tenant.default_currency || "XOF";
-  const fmt = (amountInXof: number) => formatPrice(amountInXof, targetCurrency);
+  const fmt = (amountInXof: number) => formatMoney(amountInXof, targetCurrency);
 
   const doc = new PDFDocument({
     size: "A4",
     margin: 60,
     lang: "fr-FR",
     info: {
-      Title: `Facture ${invoice.invoice_number}`,
+      Title: `Facture N° ${invoice.invoice_number}`,
       Author: "Séjoura",
       Subject: "Facture de séjour",
       Keywords: "facture, séjour, réservation",
     },
   });
-
 
   const chunks: Buffer[] = [];
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -57,23 +85,18 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   const textColor = "#0C1C33";
   const mutedColor = "#64748B";
   const borderColor = "#E2E8F0";
+  const headerFill = "#F1F5F9";
 
-  function drawBorder(doc: PDFKit.PDFDocument) {
-    doc
-      .save()
-      .rect(28, 28, 555, 746)
-      .stroke(borderColor)
-      .lineWidth(0.5);
-    doc.restore();
-  }
+  // Bordure fine de page
+  doc.save().rect(28, 28, 555, 746).lineWidth(0.5).stroke(borderColor).restore();
 
-  drawBorder(doc);
-
-  // --- HEADER ---
+  // ==========================================================================
+  // EN-TÊTE NAVY — bloc ÉMETTEUR (logo + établissement)
+  // ==========================================================================
   const headerHeight = 100;
-  doc.rect(0, 0, 612, headerHeight).fill("#0C1C33");
+  doc.rect(0, 0, 612, headerHeight).fill(primaryColor);
 
-  // Integration du Logo dynamique (Logo Établissement ou Fallback Séjoura)
+  // Logo dynamique (Établissement ou Fallback Séjoura)
   const targetLogoUrl = accommodation?.logo_url || tenant?.logo_url;
   let logoBuffer: Buffer | null = null;
 
@@ -103,6 +126,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   }
 
   let textLeft = 60;
+  const emitterWidth = 250; // Largeur max du bloc émetteur (évite la troncature des bords)
   if (logoBuffer) {
     try {
       doc.image(logoBuffer, 50, 25, { fit: [50, 50] });
@@ -112,252 +136,251 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     }
   }
 
-  // Company info (Header sur Fond Bleu Profond #0C1C33)
-  doc
-    .fontSize(18)
-    .fillColor("#FFFFFF")
-    .font("Helvetica-Bold")
-    .text(tenant.company_name || "Séjoura", textLeft, 30);
+  // Nom de l'établissement (wrappé si long, jamais tronqué)
+  const companyName = tenant.company_name || "Séjoura";
+  doc.fontSize(17).font("Helvetica-Bold").fillColor("#FFFFFF");
+  const companyLines = doc.heightOfString(companyName, { width: emitterWidth });
+  doc.text(companyName, textLeft, 28, { width: emitterWidth });
+
+  const nameBottom = 28 + companyLines;
 
   doc
     .fontSize(9)
-    .fillColor("#C2944E")
+    .fillColor(accentGold)
     .font("Helvetica-Bold")
-    .text("Séjoura SaaS", textLeft, 52);
+    .text("Séjoura SaaS", textLeft, nameBottom + 4, { width: emitterWidth });
 
   doc
     .fontSize(8)
     .fillColor("#E2E8F0")
     .font("Helvetica")
-    .text(tenant.address || "", textLeft, 64)
+    .text(tenant.address || "", textLeft, nameBottom + 16, { width: emitterWidth })
     .text(
-      `${tenant.city || ""} • Tél: ${tenant.contact_phone || ""}`,
+      [tenant.city, tenant.contact_phone ? `Tél : ${tenant.contact_phone}` : ""]
+        .filter(Boolean)
+        .join(" • "),
       textLeft,
-      74
+      nameBottom + 27,
+      { width: emitterWidth }
     );
 
-  // Ligne dorée 2px d'accentuation en-tête (Section 5.2 de la charte)
-  doc
-    .stroke("#C2944E")
-    .moveTo(0, headerHeight)
-    .lineTo(612, headerHeight)
-    .lineWidth(2);
+  // ==========================================================================
+  // BLOC TITRE (à droite) — FACTURE + N° + date
+  // ==========================================================================
+  const titleX = 340;
+  const titleWidth = 212; // 552 - 340 (borné pour éviter la troncature)
 
-  // Invoice title
-  const invoiceTitle = "FACTURE";
   doc
     .fontSize(26)
-    .fillColor("#C2944E")
+    .fillColor(accentGold)
     .font("Helvetica-Bold")
-    .text(invoiceTitle, 420, 32, { align: "right" });
+    .text("FACTURE", titleX, 26, { align: "right", width: titleWidth });
 
   doc
     .fontSize(10)
     .fillColor("#FFFFFF")
-    .font("Helvetica")
-    .text(`Facture n° ${invoice.invoice_number}`, 420, 64, {
-      align: "right",
-    });
+    .font("Helvetica-Bold")
+    .text(`Facture N° ${invoice.invoice_number}`, titleX, 60, { align: "right", width: titleWidth });
 
   doc
     .fontSize(8)
     .fillColor("#E2E8F0")
     .font("Helvetica")
-    .text(`Date: ${formatDateLong(invoice.created_at)}`, 420, 78, {
-      align: "right",
-    });
+    .text(`Date : ${formatDateLong(invoice.created_at)}`, titleX, 74, { align: "right", width: titleWidth });
 
-  // --- CLIENT INFO ---
-  let y = 140;
+  // Ligne dorée 2px d'accentuation en-tête (Section 5.2 de la charte)
   doc
-    .fontSize(10)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text("Facturée à:", 60, y);
+    .moveTo(0, headerHeight)
+    .lineTo(612, headerHeight)
+    .lineWidth(2)
+    .stroke(accentGold);
 
+  // ==========================================================================
+  // BLOC DESTINATAIRE + DÉTAILS RÉSERVATION
+  // ==========================================================================
+  let y = 126;
+
+  // --- Facturé à (destinataire, à gauche) ---
+  doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("FACTURÉ À", 60, y);
   doc
     .fontSize(13)
     .fillColor(textColor)
     .font("Helvetica-Bold")
-    .text(client?.full_name || "Client", 60, y + 16);
-
+    .text(client?.full_name || "Client", 60, y + 14, { width: 220 });
   doc
     .fontSize(9)
     .fillColor(mutedColor)
     .font("Helvetica")
-    .text(client?.phone || "", 60, y + 32)
-    .text(client?.email || "", 60, y + 44)
-    .text(client?.nationality || "", 60, y + 56);
+    .text(client?.phone || "", 60, y + 34, { width: 220 })
+    .text(client?.email || "", 60, y + 46, { width: 220 })
+    .text(client?.nationality || "", 60, y + 58, { width: 220 });
 
-  // --- INVOICE DETAILS ---
-  y = 230;
-  doc
-    .fontSize(10)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text("Détails de la réservation:", 60, y);
-
+  // --- Réservation (à droite) ---
+  const rx = 320;
+  const rw = 232;
+  doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("RÉSERVATION", rx, y);
   doc
     .fontSize(9)
     .fillColor(mutedColor)
     .font("Helvetica")
-    .text(`Code réservation: ${booking.booking_code || "—"}`, 60, y + 16)
+    .text(`Code : ${booking.booking_code || "—"}`, rx, y + 16, { width: rw })
     .text(
-      `Chambre: ${room?.room_number || "—"} (${roomType?.name || ""})`,
-      60,
-      y + 28
+      `Chambre : ${room?.room_number || "—"}${roomType?.name ? ` (${roomType.name})` : ""}`,
+      rx,
+      y + 28,
+      { width: rw }
     )
-    .text(
-      `Établissement: ${accommodation?.name || "—"}`,
-      60,
-      y + 40
-    );
+    .text(`Établissement : ${accommodation?.name || "—"}`, rx, y + 40, { width: rw })
+    .text(`Arrivée : ${formatDateLong(booking.check_in_date)}`, rx, y + 52, { width: rw })
+    .text(`Départ : ${formatDateLong(booking.check_out_date)}`, rx, y + 64, { width: rw })
+    .text(`Nombre de nuits : ${booking.nights_count}`, rx, y + 76, { width: rw });
 
-  const checkInLabel = "Arrivée:";
-  const checkOutLabel = "Départ:";
-  doc
-    .fontSize(9)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text(checkInLabel, 60, y + 52)
-    .text(
-      formatDateLong(booking.check_in_date),
-      80,
-      y + 52
-    )
-    .text(checkOutLabel, 180, y + 52)
-    .text(
-      formatDateLong(booking.check_out_date),
-      205,
-      y + 52
-    )
-    .text(
-      `Nombre de nuits: ${booking.nights_count}`,
-      320,
-      y + 52
-    );
-
-  // --- LINE ITEMS TABLE ---
-  y = 330;
-
-  const tableTop = y;
+  // ==========================================================================
+  // TABLEAU DES LIGNES
+  // ==========================================================================
   const tableLeft = 60;
   const tableWidth = 492;
-  const col1Width = 260; // Description
-  const col2Width = 70;  // Prix unitaire
-  const col3Width = 50;  // Qté
+  const descW = 240;  // Description (gauche)
+  const priceW = 100; // Prix unitaire (droite)
+  const qtyW = 52;    // Qté (centre)
+  const totalW = 100; // Total (droite)
+  const col1Right = tableLeft + descW;
+  const col2Right = col1Right + priceW;
+  const col3Right = col2Right + qtyW;
 
-  // Table header background
-  doc.rect(tableLeft, tableTop, tableWidth, 20).fill("#F1F5F9");
+  const padX = 10;
+  const headerH = 24;
+  const rowH = 24;
+  const tableTop = 250;
 
-  // Header text
+  // Fond de l'en-tête du tableau
+  doc.rect(tableLeft, tableTop, tableWidth, headerH).fill(headerFill);
+
+  // En-têtes de colonnes
   doc
     .fontSize(9)
     .fillColor("#334155")
     .font("Helvetica-Bold")
-    .text("Description", tableLeft + 10, tableTop + 5)
-    .text("Prix unitaire", tableLeft + col1Width + 10, tableTop + 5)
-    .text("Qté", tableLeft + col1Width + col2Width + 10, tableTop + 5)
-    .text("Total", tableLeft + col1Width + col2Width + col3Width + 10, tableTop + 5, {
-      align: "right",
-    });
+    .text("Description", tableLeft + padX, tableTop + (headerH - 9) / 2, { width: descW - padX * 2 })
+    .text("Prix unitaire", col1Right + padX, tableTop + (headerH - 9) / 2, { width: priceW - padX * 2, align: "right" })
+    .text("Qté", col2Right, tableTop + (headerH - 9) / 2, { width: qtyW, align: "center" })
+    .text("Total", col3Right + padX, tableTop + (headerH - 9) / 2, { width: totalW - padX * 2, align: "right" });
 
-  // Bottom border of header
-  doc
-    .stroke(borderColor)
-    .moveTo(tableLeft, tableTop + 20)
-    .lineTo(tableLeft + tableWidth, tableTop + 20)
-    .lineWidth(0.5);
+  // Lignes verticales de colonnes
+  doc.lineWidth(0.5).strokeColor(borderColor);
+  [col1Right, col2Right, col3Right].forEach((cx) => {
+    doc.moveTo(cx, tableTop).lineTo(cx, tableTop + headerH).stroke();
+  });
 
-  // Row 1: Accommodation / Nuitée
-  let rowY = tableTop + 26;
+  // Ligne basse de l'en-tête
+  doc.moveTo(tableLeft, tableTop + headerH).lineTo(tableLeft + tableWidth, tableTop + headerH).stroke();
+
+  // Ligne de détail : nuitée
+  // Le total facturé (invoice.amount = booking.total_amount) fait foi : on en
+  // déduit le prix unitaire pour garantir la cohérence tableau / sous-total /
+  // taxe / total (total_amount = negotiated_price * nights_count).
+  const nights = booking.nights_count || 1;
   const unitPrice =
-    booking.negotiated_price ||
-    (roomType ? roomType.base_price : booking.total_amount / (booking.nights_count || 1));
-  const nights = booking.nights_count;
+    booking.total_amount > 0
+      ? booking.total_amount / nights
+      : booking.negotiated_price || roomType?.base_price || 0;
   const lineTotal = unitPrice * nights;
+
+  let rowTop = tableTop + headerH;
+  const textY = rowTop + (rowH - 9) / 2;
 
   doc
     .fontSize(9)
     .fillColor(textColor)
     .font("Helvetica")
-    .text(`${roomType?.name || "Nuitée"} × ${nights} nuit(s)`, tableLeft + 10, rowY)
-    .text(`${fmt(unitPrice)}`, tableLeft + col1Width + 10, rowY)
-    .text(`${nights}`, tableLeft + col1Width + col2Width + 10, rowY)
-    .text(fmt(lineTotal), tableLeft + col1Width + col2Width + col3Width + 10, rowY, {
-      align: "right",
-    });
+    .text(`${roomType?.name || "Nuitée"} × ${nights} nuit(s)`, tableLeft + padX, textY, {
+      width: descW - padX * 2,
+    })
+    .text(fmt(unitPrice), col1Right + padX, textY, { width: priceW - padX * 2, align: "right" })
+    .text(`${nights}`, col2Right, textY, { width: qtyW, align: "center" })
+    .text(fmt(lineTotal), col3Right + padX, textY, { width: totalW - padX * 2, align: "right" });
 
-  rowY += 18;
+  rowTop += rowH;
 
-  // Subtotal row
-  doc
-    .stroke(borderColor)
-    .moveTo(tableLeft, rowY)
-    .lineTo(tableLeft + tableWidth, rowY)
-    .lineWidth(0.5);
+  // Bordures de la ligne de détail
+  doc.lineWidth(0.5).strokeColor(borderColor);
+  doc.moveTo(tableLeft, rowTop).lineTo(tableLeft + tableWidth, rowTop).stroke();
+  [col1Right, col2Right, col3Right].forEach((cx) => {
+    doc.moveTo(cx, rowTop - rowH).lineTo(cx, rowTop).stroke();
+  });
 
-  rowY += 8;
-
-  // Subtotal
+  // --- Sous-total ---
+  rowTop += 6;
+  const subY = rowTop + (12 - 9) / 2;
   doc
     .fontSize(9)
     .fillColor(mutedColor)
     .font("Helvetica")
-    .text("Sous-total", tableLeft + col1Width + col2Width + 10, rowY)
-    .text(fmt(lineTotal), tableLeft + tableWidth - 112 + 10, rowY, {
-      align: "right",
-    });
+    .text("Sous-total :", 352, subY, { width: 100, align: "right" })
+    .text(fmt(invoice.amount), col3Right + padX, subY, { width: totalW - padX * 2, align: "right" });
 
-  rowY += 14;
-
-  // Tax
+  // --- Taxe ---
+  rowTop += 16;
   const taxAmount = invoice.tax_amount || 0;
+  const taxY = rowTop + (12 - 9) / 2;
   doc
-    .fontSize(9)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text(DEFAULT_TAX_RATE.label, tableLeft + col1Width + col2Width + 10, rowY)
-    .text(fmt(taxAmount), tableLeft + tableWidth - 112 + 10, rowY, {
-      align: "right",
-    });
+    .text(DEFAULT_TAX_RATE.label, 352, taxY, { width: 100, align: "right" })
+    .text(fmt(taxAmount), col3Right + padX, taxY, { width: totalW - padX * 2, align: "right" });
 
-  rowY += 14;
-
-  // Total
+  // --- Total ---
+  rowTop += 16;
   doc
-    .stroke(borderColor)
-    .moveTo(tableLeft, rowY)
-    .lineTo(tableLeft + tableWidth, rowY)
-    .lineWidth(1);
+    .lineWidth(1)
+    .strokeColor(borderColor)
+    .moveTo(tableLeft, rowTop)
+    .lineTo(tableLeft + tableWidth, rowTop)
+    .stroke();
 
-  rowY += 8;
-
+  rowTop += 8;
+  const totalY = rowTop + (13 - 11) / 2;
   doc
     .fontSize(11)
     .fillColor(textColor)
     .font("Helvetica-Bold")
-    .text("TOTAL", tableLeft + col1Width + col2Width + 10, rowY)
-    .text(fmt(invoice.total_amount), tableLeft + tableWidth - 112 + 10, rowY, {
-      align: "right",
-    });
+    .text("TOTAL :", 352, totalY, { width: 100, align: "right" })
+    .text(fmt(invoice.total_amount), col3Right + padX, totalY, { width: totalW - padX * 2, align: "right" });
 
-  // --- PAYMENT STATUS ---
-  y = rowY + 30;
+  // ==========================================================================
+  // STATUT DU PAIEMENT
+  // ==========================================================================
+  y = rowTop + 30;
   const paymentStatusLabel =
     booking.payment_status === "paid"
       ? "Payé"
       : booking.payment_status === "partial"
-      ? "Partiellement payé"
-      : "Non payé";
+        ? "Partiellement payé"
+        : "Non payé";
 
   doc
     .fontSize(10)
     .fillColor(booking.payment_status === "paid" ? "#16A34A" : "#DC2626")
     .font("Helvetica-Bold")
-    .text(`Statut du paiement: ${paymentStatusLabel}`, 60, y);
+    .text(`Statut du paiement : ${paymentStatusLabel}`, 60, y);
 
-  // --- FOOTER ---
+  // Synthèse du règlement : montant payé et reste à payer
+  const paidAmount = Math.max(0, booking.amount_paid || 0);
+  const balance = Math.max(0, (invoice.total_amount || 0) - paidAmount);
+
+  doc
+    .fontSize(9)
+    .fillColor(mutedColor)
+    .font("Helvetica")
+    .text(`Montant payé : ${fmt(paidAmount)}`, 60, y + 22);
+
+  doc
+    .fontSize(9)
+    .fillColor(balance > 0 ? textColor : mutedColor)
+    .font(balance > 0 ? "Helvetica-Bold" : "Helvetica")
+    .text(`Reste à payer : ${fmt(balance)}`, 60, y + 38);
+
+  // ==========================================================================
+  // PIED DE PAGE
+  // ==========================================================================
   const footerY = 740;
   doc
     .fontSize(8)
@@ -375,9 +398,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .fillColor(mutedColor)
     .font("Helvetica")
     .text(
-      `Facture n° ${invoice.invoice_number} • Générée le ${formatDateLong(
-        invoice.created_at
-      )}`,
+      `Facture N° ${invoice.invoice_number} • Générée le ${formatDateLong(invoice.created_at)}`,
       60,
       footerY + 14,
       { align: "center" }
