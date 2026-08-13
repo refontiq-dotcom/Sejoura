@@ -337,24 +337,26 @@ html {
 }
 
 /* ============================================
-   Onglet Sidebar Actif — Fusion continue & Courbes concaves (Inverted Border Radius)
-   La couleur de fond du menu actif se fonde de manière 100% fluide avec le panneau principal à droite
-   En mode sombre, l'onglet actif prend la couleur Noir/Anthracite du fond de page (#090D16)
+   Onglet actif de sidebar — arrondis externes et concaves universels
+   --sidebar-bg est défini par le conteneur sidebar : les découpes restent
+   correctes pour toute couleur de tenant, claire comme sombre.
    ============================================ */
 .active-sidebar-tab {
   position: relative;
   border-top-left-radius: 1rem;
   border-bottom-left-radius: 1rem;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+  border-top-right-radius: 1rem;
+  border-bottom-right-radius: 1rem;
   margin-left: 0.75rem;
-  margin-right: 0 !important;
+  margin-right: 0.75rem;
   padding-left: 1.25rem;
   padding-right: 1.25rem;
   z-index: 20;
+  isolation: isolate;
 }
 
-/* Courbe concave haut-droit (Inverted Border Radius Top) */
+/* Courbe concave haute : le pseudo-élément reste transparent ; son ombre
+   emprunte la couleur de fond de son parent sidebar, sans aucun blanc fixe. */
 .active-sidebar-tab::before {
   content: "";
   position: absolute;
@@ -364,15 +366,11 @@ html {
   height: 20px;
   background: transparent;
   border-bottom-right-radius: 20px;
-  box-shadow: 6px 6px 0 6px var(--main-bg, #f8fafc);
+  box-shadow: 6px 6px 0 6px var(--sidebar-bg);
   pointer-events: none;
 }
 
-.dark .active-sidebar-tab::before {
-  box-shadow: 6px 6px 0 6px var(--main-bg, #090D16);
-}
-
-/* Courbe concave bas-droit (Inverted Border Radius Bottom) */
+/* Courbe concave basse : même masque dynamique hérité de la sidebar. */
 .active-sidebar-tab::after {
   content: "";
   position: absolute;
@@ -382,12 +380,8 @@ html {
   height: 20px;
   background: transparent;
   border-top-right-radius: 20px;
-  box-shadow: 6px -6px 0 6px var(--main-bg, #f8fafc);
+  box-shadow: 6px -6px 0 6px var(--sidebar-bg);
   pointer-events: none;
-}
-
-.dark .active-sidebar-tab::after {
-  box-shadow: 6px -6px 0 6px var(--main-bg, #090D16);
 }
 
 /* Cartes avec grands arrondis */
