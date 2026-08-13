@@ -71,91 +71,51 @@ export async function middleware(req: NextRequest) {
   const isAdmin = pathname.startsWith("/admin");
   const isMenage = pathname.startsWith("/menage");
 
-  // ── Vérification temps réel de l'état du compte dans la base de données ──
-  if (user) {
-    const { data: dbUser } = await supabase
-      .from("users")
-      .select("id, is_active, role")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    // Compte désactivé par l'employeur : révocation immédiate
-    if (dbUser && dbUser.is_active === false) {
-      await supabase.auth.signOut();
-      const redirectUrl = new URL("/employee-login", req.url);
-      redirectUrl.searchParams.set("error", "revoked");
-      return NextResponse.redirect(redirectUrl);
+  // ── NON CONNECTÉ : protéger les zones privées ──
+  if (!user) {
+    if (isDashboard || isAdmin) {
+      return NextResponse.redirect(new URL("/", req.url));
     }
-
-    // Profil absent de la table `users`.
-    //  - Compte employé supprimé par l'employeur → révocation immédiate.
-    //  - Gérant fraîchement inscrit (étape 1 validée) : le profil n'est créé
-    //    qu'à l'étape 2 (onboarding /api/register) → on laisse passer uniquement
-    //    /dashboard pour qu'il puisse terminer la configuration de son espace.
-    if (!dbUser) {
-      const email = (user.email || "").toLowerCase();
-      const metaRole = user.user_metadata?.role;
-      const isEmployeeAccount =
-        email.includes("@employe.sejoura.com") ||
-        metaRole === "receptionniste" ||
-        metaRole === "menagere";
-
-      if (isEmployeeAccount) {
-        await supabase.auth.signOut();
-        const redirectUrl = new URL("/employee-login", req.url);
-        redirectUrl.searchParams.set("error", "revoked");
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      if (isDashboard && pathname !== "/dashboard") {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
+    if (isMenage) {
+      return NextResponse.redirect(new URL("/employee-login", req.url));
     }
+    return supabaseResponse;
+  }
 
-    const role = dbUser?.role;
-    const isEmployee = role === "receptionniste" || role === "menagere";
+  // ── CONNECTÉ : cloisonnement des rôles ──
+  // Le rôle est lu dans les métadonnées du JWT (posées à l'inscription), SANS
+  // aucune requête base de données. Cela supprime tout conflit de redirection
+  // et tout blocage RLS au niveau du middleware. L'état complet du compte
+  // (is_active, tenant, onboarding étape 2) est vérifié côté client par les
+  // layouts et l'API /api/auth/onboarding-status (service_role).
+  const metaRole = user.user_metadata?.role as string | undefined;
+  const isEmployee = metaRole === "receptionniste" || metaRole === "menagere";
 
-    // Note : la détection d'un onboarding incomplet (étape 2) est désormais
-    // décidée côté serveur dans l'API /api/auth/onboarding-status (service_role),
-    // puis affichée par le layout du tableau de bord. Aucune redirection n'est
-    // faite ici : une lecture `accommodations` bloquée par RLS ne doit jamais
-    // renvoyer un compte déjà configuré vers un état d'installation.
-
-    // ── CLOISONNEMENT DES RÔLES ──
-    // Un employé ne doit JAMAIS accéder aux routes admin
-    if (isEmployee && (isAdminOnlyRoute(pathname) || isAdmin)) {
-      const target = role === "menagere" ? "/menage" : "/dashboard";
-      if (pathname !== target) {
-        return NextResponse.redirect(new URL(target, req.url));
-      }
-    }
-
-    // Redirection des ménagères vers leur espace spécifique s'ils accèdent au dashboard
-    if (role === "menagere" && isDashboard) {
-      if (pathname !== "/menage") {
-        return NextResponse.redirect(new URL("/menage", req.url));
-      }
-    }
-
-    // Un réceptionniste ne peut accéder qu'aux routes autorisées dans le dashboard
-    if (role === "receptionniste" && isDashboard && !isEmployeeAllowedRoute(pathname)) {
-      if (pathname !== "/dashboard") {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
+  // Un employé ne doit JAMAIS accéder aux routes admin
+  if (isEmployee && (isAdminOnlyRoute(pathname) || isAdmin)) {
+    const target = metaRole === "menagere" ? "/menage" : "/dashboard";
+    if (pathname !== target) {
+      return NextResponse.redirect(new URL(target, req.url));
     }
   }
 
-  // Protéger les routes employeur
-  if (!user && (isDashboard || isAdmin)) {
-    return NextResponse.redirect(new URL("/", req.url));
+  // Redirection des ménagères vers leur espace spécifique
+  if (metaRole === "menagere" && isDashboard) {
+    if (pathname !== "/menage") {
+      return NextResponse.redirect(new URL("/menage", req.url));
+    }
   }
 
-  // Protéger les routes employé (/menage)
-  if (!user && isMenage) {
-    return NextResponse.redirect(new URL("/employee-login", req.url));
+  // Un réceptionniste ne peut accéder qu'aux routes autorisées dans le dashboard
+  if (metaRole === "receptionniste" && isDashboard && !isEmployeeAllowedRoute(pathname)) {
+    if (pathname !== "/dashboard") {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
   }
 
-  // Rediriger la racine uniquement pour les gestionnaires (pas les employés)
+  // Racine : rediriger les utilisateurs connectés vers le tableau de bord.
+  // Un gérant en cours d'onboarding (étape 2) est géré par le layout du
+  // dashboard, pas par une redirection ici.
   if (user && isRoot) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }

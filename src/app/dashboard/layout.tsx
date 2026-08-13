@@ -37,6 +37,8 @@ export default function DashboardLayout({
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // L'étape 2 (onboarding) est décidée côté serveur via le client admin
   // (service_role) pour être insensible aux politiques RLS du navigateur.
@@ -160,7 +162,7 @@ export default function DashboardLayout({
           return;
         }
 
-        // Redirection spécifique au rôle Ménagère
+        // Redirection spécifique au rôle Ménagère (silencieuse, pas d'alerte)
         if (userData.role === "menagere") {
           router.push("/menage");
           return;
@@ -178,7 +180,6 @@ export default function DashboardLayout({
           ];
           // Bloquer uniquement la liste des résidences, pas les détails
           if (pathname === "/dashboard/residences" || adminOnlyRoutes.some((route) => pathname.startsWith(route))) {
-            toast.error("Accès réservé aux administrateurs de l'établissement.");
             router.push("/dashboard");
             return;
           }
@@ -188,7 +189,6 @@ export default function DashboardLayout({
         if (userData.role === "admin_residence") {
           const staffOnlyRoutes = ["/dashboard/cleaning", "/dashboard/shift"];
           if (staffOnlyRoutes.some((route) => pathname.startsWith(route))) {
-            toast.error("Cette section est réservée au personnel de l'établissement.");
             router.push("/dashboard");
             return;
           }
@@ -236,13 +236,18 @@ export default function DashboardLayout({
         setNeedsOnboarding(await fetchOnboardingStatus());
 
         setLoading(false);
-      } catch {
-        router.push(LOGIN_ROUTE);
+      } catch (err) {
+        // Échec de chargement : on n'expulse jamais l'utilisateur vers la page
+        // de connexion (cela créerait une fausse déconnexion / boucle). On
+        // affiche un écran d'erreur avec bouton "Réessayer".
+        console.error("dashboard: auth check failed", err);
+        setLoadError(true);
+        setLoading(false);
       }
     }
 
     checkAuth();
-  }, [router]);
+  }, [router, retryCount]);
 
   const activeTheme = getSidebarThemeStyles(themeColor, theme === "dark");
   // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
@@ -277,6 +282,27 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--main-bg,var(--background))]">
         <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--main-bg,var(--background))]">
+        <p className="text-sm text-muted-foreground text-center max-w-sm">
+          Impossible de charger votre espace. Vérifiez votre connexion puis réessayez.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(false);
+            setLoading(true);
+            setRetryCount((c) => c + 1);
+          }}
+          className="px-4 py-2 rounded-lg bg-[var(--primary-color,#0C1C33)] text-white text-sm font-medium"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }

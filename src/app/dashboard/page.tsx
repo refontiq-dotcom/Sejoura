@@ -605,7 +605,6 @@ export default function DashboardPage() {
 
         if (userError || !userData?.tenant_id) {
           setError(true);
-          toast.error("Compte utilisateur introuvable. Veuillez contacter l'administrateur.");
           if (!isSilent) setLoading(false);
           return;
         }
@@ -817,7 +816,6 @@ export default function DashboardPage() {
         setTrendPercentage(trend);
       } catch (err) {
         setError(true);
-        toast.error("Impossible de charger les données du tableau de bord.");
         const normalizedError = normalizeUnknownError(err);
         console.error(normalizedError, err);
       } finally {
