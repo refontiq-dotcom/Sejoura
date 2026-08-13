@@ -52,6 +52,53 @@ function formatMoney(amount: number, currencyCode: string): string {
   return `${formatted} ${symbol}`;
 }
 
+/**
+ * Tronque un texte pour tenir sur UNE seule ligne de maxWidth pixels (ellipse
+ * finale), en vérifiant avec heightOfString (le même algorithme de césure que
+ * text()) : widthOfString seul est légèrement optimiste et provoque des
+ * retours à la ligne inattendus.
+ */
+function truncateToWidth(doc: PDFKit.PDFDocument, text: string, maxWidth: number): string {
+  const oneLineHeight = doc.heightOfString("X", { width: maxWidth });
+  const fitsOneLine = (t: string) =>
+    doc.widthOfString(t) <= maxWidth && doc.heightOfString(t, { width: maxWidth }) <= oneLineHeight;
+  if (fitsOneLine(text)) return text;
+  let fitted = text;
+  while (fitted.length > 1 && !fitsOneLine(`${fitted}…`)) {
+    fitted = fitted.slice(0, -1);
+  }
+  return `${fitted}…`;
+}
+
+/**
+ * Réduit un texte pour tenir dans une hauteur max (ex : 2 lignes) : baisse la
+ * taille de police, puis tronque avec une ellipse si nécessaire.
+ */
+function fitText(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  maxWidth: number,
+  maxHeight: number,
+  startSize = 16,
+  minSize = 10
+): { text: string; size: number } {
+  let size = startSize;
+  const measure = (t: string) => doc.fontSize(size).heightOfString(t, { width: maxWidth });
+
+  while (size > minSize && measure(text) > maxHeight) {
+    size -= 1;
+  }
+
+  let fitted = text;
+  if (measure(fitted) > maxHeight) {
+    while (fitted.length > 1 && measure(`${fitted}…`) > maxHeight) {
+      fitted = fitted.slice(0, -1);
+    }
+    fitted = `${fitted}…`;
+  }
+  return { text: fitted, size };
+}
+
 export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
   const { tenant, booking, invoice } = data;
   const client = booking.client;
@@ -93,9 +140,9 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   doc.save().rect(28, 28, 555, 746).lineWidth(0.5).stroke(borderColor).restore();
 
   // ==========================================================================
-  // EN-TÊTE NAVY — bloc ÉMETTEUR (logo + établissement)
+  // EN-TÊTE NAVY — bloc ÉMETTEUR (gauche) + bloc TITRE (droite), sans superposition
   // ==========================================================================
-  const headerHeight = 100;
+  const headerHeight = 116;
   doc.rect(0, 0, 612, headerHeight).fill(primaryColor);
 
   // Logo dynamique (Établissement ou Fallback Séjoura)
@@ -127,44 +174,58 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     }
   }
 
-  let textLeft = 60;
-  const emitterWidth = 250; // Largeur max du bloc émetteur (évite la troncature des bords)
+  // Largeur du bloc émetteur bornée à 330 px : jamais en collision avec le bloc
+  // titre de droite (qui commence à x=340).
+  const textLeft = logoBuffer ? 116 : 60;
+  const emitterWidth = 330 - textLeft;
+
   if (logoBuffer) {
     try {
-      doc.image(logoBuffer, 50, 25, { fit: [50, 50] });
-      textLeft = 115;
+      doc.image(logoBuffer, 50, 33, { fit: [50, 50] });
     } catch {
-      textLeft = 60;
+      // Ignorer un logo corrompu
     }
   }
 
-  // Nom de l'établissement (wrappé si long, jamais tronqué)
+  // --- Nom de l'établissement : max 2 lignes (taille réduite puis troncature) ---
+  // IMPORTANT : la mesure doit utiliser la MÊME police que le rendu
+  // (Helvetica-Bold est plus large que Helvetica, sinon le texte déborde et
+  // chevauche le bloc suivant).
   const companyName = tenant.company_name || "Séjoura";
-  doc.fontSize(17).font("Helvetica-Bold").fillColor("#FFFFFF");
-  const companyLines = doc.heightOfString(companyName, { width: emitterWidth });
-  doc.text(companyName, textLeft, 28, { width: emitterWidth });
+  doc.font("Helvetica-Bold");
+  const { text: nameText, size: nameSize } = fitText(doc, companyName, emitterWidth, 44, 16, 10);
+  const nameHeight = doc.fontSize(nameSize).heightOfString(nameText, { width: emitterWidth });
 
-  const nameBottom = 28 + companyLines;
+  doc
+    .fontSize(nameSize)
+    .fillColor("#FFFFFF")
+    .font("Helvetica-Bold")
+    .text(nameText, textLeft, 24, { width: emitterWidth });
 
+  // --- Sous-titre (sous le nom, jamais au-dessus) ---
+  const taglineTop = Math.min(24 + nameHeight + 4, 74);
   doc
     .fontSize(9)
     .fillColor(accentGold)
     .font("Helvetica-Bold")
-    .text("Séjoura SaaS", textLeft, nameBottom + 4, { width: emitterWidth });
+    .text("Séjoura SaaS", textLeft, taglineTop, { width: emitterWidth });
+
+  // --- Coordonnées ancrées en bas de l'en-tête (aucun chevauchement possible) ---
+  doc.fontSize(8).font("Helvetica");
+  const contactTop = headerHeight - 30;
+  const addressLine = truncateToWidth(doc, tenant.address || "", emitterWidth);
+  const cityPhoneLine = truncateToWidth(
+    doc,
+    [tenant.city, tenant.contact_phone ? `Tél : ${tenant.contact_phone}` : ""]
+      .filter(Boolean)
+      .join(" • "),
+    emitterWidth
+  );
 
   doc
-    .fontSize(8)
     .fillColor("#E2E8F0")
-    .font("Helvetica")
-    .text(tenant.address || "", textLeft, nameBottom + 16, { width: emitterWidth })
-    .text(
-      [tenant.city, tenant.contact_phone ? `Tél : ${tenant.contact_phone}` : ""]
-        .filter(Boolean)
-        .join(" • "),
-      textLeft,
-      nameBottom + 27,
-      { width: emitterWidth }
-    );
+    .text(addressLine, textLeft, contactTop, { width: emitterWidth })
+    .text(cityPhoneLine, textLeft, contactTop + 11, { width: emitterWidth });
 
   // ==========================================================================
   // BLOC TITRE (à droite) — FACTURE + N° + date
@@ -176,13 +237,13 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .fontSize(26)
     .fillColor(accentGold)
     .font("Helvetica-Bold")
-    .text("FACTURE", titleX, 26, { align: "right", width: titleWidth });
+    .text("FACTURE", titleX, 24, { align: "right", width: titleWidth });
 
   doc
     .fontSize(10)
     .fillColor("#FFFFFF")
     .font("Helvetica-Bold")
-    .text(`Facture N° ${invoice.invoice_number}`, titleX, 60, { align: "right", width: titleWidth });
+    .text(`Facture N° ${invoice.invoice_number}`, titleX, 58, { align: "right", width: titleWidth });
 
   doc
     .fontSize(8)
@@ -200,7 +261,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   // ==========================================================================
   // BLOC DESTINATAIRE + DÉTAILS RÉSERVATION
   // ==========================================================================
-  let y = 126;
+  let y = 140;
 
   // --- Facturé à (destinataire, à gauche) ---
   doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("FACTURÉ À", 60, y);
@@ -209,30 +270,22 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .fillColor(textColor)
     .font("Helvetica-Bold")
     .text(client?.full_name || "Client", 60, y + 14, { width: 220 });
+  doc.fontSize(9).font("Helvetica").fillColor(mutedColor);
   doc
-    .fontSize(9)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text(client?.phone || "", 60, y + 34, { width: 220 })
-    .text(client?.email || "", 60, y + 46, { width: 220 })
-    .text(client?.nationality || "", 60, y + 58, { width: 220 });
+    .text(truncateToWidth(doc, client?.phone || "", 220), 60, y + 34, { width: 220 })
+    .text(truncateToWidth(doc, client?.email || "", 220), 60, y + 46, { width: 220 })
+    .text(truncateToWidth(doc, client?.nationality || "", 220), 60, y + 58, { width: 220 });
 
   // --- Réservation (à droite) ---
   const rx = 320;
   const rw = 232;
   doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("RÉSERVATION", rx, y);
+  doc.fontSize(9).font("Helvetica").fillColor(mutedColor);
+  const roomLabel = `Chambre : ${room?.room_number || "—"}${roomType?.name ? ` (${roomType.name})` : ""}`;
   doc
-    .fontSize(9)
-    .fillColor(mutedColor)
-    .font("Helvetica")
-    .text(`Code : ${booking.booking_code || "—"}`, rx, y + 16, { width: rw })
-    .text(
-      `Chambre : ${room?.room_number || "—"}${roomType?.name ? ` (${roomType.name})` : ""}`,
-      rx,
-      y + 28,
-      { width: rw }
-    )
-    .text(`Établissement : ${accommodation?.name || "—"}`, rx, y + 40, { width: rw })
+    .text(truncateToWidth(doc, `Code : ${booking.booking_code || "—"}`, rw), rx, y + 16, { width: rw })
+    .text(truncateToWidth(doc, roomLabel, rw), rx, y + 28, { width: rw })
+    .text(truncateToWidth(doc, `Établissement : ${accommodation?.name || "—"}`, rw), rx, y + 40, { width: rw })
     .text(`Arrivée : ${formatDateLong(booking.check_in_date)}`, rx, y + 52, { width: rw })
     .text(`Départ : ${formatDateLong(booking.check_out_date)}`, rx, y + 64, { width: rw })
     .text(`Nombre de nuits : ${booking.nights_count}`, rx, y + 76, { width: rw });
@@ -253,7 +306,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   const padX = 10;
   const headerH = 24;
   const rowH = 24;
-  const tableTop = 250;
+  const tableTop = 260;
 
   // Fond de l'en-tête du tableau
   doc.rect(tableLeft, tableTop, tableWidth, headerH).fill(headerFill);

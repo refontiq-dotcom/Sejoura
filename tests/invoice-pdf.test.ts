@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import zlib from "zlib";
 import { generateInvoicePdf } from "@/lib/invoice-pdf";
 
-function extractPdfText(buffer: Buffer): string {
+const PAGE_HEIGHT = 841.89;
+const HEADER_HEIGHT = 116;
+
+function decompressedStreams(buffer: Buffer): string {
   const latin = buffer.toString("latin1");
   const streams: string[] = [];
   const re = /stream\r?\n([\s\S]*?)endstream/g;
@@ -14,7 +17,11 @@ function extractPdfText(buffer: Buffer): string {
       // ignore non-compressed streams
     }
   }
-  const text = streams.join("\n");
+  return streams.join("\n");
+}
+
+function extractPdfText(buffer: Buffer): string {
+  const text = decompressedStreams(buffer);
   const runs: string[] = [];
   const tj = /\[([^\]]+)\]\s*TJ/g;
   let t: RegExpExecArray | null;
@@ -28,6 +35,40 @@ function extractPdfText(buffer: Buffer): string {
     runs.push(Buffer.from(s[1], "hex").toString("latin1"));
   }
   return runs.join("\n");
+}
+
+interface TextRun {
+  x: number;
+  y: number; // distance depuis le haut de la page
+  text: string;
+}
+
+/**
+ * Extrait les blocs de texte avec leur position. Le PDF place l'origine en bas
+ * de page (y_bottom) : on convertit en distance depuis le haut (y_top).
+ */
+function extractRuns(buffer: Buffer): TextRun[] {
+  const text = decompressedStreams(buffer);
+  const runs: TextRun[] = [];
+  const bt = /BT([\s\S]*?)ET/g;
+  let b: RegExpExecArray | null;
+  while ((b = bt.exec(text)) !== null) {
+    const block = b[1];
+    const tm = /(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+Tm/g;
+    let t: RegExpExecArray | null;
+    while ((t = tm.exec(block)) !== null) {
+      const x = parseFloat(t[1]);
+      const yBottom = parseFloat(t[2]);
+      const yTop = PAGE_HEIGHT - yBottom;
+      const after = block.slice(t.index + t[0].length);
+      const arrayEnd = /\]\s*TJ/.exec(after);
+      const snippet = arrayEnd ? after.slice(0, arrayEnd.index + 1) : after;
+      const hexes = [...snippet.matchAll(/<([0-9a-fA-F]+)>/g)];
+      const str = hexes.map((h) => Buffer.from(h[1], "hex").toString("latin1")).join("");
+      if (str.trim().length > 0) runs.push({ x, y: yTop, text: str });
+    }
+  }
+  return runs;
 }
 
 const baseTenant = {
@@ -214,5 +255,43 @@ describe("generateInvoicePdf", () => {
     expect(text).toContain("5 000");
     expect(text).toContain("Reste à payer");
     expect(text).toContain("8 200");
+  });
+
+  it("l'en-tête ne superpose jamais les textes, même avec des données longues", async () => {
+    const longTenant = {
+      ...baseTenant,
+      company_name:
+        "Hôtel Résidence Palmier Royal Beach Resort & Spa International de la Corniche Ouest",
+      address: "Avenue de la Corniche Ouest, quartier des ambassades, Cocody Riviera",
+      city: "Abidjan, District Autonome d'Abidjan",
+    };
+    const buffer = await generateInvoicePdf({
+      tenant: longTenant as never,
+      booking: { ...baseBooking, ...relations } as never,
+      invoice: baseInvoice as never,
+    });
+
+    const text = extractPdfText(buffer);
+    // Le nom très long est réduit (ellipse) ou reste sur 2 lignes : pas de troncature muette
+    expect(text).toMatch(/Hôtel Résidence Palmier/);
+
+    const runs = extractRuns(buffer).filter((r) => r.x < 330);
+    const headerRuns = runs.filter((r) => r.y < HEADER_HEIGHT);
+    const contentRuns = runs.filter((r) => r.y >= HEADER_HEIGHT);
+
+    // Aucun texte de l'en-tête ne déborde dans le bloc destinataire
+    expect(Math.max(...headerRuns.map((r) => r.y))).toBeLessThan(HEADER_HEIGHT);
+
+    // Le bloc destinataire commence après l'en-tête (marge de 12 px)
+    const firstContentTop = Math.min(...contentRuns.map((r) => r.y));
+    expect(firstContentTop).toBeGreaterThanOrEqual(HEADER_HEIGHT + 12);
+
+    // Aucun chevauchement vertical entre deux textes de l'en-tête
+    const sorted = [...headerRuns].sort((a, b) => a.y - b.y);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const lineHeight = 9 * 1.16; // hauteur de ligne maximale estimée dans l'en-tête
+      expect(sorted[i + 1].y - sorted[i].y).toBeGreaterThanOrEqual(2);
+      expect(sorted[i + 1].y).toBeGreaterThan(sorted[i].y + lineHeight - 4);
+    }
   });
 });
