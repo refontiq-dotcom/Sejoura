@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseUrl } from "./env";
 
 /**
  * Client Supabase avec la clé service_role (bypass RLS)
@@ -8,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
  * ATTENTION: Ne jamais importer ce client dans un Client Component
  */
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
