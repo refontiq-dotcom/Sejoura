@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Bell, Moon, Sun, Search, Menu, UserCircle, Sparkles, LogOut, Settings, CreditCard } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +27,7 @@ interface NotificationItem {
   time: string;
   type: "info" | "warning" | "success" | "error";
   isRead: boolean;
+  link?: string | null;
 }
 
 export function Header({ title, subtitle, onMenuClick, userName, userRole, plan, monthlyPrice }: HeaderProps) {
@@ -42,47 +43,65 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    async function loadNotifications() {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+  const loadNotifications = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        const { data: userData } = await supabase
-          .from("users")
-          .select("tenant_id")
-          .eq("auth_user_id", session.user.id)
-          .maybeSingle();
+      const { data: userData } = await supabase
+        .from("users")
+        .select("tenant_id")
+        .eq("auth_user_id", session.user.id)
+        .maybeSingle();
 
-        if (!userData?.tenant_id) return;
-        setTenantId(userData.tenant_id);
+      if (!userData?.tenant_id) return;
+      setTenantId(userData.tenant_id);
 
-        const { data, error } = await supabase
-          .from("notifications")
-          .select("*")
-          .eq("tenant_id", userData.tenant_id)
-          .order("created_at", { ascending: false })
-          .limit(20);
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("tenant_id", userData.tenant_id)
+        .order("created_at", { ascending: false })
+        .limit(20);
 
-        if (error) return;
+      if (error) return;
 
-        const formatted: NotificationItem[] = (data || []).map((n) => ({
-          id: n.id,
-          title: n.title,
-          message: n.message,
-          time: n.created_at ? new Date(n.created_at).toLocaleString("fr-FR") : "",
-          type: (n.type as NotificationItem["type"]) || "info",
-          isRead: n.is_read,
-        }));
-        setNotifications(formatted);
-      } catch {
-        // Erreur silencieuse
-      }
+      const formatted: NotificationItem[] = (data || []).map((n) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        time: n.created_at ? new Date(n.created_at).toLocaleString("fr-FR") : "",
+        type: (n.type as NotificationItem["type"]) || "info",
+        isRead: n.is_read,
+        link: n.link,
+      }));
+      setNotifications(formatted);
+    } catch {
+      // Erreur silencieuse
     }
-
-    loadNotifications();
   }, []);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  // Temps réel : la cloche se met à jour dès qu'une notification arrive
+  useEffect(() => {
+    if (!tenantId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel("notifications-bell")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `tenant_id=eq.${tenantId}` },
+        () => loadNotifications()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tenantId, loadNotifications]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -113,13 +132,34 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  async function handleNotifClick(notif: NotificationItem) {
+    if (!notif.isRead) {
+      try {
+        const supabase = createClient();
+        await supabase
+          .from("notifications")
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq("id", notif.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+        );
+      } catch {
+        // La navigation reste possible même si le marquage échoue
+      }
+    }
+    if (notif.link) {
+      setNotifOpen(false);
+      router.push(notif.link);
+    }
+  }
+
   async function handleMarkAllRead() {
     if (!tenantId || unreadCount === 0) return;
     try {
       const supabase = createClient();
       const { error } = await supabase
         .from("notifications")
-        .update({ is_read: true })
+        .update({ is_read: true, read_at: new Date().toISOString() })
         .eq("tenant_id", tenantId)
         .eq("is_read", false);
 
@@ -236,6 +276,15 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
                     notifications.map((notif) => (
                       <div
                         key={notif.id}
+                        onClick={() => handleNotifClick(notif)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleNotifClick(notif);
+                          }
+                        }}
                         className={`p-3 border-b border-[var(--border)] hover:bg-[var(--muted-hover)] transition-colors cursor-pointer ${
                           !notif.isRead ? "bg-[var(--muted)]" : ""
                         }`}
@@ -243,14 +292,22 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
                         <div className="flex items-start gap-2.5">
                           <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${notifColors[notif.type]}`} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-[var(--foreground)]">
+                            <p className={`text-xs ${notif.isRead ? "font-medium text-[var(--foreground)]" : "font-bold text-[var(--foreground)]"}`}>
                               {notif.title}
                             </p>
                             <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">
                               {notif.message}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-1">{notif.time}</p>
+                            {notif.link && (
+                              <p className="text-[10px] font-medium text-[var(--primary-color,#0C1C33)] mt-1">
+                                {t.view}
+                              </p>
+                            )}
                           </div>
+                          {!notif.isRead && (
+                            <span className="w-2 h-2 rounded-full bg-blue-500 mt-1 flex-shrink-0" />
+                          )}
                         </div>
                       </div>
                     ))
