@@ -99,7 +99,7 @@ export default function DashboardLayout({
 
         let { data: userData } = await supabase
           .from("users")
-          .select("id, auth_user_id, role, full_name, phone, email, is_active, activated_at, tenant_id, accommodation_id")
+          .select("id, auth_user_id, role, full_name, phone, email, is_active, activated_at, last_login_at, avatar_url, tenant_id, accommodation_id")
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
 
@@ -350,6 +350,10 @@ export default function DashboardLayout({
           onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           userName={user.full_name}
           userRole={user.role}
+          userEmail={user.email}
+          avatarUrl={user.avatar_url}
+          lastLogin={user.last_login_at}
+          companyName={companyName}
           plan={plan}
           monthlyPrice={monthlyPrice}
         />

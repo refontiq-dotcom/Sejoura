@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bell, Moon, Sun, Search, Menu, UserCircle, Sparkles, LogOut, Settings, CreditCard } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -16,6 +16,10 @@ interface HeaderProps {
   onMenuClick?: () => void;
   userName?: string;
   userRole?: string;
+  userEmail?: string | null;
+  avatarUrl?: string | null;
+  lastLogin?: string | null;
+  companyName?: string;
   plan?: string;
   monthlyPrice?: number;
 }
@@ -30,7 +34,67 @@ interface NotificationItem {
   link?: string | null;
 }
 
-export function Header({ title, subtitle, onMenuClick, userName, userRole, plan, monthlyPrice }: HeaderProps) {
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin_residence: "Gérant(e)",
+  receptionniste: "Réceptionniste",
+  menagere: "Ménagère",
+  client: "Client",
+};
+
+const AVATAR_GRADIENTS = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-orange-500 to-amber-600",
+  "from-pink-500 to-rose-600",
+  "from-violet-500 to-purple-600",
+  "from-cyan-500 to-sky-600",
+];
+
+function avatarGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+
+function UserAvatar({
+  name,
+  src,
+  className = "",
+}: {
+  name?: string;
+  src?: string | null;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const displayName = name || "Utilisateur";
+  const showImage = Boolean(src) && !failed;
+
+  if (showImage) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src as string}
+        alt={displayName}
+        onError={() => setFailed(true)}
+        className={`rounded-full object-cover ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`rounded-full bg-gradient-to-br ${avatarGradient(displayName)} flex items-center justify-center text-white font-semibold select-none ${className}`}
+      aria-hidden
+    >
+      {displayName.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, lastLogin, companyName, plan, monthlyPrice }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useLanguage();
   const t = translations[lang].header;
@@ -329,24 +393,41 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
           <div className="relative" ref={profileRef}>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="w-7 h-7 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white font-semibold text-xs hover:ring-2 hover:ring-[var(--primary-color)] transition-all"
-              aria-label="Profil"
+              className="relative w-8 h-8 rounded-full hover:ring-2 hover:ring-[var(--primary-color,#0C1C33)] ring-offset-2 ring-offset-[var(--main-bg,var(--background))] transition-all focus:outline-none focus-visible:ring-2"
+              aria-label={t.profile}
+              title={userName || "Profil"}
             >
-              <UserCircle className="w-4 h-4" />
+              <UserAvatar name={userName} src={avatarUrl} className="w-8 h-8" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-[var(--main-bg,var(--background))]" />
             </button>
 
             {profileOpen && (
               <div className="absolute right-0 mt-1.5 w-64 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in z-50">
                 <div className="p-3 border-b border-[var(--border)]">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white font-semibold text-xs">
-                      {userName?.charAt(0).toUpperCase() || "U"}
-                    </div>
+                    <UserAvatar name={userName} src={avatarUrl} className="w-10 h-10" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-[var(--foreground)] truncate">{userName || "Utilisateur"}</p>
-                      <p className="text-[10px] text-[var(--muted-foreground)] capitalize">{userRole?.replace("_", " ") || "Rôle"}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground)] truncate">
+                        {userEmail || userRole?.replace("_", " ") || "—"}
+                      </p>
                     </div>
                   </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold capitalize">
+                      {ROLE_LABELS[userRole || ""] || userRole?.replace("_", " ") || "Membre"}
+                    </span>
+                    {companyName && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-medium truncate max-w-[130px]">
+                        {companyName}
+                      </span>
+                    )}
+                  </div>
+                  {lastLogin && (
+                    <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
+                      {t.lastLogin}: {new Date(lastLogin).toLocaleString(lang === "en" ? "en-US" : "fr-FR")}
+                    </p>
+                  )}
                 </div>
                 <div className="p-2.5">
                   <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--muted)]">
@@ -354,8 +435,10 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
                       <Sparkles className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-[var(--muted-foreground)]">Plan actuel</p>
-                    <p className="text-xs font-semibold text-[var(--foreground)] capitalize">{monthlyPrice === 0 ? "Free" : plan || "Free"}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground)]">{t.currentPlan}</p>
+                      <p className="text-xs font-semibold text-[var(--foreground)] capitalize">
+                        {monthlyPrice === 0 ? "Free" : plan || "Free"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -365,21 +448,21 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, plan,
                     className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    Paramètres
+                    {t.settings}
                   </button>
                   <button
                     onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
                     className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    Abonnement
+                    {t.subscription}
                   </button>
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-[var(--muted-hover)] transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    Se déconnecter
+                    {t.logout}
                   </button>
                 </div>
               </div>
