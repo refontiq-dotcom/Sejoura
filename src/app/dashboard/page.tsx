@@ -1109,19 +1109,21 @@ export default function DashboardPage() {
         /* ── Vue Admin : 4 KPIs colorés, chacun avec son identité visuelle ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1: Taux d'occupation — Bleu */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-200 dark:ring-blue-900/40 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center shadow-sm">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-200 dark:ring-blue-900/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center shadow-sm flex-shrink-0">
                   <TrendingUp className="w-5 h-5" />
                 </div>
-                <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+                <div className="min-w-0">
+                  <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.occupancyRate}%</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{"Taux d'occupation"}</p>
+                </div>
               </div>
-              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">{"Taux d'occupation"}</p>
-              <p className="text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
+              <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
             </div>
-            <div className="mt-4">
-              <div className="h-2 bg-white/70 dark:bg-slate-800/80 rounded-full overflow-hidden ring-1 ring-blue-500/10">
+            <div className="mt-3">
+              <div className="h-1.5 bg-white/70 dark:bg-slate-800/80 rounded-full overflow-hidden ring-1 ring-blue-500/10">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-sky-500 rounded-full transition-all"
                   style={{ width: `${kpis.occupancyRate}%` }}
@@ -1132,86 +1134,90 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 2: Encaissements du jour — Émeraude */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-200 dark:ring-emerald-900/40 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center shadow-sm">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-200 dark:ring-emerald-900/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center shadow-sm flex-shrink-0">
                   <Wallet className="w-5 h-5" />
                 </div>
-                <Badge variant="success">{currency.code}</Badge>
+                <div className="min-w-0">
+                  <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none truncate">
+                    {formatAmountOnly(kpis.dailyRevenue, currency.code)}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Encaissements du jour</p>
+                </div>
               </div>
-              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Encaissements</p>
-              <p className="text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">
-                {formatAmountOnly(kpis.dailyRevenue, currency.code)}
-              </p>
+              <Badge variant="success">{currency.code}</Badge>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
               {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
             </p>
           </Card>
 
           {/* KPI 3: Entrées / Sorties prévues — Orange */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-200 dark:ring-orange-900/40 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center shadow-sm">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-200 dark:ring-orange-900/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center shadow-sm flex-shrink-0">
                   <LogIn className="w-5 h-5" />
                 </div>
-                <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
-              </div>
-              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Mouvements</p>
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">Mouvements</p>
+                  <div className="flex items-center gap-5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Arrivées</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                        <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Départs</p>
+                    </div>
                   </div>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Arrivées</p>
-                </div>
-                <div className="w-px h-9 bg-white/80 dark:bg-slate-700/80" />
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Départs</p>
                 </div>
               </div>
+              <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
               {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
             </p>
           </Card>
 
           {/* KPI 4: État Ménage — Violet */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-200 dark:ring-violet-900/40 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300 flex items-center justify-center shadow-sm">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-200 dark:ring-violet-900/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300 flex items-center justify-center shadow-sm flex-shrink-0">
                   <Sparkles className="w-5 h-5" />
                 </div>
-                <Badge variant="purple">Ménage</Badge>
-              </div>
-              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">État du ménage</p>
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">État du ménage</p>
+                  <div className="flex items-center gap-5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">À nettoyer</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Prêtes</p>
+                    </div>
                   </div>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">À nettoyer</p>
-                </div>
-                <div className="w-px h-9 bg-white/80 dark:bg-slate-700/80" />
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Prêtes</p>
                 </div>
               </div>
+              <Badge variant="purple">Ménage</Badge>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">Statut de propreté des chambres</p>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">Statut de propreté des chambres</p>
           </Card>
         </div>
       )}
