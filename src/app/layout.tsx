@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { LanguageProvider } from "@/hooks/use-language";
 import { CurrencyProvider } from "@/hooks/use-currency";
+import { AccommodationProvider } from "@/hooks/use-accommodation";
 import { InlineScript } from "@/components/inline-script";
 import { ThemeToaster } from "@/components/providers/theme-toaster";
 
@@ -42,8 +43,10 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <CurrencyProvider>
-              {children}
-              <ThemeToaster />
+              <AccommodationProvider>
+                {children}
+                <ThemeToaster />
+              </AccommodationProvider>
             </CurrencyProvider>
           </LanguageProvider>
         </ThemeProvider>

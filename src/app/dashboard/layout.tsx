@@ -15,7 +15,11 @@ import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE } from "@/lib/routes";
 import { getSidebarThemeStyles } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
-import type { User } from "@/types/database";
+import { useAccommodation } from "@/hooks/use-accommodation";
+import { getActiveAssignmentId } from "@/lib/assignments";
+import type { User, Accommodation } from "@/types/database";
+
+const ACTIVE_ACCOMMODATION_STORAGE_KEY = "sejoura-active-accommodation";
 
 export default function DashboardLayout({
   children,
@@ -24,6 +28,7 @@ export default function DashboardLayout({
 }) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
+  const { setAccommodations, setActiveAccommodationId } = useAccommodation();
   const t = translations[lang].dashboard;
   const router = useRouter();
   const pathname = usePathname();
@@ -235,6 +240,49 @@ export default function DashboardLayout({
             setPlan(subData.plan);
             setMonthlyPrice(subData.monthly_price || 0);
           }
+
+          // Charger les résidences accessibles à l'utilisateur pour le
+          // sélecteur multi-résidences du Header.
+          const { data: accsData } = await supabase
+            .from("accommodations")
+            .select("*")
+            .eq("tenant_id", userData.tenant_id)
+            .order("name");
+
+          if (accsData) {
+            let accessible = accsData as unknown as Accommodation[];
+            // Un réceptionniste / ménagère ne voit que sa résidence active
+            if (userData.role === "receptionniste" || userData.role === "menagere") {
+              const assignedId = await getActiveAssignmentId(
+                supabase,
+                userData.id,
+                userData.accommodation_id
+              );
+              if (assignedId) accessible = accessible.filter((a) => a.id === assignedId);
+            }
+            setAccommodations(accessible);
+
+            // Déterminer la résidence active :
+            // 1. Valeur persistée si toujours accessible
+            // 2. Sinon l'affectation permanente de l'utilisateur
+            // 3. Sinon la première résidence de la liste
+            let activeId: string | null = null;
+            const storedId =
+              typeof window !== "undefined"
+                ? window.localStorage.getItem(ACTIVE_ACCOMMODATION_STORAGE_KEY)
+                : null;
+            if (storedId && accessible.some((a) => a.id === storedId)) {
+              activeId = storedId;
+            } else if (
+              userData.accommodation_id &&
+              accessible.some((a) => a.id === userData.accommodation_id)
+            ) {
+              activeId = userData.accommodation_id;
+            } else if (accessible.length > 0) {
+              activeId = accessible[0].id;
+            }
+            setActiveAccommodationId(activeId);
+          }
         }
 
         // Le tenant seul ne suffit pas pour décider si l'étape 2 est terminée :
@@ -254,7 +302,7 @@ export default function DashboardLayout({
     }
 
     checkAuth();
-  }, [router, retryCount]);
+  }, [router, retryCount, setAccommodations, setActiveAccommodationId]);
 
   // Titre / sous-titre intelligents selon la page courante.
   // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).

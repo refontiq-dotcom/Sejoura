@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
+import { useAccommodation } from "@/hooks/use-accommodation";
+import { getPlanLabel } from "@/lib/utils";
 
 interface HeaderProps {
   title: string;
@@ -94,7 +96,96 @@ function UserAvatar({
   );
 }
 
-export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, lastLogin, companyName, plan, monthlyPrice }: HeaderProps) {
+// ============================================================================
+// SÉLECTEUR DE RÉSIDENCE (Header)
+// - 1 seule résidence : badge simple avec le nom
+// - Plusieurs résidences : dropdown permettant de basculer en 1 clic
+// ============================================================================
+function ResidenceSwitcher() {
+  const { lang } = useLanguage();
+  const t = translations[lang].header;
+  const { accommodations, activeAccommodationId, activeAccommodation, setActiveAccommodationId } = useAccommodation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  if (accommodations.length === 0) return null;
+
+  // Une seule résidence : badge simple
+  if (accommodations.length === 1) {
+    return (
+      <span
+        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)] text-xs font-semibold border border-[var(--primary-color)]/20 max-w-[200px]"
+        title={accommodations[0].name}
+      >
+        <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+        <span className="truncate">{accommodations[0].name}</span>
+      </span>
+    );
+  }
+
+  // Plusieurs résidences : dropdown
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-full bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors max-w-[52px] md:max-w-[220px]"
+        aria-label={t.switchResidence}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <Building2 className="w-3.5 h-3.5 text-[var(--muted-foreground)] flex-shrink-0" />
+        <span className="hidden md:inline text-xs font-medium truncate">
+          {activeAccommodation?.name || t.selectResidence}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-[var(--muted-foreground)] flex-shrink-0 hidden md:block" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1.5 w-60 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-2">
+          <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+            {t.switchResidence}
+          </p>
+          <div className="space-y-0.5">
+            {accommodations.map((acc) => {
+              const isActive = acc.id === activeAccommodationId;
+              return (
+                <button
+                  key={acc.id}
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => {
+                    setActiveAccommodationId(acc.id);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+                    isActive
+                      ? "bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] font-semibold"
+                      : "text-[var(--foreground)] hover:bg-[var(--muted-hover)]"
+                  }`}
+                >
+                  <span className="flex-1 text-left truncate">{acc.name}</span>
+                  {isActive && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, lastLogin, companyName, plan }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useLanguage();
   const t = translations[lang].header;
@@ -106,6 +197,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const [tenantId, setTenantId] = useState<string>("");
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const planLabel = getPlanLabel(plan || "free");
+  const { activeAccommodation } = useAccommodation();
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -295,6 +388,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </button>
           </div>
 
+          <ResidenceSwitcher />
+
           <button
             onClick={toggleTheme}
             className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
@@ -402,64 +497,73 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-1.5 w-64 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in z-50">
-                <div className="p-3 border-b border-[var(--border)]">
+              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in">
+                {/* Section 1 : Infos utilisateur & badge rôle */}
+                <div className="p-3">
                   <div className="flex items-center gap-2.5">
                     <UserAvatar name={userName} src={avatarUrl} className="w-10 h-10" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[var(--foreground)] truncate">{userName || "Utilisateur"}</p>
-                      <p className="text-[10px] text-[var(--muted-foreground)] truncate">
-                        {userEmail || userRole?.replace("_", " ") || "—"}
-                      </p>
+                      <p className="text-sm font-bold text-[var(--foreground)] truncate">{userName || "Utilisateur"}</p>
+                      <p className="text-sm text-[var(--muted-foreground)] truncate">{userEmail || "—"}</p>
                     </div>
                   </div>
+                  {companyName && (
+                    <p className="mt-2 text-xs font-medium text-[var(--foreground)] truncate">{companyName}</p>
+                  )}
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold capitalize">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold capitalize">
                       {ROLE_LABELS[userRole || ""] || userRole?.replace("_", " ") || "Membre"}
                     </span>
                     {companyName && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-medium truncate max-w-[130px]">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-medium truncate max-w-[150px]">
                         {companyName}
                       </span>
                     )}
                   </div>
+                  {activeAccommodation?.name && (
+                    <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+                      {t.activeResidence}: <span className="font-semibold text-[var(--foreground)]">{activeAccommodation.name}</span>
+                    </p>
+                  )}
                   {lastLogin && (
-                    <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
+                    <p className="mt-1.5 text-[11px] text-[var(--muted-foreground)]">
                       {t.lastLogin}: {new Date(lastLogin).toLocaleString(lang === "en" ? "en-US" : "fr-FR")}
                     </p>
                   )}
                 </div>
-                <div className="p-2.5">
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--muted)]">
-                    <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
+
+                {/* Section 2 : Plan actuel + liens Paramètres / Abonnement */}
+                <div className="border-t border-[var(--border)] p-2.5 space-y-1">
+                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--muted)]">
+                    <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center flex-shrink-0">
                       <Sparkles className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-[var(--muted-foreground)]">{t.currentPlan}</p>
-                      <p className="text-xs font-semibold text-[var(--foreground)] capitalize">
-                        {monthlyPrice === 0 ? "Free" : plan || "Free"}
-                      </p>
+                      <p className="text-xs font-semibold text-[var(--foreground)] capitalize">{planLabel}</p>
                     </div>
                   </div>
-                </div>
-                <div className="border-t border-[var(--border)] py-1.5">
                   <button
                     onClick={() => { setProfileOpen(false); router.push("/dashboard/settings"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <Settings className="w-3.5 h-3.5" />
+                    <Settings className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                     {t.settings}
                   </button>
                   <button
                     onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <CreditCard className="w-3.5 h-3.5" />
+                    <CreditCard className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                     {t.subscription}
                   </button>
+                </div>
+
+                {/* Section 3 : Déconnexion */}
+                <div className="border-t border-[var(--border)] p-1.5">
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-[var(--muted-hover)] transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     {t.logout}

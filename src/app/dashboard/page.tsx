@@ -34,6 +34,7 @@ import {
   canAccessPlanFeature,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useAccommodation } from "@/hooks/use-accommodation";
 import { convertXofTo, getCurrencyDecimals } from "@/lib/currencyConverter";
 import { createClient } from "@/lib/supabase/client";
 import { DashboardSkeletons } from "@/components/ui/skeletons";
@@ -607,6 +608,7 @@ function SectionHeader({
 export default function DashboardPage() {
   const router = useRouter();
   const { currency, fmt } = useCurrency();
+  const { activeAccommodationId } = useAccommodation();
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState("standard");
   const [kpis, setKpis] = useState<KPIData>({
@@ -673,28 +675,41 @@ export default function DashboardPage() {
               .select("plan")
               .eq("tenant_id", tenantId)
               .single(),
-            supabase
-              .from("bookings")
-              .select(`
-                *,
-                client:clients(*),
-                room:rooms(*, room_type:room_types(*), accommodation:accommodations(name))
-              `)
-              .eq("tenant_id", tenantId)
-              .in("status", ["confirmed", "checked_in", "checked_out", "cancelled"])
-              .lte("check_in_date", targetDate)
-              .gte("check_out_date", targetDate),
+            (() => {
+              let bookingsQuery = supabase
+                .from("bookings")
+                .select(`
+                  *,
+                  client:clients(*),
+                  room:rooms(*, room_type:room_types(*), accommodation:accommodations(name))
+                `)
+                .eq("tenant_id", tenantId)
+                .in("status", ["confirmed", "checked_in", "checked_out", "cancelled"])
+                .lte("check_in_date", targetDate)
+                .gte("check_out_date", targetDate);
+              // Filtrer par résidence active (multi-résidences)
+              if (activeAccommodationId) {
+                bookingsQuery = bookingsQuery.eq("accommodation_id", activeAccommodationId);
+              }
+              return bookingsQuery;
+            })(),
             supabase
               .from("payments")
-              .select("amount, payment_date")
+              .select("amount, payment_date, booking:bookings(accommodation_id)")
               .eq("tenant_id", tenantId)
               .gte("payment_date", `${twelveMonthsAgo}T00:00:00`),
-            supabase
-              .from("cleaning_tasks")
-              .select("status, created_at")
-              .eq("tenant_id", tenantId)
-              .gte("created_at", `${targetDate}T00:00:00`)
-              .lte("created_at", `${targetDate}T23:59:59.999`),
+            (() => {
+              let cleaningQuery = supabase
+                .from("cleaning_tasks")
+                .select("status, created_at")
+                .eq("tenant_id", tenantId)
+                .gte("created_at", `${targetDate}T00:00:00`)
+                .lte("created_at", `${targetDate}T23:59:59.999`);
+              if (activeAccommodationId) {
+                cleaningQuery = cleaningQuery.eq("accommodation_id", activeAccommodationId);
+              }
+              return cleaningQuery;
+            })(),
             supabase
               .from("accommodations")
               .select("id")
@@ -718,15 +733,23 @@ export default function DashboardPage() {
 
         // Pas d'établissement => pas de chambres : on évite la requête avec un UUID factice
         let rooms: { status: string }[] = [];
-        if (accommodationIds.length > 0) {
+        const roomIds = activeAccommodationId ? [activeAccommodationId] : accommodationIds;
+        if (roomIds.length > 0) {
           const roomsDataResult = await supabase
             .from("rooms")
             .select("status")
-            .in("accommodation_id", accommodationIds);
+            .in("accommodation_id", roomIds);
           if (roomsDataResult.error) throw new Error(roomsDataResult.error.message || "Erreur lors de la récupération des chambres.");
           rooms = (roomsDataResult.data || []) as unknown as { status: string }[];
         }
-        const payments = (paymentsData.data || []) as unknown as { amount: number; payment_date: string }[];
+        const rawPayments = (paymentsData.data || []) as unknown as {
+          amount: number;
+          payment_date: string;
+          booking?: { accommodation_id: string } | null;
+        }[];
+        const payments = activeAccommodationId
+          ? rawPayments.filter((p) => p.booking?.accommodation_id === activeAccommodationId)
+          : rawPayments;
         const cleaningTasks = (cleaningTasksData.data || []) as unknown as { status: string }[];
 
         const targetBookings = bookings.filter((b) => {
@@ -867,7 +890,7 @@ export default function DashboardPage() {
       } finally {
         if (!isSilent) setLoading(false);
       }
-  }, []);
+  }, [activeAccommodationId]);
 
   useEffect(() => {
     let cancelled = false;

@@ -410,6 +410,23 @@ html {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Animation d'apparition des dropdowns (fade-in + zoom-in 95%, 150 ms) */
+@keyframes dropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown-in {
+  animation: dropdownIn 0.15s ease-out;
+  transform-origin: top right;
+}
+
 /* Animation pour les modals */
 @keyframes modalIn {
   from {
