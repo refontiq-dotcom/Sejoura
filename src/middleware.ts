@@ -37,9 +37,22 @@ export async function middleware(req: NextRequest) {
     request: req,
   });
 
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabasePublicKey();
+
+  // Supabase non configuré (variables d'environnement absentes) : aucune
+  // session ne peut exister. Plutôt que de faire planter l'application
+  // (createServerClient lève une erreur), on laisse passer la page publique
+  // d'accueil et on redirige les zones privées vers `/`.
+  if (!supabaseUrl || !supabaseKey) {
+    const pathname = req.nextUrl.pathname;
+    if (pathname === "/") return supabaseResponse;
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
   const supabase = createServerClient(
-    getSupabaseUrl(),
-    getSupabasePublicKey(),
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         get(name) {

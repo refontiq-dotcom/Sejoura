@@ -555,6 +555,55 @@ function LineChart({ data, fmt, currencyCode }: { data: MonthlyRevenueData[]; fm
 }
 
 // ============================================================================
+// SECTION CARD — conteneur avec bandeau d'accent coloré
+// ============================================================================
+
+function SectionCard({
+  accent,
+  className = "",
+  children,
+}: {
+  accent: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className={`rounded-2xl shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
+      <div className={`h-1 w-full bg-gradient-to-r ${accent}`} />
+      {children}
+    </Card>
+  );
+}
+
+// En-tête générique d'une carte de section : chip icône coloré + titre + action
+function SectionHeader({
+  icon,
+  iconClass,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: React.ReactNode;
+  iconClass: string;
+  title: string;
+  subtitle: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="p-4 md:p-5 border-b border-[var(--border)] flex flex-wrap items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ${iconClass}`}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h2 className="text-[15px] font-bold text-slate-900 dark:text-white leading-tight">{title}</h2>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+// ============================================================================
 // PAGE PRINCIPALE
 // ============================================================================
 
@@ -941,17 +990,21 @@ export default function DashboardPage() {
   return (
     <div className={isReceptionniste ? "space-y-2 animate-fade-in" : "space-y-3 animate-fade-in"}>
       {/* 0. SÉLECTEUR DE DATE (discret) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 dark:text-slate-500">
-          <Calendar className="w-4 h-4" />
-          <span className="text-sm font-medium capitalize">{formattedSelectedDate}</span>
-          <span className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">
-            {isToday
-              ? "· Aujourd'hui"
-              : isPastDate
-                ? "· Activités passées"
-                : "· Activités à venir"}
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-0.5">
+        <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary-color)]/10 text-[var(--primary-color,#0C1C33)] dark:text-white flex items-center justify-center">
+            <Calendar className="w-4 h-4" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 capitalize">{formattedSelectedDate}</p>
+            <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+              {isToday
+                ? "Aujourd'hui"
+                : isPastDate
+                  ? "Activités passées"
+                  : "Activités à venir"}
+            </p>
+          </div>
         </div>
 
         {isReceptionniste && (
@@ -964,10 +1017,10 @@ export default function DashboardPage() {
           </Button>
         )}
 
-        <div className="flex items-center gap-1.5">
+        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
           <button
             onClick={() => shiftDate(-1)}
-            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             title="Jour précédent"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -976,11 +1029,11 @@ export default function DashboardPage() {
             type="date"
             value={selectedDate}
             onChange={(e) => e.target.value && handleDateChange(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-all"
+            className="px-2 py-1.5 rounded-lg border-0 bg-transparent text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[var(--primary-color,#0C1C33)] transition-all"
           />
           <button
             onClick={() => shiftDate(1)}
-            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             title="Jour suivant"
           >
             <ChevronRight className="w-4 h-4" />
@@ -998,167 +1051,167 @@ export default function DashboardPage() {
 
       {/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
       {isReceptionniste ? (
-        /* ── Vue Réceptionniste : 4 KPIs compacts et opérationnels ── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        /* ── Vue Réceptionniste : 4 KPIs colorés, compacts et opérationnels ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* KPI: Arrivées prévues */}
-          <Card className="p-3 border-l-4 border-l-emerald-500 dark:border-l-emerald-400">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-50 to-teal-100/70 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-emerald-100 dark:ring-emerald-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
-                <LogIn className="w-4 h-4 text-emerald-700 dark:text-emerald-300" />
+              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-emerald-500/20 ring-1 ring-emerald-500/20 text-emerald-600 dark:text-emerald-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <LogIn className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.expectedCheckins}</p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Arrivées prévues</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.expectedCheckins}</p>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Arrivées prévues</p>
               </div>
             </div>
           </Card>
 
           {/* KPI: Départs prévus */}
-          <Card className="p-3 border-l-4 border-l-orange-500 dark:border-l-orange-400">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-50 to-amber-100/70 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-orange-100 dark:ring-orange-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
-                <LogOut className="w-4 h-4 text-orange-700 dark:text-orange-300" />
+              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-orange-500/20 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <LogOut className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.expectedCheckouts}</p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Départs prévus</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.expectedCheckouts}</p>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Départs prévus</p>
               </div>
             </div>
           </Card>
 
           {/* KPI: Chambres à nettoyer */}
-          <Card className="p-3 border-l-4 border-l-amber-500 dark:border-l-amber-400">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-amber-50 to-yellow-100/70 dark:from-amber-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-amber-100 dark:ring-amber-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-                <Clock className="w-4 h-4 text-amber-700 dark:text-amber-300" />
+              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-amber-500/20 ring-1 ring-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Clock className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.cleaningPending}</p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Chambres à nettoyer</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.cleaningPending}</p>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Chambres à nettoyer</p>
               </div>
             </div>
           </Card>
 
           {/* KPI: Taux d'occupation */}
-          <Card className="p-3 border-l-4 border-l-blue-500 dark:border-l-blue-400">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-50 to-sky-100/70 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-blue-100 dark:ring-blue-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-4 h-4 text-blue-700 dark:text-blue-300" />
+              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-blue-500/20 ring-1 ring-blue-500/20 text-blue-600 dark:text-blue-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <TrendingUp className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">{kpis.occupancyRate}%</p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Taux d'occupation</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.occupancyRate}%</p>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{"Taux d'occupation"}</p>
               </div>
             </div>
           </Card>
         </div>
       ) : (
-        /* ── Vue Admin : 4 KPIs d'origine (inchangée) ── */
+        /* ── Vue Admin : 4 KPIs colorés, chacun avec son identité visuelle ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* KPI 1: Taux d'occupation */}
-          <Card className="p-4 border-t-4 border-t-blue-500 dark:border-t-blue-400 flex flex-col justify-between">
+          {/* KPI 1: Taux d'occupation — Bleu */}
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-blue-50 to-sky-100/60 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-100 dark:ring-blue-900/40 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-blue-700 dark:text-blue-300" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-blue-500/20 ring-1 ring-blue-500/20 text-blue-600 dark:text-blue-300 flex items-center justify-center shadow-sm">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
                 <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
               </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">{"Taux d'occupation"}</p>
-              <p className="text-3xl font-extrabold text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
+              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">{"Taux d'occupation"}</p>
+              <p className="text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.occupancyRate}%</p>
             </div>
-            <div className="mt-3">
-              <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1.5">
+            <div className="mt-4">
+              <div className="h-2 bg-white/70 dark:bg-slate-800/80 rounded-full overflow-hidden ring-1 ring-blue-500/10">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all"
+                  className="h-full bg-gradient-to-r from-blue-500 to-sky-500 rounded-full transition-all"
                   style={{ width: `${kpis.occupancyRate}%` }}
                 />
               </div>
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Pourcentage de chambres occupées</p>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5">Pourcentage de chambres occupées</p>
             </div>
           </Card>
 
-          {/* KPI 2: Encaissements du jour */}
-          <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400 flex flex-col justify-between">
+          {/* KPI 2: Encaissements du jour — Émeraude */}
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-emerald-50 to-teal-100/60 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-100 dark:ring-emerald-900/40 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                  <Wallet className="w-6 h-6 text-emerald-700 dark:text-emerald-300" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-emerald-500/20 ring-1 ring-emerald-500/20 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shadow-sm">
+                  <Wallet className="w-5 h-5" />
                 </div>
                 <Badge variant="success">{currency.code}</Badge>
               </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Encaissements</p>
-              <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
-                 {formatAmountOnly(kpis.dailyRevenue, currency.code)}
+              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Encaissements</p>
+              <p className="text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">
+                {formatAmountOnly(kpis.dailyRevenue, currency.code)}
               </p>
             </div>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">
               {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
             </p>
           </Card>
 
-          {/* KPI 3: Entrées / Sorties prévues */}
-          <Card className="p-4 border-t-4 border-t-orange-500 dark:border-t-orange-400 flex flex-col justify-between">
+          {/* KPI 3: Entrées / Sorties prévues — Orange */}
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-orange-50 to-amber-100/60 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-100 dark:ring-orange-900/40 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                  <LogIn className="w-6 h-6 text-orange-700 dark:text-orange-300" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-orange-500/20 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300 flex items-center justify-center shadow-sm">
+                  <LogIn className="w-5 h-5" />
                 </div>
                 <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
               </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">Mouvements</p>
+              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">Mouvements</p>
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
+                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Arrivées</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Arrivées</p>
                 </div>
-                <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+                <div className="w-px h-9 bg-white/80 dark:bg-slate-700/80" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
+                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Départs</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Départs</p>
                 </div>
               </div>
             </div>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">
               {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
             </p>
           </Card>
 
-          {/* KPI 4: État Ménage */}
-          <Card className="p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] flex flex-col justify-between">
+          {/* KPI 4: État Ménage — Violet */}
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-violet-50 to-purple-100/60 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-100 dark:ring-violet-900/40 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
+                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-violet-500/20 ring-1 ring-violet-500/20 text-violet-600 dark:text-violet-300 flex items-center justify-center shadow-sm">
+                  <Sparkles className="w-5 h-5" />
                 </div>
-                <Badge variant="theme">Ménage</Badge>
+                <Badge variant="purple">Ménage</Badge>
               </div>
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">État du ménage</p>
+              <p className="text-[13px] font-semibold text-slate-600 dark:text-slate-300 mb-1">État du ménage</p>
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
+                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">À nettoyer</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">À nettoyer</p>
                 </div>
-                <div className="w-px h-8 bg-slate-300 dark:bg-slate-600" />
+                <div className="w-px h-9 bg-white/80 dark:bg-slate-700/80" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
+                    <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Prêtes</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Prêtes</p>
                 </div>
               </div>
             </div>
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-3">Statut de propreté des chambres</p>
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-4">Statut de propreté des chambres</p>
           </Card>
         </div>
       )}
@@ -1166,23 +1219,21 @@ export default function DashboardPage() {
       {/* 2. CONTENEUR PRINCIPAL — Mouvements du jour */}
       {isReceptionniste ? (
         /* ── Vue Réceptionniste : Mouvements en pleine largeur avec actions rapides ── */
-        <Card className="overflow-hidden">
-          <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
-              </h2>
-              <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-0.5">
-                {isToday
-                  ? "Arrivées et départs prévus aujourd'hui"
-                  : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
-              Voir tout
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
+        <SectionCard accent="from-blue-500 via-indigo-500 to-violet-500">
+          <SectionHeader
+            icon={<LogIn className="w-5 h-5" />}
+            iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
+            title={isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
+            subtitle={isToday
+              ? "Arrivées et départs prévus aujourd'hui"
+              : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
+            action={
+              <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
+                Voir tout
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            }
+          />
 
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -1191,16 +1242,16 @@ export default function DashboardPage() {
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Client
                   </th>
-                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Logement
                   </th>
-                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Heure
                   </th>
-                  <th className="text-left p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Paiement
                   </th>
-                  <th className="text-right p-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <th className="text-right p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -1295,28 +1346,26 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-        </Card>
+        </SectionCard>
       ) : (
-        /* ── Vue Admin : 70% mouvements + 30% donut (inchangée) ── */
+        /* ── Vue Admin : 70% mouvements + 30% donut ── */
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
           {/* Tableau des mouvements (70%) */}
-          <Card className="lg:col-span-7 overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
-            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  {isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
-                </h2>
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
-                  {isToday
-                    ? "Arrivées et départs prévus aujourd'hui"
-                    : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
-                Voir tout
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
+          <SectionCard accent="from-blue-500 via-indigo-500 to-violet-500" className="lg:col-span-7">
+            <SectionHeader
+              icon={<LogIn className="w-5 h-5" />}
+              iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
+              title={isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
+              subtitle={isToday
+                ? "Arrivées et départs prévus aujourd'hui"
+                : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
+              action={
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
+                  Voir tout
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              }
+            />
 
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1325,16 +1374,16 @@ export default function DashboardPage() {
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Client
                     </th>
-                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Logement
                     </th>
-                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Heure
                     </th>
-                    <th className="text-left p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Paiement
                     </th>
-                    <th className="text-right p-4 text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="text-right p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Action
                     </th>
                   </tr>
@@ -1427,39 +1476,41 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </SectionCard>
 
           {/* Donut Chart — État du parc (30%) */}
-          <Card className="lg:col-span-3 p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-              État du parc
-            </h2>
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-4">
-              Répartition en temps réel
-            </p>
+          <SectionCard accent="from-violet-500 via-purple-500 to-fuchsia-500" className="lg:col-span-3">
+            <SectionHeader
+              icon={<Sparkles className="w-5 h-5" />}
+              iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-violet-500/20"
+              title="État du parc"
+              subtitle="Répartition en temps réel"
+            />
 
-            <DonutChart data={roomStatusData} />
+            <div className="p-4 md:p-5">
+              <DonutChart data={roomStatusData} />
 
-            {/* Légende */}
-            <div className="mt-4 space-y-2.5">
-              {roomStatusData.map((item) => (
-                <div key={item.status} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
-                    />
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {getRoomStatusLabel(item.status)}
+              {/* Légende */}
+              <div className="mt-5 space-y-2.5">
+                {roomStatusData.map((item) => (
+                  <div key={item.status} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-3 h-3 rounded-full ring-2 ring-white/60 dark:ring-slate-800"
+                        style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
+                      />
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {getRoomStatusLabel(item.status)}
+                      </span>
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums">
+                      {item.count}
                     </span>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">
-                    {item.count}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </Card>
+          </SectionCard>
         </div>
       )}
 
@@ -1477,28 +1528,26 @@ export default function DashboardPage() {
 
       {/* 4. CONTENEUR INFÉRIEUR — Graphique linéaire des recettes (réservé aux admins) */}
       {!isReceptionniste && (
-        <Card className="p-4 border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Suivi des recettes mensuelles
-              </h2>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-0.5">
-                Évolution des encaissements (en {currency.symbol})
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+        <SectionCard accent="from-emerald-500 via-teal-500 to-cyan-500">
+          <SectionHeader
+            icon={<Wallet className="w-5 h-5" />}
+            iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-500/20"
+            title="Suivi des recettes mensuelles"
+            subtitle={`Évolution des encaissements (en ${currency.symbol})`}
+            action={
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 ring-1 ring-emerald-500/20">
+                <TrendingUp className={`w-4 h-4 ${trendPercentage >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`} />
+                <span className={`text-sm font-bold tabular-nums ${trendPercentage >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-red-600 dark:text-red-400"}`}>
                   {trendPercentage >= 0 ? "+" : ""}{trendPercentage.toFixed(1)}%
                 </span>
               </div>
-            </div>
-          </div>
+            }
+          />
 
-          <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
-        </Card>
+          <div className="p-4 md:p-5">
+            <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
+          </div>
+        </SectionCard>
       )}
       {drawerMovement && (
         <ClientDrawer

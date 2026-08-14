@@ -256,6 +256,47 @@ export default function DashboardLayout({
     checkAuth();
   }, [router, retryCount]);
 
+  // Titre / sous-titre intelligents selon la page courante.
+  // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).
+  // Sur les autres pages : titre et description propres à chaque module.
+  const headerMeta = (() => {
+    const d = translations[lang];
+    const firstName = user?.full_name?.trim().split(/\s+/)[0] || "";
+    const p = pathname || "/dashboard";
+
+    if (p === "/dashboard") {
+      const hour = new Date().getHours();
+      const isDay = hour >= 6 && hour < 18;
+      const greeting = lang === "en" ? (isDay ? "Good morning" : "Good evening") : isDay ? "Bonjour" : "Bonsoir";
+      const todayLabel = new Date().toLocaleDateString(lang === "en" ? "en-US" : "fr-FR", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      return {
+        title: `${greeting}${firstName ? `, ${firstName}` : ""}`,
+        subtitle: `${t.subtitle} · ${todayLabel}`,
+      };
+    }
+
+    const map: Record<string, { title: string; subtitle?: string }> = {
+      "/dashboard/residences": d.residences,
+      "/dashboard/rooms": d.rooms,
+      "/dashboard/bookings": d.bookings,
+      "/dashboard/cleaning": d.cleaning,
+      "/dashboard/accounting": d.accounting,
+      "/dashboard/employees": d.employees,
+      "/dashboard/subscription": d.subscription,
+      "/dashboard/settings": { title: d.settings.pageTitle, subtitle: d.settings.pageSubtitle },
+      "/dashboard/shift": {
+        title: lang === "en" ? "My Shift / Cash" : "Mon Shift / Caisse",
+        subtitle: lang === "en" ? "Shift overview" : "Vue d'ensemble du shift",
+      },
+    };
+    return map[p] || { title: t.title, subtitle: t.subtitle };
+  })();
+
   const activeTheme = getSidebarThemeStyles(themeColor, theme === "dark");
   // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
   // pour garantir un contraste suffisant sur fond sombre
@@ -345,8 +386,8 @@ export default function DashboardLayout({
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
         <Header
-          title={t.title}
-          subtitle={t.subtitle}
+          title={headerMeta.title}
+          subtitle={headerMeta.subtitle}
           onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           userName={user.full_name}
           userRole={user.role}
