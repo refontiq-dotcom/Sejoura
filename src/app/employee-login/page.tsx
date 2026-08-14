@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, Suspense, useEffect } from "react";
+import { useState, useCallback, useRef, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +82,13 @@ function EmployeeLoginContent() {
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
   const [pinError, setPinError] = useState("");
+
+  // Verrou anti double-soumission : la soumission automatique peut être
+  // re-déclenchée quand `loading` repasse à false alors que le PIN est encore
+  // complet (4 chiffres). Sans ce verrou, l'étape « Confirmation » envoie
+  // deux fois POST /api/employee-pin : la 2e requête échoue en 409
+  // (« Un code PIN est déjà défini ») et réinitialise le formulaire.
+  const pinSubmitLock = useRef(false);
 
   // Animation de transition
   const [transitioning, setTransitioning] = useState(false);
@@ -237,8 +244,11 @@ function EmployeeLoginContent() {
 
   // ── Étape 2a : Définition du PIN ─────────────────────────────────────────────
   const handleSetPinSubmit = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || pinSubmitLock.current) return;
+    pinSubmitLock.current = true;
+
     if (pin !== pinConfirm) {
+      pinSubmitLock.current = false;
       setPinError("Les codes ne correspondent pas.");
       setPin("");
       setPinConfirm("");
@@ -258,6 +268,7 @@ function EmployeeLoginContent() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        pinSubmitLock.current = false;
         setPinError(data.error || "Erreur lors de la définition du code.");
         setPin("");
         setPinConfirm("");
@@ -266,14 +277,24 @@ function EmployeeLoginContent() {
       }
 
       const supabase = createClient();
-      await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: data.loginEmail,
         password: data.internalPassword,
       });
 
+      if (authError) {
+        pinSubmitLock.current = false;
+        setPinError("Erreur d'authentification. Contactez votre responsable.");
+        setPin("");
+        setPinConfirm("");
+        setPinStep("enter");
+        return;
+      }
+
       toast.success(`Bienvenue, ${profile.fullName} ! Code configuré avec succès.`);
       redirectByRole(profile.role);
     } catch {
+      pinSubmitLock.current = false;
       setPinError("Erreur serveur. Réessayez.");
       setPin("");
       setPinConfirm("");
@@ -285,7 +306,8 @@ function EmployeeLoginContent() {
 
   // ── Étape 2b : Vérification du PIN ───────────────────────────────────────────
   const handlePinSubmit = useCallback(async () => {
-    if (!profile || pin.length !== PIN_LENGTH) return;
+    if (!profile || pin.length !== PIN_LENGTH || pinSubmitLock.current) return;
+    pinSubmitLock.current = true;
 
     setLoading(true);
     setPinError("");
@@ -299,6 +321,7 @@ function EmployeeLoginContent() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        pinSubmitLock.current = false;
         setPinError(data.error || "Code PIN incorrect.");
         setPin("");
         return;
@@ -311,6 +334,7 @@ function EmployeeLoginContent() {
       });
 
       if (authError) {
+        pinSubmitLock.current = false;
         setPinError("Erreur d'authentification. Contactez votre responsable.");
         setPin("");
         return;
@@ -319,6 +343,7 @@ function EmployeeLoginContent() {
       toast.success(`Bienvenue, ${profile.fullName} !`);
       redirectByRole(data.role || profile.role);
     } catch {
+      pinSubmitLock.current = false;
       setPinError("Erreur serveur. Réessayez.");
       setPin("");
     } finally {
@@ -359,6 +384,7 @@ function EmployeeLoginContent() {
         setPinError("");
         return;
       }
+      pinSubmitLock.current = false;
       setPin("");
       setPinConfirm("");
       setPinError("");
