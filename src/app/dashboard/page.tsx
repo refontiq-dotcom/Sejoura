@@ -568,10 +568,10 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={`rounded-2xl shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
+    <div className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
       <div className={`h-1 w-full bg-gradient-to-r ${accent}`} />
       {children}
-    </Card>
+    </div>
   );
 }
 
@@ -590,7 +590,7 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="p-4 md:p-5 border-b border-[var(--border)] flex flex-wrap items-center gap-3">
+    <div className="p-4 md:p-5 border-b border-[var(--border-subtle)] flex flex-wrap items-center gap-3">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ${iconClass}`}>
         {icon}
       </div>
@@ -1054,9 +1054,9 @@ export default function DashboardPage() {
         /* ── Vue Réceptionniste : 4 KPIs colorés, compacts et opérationnels ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* KPI: Arrivées prévues */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-50 to-teal-100/70 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-emerald-100 dark:ring-emerald-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-emerald-200 dark:ring-emerald-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-emerald-500/20 ring-1 ring-emerald-500/20 text-emerald-600 dark:text-emerald-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <LogIn className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -1067,9 +1067,9 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Départs prévus */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-50 to-amber-100/70 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-orange-100 dark:ring-orange-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-orange-200 dark:ring-orange-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-orange-500/20 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <LogOut className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -1080,9 +1080,9 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Chambres à nettoyer */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-amber-50 to-yellow-100/70 dark:from-amber-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-amber-100 dark:ring-amber-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-amber-200 dark:ring-amber-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-amber-500/20 ring-1 ring-amber-500/20 text-amber-600 dark:text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white ring-1 ring-amber-600/30 dark:bg-amber-500/25 dark:text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <Clock className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -1093,9 +1093,9 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Taux d'occupation */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-50 to-sky-100/70 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-blue-100 dark:ring-blue-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-blue-200 dark:ring-blue-900/40">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/80 dark:bg-blue-500/20 ring-1 ring-blue-500/20 text-blue-600 dark:text-blue-300 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -1109,10 +1109,10 @@ export default function DashboardPage() {
         /* ── Vue Admin : 4 KPIs colorés, chacun avec son identité visuelle ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1: Taux d'occupation — Bleu */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-blue-50 to-sky-100/60 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-100 dark:ring-blue-900/40 flex flex-col justify-between">
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-200 dark:ring-blue-900/40 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-blue-500/20 ring-1 ring-blue-500/20 text-blue-600 dark:text-blue-300 flex items-center justify-center shadow-sm">
+                <div className="w-11 h-11 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center shadow-sm">
                   <TrendingUp className="w-5 h-5" />
                 </div>
                 <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
@@ -1132,10 +1132,10 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 2: Encaissements du jour — Émeraude */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-emerald-50 to-teal-100/60 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-100 dark:ring-emerald-900/40 flex flex-col justify-between">
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-200 dark:ring-emerald-900/40 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-emerald-500/20 ring-1 ring-emerald-500/20 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shadow-sm">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center shadow-sm">
                   <Wallet className="w-5 h-5" />
                 </div>
                 <Badge variant="success">{currency.code}</Badge>
@@ -1151,10 +1151,10 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 3: Entrées / Sorties prévues — Orange */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-orange-50 to-amber-100/60 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-100 dark:ring-orange-900/40 flex flex-col justify-between">
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-200 dark:ring-orange-900/40 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-orange-500/20 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300 flex items-center justify-center shadow-sm">
+                <div className="w-11 h-11 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center shadow-sm">
                   <LogIn className="w-5 h-5" />
                 </div>
                 <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
@@ -1184,10 +1184,10 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 4: État Ménage — Violet */}
-          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-violet-50 to-purple-100/60 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-100 dark:ring-violet-900/40 flex flex-col justify-between">
+          <Card className="p-5 rounded-2xl border-0 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-200 dark:ring-violet-900/40 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl bg-white/80 dark:bg-violet-500/20 ring-1 ring-violet-500/20 text-violet-600 dark:text-violet-300 flex items-center justify-center shadow-sm">
+                <div className="w-11 h-11 rounded-xl bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300 flex items-center justify-center shadow-sm">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <Badge variant="purple">Ménage</Badge>
@@ -1238,7 +1238,7 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                     Client
                   </th>
@@ -1256,7 +1256,7 @@ export default function DashboardPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {movements.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
@@ -1370,7 +1370,7 @@ export default function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                  <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
                       Client
                     </th>
@@ -1388,7 +1388,7 @@ export default function DashboardPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--border)]">
+                <tbody className="divide-y divide-[var(--border-subtle)]">
                   {movements.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
