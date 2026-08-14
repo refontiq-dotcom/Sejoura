@@ -13,7 +13,7 @@ import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE } from "@/lib/routes";
-import { getSidebarThemeStyles } from "@/lib/colors";
+import { getSidebarThemeStyles, deriveUltraLightColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -38,6 +38,7 @@ export default function DashboardLayout({
   const [companyName, setCompanyName] = useState("Mon Entreprise");
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [themeColor, setThemeColor] = useState<string | null>(null);
+  const [primaryColor, setPrimaryColor] = useState<string>("");
   const [plan, setPlan] = useState("standard");
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -83,11 +84,17 @@ export default function DashboardLayout({
       const color = (e as CustomEvent<{ themeColor: string }>).detail?.themeColor;
       if (color) setThemeColor(color);
     }
+    function handlePrimaryColorUpdated(e: Event) {
+      const color = (e as CustomEvent<{ primaryColor: string }>).detail?.primaryColor;
+      if (color) setPrimaryColor(color);
+    }
     window.addEventListener("sejoura-logo-updated", handleLogoUpdated);
     window.addEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+    window.addEventListener("sejoura-primary-color-updated", handlePrimaryColorUpdated);
     return () => {
       window.removeEventListener("sejoura-logo-updated", handleLogoUpdated);
       window.removeEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+      window.removeEventListener("sejoura-primary-color-updated", handlePrimaryColorUpdated);
     };
   }, []);
 
@@ -212,13 +219,16 @@ export default function DashboardLayout({
         if (userData.tenant_id) {
           const { data: tenantData } = await supabase
             .from("tenants")
-            .select("company_name, logo_url, theme_color")
+            .select("company_name, logo_url, theme_color, primary_color")
             .eq("id", userData.tenant_id)
             .maybeSingle();
 
           if (tenantData) {
             setCompanyName(tenantData.company_name);
             setCompanyLogo(tenantData.logo_url ?? null);
+            if (tenantData.primary_color) {
+              setPrimaryColor(tenantData.primary_color);
+            }
             if (tenantData.theme_color) {
               setThemeColor(tenantData.theme_color);
               if (typeof window !== "undefined") {
@@ -349,18 +359,27 @@ export default function DashboardLayout({
   // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
   // pour garantir un contraste suffisant sur fond sombre
   const dynamicPrimaryColor = theme === "dark" ? "#C2944E" : activeTheme.sidebarBg;
+  // Le fond principal de la page Dashboard suit la "Couleur principale" choisie
+  // dans les Paramètres (nuance pastel dérivée) quand elle est disponible.
+  const isPrimaryHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
+  const mainBg =
+    theme === "dark"
+      ? activeTheme.mainBg
+      : isPrimaryHex
+        ? deriveUltraLightColor(primaryColor)
+        : activeTheme.mainBg;
 
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.style.setProperty("--sidebar-bg", activeTheme.sidebarBg);
-      document.documentElement.style.setProperty("--main-bg", activeTheme.mainBg);
+      document.documentElement.style.setProperty("--main-bg", mainBg);
       document.documentElement.style.setProperty("--primary-color", dynamicPrimaryColor);
-      document.documentElement.style.setProperty("--primary-light", activeTheme.mainBg);
+      document.documentElement.style.setProperty("--primary-light", mainBg);
       document.documentElement.style.setProperty("--primary-hover", activeTheme.hoverBg);
       document.documentElement.style.setProperty("--card-bg", activeTheme.cardBg);
       document.documentElement.style.setProperty("--card-border", activeTheme.cardBorder);
     }
-  }, [activeTheme.sidebarBg, activeTheme.mainBg, activeTheme.hoverBg, activeTheme.cardBg, activeTheme.cardBorder, dynamicPrimaryColor]);
+  }, [activeTheme.sidebarBg, activeTheme.mainBg, activeTheme.hoverBg, activeTheme.cardBg, activeTheme.cardBorder, dynamicPrimaryColor, mainBg]);
 
   function handleOnboardingComplete() {
     setNeedsOnboarding(false);
@@ -411,11 +430,11 @@ export default function DashboardLayout({
     <div 
       className="min-h-screen dashboard-bg transition-colors duration-300"
       style={{
-        backgroundColor: activeTheme.mainBg,
+        backgroundColor: mainBg,
         ["--sidebar-bg" as string]: activeTheme.sidebarBg,
-        ["--main-bg" as string]: activeTheme.mainBg,
+        ["--main-bg" as string]: mainBg,
         ["--primary-color" as string]: dynamicPrimaryColor,
-        ["--primary-light" as string]: activeTheme.mainBg,
+        ["--primary-light" as string]: mainBg,
         ["--primary-hover" as string]: activeTheme.hoverBg,
         ["--card-bg" as string]: activeTheme.cardBg,
         ["--card-border" as string]: activeTheme.cardBorder,
@@ -448,7 +467,7 @@ export default function DashboardLayout({
         />
         <Breadcrumbs />
         <main 
-          style={{ backgroundColor: activeTheme.mainBg }} 
+          style={{ backgroundColor: mainBg }} 
           className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
         >
           {children}

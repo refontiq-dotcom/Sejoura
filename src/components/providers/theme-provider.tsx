@@ -83,9 +83,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const sidebarBg = isCustomHex ? storedThemeColor : preset.sidebarBg;
       const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : preset.contentBg;
       document.documentElement.style.setProperty("--sidebar-bg", sidebarBg);
-      document.documentElement.style.setProperty("--main-bg", contentBg);
       document.documentElement.style.setProperty("--primary-color", sidebarBg);
-      document.documentElement.style.setProperty("--primary-light", contentBg);
+      // En mode clair, le fond principal de la page Dashboard suit la couleur
+      // principale (nuance pastel dérivée), sinon le pastel du thème.
+      const mainBg =
+        storedTheme !== "dark" && isValidHex(storedColor)
+          ? deriveUltraLightColor(storedColor)
+          : storedTheme === "dark"
+            ? "#090D16"
+            : contentBg;
+      document.documentElement.style.setProperty("--main-bg", mainBg);
+      document.documentElement.style.setProperty("--primary-light", mainBg);
     }
   }, []);
 
@@ -135,7 +143,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         // - --primary-light devient le fond sombre de la page
         const isDark = theme === "dark";
         const dynamicPrimary = isDark ? getDarkModePrimaryColor(sidebarBg) : sidebarBg;
-        const dynamicLight = isDark ? "#090D16" : contentBg;
+        const dynamicLight = isDark
+          ? "#090D16"
+          : isValidHex(primaryColor)
+            ? deriveUltraLightColor(primaryColor)
+            : contentBg;
 
         root.style.setProperty("--sidebar-bg", sidebarBg);
         root.style.setProperty("--main-bg", dynamicLight);

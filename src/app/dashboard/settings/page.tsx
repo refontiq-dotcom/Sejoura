@@ -647,7 +647,7 @@ export default function SettingsPage() {
                       Couleurs du portail
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Ces couleurs sont appliquées au menu latéral du dashboard et à la vitrine publique (fond pastel, boutons, en-tête).
+                      La couleur principale règle le fond principal de la page Dashboard (nuance pastel dérivée). La version foncée règle le menu latéral et le haut de page.
                     </p>
                   </div>
 
@@ -664,6 +664,13 @@ export default function SettingsPage() {
                             const newColor = e.target.value;
                             setPrimaryColor(newColor);
                             setThemePrimaryColor(newColor);
+                            if (typeof window !== "undefined") {
+                              window.dispatchEvent(
+                                new CustomEvent("sejoura-primary-color-updated", {
+                                  detail: { primaryColor: newColor },
+                                })
+                              );
+                            }
                           }}
                           className="h-10 w-12 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent p-1 cursor-pointer"
                         />
@@ -673,6 +680,13 @@ export default function SettingsPage() {
                             const newColor = e.target.value;
                             setPrimaryColor(newColor);
                             setThemePrimaryColor(newColor);
+                            if (typeof window !== "undefined") {
+                              window.dispatchEvent(
+                                new CustomEvent("sejoura-primary-color-updated", {
+                                  detail: { primaryColor: newColor },
+                                })
+                              );
+                            }
                           }}
                           placeholder="#9d174d"
                           className="font-mono text-sm uppercase"
@@ -752,6 +766,11 @@ export default function SettingsPage() {
                                 window.dispatchEvent(
                                   new CustomEvent("sejoura-theme-color-updated", {
                                     detail: { themeColor: preset.dark },
+                                  })
+                                );
+                                window.dispatchEvent(
+                                  new CustomEvent("sejoura-primary-color-updated", {
+                                    detail: { primaryColor: preset.main },
                                   })
                                 );
                               }
