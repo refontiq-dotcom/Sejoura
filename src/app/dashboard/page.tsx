@@ -566,7 +566,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
+    <div className={`rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
       {children}
     </div>
   );
@@ -587,7 +587,7 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="p-4 md:p-5 border-b border-[var(--border-subtle)] flex flex-wrap items-center gap-3">
+    <div className="p-4 md:p-5 border-b border-[var(--border-card)] flex flex-wrap items-center gap-3">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ${iconClass}`}>
         {icon}
       </div>

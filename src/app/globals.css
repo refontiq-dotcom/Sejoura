@@ -32,6 +32,7 @@
   --border: #E2E8F0;
   --border-strong: #CBD5E1;
   --border-subtle: #EEF2F7;
+  --border-card: #DDE5F0;            /* Bordure des conteneurs principaux (raffinée mais visible) */
 
   /* ── Texte ── */
   --foreground: #0C1C33;
@@ -120,6 +121,7 @@
   --border: #1E293B;
   --border-strong: #334155;
   --border-subtle: #16213A;
+  --border-card: #253350;
 
   /* ── Texte ── */
   --foreground: #F8FAFC;
@@ -201,6 +203,7 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-border-subtle: var(--border-subtle);
+  --color-border-card: var(--border-card);
   --color-foreground-muted: var(--foreground-muted);
   --color-foreground-subtle: var(--foreground-subtle);
   --color-foreground-inverse: var(--foreground-inverse);
