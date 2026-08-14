@@ -275,13 +275,28 @@ export function getSubscriptionStatusLabel(status: string): string {
 }
 
 /**
+ * Modes de paiement considérés comme « Mobile Money ».
+ * Mobile Money regroupe tous les opérateurs : Wave, Orange Money, MTN Money,
+ * Moov Money et Pi-SPI. Ajoutez ici les futurs opérateurs pour qu'ils soient
+ * agrégés automatiquement dans la comptabilité.
+ */
+export const MOBILE_MONEY_METHODS = ["wave", "pi_spi"] as const;
+
+/**
+ * Retourne true si la méthode de paiement appartient au regroupement Mobile Money.
+ */
+export function isMobileMoney(method: string): boolean {
+  return (MOBILE_MONEY_METHODS as readonly string[]).includes(method);
+}
+
+/**
  * Retourne le libellé d'une méthode de paiement
  */
 export function getPaymentMethodLabel(method: string): string {
   const labels: Record<string, string> = {
     cash: "Espèces",
     wave: "Wave",
-    pi_spi: "PI-SPI",
+    pi_spi: "Pi-SPI",
     bank: "Virement",
     other: "Autre",
   };
