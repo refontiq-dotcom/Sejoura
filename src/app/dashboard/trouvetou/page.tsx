@@ -152,7 +152,7 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[var(--card)] w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
+      <div className="bg-[var(--card-bg,var(--surface))] w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/15 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -587,7 +587,7 @@ export default function TrouvetouDashboardPage() {
 
       {/* ── Statistiques (ENTREPRISE) ou Bannières (autres plans) ───────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+        <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
           <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
             <Eye className="w-6 h-6" />
           </div>
@@ -600,7 +600,7 @@ export default function TrouvetouDashboardPage() {
           {!isEnterprisePlan && <Lock className="w-4 h-4 text-slate-400 ml-auto" />}
         </div>
 
-        <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+        <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
           <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
             <MessageSquare className="w-6 h-6" />
           </div>
@@ -613,7 +613,7 @@ export default function TrouvetouDashboardPage() {
           {!isEnterprisePlan && <Lock className="w-4 h-4 text-slate-400 ml-auto" />}
         </div>
 
-        <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+        <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
           <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
             <Building2 className="w-6 h-6" />
           </div>
@@ -631,7 +631,7 @@ export default function TrouvetouDashboardPage() {
         <div className="space-y-3">
           {/* Compteur simple pour ESSENTIEL */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+            <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
               <div className="p-3.5 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]">
                 <Building2 className="w-6 h-6" />
               </div>
@@ -642,7 +642,7 @@ export default function TrouvetouDashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="bg-[var(--card)] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
+            <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
               <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
                 <Zap className="w-6 h-6" />
               </div>
@@ -700,7 +700,7 @@ export default function TrouvetouDashboardPage() {
 
       {/* ── Gestion du Boost Permanent (ENTREPRISE uniquement) ──────────────── */}
       {accommodations.length > 0 && (
-        <div className="bg-[var(--card)] rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-3 shadow-sm">
+        <div className="bg-[var(--card-bg,var(--surface))] rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -767,7 +767,7 @@ export default function TrouvetouDashboardPage() {
 
       {/* ── Gestion du Boost Express (ESSENTIEL uniquement) ─────────────────── */}
       {isEssentielPlan && accommodations.length > 0 && (
-        <div className="bg-[var(--card)] rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-3 shadow-sm">
+        <div className="bg-[var(--card-bg,var(--surface))] rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -854,7 +854,7 @@ export default function TrouvetouDashboardPage() {
         </div>
 
         {units.length === 0 ? (
-          <div className="text-center py-12 bg-[var(--card)] rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="text-center py-12 bg-[var(--card-bg,var(--surface))] rounded-xl border border-slate-200 dark:border-slate-700">
             <Building2 className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Aucun logement trouvé</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md mx-auto mt-1">
@@ -873,7 +873,7 @@ export default function TrouvetouDashboardPage() {
               return (
                 <div
                   key={unit.id}
-                  className={`group relative flex flex-col rounded-xl border transition-all duration-300 bg-[var(--card)] overflow-hidden shadow-sm hover:shadow-md ${
+                  className={`group relative flex flex-col rounded-xl border transition-all duration-300 bg-[var(--card-bg,var(--surface))] overflow-hidden shadow-sm hover:shadow-md ${
                     isPub
                       ? "border-blue-500/40 dark:border-blue-500/30"
                       : "border-slate-200 dark:border-slate-700 opacity-80 hover:opacity-100"
@@ -1009,7 +1009,7 @@ export default function TrouvetouDashboardPage() {
       {/* ── Modal Personnalisation Fiche ──────────────────────────────────────── */}
       {modalOpen && selectedUnit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[var(--card)] w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-[var(--card-bg,var(--surface))] w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               {/* Header */}
               <div className="p-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
               <div className="flex items-center gap-3">

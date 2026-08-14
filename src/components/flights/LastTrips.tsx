@@ -25,7 +25,7 @@ const trips = [
 
 export function LastTrips() {
   return (
-    <div className="bg-[var(--card)] rounded-3xl p-6 shadow-sm flex flex-col h-full border border-[var(--border)] relative">
+    <div className="bg-[var(--card-bg,var(--surface))] rounded-3xl p-6 shadow-sm flex flex-col h-full border border-[var(--border)] relative">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h2 className="text-xl font-bold text-[var(--foreground)]">Last Trips</h2>
@@ -64,7 +64,7 @@ export function LastTrips() {
                 <td className="py-4">
                   <div className="flex -space-x-2">
                     {[...Array(trip.members)].map((_, i) => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-[var(--card)] bg-[var(--muted)] overflow-hidden">
+                      <div key={i} className="w-8 h-8 rounded-full border-2 border-[var(--card-border,var(--border))] bg-[var(--muted)] overflow-hidden">
                         <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${trip.name}${i}`} alt="member" />
                       </div>
                     ))}

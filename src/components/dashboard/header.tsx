@@ -151,7 +151,7 @@ function ResidenceSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1.5 w-60 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-2">
+        <div className="absolute right-0 mt-1.5 w-60 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-2">
           <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
             {t.switchResidence}
           </p>
@@ -417,7 +417,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
+              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
                 <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
                   <h3 className="font-semibold text-sm text-[var(--foreground)]">{t.notifications}</h3>
                   {unreadCount > 0 && (
@@ -497,7 +497,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in">
+              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in">
                 {/* Section 1 : Infos utilisateur & badge rôle */}
                 <div className="p-3">
                   <div className="flex items-center gap-2.5">
@@ -579,7 +579,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       {searchOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 sm:px-0">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
-          <div className="relative w-full max-w-lg bg-[var(--card)] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-lg bg-[var(--card-bg,var(--surface))] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center px-3 py-2.5 border-b border-[var(--border)]">
               <Search className="w-4 h-4 text-[var(--muted-foreground)] mr-2.5 flex-shrink-0" />
               <input
