@@ -626,6 +626,7 @@ export default function DashboardPage() {
   const [trendPercentage, setTrendPercentage] = useState(0);
   const [userId, setUserId] = useState<string>("");
   const [userRole, setUserRole] = useState<string>("");
+  const [tenantId, setTenantId] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
@@ -660,6 +661,7 @@ export default function DashboardPage() {
 
         setUserId(userData.id);
         setUserRole(userData.role || "");
+        setTenantId(userData.tenant_id);
 
         const tenantId = userData.tenant_id;
         const now = new Date();
@@ -919,6 +921,25 @@ export default function DashboardPage() {
       clearInterval(interval);
     };
   }, [loadDashboardData, selectedDate]);
+
+  // Temps réel : rechargement immédiat dès qu'une réservation change
+  // (création, modification, check-in/out, paiement — le trigger de paiement
+  // met aussi à jour bookings.payment_status, donc un seul canal suffit).
+  useEffect(() => {
+    if (!tenantId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel("dashboard-bookings-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
+        () => loadDashboardData(true, selectedDate)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tenantId, selectedDate, loadDashboardData]);
 
   function handleDateChange(newDate: string) {
     setSelectedDate(newDate);

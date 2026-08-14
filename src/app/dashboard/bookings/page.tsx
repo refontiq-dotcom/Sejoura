@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,12 @@ export default function BookingsPage() {
   const [saving, setSaving] = useState(false);
   const [tenantId, setTenantId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
+  // Filtre de résidence appliqué au rechargement des réservations (réceptionniste
+  // affecté à un établissement). Conservé dans une ref pour le rechargement
+  // temps réel, qui ne doit pas se resouscrire à chaque rendu.
+  const accommodationFilterRef = useRef<string | undefined>(undefined);
+  const loadBookingsRef = useRef(loadBookings);
+  loadBookingsRef.current = loadBookings;
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
@@ -125,6 +131,25 @@ export default function BookingsPage() {
     loadInitData();
   }, []);
 
+  // Temps réel : rechargement immédiat dès qu'une réservation change
+  // (création, modification, check-in/out, paiement). Le rechargement est
+  // effectué via une ref pour ne pas se resouscrire à chaque rendu.
+  useEffect(() => {
+    if (!tenantId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel("bookings-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
+        () => loadBookingsRef.current(tenantId, accommodationFilterRef.current)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tenantId]);
+
   // Ouvre automatiquement la modal de nouvelle réservation si ?new=1 est dans l'URL
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("new=1") && !loading) {
@@ -175,6 +200,7 @@ export default function BookingsPage() {
         setFormData((prev) => ({ ...prev, accommodation_id: activeAccId ?? "" }));
       }
 
+      accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined;
       await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
       await loadInvoices(userData.tenant_id);
     } catch (err) {
