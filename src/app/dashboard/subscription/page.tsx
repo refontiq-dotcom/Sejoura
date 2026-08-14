@@ -45,6 +45,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [confirmPlan, setConfirmPlan] = useState<string | null>(null);
+  const [paymentStep, setPaymentStep] = useState<1 | 2>(1);
   const [senderPhone, setSenderPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [notifying, setNotifying] = useState(false);
@@ -86,7 +87,15 @@ export default function SubscriptionPage() {
   function openPayment(plan: string) {
     setSenderPhone("");
     setPhoneError("");
+    setPaymentStep(1);
     setConfirmPlan(plan);
+  }
+
+  function closePayment() {
+    setConfirmPlan(null);
+    setPaymentStep(1);
+    setSenderPhone("");
+    setPhoneError("");
   }
 
   // Soumission du paiement : le statut passe en 'pending' (activation rapide).
@@ -115,9 +124,7 @@ export default function SubscriptionPage() {
       } else {
         toast.success("Demande envoyée ! L'administrateur va vérifier votre paiement Wave.");
       }
-      setConfirmPlan(null);
-      setSenderPhone("");
-      setPhoneError("");
+      setPaymentStep(2);
       loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur de connexion.");
@@ -339,82 +346,86 @@ export default function SubscriptionPage() {
         })}
       </div>
 
-      {/* Paiement Wave — Confirmation moderne */}
+      {/* Paiement Wave — Confirmation en 2 étapes */}
       <Modal
         open={!!confirmPlan}
-        onClose={() => setConfirmPlan(null)}
+        onClose={closePayment}
         title="Paiement Wave sécurisé"
-        description="Réglez votre abonnement en 3 étapes rapides"
+        description={paymentStep === 1 ? "Réglez votre abonnement en 3 étapes rapides" : undefined}
       >
-        <div className="space-y-4">
-          {/* Récapitulatif plan / montant */}
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 p-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Plan {confirmLabel}</p>
-              <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">
-                {fmt(confirmPrice)}
-                <span className="text-sm font-normal text-slate-400 dark:text-slate-500">/mois</span>
+        {paymentStep === 1 ? (
+          <div className="space-y-4">
+            {/* Étape 1 — Vérification du transfert */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Vérification du transfert</p>
+              </div>
+              <Input
+                label="Numéro de téléphone Wave expéditeur"
+                placeholder="+225 07 00 00 00 00"
+                value={senderPhone}
+                error={phoneError}
+                icon={<Smartphone className="h-4 w-4" />}
+                onChange={(e) => {
+                  setSenderPhone(e.target.value);
+                  if (phoneError) setPhoneError("");
+                }}
+                inputMode="tel"
+                autoComplete="tel"
+              />
+              <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                Le numéro qui a envoyé l&apos;argent est transmis à l&apos;administrateur pour accélérer la validation de votre abonnement.
               </p>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10">
-              <WaveIcon className="h-6 w-6 rounded-lg" />
-            </div>
-          </div>
 
-          {/* Accès au lien Wave */}
-          <div>
-            <a
-              href={waveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1C3AA9] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#162C85] hover:shadow-blue-900/30"
+            {/* Action principale — étape 1 */}
+            <Button
+              variant="purple"
+              size="lg"
+              className="w-full"
+              loading={notifying}
+              disabled={!confirmPlan}
+              onClick={handleSubmitPayment}
             >
-              <WaveIcon className="bg-white/15" />
-              Payer avec l&apos;application Wave
-            </a>
-            <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
-              Le lien s&apos;ouvre dans un nouvel onglet. Réglez exactement {fmt(confirmPrice)} sur Wave, puis revenez ici.
-            </p>
+              <Sparkles className="w-4 h-4" />
+              Soumettre pour activation rapide
+              <ArrowRight className="w-4 h-4" />
+            </Button>
           </div>
-
-          {/* Vérification du transfert */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">Vérification du transfert</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Étape 2 — Récapitulatif plan / montant */}
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 p-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Plan {confirmLabel}</p>
+                <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">
+                  {fmt(confirmPrice)}
+                  <span className="text-sm font-normal text-slate-400 dark:text-slate-500">/mois</span>
+                </p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10">
+                <WaveIcon className="h-6 w-6 rounded-lg" />
+              </div>
             </div>
-            <Input
-              label="Numéro de téléphone Wave expéditeur"
-              placeholder="+225 07 00 00 00 00"
-              value={senderPhone}
-              error={phoneError}
-              icon={<Smartphone className="h-4 w-4" />}
-              onChange={(e) => {
-                setSenderPhone(e.target.value);
-                if (phoneError) setPhoneError("");
-              }}
-              inputMode="tel"
-              autoComplete="tel"
-            />
-            <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
-              Le numéro qui a envoyé l&apos;argent est transmis à l&apos;administrateur pour accélérer la validation de votre abonnement.
-            </p>
-          </div>
 
-          {/* Action principale */}
-          <Button
-            variant="purple"
-            size="lg"
-            className="w-full"
-            loading={notifying}
-            disabled={!confirmPlan}
-            onClick={handleSubmitPayment}
-          >
-            <Sparkles className="w-4 h-4" />
-            Soumettre pour activation rapide
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-        </div>
+            {/* Accès au lien Wave */}
+            <div>
+              <a
+                href={waveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1C3AA9] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#162C85] hover:shadow-blue-900/30"
+              >
+                <WaveIcon className="bg-white/15" />
+                Payer avec l&apos;application Wave
+              </a>
+              <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                Le lien s&apos;ouvre dans un nouvel onglet. Réglez exactement {fmt(confirmPrice)} sur Wave, puis revenez ici.
+              </p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
