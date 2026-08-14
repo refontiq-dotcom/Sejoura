@@ -555,21 +555,18 @@ function LineChart({ data, fmt, currencyCode }: { data: MonthlyRevenueData[]; fm
 }
 
 // ============================================================================
-// SECTION CARD — conteneur avec bandeau d'accent coloré
+// SECTION CARD — conteneur raffiné, bordure uniforme sur les 4 côtés
 // ============================================================================
 
 function SectionCard({
-  accent,
   className = "",
   children,
 }: {
-  accent: string;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={`rounded-2xl border border-[var(--border-subtle)] bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-md)] overflow-hidden ${className}`}>
-      <div className={`h-1 w-full bg-gradient-to-r ${accent}`} />
       {children}
     </div>
   );
@@ -1225,7 +1222,7 @@ export default function DashboardPage() {
       {/* 2. CONTENEUR PRINCIPAL — Mouvements du jour */}
       {isReceptionniste ? (
         /* ── Vue Réceptionniste : Mouvements en pleine largeur avec actions rapides ── */
-        <SectionCard accent="from-blue-500 via-indigo-500 to-violet-500">
+        <SectionCard>
           <SectionHeader
             icon={<LogIn className="w-5 h-5" />}
             iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
@@ -1357,7 +1354,7 @@ export default function DashboardPage() {
         /* ── Vue Admin : 70% mouvements + 30% donut ── */
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
           {/* Tableau des mouvements (70%) */}
-          <SectionCard accent="from-blue-500 via-indigo-500 to-violet-500" className="lg:col-span-7">
+          <SectionCard className="lg:col-span-7">
             <SectionHeader
               icon={<LogIn className="w-5 h-5" />}
               iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
@@ -1485,7 +1482,7 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* Donut Chart — État du parc (30%) */}
-          <SectionCard accent="from-violet-500 via-purple-500 to-fuchsia-500" className="lg:col-span-3">
+          <SectionCard className="lg:col-span-3">
             <SectionHeader
               icon={<Sparkles className="w-5 h-5" />}
               iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-violet-500/20"
@@ -1534,7 +1531,7 @@ export default function DashboardPage() {
 
       {/* 4. CONTENEUR INFÉRIEUR — Graphique linéaire des recettes (réservé aux admins) */}
       {!isReceptionniste && (
-        <SectionCard accent="from-emerald-500 via-teal-500 to-cyan-500">
+        <SectionCard>
           <SectionHeader
             icon={<Wallet className="w-5 h-5" />}
             iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-500/20"
