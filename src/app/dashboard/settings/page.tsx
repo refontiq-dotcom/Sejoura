@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme } from "@/components/providers/theme-provider";
-import { THEME_PRESETS, getThemePresetById } from "@/lib/colors";
+import { getThemePresetById } from "@/lib/colors";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import { toast } from "sonner";
 import {
@@ -26,16 +25,18 @@ import {
   Save,
   LogOut,
   Copy,
-  Share2,
-  Users,
   ExternalLink,
   Palette,
 } from "lucide-react";
-import { SUPPORTED_CURRENCIES, SUPPORTED_COUNTRIES } from "@/lib/countries";
+import { SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { useLanguage } from "@/hooks/use-language";
 import { useCurrency } from "@/hooks/use-currency";
 import { translations } from "@/lib/translations";
 import type { Tenant, User as UserType } from "@/types/database";
+
+function themeHex(color: string) {
+  return color.startsWith("#") ? color : getThemePresetById(color).sidebarBg;
+}
 
 export default function SettingsPage() {
   const { theme, toggleTheme, setPrimaryColor: setThemePrimaryColor, setThemeColor: setThemeContextColor } = useTheme();
@@ -54,8 +55,12 @@ export default function SettingsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [user, setUser] = useState<UserType | null>(null);
   const [activeSection, setActiveSection] = useState("company");
-  const [savedMsg, setSavedMsg] = useState("");
   const [copiedPortalLink, setCopiedPortalLink] = useState(false);
+  const skipColorAutoSave = useRef(true);
+  const lastSavedColorsRef = useRef<{ primaryColor: string; themeColor: string } | null>(null);
+  const pendingColorsRef = useRef<{ primaryColor: string; themeColor: string } | null>(null);
+  const companySnapshotRef = useRef<string>("");
+  const [formError, setFormError] = useState("");
   const [employeeLink, setEmployeeLink] = useState<string>("");
 
   const [companyForm, setCompanyForm] = useState({
@@ -132,7 +137,7 @@ export default function SettingsPage() {
             // Charger la couleur du Sidebar depuis la DB
             const dbThemeColor = (tenantData as unknown as Record<string, unknown>).theme_color as string || "#0C1C33";
             setThemeColor(dbThemeColor);
-            setCompanyForm({
+            const companyFormInitial = {
               company_name: tenantData.company_name || "",
               contact_name: tenantData.contact_name || "",
               contact_email: tenantData.contact_email || "",
@@ -142,11 +147,26 @@ export default function SettingsPage() {
               default_currency: tenantData.default_currency || "XOF",
               default_currency_symbol: tenantData.default_currency_symbol || "FCFA",
               default_language: tenantData.default_language || "fr",
-            });
+            };
+            setCompanyForm(companyFormInitial);
+            companySnapshotRef.current = JSON.stringify(companyFormInitial);
             // Sync devise globale depuis la BDD (multi-appareil)
             const dbCurrency = tenantData.default_currency || "XOF";
             const dbSymbol = tenantData.default_currency_symbol || "FCFA";
             setCurrency({ code: dbCurrency, symbol: dbSymbol });
+          }
+        }
+
+        // Préférences de notifications persistées par établissement + utilisateur
+        if (userData.tenant_id && typeof window !== "undefined") {
+          const notifKey = `sejoura-notif-prefs:${userData.tenant_id}:${userData.id}`;
+          try {
+            const stored = localStorage.getItem(notifKey);
+            if (stored) {
+              setNotifForm((prev) => ({ ...prev, ...JSON.parse(stored) }));
+            }
+          } catch {
+            // JSON corrompu : on ignore et on garde les valeurs par défaut
           }
         }
       }
@@ -171,69 +191,171 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // Autosave silencieux et anti-redondance des couleurs.
+  // - Ignore le premier déclenchement (synchro avec la BDD au chargement).
+  // - N'envoie que les couleurs (jamais les champs du formulaire entreprise).
+  // - Saut si les couleurs n'ont pas réellement changé depuis la dernière sauvegarde.
   useEffect(() => {
     if (!tenant) return;
+    if (skipColorAutoSave.current) {
+      skipColorAutoSave.current = false;
+      lastSavedColorsRef.current = { primaryColor, themeColor: themeHex(themeColor) };
+      return;
+    }
+    pendingColorsRef.current = { primaryColor, themeColor: themeHex(themeColor) };
     const timer = setTimeout(() => {
-      handleSaveCompany({
-        primary_color: primaryColor,
-        theme_color: themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg,
-      });
+      if (pendingColorsRef.current) {
+        persistColors(pendingColorsRef.current.primaryColor, pendingColorsRef.current.themeColor, { silent: true });
+      }
     }, 1200);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [primaryColor, themeColor, tenant]);
 
-  async function handleSaveCompany(overrides?: Partial<typeof companyForm> & { primary_color?: string; theme_color?: string }) {
-    if (!tenant) return;
-    const form = overrides ? { ...companyForm, ...overrides } : companyForm;
-    setSaving(true);
+  // Sauvegarde atomique vers la table tenants avec repli si la colonne theme_color n'existe pas.
+  async function saveTenant(payload: Record<string, unknown>, opts: { silent?: boolean; successMessage?: string | null } = {}) {
+    if (!tenant) return false;
+    if (!opts.silent) setSaving(true);
     try {
       const supabase = createClient();
-      const updatePayload: Record<string, unknown> = {
-        company_name: form.company_name,
-        contact_name: form.contact_name,
-        contact_email: form.contact_email,
-        contact_phone: form.contact_phone,
-        city: form.city,
-        address: form.address,
-        default_currency: form.default_currency,
-        default_currency_symbol: form.default_currency_symbol,
-        default_language: form.default_language,
-        primary_color: overrides?.primary_color || primaryColor,
-        theme_color: overrides?.theme_color || themeColor,
-      };
-
       let { error } = await supabase
         .from("tenants")
-        .update(updatePayload)
+        .update(payload)
         .eq("id", tenant.id);
 
       if (error && (error.message?.includes("primary_color") || error.message?.includes("theme_color"))) {
-        delete updatePayload.primary_color;
-        delete updatePayload.theme_color;
-        const fallback = await supabase
-          .from("tenants")
-          .update(updatePayload)
-          .eq("id", tenant.id);
-        error = fallback.error;
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.primary_color;
+        delete fallbackPayload.theme_color;
+        error = (await supabase.from("tenants").update(fallbackPayload).eq("id", tenant.id)).error;
       }
 
       if (error) {
-        const errorMsg = error.message || error.details || "Impossible d'enregistrer l'entreprise.";
-        toast.error(errorMsg);
-        console.error("Erreur lors de la sauvegarde Supabase:", errorMsg);
-        return;
+        if (!opts.silent) {
+          toast.error(error.message || "Impossible d'enregistrer.");
+        }
+        return false;
       }
-
-      if (overrides) {
-        setCompanyForm((prev) => ({ ...prev, ...overrides }));
+      if (!opts.silent && opts.successMessage) {
+        toast.success(opts.successMessage);
       }
-      setSavedMsg("Paramètres enregistrés ✓");
-      setTimeout(() => setSavedMsg(""), 3000);
+      return true;
     } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Une erreur est survenue.");
+      if (!opts.silent) {
+        toast.error(err instanceof Error ? err.message : "Une erreur est survenue.");
+      }
+      return false;
     } finally {
-      setSaving(false);
+      if (!opts.silent) setSaving(false);
+    }
+  }
+
+  async function persistColors(primaryColor: string, themeColor: string, opts: { silent?: boolean; successMessage?: string | null } = {}) {
+    if (!tenant) return false;
+    const payload = { primary_color: primaryColor, theme_color: themeHex(themeColor) };
+    const last = lastSavedColorsRef.current;
+    if (last && last.primaryColor === payload.primary_color && last.themeColor === payload.theme_color) {
+      return false;
+    }
+    const ok = await saveTenant(payload, opts);
+    if (ok) {
+      lastSavedColorsRef.current = { primaryColor: payload.primary_color, themeColor: payload.theme_color };
+      pendingColorsRef.current = null;
+    }
+    return ok;
+  }
+
+  // Vidange des couleurs en attente quand on quitte la page avant la fin du debounce.
+  useEffect(() => {
+    return () => {
+      const pending = pendingColorsRef.current;
+      if (!pending || !tenant || skipColorAutoSave.current) return;
+      const last = lastSavedColorsRef.current;
+      if (last && last.primaryColor === pending.primaryColor && last.themeColor === pending.themeColor) return;
+      const supabase = createClient();
+      supabase
+        .from("tenants")
+        .update({ primary_color: pending.primaryColor, theme_color: pending.themeColor })
+        .eq("id", tenant.id)
+        .then(() => {});
+    };
+  }, [tenant]);
+
+  async function handleSaveCompany() {
+    if (!tenant) return;
+    if (!companyForm.company_name?.trim()) {
+      setFormError("Le nom de l'entreprise est requis.");
+      return;
+    }
+    if (companyForm.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyForm.contact_email)) {
+      setFormError("Adresse email invalide.");
+      return;
+    }
+    setFormError("");
+
+    const current = { ...companyForm };
+    const unchanged = (() => {
+      try {
+        const last = JSON.parse(companySnapshotRef.current || "null");
+        if (!last) return false;
+        return (
+          last.company_name === current.company_name &&
+          last.contact_name === current.contact_name &&
+          last.contact_email === current.contact_email &&
+          last.contact_phone === current.contact_phone &&
+          last.city === current.city &&
+          last.address === current.address &&
+          last.default_currency === current.default_currency &&
+          last.default_currency_symbol === current.default_currency_symbol &&
+          last.default_language === current.default_language
+        );
+      } catch {
+        return false;
+      }
+    })();
+    if (unchanged) {
+      toast.success("Aucun changement à enregistrer.");
+      return;
+    }
+
+    const updatePayload = {
+      company_name: current.company_name,
+      contact_name: current.contact_name,
+      contact_email: current.contact_email,
+      contact_phone: current.contact_phone,
+      city: current.city,
+      address: current.address,
+      default_currency: current.default_currency,
+      default_currency_symbol: current.default_currency_symbol,
+      default_language: current.default_language,
+      primary_color: primaryColor,
+      theme_color: themeHex(themeColor),
+    };
+
+    const ok = await saveTenant(updatePayload, { successMessage: "Paramètres enregistrés ✓" });
+    if (ok) {
+      companySnapshotRef.current = JSON.stringify(current);
+      lastSavedColorsRef.current = { primaryColor, themeColor: themeHex(themeColor) };
+    }
+  }
+
+  function applyPrimaryColor(color: string) {
+    setPrimaryColor(color);
+    setThemePrimaryColor(color);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("sejoura-primary-color-updated", { detail: { primaryColor: color } })
+      );
+    }
+  }
+
+  function applyThemeColor(color: string) {
+    setThemeColor(color);
+    setThemeContextColor(color);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("sejoura-theme-color-updated", { detail: { themeColor: color } })
+      );
     }
   }
 
@@ -256,8 +378,7 @@ export default function SettingsPage() {
       }
 
       setUser({ ...user!, full_name: accountForm.full_name, phone: accountForm.phone, email: accountForm.email } as unknown as UserType);
-      setSavedMsg("Informations du compte mises à jour");
-      setTimeout(() => setSavedMsg(""), 3000);
+      toast.success("Informations du compte mises à jour");
     } catch {
       toast.error("Une erreur est survenue.");
     } finally {
@@ -271,8 +392,7 @@ export default function SettingsPage() {
       return;
     }
     localStorage.setItem("sejoura-whatsapp-config", JSON.stringify(whatsappForm));
-    setSavedMsg("Configuration WhatsApp sauvegardée localement");
-    setTimeout(() => setSavedMsg(""), 3000);
+    toast.success("Configuration WhatsApp sauvegardée localement");
   }
 
   async function handleSavePassword() {
@@ -399,8 +519,7 @@ export default function SettingsPage() {
       setLogoFile(null);
       setLogoPreviewUrl(result.logoUrl);
       setLogoError("");
-      setSavedMsg("Logo de l'entreprise mis à jour avec succès");
-      setTimeout(() => setSavedMsg(""), 3000);
+      toast.success("Logo de l'entreprise mis à jour avec succès");
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("sejoura-logo-updated", { detail: { logoUrl: result.logoUrl } }));
       }
@@ -444,12 +563,6 @@ export default function SettingsPage() {
         <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Paramètres</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">Gérez votre compte et votre entreprise</p>
       </div>
-
-      {savedMsg && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm animate-fade-in">
-          <Check className="w-4 h-4" /> {savedMsg}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <Card className="lg:col-span-3 p-4 h-fit">
@@ -503,8 +616,11 @@ export default function SettingsPage() {
                     <Input label="Ville" value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} />
                     <Input label="Adresse" value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} />
                   </div>
+                  {formError && (
+                    <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
+                  )}
                   <div className="flex justify-end pt-2">
-                    <Button onClick={() => handleSaveCompany()} loading={saving}>
+                    <Button onClick={handleSaveCompany} loading={saving} disabled={!companyForm.company_name.trim()}>
                       <Save className="w-4 h-4" /> Enregistrer
                     </Button>
                   </div>
@@ -660,34 +776,12 @@ export default function SettingsPage() {
                         <input
                           type="color"
                           value={primaryColor}
-                          onChange={(e) => {
-                            const newColor = e.target.value;
-                            setPrimaryColor(newColor);
-                            setThemePrimaryColor(newColor);
-                            if (typeof window !== "undefined") {
-                              window.dispatchEvent(
-                                new CustomEvent("sejoura-primary-color-updated", {
-                                  detail: { primaryColor: newColor },
-                                })
-                              );
-                            }
-                          }}
+                          onChange={(e) => applyPrimaryColor(e.target.value)}
                           className="h-10 w-12 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent p-1 cursor-pointer"
                         />
                         <Input
                           value={primaryColor}
-                          onChange={(e) => {
-                            const newColor = e.target.value;
-                            setPrimaryColor(newColor);
-                            setThemePrimaryColor(newColor);
-                            if (typeof window !== "undefined") {
-                              window.dispatchEvent(
-                                new CustomEvent("sejoura-primary-color-updated", {
-                                  detail: { primaryColor: newColor },
-                                })
-                              );
-                            }
-                          }}
+                          onChange={(e) => applyPrimaryColor(e.target.value)}
                           placeholder="#9d174d"
                           className="font-mono text-sm uppercase"
                         />
@@ -701,35 +795,13 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
-                          value={themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg}
-                          onChange={(e) => {
-                            const newColor = e.target.value;
-                            setThemeColor(newColor);
-                            setThemeContextColor(newColor);
-                            if (typeof window !== "undefined") {
-                              window.dispatchEvent(
-                                new CustomEvent("sejoura-theme-color-updated", {
-                                  detail: { themeColor: newColor },
-                                })
-                              );
-                            }
-                          }}
+                          value={themeHex(themeColor)}
+                          onChange={(e) => applyThemeColor(e.target.value)}
                           className="h-10 w-12 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent p-1 cursor-pointer"
                         />
                         <Input
-                          value={themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg}
-                          onChange={(e) => {
-                            const newColor = e.target.value;
-                            setThemeColor(newColor);
-                            setThemeContextColor(newColor);
-                            if (typeof window !== "undefined") {
-                              window.dispatchEvent(
-                                new CustomEvent("sejoura-theme-color-updated", {
-                                  detail: { themeColor: newColor },
-                                })
-                              );
-                            }
-                          }}
+                          value={themeHex(themeColor)}
+                          onChange={(e) => applyThemeColor(e.target.value)}
                           placeholder="#701a43"
                           className="font-mono text-sm uppercase"
                         />
@@ -750,7 +822,7 @@ export default function SettingsPage() {
                         { id: "soleil", name: "Soleil", main: "#d97706", dark: "#78350f" },
                         { id: "slate", name: "Ardoise", main: "#475569", dark: "#111827" },
                       ].map((preset) => {
-                        const currentDark = themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg;
+                        const currentDark = themeHex(themeColor);
                         const isActive = currentDark.toLowerCase() === preset.dark.toLowerCase();
 
                         return (
@@ -758,25 +830,9 @@ export default function SettingsPage() {
                             key={preset.id}
                             type="button"
                             onClick={async () => {
-                              setPrimaryColor(preset.main);
-                              setThemePrimaryColor(preset.main);
-                              setThemeColor(preset.dark);
-                              setThemeContextColor(preset.dark);
-                              if (typeof window !== "undefined") {
-                                window.dispatchEvent(
-                                  new CustomEvent("sejoura-theme-color-updated", {
-                                    detail: { themeColor: preset.dark },
-                                  })
-                                );
-                                window.dispatchEvent(
-                                  new CustomEvent("sejoura-primary-color-updated", {
-                                    detail: { primaryColor: preset.main },
-                                  })
-                                );
-                              }
-                              await handleSaveCompany({ primary_color: preset.main, theme_color: preset.dark });
-                              setSavedMsg(`Thème ${preset.name} appliqué ✓`);
-                              setTimeout(() => setSavedMsg(""), 3000);
+                              applyPrimaryColor(preset.main);
+                              applyThemeColor(preset.dark);
+                              await persistColors(preset.main, preset.dark, { successMessage: `Thème ${preset.name} appliqué ✓` });
                             }}
                             className={`flex items-center gap-2 p-2 rounded-xl border transition-all text-xs font-medium ${
                               isActive
@@ -827,8 +883,13 @@ export default function SettingsPage() {
                       onChange={async (e) => {
                         const newLang = e.target.value as "fr" | "en";
                         setLang(newLang);
-                        await handleSaveCompany({ default_language: newLang });
-                        toast.success(newLang === "en" ? "Language set to English ✓" : "Langue définie sur Français ✓");
+                        const nextForm = { ...companyForm, default_language: newLang };
+                        setCompanyForm(nextForm);
+                        const ok = await saveTenant(
+                          { default_language: newLang },
+                          { successMessage: newLang === "en" ? "Language set to English ✓" : "Langue définie sur Français ✓" }
+                        );
+                        if (ok) companySnapshotRef.current = JSON.stringify(nextForm);
                       }}
                       className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-white"
                     >
@@ -860,8 +921,13 @@ export default function SettingsPage() {
                         if (typeof window !== "undefined") {
                           window.dispatchEvent(new CustomEvent("sejoura-currency-updated", { detail: { code: currCode, symbol } }));
                         }
-                        await handleSaveCompany({ default_currency: currCode, default_currency_symbol: symbol });
-                        toast.success(`Devise mise à jour : ${symbol} (${currCode}) ✓`);
+                        const nextForm = { ...companyForm, default_currency: currCode, default_currency_symbol: symbol };
+                        setCompanyForm(nextForm);
+                        const ok = await saveTenant(
+                          { default_currency: currCode, default_currency_symbol: symbol },
+                          { successMessage: `Devise mise à jour : ${symbol} (${currCode}) ✓` }
+                        );
+                        if (ok) companySnapshotRef.current = JSON.stringify(nextForm);
                       }}
                       className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-white"
                     >
@@ -874,10 +940,10 @@ export default function SettingsPage() {
 
                 <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
                   <Button
-                    onClick={() => handleSaveCompany({ primary_color: primaryColor, theme_color: themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg })}
+                    onClick={() => persistColors(primaryColor, themeColor, { successMessage: "Apparence enregistrée ✓" })}
                     loading={saving}
                     className="text-white hover:brightness-110"
-                    style={{ backgroundColor: themeColor.startsWith("#") ? themeColor : getThemePresetById(themeColor).sidebarBg }}
+                    style={{ backgroundColor: themeHex(themeColor) }}
                   >
                     <Save className="w-4 h-4 mr-2" /> Enregistrer l'apparence
                   </Button>
@@ -906,7 +972,17 @@ export default function SettingsPage() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{item.desc}</p>
                     </div>
                     <button
-                      onClick={() => setNotifForm({ ...notifForm, [item.key]: !notifForm[item.key as keyof typeof notifForm] })}
+                      onClick={() => {
+                        const key = item.key as keyof typeof notifForm;
+                        const next = { ...notifForm, [key]: !notifForm[key] };
+                        setNotifForm(next);
+                        if (tenant && user) {
+                          localStorage.setItem(
+                            `sejoura-notif-prefs:${tenant.id}:${user.id}`,
+                            JSON.stringify(next)
+                          );
+                        }
+                      }}
                       className={`relative w-12 h-6 rounded-full transition-colors ${notifForm[item.key as keyof typeof notifForm] ? "bg-[var(--primary-color,#0C1C33)]" : "bg-slate-300"}`}
                     >
                       <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${notifForm[item.key as keyof typeof notifForm] ? "translate-x-6" : ""}`} />
