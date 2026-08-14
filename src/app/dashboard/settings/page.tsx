@@ -647,14 +647,14 @@ export default function SettingsPage() {
                       Couleurs du portail
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      La couleur principale règle le fond principal de la page Dashboard (nuance pastel dérivée). La version foncée règle le menu latéral et le haut de page.
+                      Le fond de la page Dashboard est appliqué via une nuance pastel dérivée de la couleur choisie. La version foncée règle le menu latéral et le haut de page.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div>
                       <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Couleur principale
+                        Fond de la page Dashboard
                       </label>
                       <div className="flex items-center gap-2">
                         <input
