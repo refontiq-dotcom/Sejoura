@@ -14,6 +14,7 @@ import {
   getBookingStatusColor,
   getPaymentStatusLabel,
   getPaymentStatusColor,
+  MOBILE_MONEY_OPERATORS,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import {
@@ -116,6 +117,7 @@ export default function BookingsPage() {
     number_of_guests: "1",
     special_requests: "",
     payment_method: "",
+    mobile_money_operator: "",
     immediateCheckIn: false,
   });
 
@@ -368,6 +370,7 @@ export default function BookingsPage() {
       number_of_guests: "1",
       special_requests: "",
       payment_method: "",
+      mobile_money_operator: "",
       immediateCheckIn: false,
     });
     setError("");
@@ -496,6 +499,7 @@ export default function BookingsPage() {
             accommodation_id: formData.accommodation_id,
             amount: totalAmount,
             payment_method: formData.payment_method,
+            mobile_money_operator: formData.payment_method === "mobile_money" ? formData.mobile_money_operator || null : null,
             payment_date: new Date().toISOString(),
             received_by: userId,
             operation_type: "booking",
@@ -1253,12 +1257,28 @@ export default function BookingsPage() {
              >
                <option value="">Sélectionner un moyen de paiement</option>
                <option value="cash">Espèces</option>
-               <option value="wave">Wave</option>
-               <option value="pi_spi">Pi-SPI / Mobile Money</option>
+               <option value="mobile_money">Mobile Money</option>
                <option value="bank">Virement bancaire</option>
                <option value="other">Autre</option>
-             </select>
-           </div>
+              </select>
+            </div>
+
+            {formData.payment_method === "mobile_money" && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Opérateur Mobile Money</label>
+                <select
+                  name="mobile_money_operator"
+                  value={formData.mobile_money_operator}
+                  onChange={(e) => setFormData({ ...formData, mobile_money_operator: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Sélectionner un opérateur</option>
+                  {MOBILE_MONEY_OPERATORS.map((op) => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Demandes spéciales (optionnel)</label>

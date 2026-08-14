@@ -42,7 +42,7 @@ export type CleaningTaskStatus =
 
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
-export type PaymentMethod = "cash" | "wave" | "pi_spi" | "bank" | "other";
+export type PaymentMethod = "cash" | "wave" | "pi_spi" | "mobile_money" | "bank" | "other";
 
 export type ExpenseCategory =
   | "salaries"
@@ -287,9 +287,10 @@ export interface Booking {
 export interface Payment {
   id: string;
   tenant_id: string;
-  booking_id: string;
+  booking_id: string | null;
   amount: number;
   payment_method: PaymentMethod;
+  mobile_money_operator?: string | null;
   payment_date: string;
   reference: string | null;
   received_by: string;

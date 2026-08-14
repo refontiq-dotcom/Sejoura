@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const [paymentsRes, expensesRes, tenantRes] = await Promise.all([
       admin
         .from("payments")
-        .select("payment_date, amount, payment_method, operation_type")
+        .select("payment_date, amount, payment_method, mobile_money_operator, operation_type")
         .eq("tenant_id", tid)
         .gte("payment_date", `${start}T00:00:00`)
         .lte("payment_date", `${end}T23:59:59.999Z`),
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
     const expenses = (expensesRes.data as Expense[] | null) || [];
 
     const revenueByMethodMap: Record<string, number> = {};
+    const mobileMoneyByOperatorMap: Record<string, number> = {};
     let totalRevenue = 0;
     let cashOut = 0;
 
@@ -81,6 +82,10 @@ export async function POST(request: Request) {
       if (p.amount > 0) {
         totalRevenue += p.amount;
         revenueByMethodMap[p.payment_method] = (revenueByMethodMap[p.payment_method] || 0) + p.amount;
+        if (p.payment_method === "mobile_money") {
+          const op = p.mobile_money_operator || "mobile_money";
+          mobileMoneyByOperatorMap[op] = (mobileMoneyByOperatorMap[op] || 0) + p.amount;
+        }
       } else {
         cashOut += Math.abs(p.amount);
       }
@@ -104,6 +109,7 @@ export async function POST(request: Request) {
       end,
       currencyCode,
       revenueByMethod: Object.entries(revenueByMethodMap).map(([method, amount]) => ({ method, amount })),
+      mobileMoneyByOperator: Object.entries(mobileMoneyByOperatorMap).map(([operator, amount]) => ({ operator, amount })),
       totalRevenue,
       cashOut,
       expensesByCategory: Object.entries(expensesByCategoryMap).map(([category, amount]) => ({ category, amount })),

@@ -12,8 +12,9 @@ import {
   formatDate,
   getExpenseCategoryLabel,
   getPaymentMethodLabel,
+  getMobileMoneyOperatorLabel,
   isMobileMoney,
-  MOBILE_MONEY_METHODS,
+  MOBILE_MONEY_OPERATORS,
   canAccessPlanFeature,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
@@ -145,6 +146,14 @@ interface EnrichedPayment extends Payment {
     total_amount: number;
     payment_status: string;
   } | null;
+}
+
+function paymentMethodDisplay(p: { payment_method: string; mobile_money_operator?: string | null }): string {
+  const base = getPaymentMethodLabel(p.payment_method);
+  if (p.payment_method === "mobile_money" && p.mobile_money_operator) {
+    return `${base} · ${getMobileMoneyOperatorLabel(p.mobile_money_operator)}`;
+  }
+  return base;
 }
 
 interface EnrichedInvoice extends Invoice {
@@ -963,17 +972,20 @@ export default function AccountingPage() {
     return map;
   }, [filteredPayments]);
 
-  // Détail par opérateur Mobile Money (Wave, Pi-SPI, …) pour ne rien perdre
+  // Détail par opérateur Mobile Money (Wave, Orange Money, …) pour ne rien perdre
   // dans l'agrégat « Mobile Money » affiché dans la répartition.
   const mobileMoneyBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     filteredPayments
       .filter((p) => p.amount > 0 && isMobileMoney(p.payment_method))
-      .forEach((p) => (map[p.payment_method] = (map[p.payment_method] || 0) + p.amount));
+      .forEach((p) => {
+        const op = p.mobile_money_operator || "mobile_money";
+        map[op] = (map[op] || 0) + p.amount;
+      });
     return map;
   }, [filteredPayments]);
 
-  const mobileMoneyTotal = MOBILE_MONEY_METHODS.reduce((s, m) => s + (mobileMoneyBreakdown[m] || 0), 0);
+  const mobileMoneyTotal = Object.values(mobileMoneyBreakdown).reduce((s, v) => s + v, 0);
 
   // Nombre de modes réellement utilisés, avec Mobile Money compté comme un seul mode.
   const activeMethodCount =
@@ -1177,7 +1189,7 @@ export default function AccountingPage() {
         p.payment_date,
         p.booking?.booking_code || "",
         p.booking?.client_name || (p.notes || ""),
-        getPaymentMethodLabel(p.payment_method),
+        paymentMethodDisplay(p),
         p.reference || "",
         p.operation_type === "manual_out" ? "Sortie de caisse" : p.operation_type === "manual_in" ? "Entrée de caisse" : "Paiement",
         p.amount,
@@ -1398,12 +1410,18 @@ export default function AccountingPage() {
                         <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
                           Détail Mobile Money · Wave · Orange Money · MTN Money · Moov Money · Pi-SPI
                         </p>
-                        {MOBILE_MONEY_METHODS.map((m) => (
-                          <div key={m} className="flex items-center justify-between gap-6 text-[11px]">
-                            <span className="text-zinc-400">{getPaymentMethodLabel(m)}</span>
-                            <span className="font-semibold text-white">{mobileMoneyBreakdown[m] ? fmt(mobileMoneyBreakdown[m]) : "—"}</span>
+                        {MOBILE_MONEY_OPERATORS.map((op) => (
+                          <div key={op.value} className="flex items-center justify-between gap-6 text-[11px]">
+                            <span className="text-zinc-400">{op.label}</span>
+                            <span className="font-semibold text-white">{mobileMoneyBreakdown[op.value] ? fmt(mobileMoneyBreakdown[op.value]) : "—"}</span>
                           </div>
                         ))}
+                        {mobileMoneyBreakdown["mobile_money"] > 0 && (
+                          <div className="flex items-center justify-between gap-6 text-[11px]">
+                            <span className="text-zinc-400">Opérateur non précisé</span>
+                            <span className="font-semibold text-white">{fmt(mobileMoneyBreakdown["mobile_money"])}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1532,7 +1550,7 @@ export default function AccountingPage() {
                             {pay.booking?.client_name || "Opération de caisse"}
                           </p>
                           <p className="text-xs text-zinc-500">
-                            {getPaymentMethodLabel(pay.payment_method)} • {formatDate(pay.payment_date)}
+                            {paymentMethodDisplay(pay)} • {formatDate(pay.payment_date)}
                           </p>
                         </div>
                         <p className={`text-sm font-bold ${pay.amount < 0 ? "text-red-400" : "text-emerald-400"} flex-shrink-0`}>
@@ -1571,8 +1589,6 @@ export default function AccountingPage() {
                   <option value="all">Tous les modes</option>
                   <option value="cash">Espèces</option>
                   <option value="mobile_money">Mobile Money</option>
-                  <option value="wave">Wave</option>
-                  <option value="pi_spi">Pi-SPI</option>
                   <option value="bank">Virement</option>
                   <option value="other">Autre</option>
                 </select>
@@ -1654,7 +1670,7 @@ export default function AccountingPage() {
                           </td>
                           <td className="p-2.5">
                             <Badge variant={isOut ? "error" : "info"} className={isOut ? "!bg-red-500/15 !text-red-400" : "!bg-blue-500/15 !text-blue-400"}>
-                              {getPaymentMethodLabel(pay.payment_method)}
+                              {paymentMethodDisplay(pay)}
                             </Badge>
                           </td>
                           <td className="p-2.5 text-xs text-zinc-400">{pay.reference || "—"}</td>

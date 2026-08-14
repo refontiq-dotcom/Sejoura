@@ -149,6 +149,7 @@ function ClientDrawer({
     cash: "Espèces",
     wave: "Wave",
     pi_spi: "PI-SPI",
+    mobile_money: "Mobile Money",
     bank: "Virement",
     other: "Autre",
   };

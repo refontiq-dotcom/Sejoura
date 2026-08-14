@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import { formatPrice } from "@/lib/currencyConverter";
-import { getExpenseCategoryLabel, getPaymentMethodLabel, formatDate } from "@/lib/utils";
+import { getExpenseCategoryLabel, getPaymentMethodLabel, getMobileMoneyOperatorLabel, formatDate } from "@/lib/utils";
 
 export interface FinancialReportData {
   tenant: {
@@ -14,6 +14,7 @@ export interface FinancialReportData {
   end: string;
   currencyCode: string;
   revenueByMethod: { method: string; amount: number }[];
+  mobileMoneyByOperator?: { operator: string; amount: number }[];
   totalRevenue: number;
   cashOut: number;
   expensesByCategory: { category: string; amount: number }[];
@@ -219,7 +220,28 @@ export async function generateFinancialReportPdf(data: FinancialReportData): Pro
     .font("Helvetica-Bold")
     .text("Total recettes", tableLeft + 10, y)
     .text(fmt(data.totalRevenue), tableLeft + labelCol + 10, y, { align: "right", width: amountCol - 20 });
-  y += 22;
+  y += 14;
+
+  // Détail Mobile Money par opérateur (rapprochement de trésorerie)
+  const operatorRows = data.mobileMoneyByOperator ?? [];
+  if (operatorRows.length > 0) {
+    doc
+      .fontSize(8)
+      .fillColor(textColor)
+      .font("Helvetica-Bold")
+      .text("Dont Mobile Money par opérateur", tableLeft + 10, y);
+    y += 12;
+    operatorRows.forEach((r) => {
+      doc
+        .fontSize(8.5)
+        .fillColor(textColor)
+        .font("Helvetica")
+        .text(`· ${getMobileMoneyOperatorLabel(r.operator)}`, tableLeft + 16, y)
+        .text(fmt(r.amount), tableLeft + labelCol + 10, y, { align: "right", width: amountCol - 20 });
+      y += 12;
+    });
+  }
+  y += 8;
 
   // --- DÉPENSES PAR CATÉGORIE ---
   doc

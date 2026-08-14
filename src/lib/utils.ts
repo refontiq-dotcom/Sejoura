@@ -276,17 +276,39 @@ export function getSubscriptionStatusLabel(status: string): string {
 
 /**
  * Modes de paiement considérés comme « Mobile Money ».
- * Mobile Money regroupe tous les opérateurs : Wave, Orange Money, MTN Money,
- * Moov Money et Pi-SPI. Ajoutez ici les futurs opérateurs pour qu'ils soient
- * agrégés automatiquement dans la comptabilité.
+ * Depuis la migration, tous les paiements Mobile Money utilisent la méthode
+ * générique « mobile_money » ; l'opérateur réel (Wave, Orange Money, …) est
+ * stocké dans payments.mobile_money_operator pour le rapprochement.
  */
-export const MOBILE_MONEY_METHODS = ["wave", "pi_spi"] as const;
+export const MOBILE_MONEY_METHODS = ["mobile_money"] as const;
+
+/**
+ * Opérateurs Mobile Money supportés pour le rapprochement de trésorerie.
+ * Champ TEXT en base : ajoutez ici les futurs opérateurs sans migration.
+ */
+export const MOBILE_MONEY_OPERATORS = [
+  { value: "wave", label: "Wave" },
+  { value: "orange_money", label: "Orange Money" },
+  { value: "mtn_money", label: "MTN Money" },
+  { value: "moov_money", label: "Moov Money" },
+  { value: "pi_spi", label: "Pi-SPI" },
+] as const;
 
 /**
  * Retourne true si la méthode de paiement appartient au regroupement Mobile Money.
  */
 export function isMobileMoney(method: string): boolean {
   return (MOBILE_MONEY_METHODS as readonly string[]).includes(method);
+}
+
+/**
+ * Retourne le libellé d'un opérateur Mobile Money
+ * (retombe sur « Mobile Money » si aucun opérateur n'est renseigné).
+ */
+export function getMobileMoneyOperatorLabel(operator: string | null | undefined): string {
+  if (!operator) return "Mobile Money";
+  if (operator === "mobile_money") return "Opérateur non précisé";
+  return MOBILE_MONEY_OPERATORS.find((o) => o.value === operator)?.label || operator;
 }
 
 /**
@@ -297,6 +319,7 @@ export function getPaymentMethodLabel(method: string): string {
     cash: "Espèces",
     wave: "Wave",
     pi_spi: "Pi-SPI",
+    mobile_money: "Mobile Money",
     bank: "Virement",
     other: "Autre",
   };

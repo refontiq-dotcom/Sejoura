@@ -259,6 +259,7 @@ export const translations = {
       payNow: "Payer maintenant",
       wave: "Wave",
       piSpi: "PI-SPI",
+      mobileMoney: "Mobile Money",
       cash: "Espèces",
       selectMethod: "Sélectionnez une méthode",
       benefits: {
@@ -703,6 +704,7 @@ export const translations = {
       payNow: "Pay now",
       wave: "Wave",
       piSpi: "PI-SPI",
+      mobileMoney: "Mobile Money",
       cash: "Cash",
       selectMethod: "Select a method",
       benefits: {

@@ -32,6 +32,7 @@ import {
   ArrowUpCircle,
 } from "lucide-react";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import { isMobileMoney, getMobileMoneyOperatorLabel, MOBILE_MONEY_OPERATORS } from "@/lib/utils";
 import type { Payment, Booking } from "@/types/database";
 
 interface ShiftPayment extends Payment {
@@ -50,6 +51,7 @@ const METHOD_LABELS: Record<string, { label: string; icon: React.ComponentType<{
   cash: { label: "Espèces", icon: Banknote },
   wave: { label: "Wave", icon: Smartphone },
   pi_spi: { label: "Pi-SPI", icon: Smartphone },
+  mobile_money: { label: "Mobile Money", icon: Smartphone },
   bank: { label: "Virement", icon: Building },
   other: { label: "Autre", icon: HelpCircle },
 };
@@ -58,6 +60,7 @@ const METHOD_COLORS: Record<string, string> = {
   cash: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
   wave: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
   pi_spi: "bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)] font-semibold",
+  mobile_money: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
   bank: "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
   other: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
 };
@@ -88,6 +91,7 @@ export default function ShiftPage() {
     operation_type: "manual_in" as "manual_in" | "manual_out",
     amount: "",
     payment_method: "cash",
+    mobile_money_operator: "",
     notes: "",
   });
   // ──────────────────────────────────────────────────
@@ -227,6 +231,7 @@ export default function ShiftPage() {
         accommodation_id: accommodationId,
         amount: signedAmount,
         payment_method: manualForm.payment_method,
+        mobile_money_operator: manualForm.payment_method === "mobile_money" ? manualForm.mobile_money_operator || null : null,
         payment_date: new Date().toISOString(),
         received_by: userId,
         operation_type: manualForm.operation_type,
@@ -242,7 +247,7 @@ export default function ShiftPage() {
           : `➖ Sortie de ${fmt(amount)} enregistrée ✓`
       );
       setManualModalOpen(false);
-      setManualForm({ operation_type: "manual_in", amount: "", payment_method: "cash", notes: "" });
+      setManualForm({ operation_type: "manual_in", amount: "", payment_method: "cash", mobile_money_operator: "", notes: "" });
       // Recharger les paiements
       await loadData();
     } catch {
@@ -263,8 +268,8 @@ export default function ShiftPage() {
   // Calculs du shift
   const totalCaisse = payments.reduce((sum, p) => sum + p.amount, 0);
   const byCash = payments.filter((p) => p.payment_method === "cash").reduce((s, p) => s + p.amount, 0);
-  const byWave = payments.filter((p) => p.payment_method === "wave").reduce((s, p) => s + p.amount, 0);
-  const byOther = payments.filter((p) => p.payment_method !== "cash" && p.payment_method !== "wave").reduce((s, p) => s + p.amount, 0);
+  const byMobileMoney = payments.filter((p) => isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
+  const byOther = payments.filter((p) => p.payment_method !== "cash" && !isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
   const checkedIn = bookings.filter((b) => b.status === "checked_in").length;
   const checkinsToday = bookings.filter((b) => b.check_in_date === new Date().toISOString().split("T")[0]).length;
 
@@ -323,8 +328,8 @@ export default function ShiftPage() {
               <span className="font-semibold text-slate-700 dark:text-slate-300">{fmt(byCash)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 dark:text-slate-500"><Smartphone className="w-3.5 h-3.5" /> Wave</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{fmt(byWave)}</span>
+              <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 dark:text-slate-500"><Smartphone className="w-3.5 h-3.5" /> Mobile Money</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{fmt(byMobileMoney)}</span>
             </div>
             {byOther > 0 && (
               <div className="flex items-center justify-between text-sm">
@@ -374,7 +379,7 @@ export default function ShiftPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: "Espèces en caisse", value: fmt(byCash), color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20" },
-            { label: "Wave / Mobile", value: fmt(byWave), color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
+            { label: "Mobile Money", value: fmt(byMobileMoney), color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20" },
             { label: "Autres modes", value: fmt(byOther), color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20" },
             { label: "Total général", value: fmt(totalCaisse), color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-900/20" },
           ].map((item) => (
@@ -445,6 +450,9 @@ export default function ShiftPage() {
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${METHOD_COLORS[p.payment_method] || METHOD_COLORS.other}`}>
                           <MethodIcon className="w-3 h-3" />
                           {methodInfo.label}
+                          {p.payment_method === "mobile_money" && p.mobile_money_operator && (
+                            <span className="opacity-80">· {getMobileMoneyOperatorLabel(p.mobile_money_operator)}</span>
+                          )}
                         </span>
                       </td>
                       <td className="py-3 px-2 text-right">
@@ -576,12 +584,29 @@ export default function ShiftPage() {
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-900 dark:text-white"
             >
               <option value="cash">Espèces</option>
-              <option value="wave">Wave</option>
-              <option value="pi_spi">Pi-SPI</option>
+              <option value="mobile_money">Mobile Money</option>
               <option value="bank">Virement bancaire</option>
               <option value="other">Autre</option>
             </select>
           </div>
+
+          {manualForm.payment_method === "mobile_money" && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Opérateur Mobile Money
+              </label>
+              <select
+                value={manualForm.mobile_money_operator}
+                onChange={(e) => setManualForm({ ...manualForm, mobile_money_operator: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-900 dark:text-white"
+              >
+                <option value="">Sélectionner un opérateur</option>
+                {MOBILE_MONEY_OPERATORS.map((op) => (
+                  <option key={op.value} value={op.value}>{op.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <Input
             label="Raison / Note (Obligatoire)"

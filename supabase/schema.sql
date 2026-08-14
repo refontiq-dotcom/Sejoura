@@ -145,11 +145,12 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Méthodes de paiement
 DO $$ BEGIN
   CREATE TYPE payment_method AS ENUM (
-    'cash',     -- Espèces
-    'wave',     -- Wave
-    'pi_spi',   -- PI-SPI
-    'bank',     -- Virement bancaire
-    'other'     -- Autre
+    'cash',          -- Espèces
+    'wave',          -- Wave (hérité, migré vers mobile_money + opérateur)
+    'pi_spi',        -- PI-SPI (hérité, migré vers mobile_money + opérateur)
+    'mobile_money',  -- Mobile Money générique (opérateur dans payments.mobile_money_operator)
+    'bank',          -- Virement bancaire
+    'other'          -- Autre
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -434,6 +435,7 @@ CREATE TABLE payments (
   booking_id      UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   amount          INTEGER NOT NULL,        -- Montant en FCFA
   payment_method  payment_method NOT NULL,
+  mobile_money_operator TEXT,  -- Opérateur Mobile Money (wave, orange_money, mtn_money, moov_money, pi_spi)
   payment_date    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   reference       TEXT,                    -- Référence transaction (Wave, PI-SPI)
   received_by     UUID NOT NULL REFERENCES users(id),
