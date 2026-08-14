@@ -799,7 +799,7 @@ export default function DashboardPage() {
             clientEmail: b.client?.email || undefined,
             clientNationality: b.client?.nationality || undefined,
             roomNumber: b.room?.room_number || "—",
-            roomType: b.room_type?.name || "—",
+            roomType: (b.room as unknown as { room_type?: { name?: string } })?.room_type?.name || "—",
             accommodationName: (b.room as unknown as { accommodation?: { name?: string } })?.accommodation?.name || undefined,
             paymentStatus: b.payment_status,
             paymentMethod: (b as unknown as Record<string, unknown>).payment_method as string | undefined,
