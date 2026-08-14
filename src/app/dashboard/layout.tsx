@@ -168,6 +168,13 @@ export default function DashboardLayout({
           return;
         }
 
+        // Le Super Admin n'utilise pas l'espace résidence : on l'envoie sur
+        // la console d'administration (/admin)
+        if (userData.role === "super_admin") {
+          router.push("/admin");
+          return;
+        }
+
         // Protection des routes réservées aux Admins pour les Réceptionnistes
         if (userData.role === "receptionniste") {
           const adminOnlyRoutes = [

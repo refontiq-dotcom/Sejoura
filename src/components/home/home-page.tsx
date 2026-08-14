@@ -366,6 +366,8 @@ export function HomePage() {
           .maybeSingle();
         if (userData?.role === "menagere") {
           targetRoute = "/menage";
+        } else if (userData?.role === "super_admin") {
+          targetRoute = "/admin";
         }
       }
 

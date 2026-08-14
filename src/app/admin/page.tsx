@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
 import { formatFCFA, formatDate, getPlanLabel } from "@/lib/utils";
-import { Shield, Building2, CreditCard, AlertTriangle, Loader2, CheckCircle2, XCircle, Clock, Check, BadgeCheck, History } from "lucide-react";
+import { normalizePlan } from "@/lib/subscription-plans";
+import { Shield, Building2, CreditCard, AlertTriangle, Loader2, CheckCircle2, XCircle, Clock, Check, BadgeCheck, History, LogOut, X } from "lucide-react";
 import { LOGIN_ROUTE } from "@/lib/routes";
 import type { Tenant, Subscription, SubscriptionPaymentRequest } from "@/types/database";
 
@@ -37,7 +38,10 @@ export default function SuperAdminPage() {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        window.location.href = LOGIN_ROUTE;
+        return;
+      }
 
       const { data: userData } = await supabase
         .from("users")
@@ -116,6 +120,16 @@ export default function SuperAdminPage() {
     }
   }
 
+  async function handleLogout() {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = LOGIN_ROUTE;
+    } catch {
+      window.location.href = LOGIN_ROUTE;
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -124,11 +138,23 @@ export default function SuperAdminPage() {
     );
   }
 
-  const activeTenants = tenants.filter((t) => !t.is_suspended);
+  // Un abonnement est bloqué si soft-locked ou marqué expiré ou suspendu
+  function isSubscriptionLocked(sub?: Subscription): boolean {
+    if (!sub) return false;
+    if (sub.is_soft_locked) return true;
+    if (sub.subscription_status === "expired") return true;
+    if (sub.status === "suspended") return true;
+    return false;
+  }
+
+  const activeTenants = tenants.filter(
+    (t) => !t.is_suspended && !isSubscriptionLocked(subscriptions[t.id])
+  );
   const suspendedTenants = tenants.filter((t) => t.is_suspended);
   const totalRevenue = Object.values(subscriptions).reduce((sum, s) => sum + (s.last_payment_amount || 0), 0);
   const pendingRequests = paymentRequests.filter((r) => r.status === "pending");
   const validatedRequests = paymentRequests.filter((r) => r.status === "validated");
+  const rejectedRequests = paymentRequests.filter((r) => r.status === "rejected");
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-6">
@@ -145,6 +171,9 @@ export default function SuperAdminPage() {
             <Clock className="w-3 h-3" /> {pendingRequests.length} validation{pendingRequests.length > 1 ? "s" : ""} en attente
           </Badge>
         )}
+        <Button size="sm" variant="outline" onClick={handleLogout} className="ml-2 shrink-0">
+          <LogOut className="w-4 h-4" /> Se déconnecter
+        </Button>
       </div>
 
       {/* Alerte visuelle : validations en attente */}
@@ -187,7 +216,7 @@ export default function SuperAdminPage() {
         </Card>
         <Card className="p-4">
           <p className="text-2xl font-bold text-[var(--primary-color,#0C1C33)]">{formatFCFA(totalRevenue)}</p>
-          <p className="text-xs text-slate-400">Derniers paiements</p>
+          <p className="text-xs text-slate-400">Derniers paiements reçus</p>
         </Card>
       </div>
 
@@ -311,6 +340,45 @@ export default function SuperAdminPage() {
               </table>
             </div>
           </Card>
+        {/* Historique des paiements rejetés */}
+        {rejectedRequests.length > 0 && (
+          <Card className="overflow-hidden mb-6">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+              <X className="w-4 h-4 text-red-600" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Paiements rejetés</h3>
+              <Badge variant="error">{rejectedRequests.length}</Badge>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Gérant</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Établissement</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Plan</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Montant</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Rejeté le</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  {rejectedRequests.map((req) => (
+                    <tr key={req.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                      <td className="p-4">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{req.tenants?.contact_name || "—"}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{req.tenants?.company_name || "—"}</p>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="error"><X className="w-3 h-3" /> {getPlanLabel(req.plan)}</Badge>
+                      </td>
+                      <td className="p-4 text-sm font-semibold text-slate-900 dark:text-white">{formatFCFA(req.amount)}</td>
+                      <td className="p-4 text-sm text-slate-500">{req.validated_at ? formatDate(req.validated_at) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         )}
       </div>
 
@@ -352,13 +420,17 @@ export default function SuperAdminPage() {
                       <p className="text-xs text-slate-400">{t.contact_email}</p>
                     </td>
                     <td className="p-4">
-                      <Badge variant={sub?.plan === "enterprise" ? "theme" : "default"}>
+                      <Badge variant={normalizePlan(sub?.plan) === "entreprise" ? "theme" : "default"}>
                         {getPlanLabel(sub?.plan || "standard")}
                       </Badge>
                     </td>
                     <td className="p-4">
                       {t.is_suspended ? (
                         <Badge variant="error"><XCircle className="w-3 h-3" /> Suspendu</Badge>
+                      ) : isSubscriptionLocked(sub) ? (
+                        <Badge variant="warning"><Clock className="w-3 h-3" /> Abonnement bloqué</Badge>
+                      ) : sub?.subscription_status === "pending" ? (
+                        <Badge variant="warning"><Clock className="w-3 h-3" /> En attente de validation</Badge>
                       ) : (
                         <Badge variant="success"><CheckCircle2 className="w-3 h-3" /> Actif</Badge>
                       )}

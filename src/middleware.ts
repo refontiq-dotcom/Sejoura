@@ -113,10 +113,19 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Racine : rediriger les utilisateurs connectés vers le tableau de bord.
-  // Un gérant en cours d'onboarding (étape 2) est géré par le layout du
-  // dashboard, pas par une redirection ici.
+  // La console d'administration est réservée au Super Admin
+  if (isAdmin && metaRole !== "super_admin") {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  // Racine : rediriger les utilisateurs connectés vers leur espace.
+  // Le super admin va directement sur la console d'administration, les autres
+  // sur le tableau de bord. Un gérant en cours d'onboarding (étape 2) est
+  // géré par le layout du dashboard, pas par une redirection ici.
   if (user && isRoot) {
+    if (metaRole === "super_admin") {
+      return NextResponse.redirect(new URL("/admin", req.url));
+    }
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
