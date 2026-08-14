@@ -641,6 +641,10 @@ export interface Database {
         Args: { p_request_id: string };
         Returns: SubscriptionPaymentRequest;
       };
+      reject_subscription_payment: {
+        Args: { p_request_id: string };
+        Returns: SubscriptionPaymentRequest;
+      };
       sync_subscription_statuses: {
         Args: Record<string, never>;
         Returns: number;

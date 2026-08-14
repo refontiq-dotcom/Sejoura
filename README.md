@@ -25,12 +25,24 @@ Déroulé :
    gérant pour vérifier le transfert). En cliquant sur « Valider l'abonnement »,
    la RPC `validate_subscription_payment` active l'abonnement (+30 jours),
    débloque les interrupteurs et réactive les utilisateurs de l'établissement.
+   Un bouton « Rejeter » (avec confirmation) permet au contraire de marquer la
+   demande comme `rejected` via la RPC `reject_subscription_payment` : le gérant
+   est notifié et peut soumettre une nouvelle demande. Les demandes dont le
+   montant ne correspond pas au tarif du plan (15 000 FCFA Essentiel /
+   55 000 FCFA Entreprise) sont signalées visuellement avant validation.
 
 Migrations correspondantes :
 - `supabase/migrations/20260812_subscription_manual_payment_flow.sql`
   (table `subscription_payment_requests`, RLS, RPC `validate_subscription_payment`)
 - `supabase/migrations/20260813_subscription_payment_sender_phone.sql`
   (colonne `sender_phone` sur `subscription_payment_requests`)
+- `supabase/migrations/20260818_reject_subscription_payment.sql`
+  (RPC `reject_subscription_payment`)
+- `supabase/migrations/20260818_fix_subscription_payment_requests_fk.sql`
+  (répare les clés étrangères manquantes sur `subscription_payment_requests`,
+  nécessaire si la table existait avant l'ajout des contraintes : sans la FK
+  `tenant_id -> tenants(id)`, la jointure `tenants(...)` de la page `/admin`
+  échoue et les validations en attente ne s'affichent pas)
 
 Idempotentes, à appliquer via `npm run db:push` avec `DATABASE_URL`.
 
