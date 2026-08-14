@@ -340,6 +340,8 @@ export default function SuperAdminPage() {
               </table>
             </div>
           </Card>
+        )}
+
         {/* Historique des paiements rejetés */}
         {rejectedRequests.length > 0 && (
           <Card className="overflow-hidden mb-6">
