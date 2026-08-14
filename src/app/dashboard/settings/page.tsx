@@ -940,7 +940,18 @@ export default function SettingsPage() {
 
                 <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
                   <Button
-                    onClick={() => persistColors(primaryColor, themeColor, { successMessage: "Apparence enregistrée ✓" })}
+                    onClick={() => {
+                      const last = lastSavedColorsRef.current;
+                      const unchanged =
+                        last &&
+                        last.primaryColor === primaryColor &&
+                        last.themeColor === themeHex(themeColor);
+                      if (unchanged) {
+                        toast.success("L'apparence est déjà enregistrée ✓");
+                        return;
+                      }
+                      persistColors(primaryColor, themeColor, { successMessage: "Apparence enregistrée ✓" });
+                    }}
                     loading={saving}
                     className="text-white hover:brightness-110"
                     style={{ backgroundColor: themeHex(themeColor) }}
