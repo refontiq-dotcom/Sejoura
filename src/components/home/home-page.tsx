@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
 import { useTheme } from "@/components/providers/theme-provider";
 import { PasswordStrength } from "@/components/auth/password-strength";
+import { HeroCarousel, type HeroSlide } from "@/components/home/hero-carousel";
 import { toast } from "sonner";
 import {
   Menu,
@@ -50,6 +51,20 @@ const messages: Record<Lang, Record<string, string>> = {
       "Zéro frais d'installation. Suivez vos paiements, vos équipes et votre caisse, jour après jour.",
     dashboardPreview: "Tableau de bord gérant en temps réel",
     dashboardPreviewDesc: "Suivi des chambres libres, caisse & réservations",
+    car1Badge: "SOLUTION TOUT-EN-UN",
+    car1Title: "Une seule plateforme pour hôtels & résidences",
+    car1Desc:
+      "Zéro frais d'installation. Suivez vos paiements, vos équipes et votre caisse, jour après jour.",
+    car2Badge: "TABLEAU DE BORD EN TEMPS RÉEL",
+    car2Title: "Chambres libres, caisse & réservations",
+    car2Desc: "Voyez en un coup d'œil qui arrive, qui part, et combien d'argent est entré aujourd'hui.",
+    car3Badge: "GESTION DE CAISSE",
+    car3Title: "Chaque entrée & sortie notée",
+    car3Desc:
+      "Enregistrez vos paiements en espèces ou Mobile Money (Orange, MTN, Moov, Wave).",
+    car4Badge: "ÉQUIPES & SERVICES",
+    car4Title: "Ménage, facturation, réservations",
+    car4Desc: "Coordonnez vos équipes et automatisez vos factures en quelques clics.",
     dataProtected: "Vos données sont protégées et confidentielles",
     umoaCompliant: "Conforme aux règles bancaires de la région (UMOA)",
     // Auth
@@ -110,6 +125,18 @@ const messages: Record<Lang, Record<string, string>> = {
       "Zero setup fees. Track your payments, your teams and your cash, day after day.",
     dashboardPreview: "Real-time manager dashboard",
     dashboardPreviewDesc: "Track available rooms, cash & reservations",
+    car1Badge: "ALL-IN-ONE SOLUTION",
+    car1Title: "One platform for hotels & residences",
+    car1Desc: "Zero setup fees. Track your payments, your teams and your cash, day after day.",
+    car2Badge: "REAL-TIME DASHBOARD",
+    car2Title: "Available rooms, cash & bookings",
+    car2Desc: "See at a glance who arrives, who leaves, and how much money came in today.",
+    car3Badge: "CASH MANAGEMENT",
+    car3Title: "Every entry & exit recorded",
+    car3Desc: "Record payments in cash or Mobile Money (Orange, MTN, Moov, Wave).",
+    car4Badge: "TEAMS & SERVICES",
+    car4Title: "Cleaning, invoicing, bookings",
+    car4Desc: "Coordinate your teams and automate your invoices in a few clicks.",
     dataProtected: "Your data is protected and confidential",
     umoaCompliant: "Compliant with regional banking rules (UMOA)",
     signIn: "Sign in",
@@ -297,11 +324,32 @@ export function HomePage() {
         },
       });
       if (error) {
-        toast.error(t.generalError);
-        setLoading(false);
+        const code = (error as { code?: string }).code || "";
+        const message = (error.message || "").toLowerCase();
+
+        // L'utilisateur a fermé la popup / annulé : ce n'est pas une erreur à afficher.
+        if (code === "access_denied" || message.includes("closed by user") || message.includes("popup") || message.includes("annul")) {
+          return;
+        }
+        if (
+          message.includes("provider") ||
+          message.includes("not enabled") ||
+          message.includes("configuration") ||
+          message.includes("n'est pas activé") ||
+          message.includes("pas activée")
+        ) {
+          toast.error(
+            lang === "fr"
+              ? "La connexion Google n'est pas encore activée. Contactez l'équipe Séjoura."
+              : "Google sign-in is not enabled yet. Contact the Séjoura team."
+          );
+        } else {
+          toast.error(t.generalError);
+        }
       }
     } catch {
       toast.error(t.generalError);
+    } finally {
       setLoading(false);
     }
   }
@@ -820,8 +868,35 @@ export function HomePage() {
     { label: t.navFaq, section: "FAQ" as const },
   ];
 
+  const heroSlides: HeroSlide[] = [
+    {
+      image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=400&auto=format&fit=crop",
+      badge: t.car1Badge,
+      title: t.car1Title,
+      desc: t.car1Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=400&auto=format&fit=crop",
+      badge: t.car2Badge,
+      title: t.car2Title,
+      desc: t.car2Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=400&auto=format&fit=crop",
+      badge: t.car3Badge,
+      title: t.car3Title,
+      desc: t.car3Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=400&auto=format&fit=crop",
+      badge: t.car4Badge,
+      title: t.car4Title,
+      desc: t.car4Desc,
+    },
+  ];
+
   return (
-    <div className="relative h-screen flex flex-col text-white overflow-hidden">
+    <div className="relative h-screen w-full overflow-hidden flex flex-col justify-between py-3 px-6 md:px-12 text-white">
       {/* Full-screen panoramic background with dark overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
         <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
@@ -838,7 +913,7 @@ export function HomePage() {
       )}
 
       {/* Header */}
-      <header className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-4 sm:py-6 flex items-center justify-between">
+      <header className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-1.5 sm:py-2 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center">
           <button
@@ -852,7 +927,7 @@ export function HomePage() {
               alt="Séjoura"
               width={200}
               height={64}
-              className="object-contain h-28 w-auto brightness-0 invert"
+              className="object-contain h-16 sm:h-20 w-auto brightness-0 invert"
               priority
             />
           </button>
@@ -860,7 +935,7 @@ export function HomePage() {
 
         {/* Desktop Navigation */}
         <nav
-          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-white/80 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-white/20 shadow-lg"
+          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-white/80 bg-white/10 backdrop-blur-md px-5 py-2 rounded-full border border-white/20 shadow-lg"
           aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
         >
           {navItems.map((item) => (
@@ -879,7 +954,7 @@ export function HomePage() {
           {/* Language toggle */}
           <button
             onClick={toggleLang}
-            className="px-2.5 py-2 rounded-lg text-[10px] font-medium bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
             aria-label={t.langLabel}
           >
             {lang === "fr" ? "FR" : "EN"}
@@ -899,7 +974,7 @@ export function HomePage() {
             href="https://wa.me/2250100372900"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex px-4 py-2.5 bg-[#25D366] hover:bg-[#1DA851] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
+            className="hidden sm:flex px-3.5 py-2 bg-[#25D366] hover:bg-[#1DA851] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
           >
             <MessageCircle className="w-4 h-4" />
             {t.contactTeam}
@@ -969,50 +1044,26 @@ export function HomePage() {
       {/* Main content */}
       <main
         id="main-content"
-        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-4 sm:py-6"
+        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3"
       >
-        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-6 lg:gap-12 min-h-[500px] lg:min-h-[600px]">
-          {/* Left side — Hero text on panoramic background */}
+        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-5 lg:gap-10 min-h-[400px] lg:min-h-[500px]">
+          {/* Left side — Hero title + dynamic carousel */}
           <div className="relative lg:flex-1 flex flex-col justify-center text-white">
-            <div className="space-y-3 max-w-lg">
-              <span className="inline-block px-3.5 py-1 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-white uppercase tracking-widest backdrop-blur-md">
-                {t.badge}
-              </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
+            <div className="flex flex-col gap-6 sm:gap-8 max-w-xl">
+              <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
                 {t.heroTitle}
               </h1>
-              <p className="text-blue-100 text-sm font-light leading-relaxed">
-                {t.heroSubtitle}
-              </p>
 
-              {/* App preview card */}
-              <div className="pt-2">
-                <div className="bg-white/10 border border-white/20 p-3 rounded-2xl backdrop-blur-md flex items-center gap-4 shadow-lg">
-                  <div className="relative w-16 h-12 rounded-xl overflow-hidden shadow shrink-0">
-                    <Image
-                      src="https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=300&auto=format&fit=crop"
-                      alt={t.dashboardPreview}
-                      fill
-                      sizes="64px"
-                      className="object-cover"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">{t.dashboardPreview}</p>
-                    <p className="text-[11px] text-blue-200">{t.dashboardPreviewDesc}</p>
-                  </div>
-                </div>
-              </div>
+              <HeroCarousel slides={heroSlides} />
             </div>
-
           </div>
 
           {/* Right side — Floating auth card */}
-          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-6 sm:p-7 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-180px)] overflow-y-auto">
+          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-4 sm:p-5 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-140px)] overflow-y-auto">
             {/* Tab switcher */}
             <div>
               <div
-                className="flex bg-slate-100 dark:bg-[#262626] p-1 rounded-xl mb-6 border border-slate-200 dark:border-[#333333]"
+                className="flex bg-slate-100 dark:bg-[#262626] p-1 rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
                 role="tablist"
                 aria-label={lang === "fr" ? "Authentification" : "Authentication"}
               >
@@ -1047,10 +1098,10 @@ export function HomePage() {
               {/* Login form */}
               {mode === "login" && (
                 <div id="form-login" role="tabpanel" className="space-y-3">
-                  <h2 className="text-xl font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
                     {t.managerSpace}
                   </h2>
-                  <form onSubmit={handleLogin} className="space-y-3 mt-2" noValidate>
+                  <form onSubmit={handleLogin} className="space-y-2.5 mt-2" noValidate>
                     <div>
                       <label
                         htmlFor="login-email"
@@ -1070,7 +1121,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="contact@sejoura.com"
-                        className={`w-full px-3.5 py-2.5 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                        className={`w-full px-3.5 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.email
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1101,7 +1152,7 @@ export function HomePage() {
                             clearErrors();
                           }}
                           placeholder="••••••••"
-                          className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          className={`w-full px-3.5 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
                             errors.password
                               ? "border-red-400 dark:border-red-500"
                               : "border-slate-200 dark:border-[#404040]"
@@ -1143,7 +1194,7 @@ export function HomePage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1157,7 +1208,7 @@ export function HomePage() {
                   </form>
 
                   {/* Divider */}
-                  <div className="relative my-4">
+                  <div className="relative my-3">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
                     </div>
@@ -1173,7 +1224,7 @@ export function HomePage() {
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={loading}
-                    className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                    className="w-full py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1193,11 +1244,11 @@ export function HomePage() {
               {/* Signup form */}
               {mode === "signup" && (
                 <div id="form-signup" role="tabpanel" className="space-y-3">
-                  <h2 className="text-xl font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
                     {t.createAccount}
                   </h2>
-                  <form onSubmit={handleSignUp} className="space-y-2.5 mt-2" noValidate>
-                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0]">
+                  <form onSubmit={handleSignUp} className="space-y-2 mt-2" noValidate>
+                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0] [@media(max-height:640px)]:hidden">
                       {lang === "fr"
                         ? "Étape 1 sur 2 — créez votre compte, puis configurez votre établissement."
                         : "Step 1 of 2 — create your account, then set up your establishment."}
@@ -1324,7 +1375,7 @@ export function HomePage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full mt-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full mt-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1340,37 +1391,38 @@ export function HomePage() {
                     </p>
                   </form>
 
-                  {/* Divider */}
-                  <div className="relative my-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                  {/* Divider + Google sign-up, masqués sur écrans courts pour éviter le scroll */}
+                  <div className="[@media(max-height:760px)]:hidden">
+                    <div className="relative my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
+                          {t.or}
+                        </span>
+                      </div>
                     </div>
-                    <div className="relative flex justify-center">
-                      <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
-                        {t.or}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Google sign-up */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={loading}
-                    className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <svg className="w-4 h-4" viewBox="0 0 24 24">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                      </svg>
-                    )}
-                    {t.signUpWith}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleGoogleAuth}
+                      disabled={loading}
+                      className="w-full py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                      )}
+                      {t.signUpWith}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1386,7 +1438,7 @@ export function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-6 text-xs text-white/75 space-y-2 px-4">
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-2 text-xs text-white/75 space-y-2 px-4">
         <p>{t.footerRights}</p>
       </footer>
 
