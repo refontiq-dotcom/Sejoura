@@ -835,11 +835,9 @@ export default function ResidenceDetailPage() {
                     }}
                   />
                 </label>
-                {!typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0 && (
-                  <p className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
-                  </p>
-                )}
+                <p className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
+                </p>
               </div>
             </div>
 
