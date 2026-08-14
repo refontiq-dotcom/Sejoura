@@ -96,7 +96,7 @@ export async function POST(request: Request) {
           email: loginEmail,
           password: internalPassword,
           email_confirm: true,
-          user_metadata: { full_name: user.full_name, role: user.role },
+          user_metadata: { full_name: user.full_name, role: user.role, phone: user.phone },
         });
 
         if (signUpError || !newAuthUser.user) {
@@ -107,6 +107,7 @@ export async function POST(request: Request) {
             authUserId = found.id;
             await admin.auth.admin.updateUserById(found.id, { password: internalPassword });
           } else {
+            console.error("Erreur API employee-pin: aucun compte Auth trouvé pour", loginEmail, signUpError?.message);
             return NextResponse.json({ error: "Erreur lors de la création du compte." }, { status: 500 });
           }
         } else {
@@ -115,6 +116,23 @@ export async function POST(request: Request) {
       } else {
         // Synchroniser le mot de passe interne
         await admin.auth.admin.updateUserById(authUserId, { password: internalPassword });
+      }
+
+      // Le trigger handle_new_user (on_auth_user_created) insère automatiquement
+      // un profil dans public.users à la création du compte Auth. Comme l'employé
+      // possède déjà un profil (créé par l'employeur, auth_user_id NULL), ce
+      // trigger crée un DOUBLON qui provoque ensuite une violation de contrainte
+      // UNIQUE sur auth_user_id lors de la mise à jour ci-dessous (erreur 500
+      // « Erreur lors de la sauvegarde du PIN »). On supprime donc les éventuels
+      // doublons avant de lier le profil d'origine (idempotent si aucun doublon).
+      const { error: cleanupError } = await admin
+        .from("users")
+        .delete()
+        .eq("auth_user_id", authUserId)
+        .neq("id", userId);
+
+      if (cleanupError) {
+        console.error("Erreur API employee-pin (nettoyage doublon):", cleanupError.message);
       }
 
       // Sauvegarder le hash PIN et passer first_login à false
@@ -131,6 +149,7 @@ export async function POST(request: Request) {
         .eq("id", userId);
 
       if (updateError) {
+        console.error("Erreur API employee-pin (sauvegarde PIN):", updateError.message);
         return NextResponse.json({ error: "Erreur lors de la sauvegarde du PIN." }, { status: 500 });
       }
 
