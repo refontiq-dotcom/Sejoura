@@ -65,6 +65,20 @@ export function deriveUltraLightColor(hexColor?: string | null): string {
 }
 
 /**
+ * Calcule une nuance pastel claire bien visible (30% de la couleur + 70% blanc)
+ * à partir de n'importe quelle couleur hexadécimale.
+ * Ex: #0C1C33 -> #B6BBC2, #2563EB -> #BDD0F7, #9D174D -> #E2BACB
+ */
+export function derivePastelColor(hexColor?: string | null): string {
+  const hex = hexColor && hexColor.trim() !== "" ? hexColor : "#0C1C33";
+  const { r, g, b } = hexToRgb(hex);
+  const rPastel = Math.round(r * 0.3 + 255 * 0.7);
+  const gPastel = Math.round(g * 0.3 + 255 * 0.7);
+  const bPastel = Math.round(b * 0.3 + 255 * 0.7);
+  return `#${rPastel.toString(16).padStart(2, "0")}${gPastel.toString(16).padStart(2, "0")}${bPastel.toString(16).padStart(2, "0")}`;
+}
+
+/**
  * Calcule une nuance de survol (hover) basée sur la couleur principale choisie
  */
 export function deriveHoverColor(hexColor?: string | null): string {

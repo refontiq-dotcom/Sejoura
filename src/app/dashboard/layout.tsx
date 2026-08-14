@@ -13,7 +13,7 @@ import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE } from "@/lib/routes";
-import { getSidebarThemeStyles, deriveUltraLightColor } from "@/lib/colors";
+import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -359,14 +359,14 @@ export default function DashboardLayout({
   // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
   // pour garantir un contraste suffisant sur fond sombre
   const dynamicPrimaryColor = theme === "dark" ? "#C2944E" : activeTheme.sidebarBg;
-  // Le fond principal de la page Dashboard suit la "Couleur principale" choisie
+  // Le fond principal de la page Dashboard suit la "Couleur pastel" choisie
   // dans les Paramètres (nuance pastel dérivée) quand elle est disponible.
   const isPrimaryHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
   const mainBg =
     theme === "dark"
       ? activeTheme.mainBg
       : isPrimaryHex
-        ? deriveUltraLightColor(primaryColor)
+        ? derivePastelColor(primaryColor)
         : activeTheme.mainBg;
 
   useEffect(() => {

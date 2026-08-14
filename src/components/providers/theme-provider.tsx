@@ -1,6 +1,6 @@
 "use client";
 
-import { getThemePresetById, THEME_PRESETS, deriveUltraLightColor } from "@/lib/colors";
+import { getThemePresetById, THEME_PRESETS, deriveUltraLightColor, derivePastelColor } from "@/lib/colors";
 import {
   createContext,
   useContext,
@@ -85,10 +85,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       document.documentElement.style.setProperty("--sidebar-bg", sidebarBg);
       document.documentElement.style.setProperty("--primary-color", sidebarBg);
       // En mode clair, le fond principal de la page Dashboard suit la couleur
-      // principale (nuance pastel dérivée), sinon le pastel du thème.
+      // pastel choisie (nuance dérivée), sinon le pastel du thème.
       const mainBg =
         storedTheme !== "dark" && isValidHex(storedColor)
-          ? deriveUltraLightColor(storedColor)
+          ? derivePastelColor(storedColor)
           : storedTheme === "dark"
             ? "#090D16"
             : contentBg;
@@ -146,7 +146,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const dynamicLight = isDark
           ? "#090D16"
           : isValidHex(primaryColor)
-            ? deriveUltraLightColor(primaryColor)
+            ? derivePastelColor(primaryColor)
             : contentBg;
 
         root.style.setProperty("--sidebar-bg", sidebarBg);
