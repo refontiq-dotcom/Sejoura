@@ -281,6 +281,7 @@ export function HomePage() {
     }, 1200);
     if (logoClicks.current >= 4) {
       logoClicks.current = 0;
+      localStorage.setItem("sejoura_admin_intent", "/admin");
       window.open("/admin", "_blank");
     }
   }
@@ -368,9 +369,10 @@ export function HomePage() {
         }
       }
 
-      // Intention super admin mémorisée par le middleware lors d'une visite de /admin
-      if (targetRoute !== "/menage" && document.cookie.includes("sejoura_admin_intent=")) {
-        document.cookie = "sejoura_admin_intent=; Max-Age=0; path=/";
+      // Intention super admin mémorisée (localStorage, partagé entre onglets)
+      const adminIntent = localStorage.getItem("sejoura_admin_intent");
+      if (targetRoute !== "/menage" && adminIntent === "/admin") {
+        localStorage.removeItem("sejoura_admin_intent");
         targetRoute = "/admin";
       }
 

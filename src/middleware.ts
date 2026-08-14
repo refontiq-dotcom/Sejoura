@@ -73,18 +73,7 @@ export async function middleware(req: NextRequest) {
 
   // ── NON CONNECTÉ : protéger les zones privées ──
   if (!user) {
-    if (isAdmin) {
-      // Mémo­riser l'intention super admin : après connexion, le client
-      // redirigera vers /admin au lieu du tableau de bord.
-      const loginResponse = NextResponse.redirect(new URL("/", req.url));
-      loginResponse.cookies.set("sejoura_admin_intent", pathname, {
-        maxAge: 300,
-        sameSite: "lax",
-        path: "/",
-      });
-      return loginResponse;
-    }
-    if (isDashboard) {
+    if (isDashboard || isAdmin) {
       return NextResponse.redirect(new URL("/", req.url));
     }
     if (isMenage) {
