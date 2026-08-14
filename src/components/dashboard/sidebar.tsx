@@ -113,30 +113,30 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
 
       {/* Logo Section */}
       <div 
-        className="flex flex-col p-2.5 border-b"
+        className="flex flex-col p-3 border-b"
         style={{ borderColor: themeStyles.borderColor }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-0.5">
+        <div className={`flex items-center gap-3 min-w-0 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`${isCollapsed ? "w-10 h-10" : "w-11 h-11"} rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm p-1`}>
               <AppLogo
                 logoUrl={companyLogo}
                 alt={companyName}
-                width={24}
-                height={24}
+                width={36}
+                height={36}
                 className="object-contain"
               />
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden min-w-0">
                 <h1 
-                  className="text-[13px] font-bold whitespace-nowrap truncate"
+                  className="text-[15px] font-bold leading-tight whitespace-nowrap truncate"
                   style={{ color: themeStyles.textColor }}
                 >
                   {companyName}
                 </h1>
                 <p 
-                  className="text-[9px] font-semibold tracking-wide"
+                  className="text-[11px] font-semibold tracking-wide mt-0.5"
                   style={{ color: themeStyles.accentColor }}
                 >
                   Séjoura SaaS
@@ -149,20 +149,20 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           <button
             onClick={toggleCollapsed}
             style={{ color: themeStyles.textColor }}
-            className="hidden lg:flex p-1 rounded-md hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
+            className="hidden lg:flex p-1.5 rounded-md hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
             aria-label={isCollapsed ? t.expand : t.collapse}
             title={isCollapsed ? t.expand : t.collapse}
           >
             {isCollapsed ? (
-              <PanelLeftOpen className="w-3.5 h-3.5" />
+              <PanelLeftOpen className="w-4 h-4" />
             ) : (
-              <PanelLeftClose className="w-3.5 h-3.5" />
+              <PanelLeftClose className="w-4 h-4" />
             )}
           </button>
         </div>
         {!isCollapsed && (
           <div 
-            className="mt-1.5 h-[1.5px] w-full"
+            className="mt-2 h-[2px] w-full rounded-full"
             style={{ backgroundColor: themeStyles.accentColor }}
           />
         )}
