@@ -281,7 +281,7 @@ export function HomePage() {
     }, 1200);
     if (logoClicks.current >= 4) {
       logoClicks.current = 0;
-      router.push("/admin");
+      window.open("/admin", "_blank");
     }
   }
 
@@ -366,6 +366,12 @@ export function HomePage() {
         if (userData?.role === "menagere") {
           targetRoute = "/menage";
         }
+      }
+
+      // Intention super admin mémorisée par le middleware lors d'une visite de /admin
+      if (targetRoute !== "/menage" && document.cookie.includes("sejoura_admin_intent=")) {
+        document.cookie = "sejoura_admin_intent=; Max-Age=0; path=/";
+        targetRoute = "/admin";
       }
 
       toast.success(t.loginSuccess);
@@ -842,7 +848,7 @@ export function HomePage() {
               alt="Séjoura"
               width={200}
               height={64}
-              className="object-contain h-20 w-auto brightness-0 invert"
+              className="object-contain h-28 w-auto brightness-0 invert"
               priority
             />
           </button>
