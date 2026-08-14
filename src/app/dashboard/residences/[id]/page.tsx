@@ -769,6 +769,54 @@ export default function ResidenceDetailPage() {
               </div>
             </div>
 
+            {/* Photos pour Trouvetou */}
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Photos de la chambre (requises pour la diffusion)</label>
+              {typeForm.featured_images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {typeForm.featured_images.map((img, index) => (
+                    <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 dark:border-slate-600">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeTypeImage(index)}
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white"
+                        title="Retirer cette photo"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
+                <Button type="button" variant="outline" size="sm" onClick={addTypeImage}>
+                  <ImagePlus className="w-4 h-4" /> Ajouter
+                </Button>
+              </div>
+              <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+                {uploadingImage ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-4 h-4" />
+                )}
+                {uploadingImage ? "Upload en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP — max 5 Mo)"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                  className="hidden"
+                  disabled={uploadingImage}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadTypeImage(file);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
             {/* Visibilité Trouvetou */}
             <div className={`rounded-lg border p-3 space-y-2.5 ${typeForm.is_listed_on_trouvetou ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-600"}`}>
               <div className="flex items-center justify-between gap-3">
@@ -788,57 +836,9 @@ export default function ResidenceDetailPage() {
                   <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${typeForm.is_listed_on_trouvetou ? "left-5.5" : "left-0.5"}`} style={{ width: 18, height: 18, top: 2 }} />
                 </button>
               </div>
-
-              {/* Photos pour Trouvetou */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Photos de la chambre (requises pour la diffusion)</label>
-                {typeForm.featured_images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {typeForm.featured_images.map((img, index) => (
-                      <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 dark:border-slate-600">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removeTypeImage(index)}
-                          className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white"
-                          title="Retirer cette photo"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
-                  <Button type="button" variant="outline" size="sm" onClick={addTypeImage}>
-                    <ImagePlus className="w-4 h-4" /> Ajouter
-                  </Button>
-                </div>
-                <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
-                  {uploadingImage ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ImagePlus className="w-4 h-4" />
-                  )}
-                  {uploadingImage ? "Upload en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP — max 5 Mo)"}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-                    className="hidden"
-                    disabled={uploadingImage}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) uploadTypeImage(file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <p className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
-                </p>
-              </div>
+              <p className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+                <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
+              </p>
             </div>
 
             <div className="flex gap-3 pt-2">
