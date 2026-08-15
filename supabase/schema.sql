@@ -1761,8 +1761,13 @@ BEGIN
     RAISE EXCEPTION 'SUBSCRIPTION_NOT_FOUND: Aucun abonnement trouvé pour cet établissement';
   END IF;
 
-  -- Date de fin : prolongation de 30 jours à compter d'aujourd'hui
-  v_end_date := NOW() + INTERVAL '30 days';
+  -- Date de fin : prolongation de 30 jours à compter d'aujourd'hui, ou depuis la
+  -- date de fin actuelle si celle-ci est dans le futur (renouvellement anticipé).
+  SELECT COALESCE(subscription_end_date, NOW()) INTO v_end_date
+  FROM subscriptions
+  WHERE id = v_subscription_id;
+
+  v_end_date := GREATEST(NOW(), v_end_date) + INTERVAL '30 days';
 
   -- Activation de l'abonnement + déblocage des interrupteurs
   UPDATE subscriptions

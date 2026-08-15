@@ -44,6 +44,7 @@ export default function SubscriptionPage() {
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<{ plan: string } | null>(null);
   const [confirmPlan, setConfirmPlan] = useState<string | null>(null);
   const [paymentStep, setPaymentStep] = useState<1 | 2>(1);
   const [senderPhone, setSenderPhone] = useState("");
@@ -71,6 +72,14 @@ export default function SubscriptionPage() {
         .eq("tenant_id", userData.tenant_id)
         .single();
       if (subData) setSubscription(subData as unknown as Subscription);
+
+      const { data: reqData } = await supabase
+        .from("subscription_payment_requests")
+        .select("id, plan")
+        .eq("tenant_id", userData.tenant_id)
+        .eq("status", "pending")
+        .maybeSingle();
+      setPendingRequest((reqData as { plan: string } | null) ?? null);
     } catch (err) {
       toast.error("Impossible de charger les données. Veuillez réessayer.");
       console.error(err);
@@ -184,17 +193,11 @@ export default function SubscriptionPage() {
   const dateExpired = !!endDate && !isPending && new Date(endDate).getTime() < now;
   const isExpired = subStatus === "expired" || isLocked || dateExpired;
 
-  const pendingBadge = (
-    <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-3">
-      <span className="relative flex h-2.5 w-2.5 shrink-0">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
-      </span>
-      <span className="text-xs font-medium text-amber-800 dark:text-amber-300">
-        ⏳ Activation en cours de traitement (Sous 15 minutes)
-      </span>
-    </div>
-  );
+  const planOrder: Record<string, number> = { essentiel: 1, entreprise: 2 };
+  const currentRank = planOrder[currentPlan] ?? 0;
+  const pendingTargetPlan = isPending
+    ? normalizePlan(pendingRequest?.plan ?? subscription?.plan ?? currentPlan)
+    : null;
 
   const confirmPrice = getPlanPrice(confirmPlan ?? "");
   const confirmLabel = getPlanLabel(confirmPlan ?? "");
@@ -309,11 +312,15 @@ export default function SubscriptionPage() {
                 <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/mois</span>
               </div>
 
-              {isCurrent && !isExpired && (
+              {isPending && plan.key === pendingTargetPlan ? (
+                <div className="mt-3">
+                  <Badge variant="warning"><Clock className="w-3 h-3" /> En attente de confirmation</Badge>
+                </div>
+              ) : isCurrent && !isExpired && !isPending ? (
                 <div className="mt-3">
                   <Badge variant="success"><Check className="w-3 h-3" /> Plan actuel</Badge>
                 </div>
-              )}
+              ) : null}
 
               <ul className="mt-6 flex-1 space-y-3">
                 {plan.features.map((feature, i) => (
@@ -329,17 +336,30 @@ export default function SubscriptionPage() {
               </ul>
 
               {isPending ? (
-                pendingBadge
-              ) : (
-                <Button
-                  variant={isHighlight ? "purple" : "primary"}
-                  size="lg"
-                  className="mt-6 w-full"
-                  onClick={() => openPayment(plan.key)}
-                >
-                  <Smartphone className="w-4 h-4" />
-                  Payer via Wave
+                <Button variant="outline" size="lg" className="mt-6 w-full" disabled>
+                  <Clock className="w-4 h-4" /> Validation en cours...
                 </Button>
+              ) : (
+                <div className="mt-6">
+                  <Button
+                    variant={isHighlight ? "purple" : "primary"}
+                    size="lg"
+                    className="w-full"
+                    onClick={() => openPayment(plan.key)}
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    {isCurrent
+                      ? "Prolonger l'abonnement"
+                      : (planOrder[plan.key] ?? 0) > currentRank
+                        ? `Passer à ${plan.name}`
+                        : "Changer pour ce plan"}
+                  </Button>
+                  {(planOrder[plan.key] ?? 0) < currentRank && endDate && (
+                    <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                      Prendra effet le {formatDate(endDate)}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           );
