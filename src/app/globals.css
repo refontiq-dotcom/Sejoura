@@ -342,9 +342,11 @@ html {
 }
 
 /* ============================================
-   Onglet actif de sidebar — arrondis externes et concaves universels
-   --sidebar-bg est défini par le conteneur sidebar : les découpes restent
-   correctes pour toute couleur de tenant, claire comme sombre.
+   Onglet actif de sidebar — feuille continue (concave tab)
+   --sidebar-bg : couleur de la sidebar (languette du pseudo-élément)
+   --main-bg    : couleur EXACTE du canvas (<main>) → découpe continue
+   Les deux variables sont posées par le layout (layout.tsx) et héritées
+   par la sidebar, qui ne définit plus elle-même --main-bg.
    ============================================ */
 .active-sidebar-tab {
   position: relative;
@@ -360,32 +362,33 @@ html {
   isolation: isolate;
 }
 
-/* Courbe concave haute : le pseudo-élément reste transparent ; son ombre
-   emprunte la couleur de fond de son parent sidebar, sans aucun blanc fixe. */
+/* Encoche concave HAUTE : la languette reprend la couleur de la sidebar et
+   son ombre emprunte la couleur exacte du canvas → illusion de découpe
+   continue, sans aucun blanc fixe ni hexadécimal codé en dur. */
 .active-sidebar-tab::before {
   content: "";
   position: absolute;
-  top: -20px;
+  top: -16px;
   right: 0;
-  width: 20px;
-  height: 20px;
-  background: transparent;
-  border-bottom-right-radius: 20px;
-  box-shadow: 6px 6px 0 6px var(--sidebar-bg);
+  width: 16px;
+  height: 16px;
+  background: var(--sidebar-bg);
+  border-bottom-right-radius: 16px;
+  box-shadow: 0 8px 0 0 var(--main-bg);
   pointer-events: none;
 }
 
-/* Courbe concave basse : même masque dynamique hérité de la sidebar. */
+/* Encoche concave BASSE : miroir vertical de la précédente. */
 .active-sidebar-tab::after {
   content: "";
   position: absolute;
-  bottom: -20px;
+  bottom: -16px;
   right: 0;
-  width: 20px;
-  height: 20px;
-  background: transparent;
-  border-top-right-radius: 20px;
-  box-shadow: 6px -6px 0 6px var(--sidebar-bg);
+  width: 16px;
+  height: 16px;
+  background: var(--sidebar-bg);
+  border-top-right-radius: 16px;
+  box-shadow: 0 -8px 0 0 var(--main-bg);
   pointer-events: none;
 }
 

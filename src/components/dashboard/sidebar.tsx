@@ -104,7 +104,6 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           backgroundColor: themeStyles.sidebarBg,
           color: themeStyles.textColor,
           "--sidebar-bg": themeStyles.sidebarBg,
-          "--main-bg": themeStyles.mainBg,
         } as React.CSSProperties}
         className={`group flex flex-col transition-all duration-300 fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible ${
           isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-60"
@@ -179,7 +178,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
               key={item.href}
               href={item.href}
               style={{
-                backgroundColor: isActive ? themeStyles.mainBg : "transparent",
+                backgroundColor: isActive ? "var(--main-bg)" : "transparent",
                 color: isActive ? themeStyles.activeTextColor : themeStyles.textColor,
               }}
               className={
@@ -204,7 +203,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
                   className="ml-auto px-1.5 py-px text-[10px] rounded-full font-bold"
                   style={{
                     backgroundColor: isActive ? themeStyles.sidebarBg : themeStyles.accentColor,
-                    color: isActive ? themeStyles.mainBg : (themeStyles.isDark ? "#0C1C33" : "#FFFFFF"),
+                    color: isActive ? "var(--main-bg)" : (themeStyles.isDark ? "#0C1C33" : "#FFFFFF"),
                   }}
                 >
                   {item.badge}
@@ -220,7 +219,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
         <Link
           href="/dashboard/settings"
           style={{
-            backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.mainBg : "transparent",
+            backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? "var(--main-bg)" : "transparent",
             color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,
           }}
           className={
