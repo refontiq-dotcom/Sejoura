@@ -474,6 +474,41 @@ html {
 .animate-hero-slide {
   animation: heroSlide 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ============================================
+   Saisie de code PIN — animation "shake" en cas d'erreur
+   ============================================ */
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Rebond discret des puces PIN à chaque chiffre saisi */
+@keyframes pinPop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.animate-pin-pop {
+  animation: pinPop 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Pulsation douce de l'invite biométrique */
+@keyframes biometricPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35); }
+  50% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0); }
+}
+
+.animate-biometric-pulse {
+  animation: biometricPulse 2s ease-in-out infinite;
+}
 /* ============================================
    Sonner Toaster — Glassmorphism SaaS
    ============================================ */

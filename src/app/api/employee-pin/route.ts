@@ -1,34 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createHash, randomBytes, timingSafeEqual } from "crypto";
-
-// ─── Hashing PIN (PBKDF2-like avec crypto natif Node.js) ─────────────────────
-// Format : "pbkdf2$<salt>$<hash>"
-function hashPin(pin: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = createHash("sha256")
-    .update(salt + pin + (process.env.PIN_PEPPER || "sejoura_pin_secret"))
-    .digest("hex");
-  return `sha256$${salt}$${hash}`;
-}
-
-function verifyPin(pin: string, stored: string): boolean {
-  try {
-    const parts = stored.split("$");
-    if (parts.length !== 3 || parts[0] !== "sha256") return false;
-    const [, salt, storedHash] = parts;
-    const computedHash = createHash("sha256")
-      .update(salt + pin + (process.env.PIN_PEPPER || "sejoura_pin_secret"))
-      .digest("hex");
-    // Comparaison en temps constant pour éviter les timing attacks
-    const a = Buffer.from(computedHash, "hex");
-    const b = Buffer.from(storedHash, "hex");
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
+import { hashPin, verifyPin } from "@/lib/pin";
 
 /**
  * POST /api/employee-pin
