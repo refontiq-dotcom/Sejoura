@@ -5,55 +5,40 @@ import { NextResponse } from "next/server";
 // ============================================================================
 // POST /api/feature-requests/notify
 //
-// Alerte WhatsApp "nouvelle suggestion" via Evolution API.
+// Alerte Telegram "nouvelle suggestion" via la Bot API.
 // Appelé (fire-and-forget) par le client juste après l'insertion d'une idée.
 //
 // Configuration (variables d'environnement, côté serveur uniquement) :
-//   FEATURE_ALERT_EVOLUTION_API_URL  → base de l'API, ex. https://evo.mondomaine.com
-//   FEATURE_ALERT_EVOLUTION_INSTANCE → nom de l'instance Evolution
-//   FEATURE_ALERT_EVOLUTION_TOKEN    → clé d'API de l'instance
-//   FEATURE_ALERT_TO_PHONE           → numéro destinataire (format international,
-//                                       ex. 221771234567)
-//   FEATURE_ALERT_ADMIN_URL          → lien vers le dashboard admin dans le message
-// Si une de ces variables manque, la route ne fait rien (aucune erreur remontée).
+//   TELEGRAM_BOT_TOKEN → token du bot Telegram (fourni par @BotFather)
+//   TELEGRAM_CHAT_ID   → identifiant du chat destinataire (ex. un canal privé)
+//   TELEGRAM_ADMIN_URL → lien vers le dashboard admin dans le message
+//                        (défaut : https://app.sejoura.com/admin/ideas)
+// Si TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID manque, la route ne fait rien
+// (aucune erreur remontée).
 // ============================================================================
 
-const IMPACT_LABELS: Record<string, string> = {
-  essential: "Essentiel au quotidien",
-  nice_to_have: "Pratique d'avoir",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  new_feature: "Nouvelle fonctionnalité",
-  page_improvement: "Amélioration d'une page",
-  bug_report: "Petit bug",
-};
-
-function isConfigured(): boolean {
-  return Boolean(
-    process.env.FEATURE_ALERT_EVOLUTION_API_URL &&
-      process.env.FEATURE_ALERT_EVOLUTION_INSTANCE &&
-      process.env.FEATURE_ALERT_EVOLUTION_TOKEN &&
-      process.env.FEATURE_ALERT_TO_PHONE
-  );
+// Échappement des caractères spéciaux du parse_mode "Markdown" (legacy) :
+// _, *, [, ], `, \ doivent être préfixés d'un backslash hors entité de format.
+function escapeMarkdown(text: string): string {
+  return text.replace(/([_*[\]`\\])/g, "\\$1");
 }
 
-async function sendEvolutionMessage(text: string): Promise<boolean> {
-  const baseUrl = process.env.FEATURE_ALERT_EVOLUTION_API_URL!.replace(/\/+$/, "");
-  const instance = process.env.FEATURE_ALERT_EVOLUTION_INSTANCE!;
-  const token = process.env.FEATURE_ALERT_EVOLUTION_TOKEN!;
-  const number = process.env.FEATURE_ALERT_TO_PHONE!;
+function isConfigured(): boolean {
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+}
 
-  const res = await fetch(`${baseUrl}/message/sendText/${instance}`, {
+async function sendTelegramMessage(text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN!;
+  const chatId = process.env.TELEGRAM_CHAT_ID!;
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: token,
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      number,
+      chat_id: chatId,
       text,
+      parse_mode: "Markdown",
+      disable_web_page_preview: false,
     }),
     // Échec rapide : ne bloque jamais le retour utilisateur
     signal: AbortSignal.timeout(10_000),
@@ -82,32 +67,39 @@ export async function POST(req: Request) {
     const adminSupabase = createAdminClient();
     const { data: idea } = await adminSupabase
       .from("feature_requests")
-      .select("id, title, category, impact, tenant_id")
+      .select("id, title, created_by, tenant_id")
       .eq("id", id)
       .maybeSingle();
     if (!idea) {
       return NextResponse.json({ error: "Suggestion introuvable." }, { status: 404 });
     }
 
-    const { data: tenant } = await adminSupabase
-      .from("tenants")
-      .select("company_name")
-      .eq("id", idea.tenant_id)
-      .maybeSingle();
+    const [{ data: tenant }, { data: author }] = await Promise.all([
+      adminSupabase
+        .from("tenants")
+        .select("company_name")
+        .eq("id", idea.tenant_id)
+        .maybeSingle(),
+      adminSupabase
+        .from("users")
+        .select("full_name")
+        .eq("id", idea.created_by)
+        .maybeSingle(),
+    ]);
 
-    const adminUrl = process.env.FEATURE_ALERT_ADMIN_URL || "https://app.sejoura.com/admin/ideas";
+    const adminUrl = process.env.TELEGRAM_ADMIN_URL || "https://app.sejoura.com/admin/ideas";
 
     const text = [
-      "\uD83D\uDCA1 Nouvelle suggestion soumise !",
-      `Auteur : ${tenant?.company_name || "Établissement inconnu"}`,
-      `Titre : ${idea.title}`,
-      `Impact choisi : ${IMPACT_LABELS[idea.impact] || idea.impact}`,
-      `Catégorie : ${CATEGORY_LABELS[idea.category] || idea.category}`,
+      "\uD83D\uDCA1 *Nouvelle suggestion Sejoura !*",
       "",
-      `\uD83D\uDD17 Cliquer ici pour ouvrir le Dashboard Admin : ${adminUrl}`,
+      `\uD83D\uDCCC *Titre :* ${escapeMarkdown(idea.title)}`,
+      `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(tenant?.company_name || "Établissement inconnu")}`,
+      `\uD83D\uDC64 *Auteur :* ${escapeMarkdown(author?.full_name || "Utilisateur")}`,
+      "",
+      `\uD83D\uDD17 [Voir sur le Dashboard Admin](${adminUrl})`,
     ].join("\n");
 
-    const sent = await sendEvolutionMessage(text);
+    const sent = await sendTelegramMessage(text);
 
     return NextResponse.json({ sent });
   } catch (error) {
