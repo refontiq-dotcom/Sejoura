@@ -342,29 +342,28 @@ html {
 }
 
 /* ============================================
-   Onglet actif de sidebar — feuille continue (concave tab)
+   Onglet actif de sidebar — feuille continue (concave tab) FLUSH
+   L'onglet s'arrête pile sur la frontière droite de la sidebar
+   (margin-right: 0) : les pseudo-éléments, positionnés en right:0,
+   creusent donc le bleu de la sidebar exactement à la frontière.
    --sidebar-bg : couleur de la sidebar (languette du pseudo-élément)
    --main-bg    : couleur EXACTE du canvas (<main>) → découpe continue
-   Les deux variables sont posées par le layout (layout.tsx) et héritées
-   par la sidebar, qui ne définit plus elle-même --main-bg.
    ============================================ */
 .active-sidebar-tab {
   position: relative;
   border-top-left-radius: 1rem;
   border-bottom-left-radius: 1rem;
-  border-top-right-radius: 1rem;
-  border-bottom-right-radius: 1rem;
   margin-left: 0.75rem;
-  margin-right: 0.75rem;
+  margin-right: 0;
   padding-left: 1.25rem;
   padding-right: 1.25rem;
   z-index: 20;
   isolation: isolate;
 }
 
-/* Encoche concave HAUTE : la languette reprend la couleur de la sidebar et
-   son ombre emprunte la couleur exacte du canvas → illusion de découpe
-   continue, sans aucun blanc fixe ni hexadécimal codé en dur. */
+/* Encoche concave HAUTE : languette = couleur de la sidebar, ombre =
+   couleur exacte du canvas. À right:0 (frontière), la découpe courbe
+   le bleu en douceur, sans crochet ni droite dure (bords courbes). */
 .active-sidebar-tab::before {
   content: "";
   position: absolute;
