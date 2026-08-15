@@ -44,7 +44,9 @@ import {
   MessageSquare,
   ExternalLink,
   Receipt,
+  MoreHorizontal,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice } from "@/types/database";
 
@@ -70,6 +72,9 @@ export default function BookingsPage() {
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: "cancel" | "no_show" } | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // Réservation dont une action (check-in/check-out) est en cours : permet de
+  // désactiver le bouton principal et le menu pour éviter les doubles clics.
+  const [actioningId, setActioningId] = useState<string>("");
   const [tenantId, setTenantId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
   // Filtre de résidence appliqué au rechargement des réservations (réceptionniste
@@ -611,6 +616,18 @@ export default function BookingsPage() {
     await executeAction(bookingId, action);
   }
 
+  // Action principale (check-in / check-out) avec garde anti double-clic :
+  // le bouton principal et le menu restent désactivés pendant l'exécution.
+  async function handlePrimaryAction(bookingId: string, action: "check_in" | "check_out") {
+    if (actioningId) return;
+    setActioningId(bookingId);
+    try {
+      await handleAction(bookingId, action);
+    } finally {
+      setActioningId("");
+    }
+  }
+
   async function executeAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
      try {
        const supabase = createClient();
@@ -930,65 +947,80 @@ export default function BookingsPage() {
                       </span>
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button 
-                          onClick={() => shareStayWhatsApp(b.client?.phone || "", b.client?.full_name || "Client", b.booking_code)} 
-                          title="Envoyer l'accès séjour par WhatsApp" 
-                          className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => copyStayLink(b.booking_code)} 
-                          title="Copier le lien d'accès au séjour" 
-                          className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
-                          invoicesMap[b.id]?.pdf_url ? (
-                            <button 
-                              onClick={() => handleDownloadInvoice(invoicesMap[b.id])} 
-                              title="Télécharger la facture" 
-                              className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => handleGenerateInvoice(b)} 
-                              title="Générer une facture PDF" 
-                              className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </button>
-                          )
-                        )}
+                      <div className="flex items-center gap-1 md:gap-2 justify-end">
+                        {/* Action primaire — Desktop/tablette : bouton avec libellé complet */}
                         {b.status === "confirmed" && (
-                          <button onClick={() => handleAction(b.id, "check_in")} title="Check-in" className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                          <Button size="sm" variant="success" className="hidden md:inline-flex" onClick={() => handlePrimaryAction(b.id, "check_in")} loading={actioningId === b.id}>
+                            <LogIn className="w-3.5 h-3.5" /> Check-in
+                          </Button>
+                        )}
+                        {b.status === "checked_in" && (
+                          <Button size="sm" className="hidden md:inline-flex bg-orange-500 text-white hover:bg-orange-600" onClick={() => handlePrimaryAction(b.id, "check_out")} loading={actioningId === b.id}>
+                            <LogOut className="w-3.5 h-3.5" /> Check-out
+                          </Button>
+                        )}
+
+                        {/* Action primaire — Mobile : icône compacte à grand tap target */}
+                        {b.status === "confirmed" && (
+                          <Button size="icon" variant="ghost" className="md:hidden h-10 w-10 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handlePrimaryAction(b.id, "check_in")} loading={actioningId === b.id} aria-label="Check-in">
                             <LogIn className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
                         {b.status === "checked_in" && (
-                          <button onClick={() => handleAction(b.id, "check_out")} title="Check-out" className="p-2 rounded-lg text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20">
+                          <Button size="icon" variant="ghost" className="md:hidden h-10 w-10 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20" onClick={() => handlePrimaryAction(b.id, "check_out")} loading={actioningId === b.id} aria-label="Check-out">
                             <LogOut className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
-                        {b.status === "checked_in" && (
-                          <button onClick={() => handleMidStayCleaning(b.id)} title="Demander un ménage (en cours de séjour)" className="p-2 rounded-lg text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)]">
-                            <Sparkles className="w-4 h-4" />
-                          </button>
-                        )}
-                        {(b.status === "confirmed" || b.status === "checked_in") && (
-                          <button onClick={() => handleAction(b.id, "cancel")} title="Annuler" className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        {b.status === "confirmed" && (
-                          <button onClick={() => handleAction(b.id, "no_show")} title="No-show" className="p-2 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
-                            <UserX className="w-4 h-4" />
-                          </button>
-                        )}
+
+                        {/* Menu des actions secondaires : toujours visible */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger aria-label="Plus d'actions" disabled={actioningId === b.id} className="h-10 w-10 md:h-8 md:w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Séjour</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => shareStayWhatsApp(b.client?.phone || "", b.client?.full_name || "Client", b.booking_code)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                              <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => copyStayLink(b.booking_code)}>
+                              <Copy className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Copier le lien du séjour
+                            </DropdownMenuItem>
+                            {b.status === "checked_in" && (
+                              <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
+                                <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                              </DropdownMenuItem>
+                            )}
+                            {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Facturation</DropdownMenuLabel>
+                                {invoicesMap[b.id]?.pdf_url ? (
+                                  <DropdownMenuItem onSelect={() => handleDownloadInvoice(invoicesMap[b.id])} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    <Receipt className="w-4 h-4" /> Télécharger la facture
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onSelect={() => handleGenerateInvoice(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    <Receipt className="w-4 h-4" /> Générer la facture PDF
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
+                                <DropdownMenuItem onSelect={() => handleAction(b.id, "cancel")} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                                  <XCircle className="w-4 h-4" /> Annuler la réservation
+                                </DropdownMenuItem>
+                                {b.status === "confirmed" && (
+                                  <DropdownMenuItem onSelect={() => handleAction(b.id, "no_show")} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                                    <UserX className="w-4 h-4" /> Marquer en no-show
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

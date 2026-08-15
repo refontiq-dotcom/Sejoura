@@ -9,7 +9,8 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { getRoleLabel, getPlanLimits, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
-import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History } from "lucide-react";
+import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
 
 // Map userId → affectation temporaire active (si elle existe)
@@ -580,64 +581,58 @@ export default function EmployeesPage() {
                       <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{formatDate(emp.created_at)}</td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openReassign(emp)}
-                            className="p-2 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
-                            title="Changer d'établissement / Réaffecter"
-                            aria-label={`Réaffecter ${emp.full_name}`}
-                          >
-                            <ArrowLeftRight className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => openHistory(emp)}
-                            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Historique des affectations"
-                            aria-label={`Historique des affectations de ${emp.full_name}`}
-                          >
-                            <History className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const origin = typeof window !== "undefined" ? window.location.origin : "";
-                              const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(emp.phone)}`;
-                              setInviteData({
-                                full_name: emp.full_name,
-                                phone: emp.phone,
-                                role: emp.role,
-                                link: generatedLink,
-                              });
-                              setInviteModalOpen(true);
-                            }}
-                            className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                            title="Partager le lien d'accès"
-                            aria-label={`Partager le lien d'accès de ${emp.full_name}`}
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
-                          {emp.role !== "admin_residence" && (
-                            <>
-                              <button
-                                onClick={() => handleToggleActive(emp)}
-                                className={`p-2 rounded-lg transition-colors ${
-                                  emp.is_active
-                                    ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                                    : "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                }`}
-                                title={emp.is_active ? "Révoquer l'accès" : "Réactiver l'accès"}
-                                aria-label={emp.is_active ? `Révoquer l'accès de ${emp.full_name}` : `Réactiver l'accès de ${emp.full_name}`}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger aria-label={`Actions pour ${emp.full_name}`} className="h-10 w-10 md:h-8 md:w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Affectation</DropdownMenuLabel>
+                              <DropdownMenuItem onSelect={() => openReassign(emp)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                                <ArrowLeftRight className="w-4 h-4" /> Changer d&apos;établissement
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => openHistory(emp)}>
+                                <History className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Historique des affectations
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Accès</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  const origin = typeof window !== "undefined" ? window.location.origin : "";
+                                  const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(emp.phone)}`;
+                                  setInviteData({
+                                    full_name: emp.full_name,
+                                    phone: emp.phone,
+                                    role: emp.role,
+                                    link: generatedLink,
+                                  });
+                                  setInviteModalOpen(true);
+                                }}
+                                className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
                               >
-                                {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget(emp)}
-                                className="p-2 rounded-lg text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-                                title="Supprimer l'employé"
-                                aria-label={`Supprimer ${emp.full_name}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                                <Share2 className="w-4 h-4" /> Partager le lien d&apos;accès
+                              </DropdownMenuItem>
+                              {emp.role !== "admin_residence" && (
+                                <>
+                                  <DropdownMenuItem
+                                    onSelect={() => handleToggleActive(emp)}
+                                    className={
+                                      emp.is_active
+                                        ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                        : "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    }
+                                  >
+                                    {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                                    {emp.is_active ? "Révoquer l&apos;accès" : "Réactiver l&apos;accès"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
+                                  <DropdownMenuItem onSelect={() => setDeleteTarget(emp)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                                    <Trash2 className="w-4 h-4" /> Supprimer l&apos;employé
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>
