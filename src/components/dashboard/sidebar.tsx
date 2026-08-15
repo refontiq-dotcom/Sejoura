@@ -15,6 +15,7 @@ import {
   PanelLeftOpen,
   ClipboardList,
   Store,
+  Lightbulb,
 } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
@@ -26,6 +27,8 @@ import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 
 import { AppLogo } from "@/components/ui/app-logo";
+
+import { IdeaSubmissionModal } from "@/components/dashboard/idea-box";
 
 import { getSidebarThemeStyles } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
@@ -67,6 +70,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
   const navLabels = Object.fromEntries(t.navItems.map((item) => [item.href, item.label]));
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [ideaModalOpen, setIdeaModalOpen] = useState(false);
 
   const themeStyles = getSidebarThemeStyles(themeColor, theme === "dark");
 
@@ -241,6 +245,27 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           )}
         </Link>
 
+        {/* Proposer une idée */}
+        <button
+          onClick={() => setIdeaModalOpen(true)}
+          style={{
+            color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,
+          }}
+          className={
+            isCollapsed
+              ? "flex items-center justify-center w-8 h-8 rounded-md mx-auto my-0.5 transition-all hover:bg-white/10"
+              : "flex items-center gap-2 py-1.5 px-2.5 ml-1.5 mr-1.5 rounded-md text-[13px] font-medium transition-all hover:bg-white/10"
+          }
+          title={isCollapsed ? "Proposer une idée" : undefined}
+        >
+          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+          {!isCollapsed && (
+            <span className="text-[13px] font-medium truncate opacity-70">
+              Proposer une idée
+            </span>
+          )}
+        </button>
+
         {/* User info & logout */}
         <div 
         className="p-2.5 border-t"
@@ -277,6 +302,8 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
        </div>
        </div>
      </aside>
+
+      {ideaModalOpen && <IdeaSubmissionModal open onClose={() => setIdeaModalOpen(false)} />}
     </>
   );
 }

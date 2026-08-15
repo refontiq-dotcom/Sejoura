@@ -45,6 +45,7 @@ import {
   PieChart as PieChartIcon,
   CalendarClock,
   Phone,
+  Lightbulb,
 } from "lucide-react";
 import { LOGIN_ROUTE } from "@/lib/routes";
 import type { Tenant, Subscription, SubscriptionPaymentRequest } from "@/types/database";
@@ -394,6 +395,12 @@ export default function SuperAdminPage() {
               <Clock className="w-3 h-3" /> {pendingRequests.length} validation{pendingRequests.length > 1 ? "s" : ""} en attente
             </Badge>
           )}
+          <a
+            href="/admin/ideas"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary-color,#0C1C33)] text-white text-xs font-bold hover:opacity-90 transition-opacity shrink-0"
+          >
+            <Lightbulb className="w-4 h-4" /> Boîte à idées
+          </a>
           <Button size="sm" variant="outline" onClick={() => loadData(true)} className="shrink-0">
             <RefreshCw className="w-4 h-4" /> Rafraîchir
           </Button>

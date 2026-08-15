@@ -406,6 +406,7 @@ export const translations = {
         { key: "whatsapp", label: "WhatsApp" },
         { key: "integrations", label: "Intégrations" },
         { key: "security", label: "Sécurité" },
+        { key: "ideas", label: "Boîte à idées" },
       ],
     },
     residenceDetail: {
@@ -859,6 +860,7 @@ export const translations = {
         { key: "whatsapp", label: "WhatsApp" },
         { key: "integrations", label: "Integrations" },
         { key: "security", label: "Security" },
+        { key: "ideas", label: "Ideas Box" },
       ],
     },
     residenceDetail: {

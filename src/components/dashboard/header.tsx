@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getPlanLabel } from "@/lib/utils";
+import { IdeaSubmissionModal } from "@/components/dashboard/idea-box";
+import type { FeatureRequestCategory } from "@/types/database";
 
 interface HeaderProps {
   title: string;
@@ -193,10 +195,14 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [ideaModalOpen, setIdeaModalOpen] = useState(false);
+  const [ideaCategory, setIdeaCategory] = useState<FeatureRequestCategory>("new_feature");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [tenantId, setTenantId] = useState<string>("");
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
   const planLabel = getPlanLabel(plan || "free");
   const { activeAccommodation } = useAccommodation();
 
@@ -267,6 +273,9 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       }
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
+      }
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setHelpOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -354,7 +363,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md border-b border-[var(--border)]">
+    <>
+      <header className="sticky top-0 z-30 bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md border-b border-[var(--border)]">
       <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-4">
           {onMenuClick && (
@@ -389,6 +399,39 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </div>
 
           <ResidenceSwitcher />
+
+          <div className="relative" ref={helpRef}>
+            <button
+              onClick={() => setHelpOpen(!helpOpen)}
+              className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+              aria-label="Aide & support"
+              title="Aide & support"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+
+            {helpOpen && (
+              <div className="absolute right-0 mt-1.5 w-64 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-1.5">
+                <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Aide &amp; Support
+                </p>
+                <button
+                  onClick={() => { setHelpOpen(false); setIdeaCategory("bug_report"); setIdeaModalOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  <Bug className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                  Signaler un problème
+                </button>
+                <button
+                  onClick={() => { setHelpOpen(false); setIdeaCategory("new_feature"); setIdeaModalOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  <Wand2 className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                  Suggérer une fonctionnalité
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={toggleTheme}
@@ -596,6 +639,9 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </div>
         </div>
       )}
-    </header>
+      </header>
+
+      {ideaModalOpen && <IdeaSubmissionModal open onClose={() => setIdeaModalOpen(false)} initialCategory={ideaCategory} />}
+    </>
   );
 }

@@ -27,12 +27,14 @@ import {
   Copy,
   ExternalLink,
   Palette,
+  Lightbulb,
 } from "lucide-react";
 import { SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { useLanguage } from "@/hooks/use-language";
 import { useCurrency } from "@/hooks/use-currency";
 import { translations } from "@/lib/translations";
 import type { Tenant, User as UserType } from "@/types/database";
+import { IdeaBoxSection } from "@/components/dashboard/idea-box";
 
 function themeHex(color: string) {
   return color.startsWith("#") ? color : getThemePresetById(color).sidebarBg;
@@ -54,7 +56,13 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [user, setUser] = useState<UserType | null>(null);
-  const [activeSection, setActiveSection] = useState("company");
+  const [activeSection, setActiveSection] = useState(() => {
+    if (typeof window !== "undefined") {
+      const section = new URLSearchParams(window.location.search).get("section");
+      if (section) return section;
+    }
+    return "company";
+  });
   const [copiedPortalLink, setCopiedPortalLink] = useState(false);
   const skipColorAutoSave = useRef(true);
   const lastSavedColorsRef = useRef<{ primaryColor: string; themeColor: string } | null>(null);
@@ -555,6 +563,7 @@ export default function SettingsPage() {
     { key: "whatsapp",      label: sectionLabelMap["whatsapp"]      || "WhatsApp",       icon: MessageSquare },
     { key: "integrations",  label: sectionLabelMap["integrations"]  || "Intégrations",  icon: Globe },
     { key: "security",      label: sectionLabelMap["security"]      || "Sécurité",      icon: Shield },
+    { key: "ideas",         label: sectionLabelMap["ideas"]         || "Boîte à idées", icon: Lightbulb },
   ];
 
   return (
@@ -1088,6 +1097,9 @@ export default function SettingsPage() {
               </div>
             </Card>
           )}
+
+          {/* Boîte à idées & Roadmap */}
+          {activeSection === "ideas" && <IdeaBoxSection />}
         </div>
       </div>
     </div>

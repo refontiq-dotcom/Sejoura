@@ -154,6 +154,41 @@ export interface EmployeeAssignment {
   user?: User;
 }
 
+export type FeatureRequestCategory = "new_feature" | "page_improvement" | "bug_report";
+export type FeatureRequestImpact = "essential" | "nice_to_have";
+export type FeatureRequestStatus = "under_review" | "planned" | "in_development" | "shipped";
+
+/**
+ * Suggestion d'un client dans la boîte à idées / roadmap participative.
+ * Les idées sont globales : visibles par tous les tenants.
+ */
+export interface FeatureRequest {
+  id: string;
+  tenant_id: string;
+  created_by: string;
+  title: string;
+  description: string;
+  category: FeatureRequestCategory;
+  impact: FeatureRequestImpact;
+  screenshot_url: string | null;
+  status: FeatureRequestStatus;
+  hidden: boolean;
+  upvotes: number;
+  created_at: string;
+  updated_at: string;
+  // Relations optionnelles (via join)
+  creator?: Pick<User, "full_name"> | null;
+  tenant_name?: string | null;
+}
+
+export interface FeatureRequestVote {
+  id: string;
+  feature_request_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+
 
 export interface Accommodation {
   id: string;
@@ -570,6 +605,16 @@ export interface Database {
         Row: WhatsAppMessage;
         Insert: Omit<WhatsAppMessage, "id" | "created_at">;
         Update: Partial<Omit<WhatsAppMessage, "id" | "created_at">>;
+      };
+      feature_requests: {
+        Row: FeatureRequest;
+        Insert: Omit<FeatureRequest, "id" | "created_at" | "updated_at" | "upvotes" | "status" | "hidden">;
+        Update: Partial<Omit<FeatureRequest, "id" | "created_at">>;
+      };
+      feature_request_votes: {
+        Row: FeatureRequestVote;
+        Insert: Omit<FeatureRequestVote, "id" | "created_at">;
+        Update: Partial<Omit<FeatureRequestVote, "id" | "created_at">>;
       };
     };
     Views: {
