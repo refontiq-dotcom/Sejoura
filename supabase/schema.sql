@@ -311,6 +311,7 @@ CREATE TABLE room_types (
   surface_m2      DOUBLE PRECISION,        -- Superficie en m² (optionnel)
   is_listed_on_trouvetou BOOLEAN NOT NULL DEFAULT FALSE, -- Interrupteur Visibilité Trouvetou
   featured_images TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], -- Photos diffusées sur Trouvetou
+  check_out_time  TIME NOT NULL DEFAULT '11:00', -- Heure de sortie du type de chambre
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- Règle de sécurité : pas de diffusion Trouvetou sans au moins une photo
@@ -1449,7 +1450,7 @@ CREATE OR REPLACE FUNCTION create_booking(
   p_total_amount INTEGER,
   p_created_by UUID,
   p_check_in_time TIME DEFAULT '14:00',
-  p_check_out_time TIME DEFAULT '11:00',
+  p_check_out_time TIME DEFAULT NULL,
   p_number_of_guests INTEGER DEFAULT 1,
   p_special_requests TEXT DEFAULT NULL
 )
@@ -1458,6 +1459,7 @@ DECLARE
   v_booking bookings;
   v_code TEXT;
   v_is_available BOOLEAN;
+  v_check_out_time TIME;
 BEGIN
   -- Vérifier anti double-booking
   SELECT check_double_booking(p_room_id, p_check_in_date, p_check_out_date) INTO v_is_available;
@@ -1466,10 +1468,21 @@ BEGIN
     RAISE EXCEPTION 'DOUBLE_BOOKING: Cette chambre est déjà réservée pour ces dates';
   END IF;
 
+  -- Heure de sortie : celle du type de chambre de la chambre réservée par
+  -- défaut, sinon une heure explicite, sinon 11:00 (rétrocompatibilité).
+  SELECT COALESCE(
+    p_check_out_time,
+    (SELECT rt.check_out_time
+     FROM rooms r
+     JOIN room_types rt ON rt.id = r.room_type_id
+     WHERE r.id = p_room_id),
+    TIME '11:00'
+  ) INTO v_check_out_time;
+
   -- Générer le code de réservation
   SELECT generate_booking_code(p_tenant_id) INTO v_code;
 
-  -- Créer la réservation
+  -- Créer la réservation (instantané de l'heure de sortie dans la réservation)
   INSERT INTO bookings (
     tenant_id, accommodation_id, room_id, client_id,
     booking_code, check_in_date, check_out_date,
@@ -1479,7 +1492,7 @@ BEGIN
   ) VALUES (
     p_tenant_id, p_accommodation_id, p_room_id, p_client_id,
     v_code, p_check_in_date, p_check_out_date,
-    p_check_in_time, p_check_out_time,
+    p_check_in_time, v_check_out_time,
     p_base_price, p_negotiated_price, p_nights_count, p_total_amount,
     p_number_of_guests, p_special_requests, p_created_by
   )

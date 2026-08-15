@@ -243,6 +243,7 @@ export interface RoomType {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[];
+  check_out_time: string;
   created_at: string;
   updated_at: string;
 }

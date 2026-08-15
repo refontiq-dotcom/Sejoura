@@ -33,7 +33,7 @@ export default function ResidenceDetailPage() {
 
   const [residenceForm, setResidenceForm] = useState({ name: "", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
-  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[] });
+  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[], check_out_time: "11:00" });
   const [newTypeImageUrl, setNewTypeImageUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
@@ -282,7 +282,7 @@ export default function ResidenceDetailPage() {
   function openAddTypeModal() {
     setEditingType(null);
     setNewTypeImageUrl("");
-    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] });
+    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [], check_out_time: "11:00" });
     setTypeModalOpen(true);
   }
 
@@ -299,6 +299,7 @@ export default function ResidenceDetailPage() {
       surface_m2: rt.surface_m2 ? rt.surface_m2.toString() : "",
       is_listed_on_trouvetou: rt.is_listed_on_trouvetou,
       featured_images: rt.featured_images || [],
+      check_out_time: rt.check_out_time || "11:00",
     });
     setTypeModalOpen(true);
   }
@@ -390,6 +391,7 @@ export default function ResidenceDetailPage() {
           surface_m2,
           is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
           featured_images: typeForm.featured_images,
+          check_out_time: typeForm.check_out_time,
         }).eq("id", editingType.id);
         if (error) throw error;
       } else {
@@ -403,6 +405,7 @@ export default function ResidenceDetailPage() {
           surface_m2,
           is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
           featured_images: typeForm.featured_images,
+          check_out_time: typeForm.check_out_time,
         }).select("id").single();
         if (insertError) throw insertError;
         typeId = created?.id || "";
@@ -752,7 +755,15 @@ export default function ResidenceDetailPage() {
               <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
               <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
             </div>
-            <Input label="Superficie en m² (optionnelle)" type="number" value={typeForm.surface_m2} onChange={(e) => setTypeForm({ ...typeForm, surface_m2: e.target.value })} placeholder="25" min="0" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <Input label="Superficie en m² (optionnelle)" type="number" value={typeForm.surface_m2} onChange={(e) => setTypeForm({ ...typeForm, surface_m2: e.target.value })} placeholder="25" min="0" />
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  Heure de sortie <span className="text-slate-400 dark:text-slate-500 font-normal">(appliquée aux réservations)</span>
+                </label>
+                <Input type="time" value={typeForm.check_out_time} onChange={(e) => setTypeForm({ ...typeForm, check_out_time: e.target.value })} className="w-full" />
+              </div>
+            </div>
 
             {/* Commodités */}
             <div>

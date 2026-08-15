@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatDate,
+  formatTime,
   calculateNights,
   getBookingStatusLabel,
   getBookingStatusColor,
@@ -1026,7 +1027,7 @@ export default function BookingsPage() {
                     </td>
                     <td className="p-3">
                       <p className="text-sm text-slate-700 dark:text-slate-300">{formatDate(b.check_in_date)}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">→ {formatDate(b.check_out_date)}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">→ {formatDate(b.check_out_date)}{b.check_out_time ? ` · ${formatTime(b.check_out_time)}` : ""}</p>
                       {overdue && (
                         <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
                           Départ prévu dépassé

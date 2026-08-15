@@ -19,6 +19,10 @@ export const roomTypeSchema = z.object({
   surface_m2: z.number().positive("Surface invalide").nullable().optional(),
   is_listed_on_trouvetou: z.boolean().default(false),
   featured_images: z.array(z.string()).default([]),
+  check_out_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Heure de sortie invalide (HH:MM)")
+    .default("11:00"),
 }).superRefine((data, ctx) => {
   if (data.is_listed_on_trouvetou && data.featured_images.length === 0) {
     ctx.addIssue({

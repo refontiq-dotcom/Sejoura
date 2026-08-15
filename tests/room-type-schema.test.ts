@@ -60,4 +60,30 @@ describe("roomTypeSchema — garde-fou Visibilité Trouvetou", () => {
     );
     expect(result.success).toBe(true);
   });
+
+  describe("check_out_time — heure de sortie du type de chambre", () => {
+    it("définit l'heure de sortie par défaut à 11:00", () => {
+      const result = roomTypeSchema.safeParse(baseType({}));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.check_out_time).toBe("11:00");
+      }
+    });
+
+    it("accepte une heure de sortie valide", () => {
+      const result = roomTypeSchema.safeParse(baseType({ check_out_time: "12:30" }));
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.check_out_time).toBe("12:30");
+      }
+    });
+
+    it("refuse une heure invalide", () => {
+      const bad = roomTypeSchema.safeParse(baseType({ check_out_time: "25:99" }));
+      expect(bad.success).toBe(false);
+      if (!bad.success) {
+        expect(bad.error.issues.some((i) => i.path.includes("check_out_time"))).toBe(true);
+      }
+    });
+  });
 });
