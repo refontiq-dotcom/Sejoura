@@ -354,9 +354,14 @@ export default function SubscriptionPage() {
                         ? `Passer à ${plan.name}`
                         : "Changer pour ce plan"}
                   </Button>
-                  {(planOrder[plan.key] ?? 0) < currentRank && endDate && (
+                  {isCurrent && !isExpired && endDate && (
                     <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
-                      Prendra effet le {formatDate(endDate)}
+                      Renouvellement le {formatDate(endDate)}
+                    </p>
+                  )}
+                  {(planOrder[plan.key] ?? 0) < currentRank && endDate && !isExpired && (
+                    <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                      Passage effectif le {formatDate(endDate)}
                     </p>
                   )}
                 </div>
