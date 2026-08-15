@@ -315,6 +315,9 @@ export interface Booking {
   status: BookingStatus;
   number_of_guests: number;
   special_requests: string | null;
+  is_overstay: boolean;
+  overstay_detected_at: string | null;
+  overstay_auto_checked_out: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -674,6 +677,21 @@ export interface Database {
       };
       mark_no_show: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
       check_cleaning_alerts: { Args: Record<string, never>; Returns: void };
+      check_overstays: {
+        Args: {
+          p_alert_after_minutes?: number;
+          p_auto_checkout_after_minutes?: number;
+        };
+        Returns: number;
+      };
+      extend_booking: {
+        Args: {
+          p_booking_id: string;
+          p_new_check_out_date: string;
+          p_user_id: string;
+        };
+        Returns: Booking;
+      };
       suspend_tenant: { Args: { p_tenant_id: string; p_reason: string }; Returns: Tenant };
       reactivate_tenant: { Args: { p_tenant_id: string }; Returns: Tenant };
       request_mid_stay_cleaning: {

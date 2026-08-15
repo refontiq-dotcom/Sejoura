@@ -32,6 +32,7 @@ import {
   getRoomStatusLabel,
   getRoomStatusChartColor,
   canAccessPlanFeature,
+  isBookingOverdue,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -630,6 +631,7 @@ export default function DashboardPage() {
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
+  const [overstayCount, setOverstayCount] = useState(0);
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
 
@@ -667,6 +669,20 @@ export default function DashboardPage() {
         const now = new Date();
         const today = toLocalISODate(now);
         const targetDate = date || today;
+
+        // Détection intelligente des dépassements de séjour (alerte + auto
+        // check-out après délai de grâce). Exécutée régulièrement ici (30 s)
+        // et couverte par le cron pg_cron.
+        (async () => {
+          try {
+            await supabase.rpc("check_overstays", {
+              p_alert_after_minutes: 0,
+              p_auto_checkout_after_minutes: 120,
+            });
+          } catch {
+            // Silencieux : l'échec ne doit pas bloquer l'affichage
+          }
+        })();
 
         // Fenêtre de 12 mois glissants pour le graphique des recettes
         const twelveMonthsAgo = toLocalISODate(new Date(now.getFullYear(), now.getMonth() - 11, 1));
@@ -791,6 +807,14 @@ export default function DashboardPage() {
           cleaningPending,
           cleaningDone,
         });
+
+        // Nombre de séjours en dépassement (client encore en chambre après le
+        // départ prévu) : affiché en bannière d'alerte sur le dashboard.
+        setOverstayCount(
+          bookings.filter(
+            (b) => b.status === "checked_in" && (b.is_overstay || isBookingOverdue(b))
+          ).length
+        );
 
         // Une réservation arrivant ET repartant le jour cible génère deux mouvements distincts
         const movements: Movement[] = targetBookings.flatMap((b) => {
@@ -1090,6 +1114,31 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* 0b. ALERTE DÉPASSEMENT DE SÉJOUR */}
+      {overstayCount > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 animate-fade-in">
+          <div className="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+              {overstayCount} séjour{overstayCount > 1 ? "s" : ""} en dépassement
+            </p>
+            <p className="text-xs text-red-600/80 dark:text-red-400/80 truncate">
+              Client{overstayCount > 1 ? "s" : ""} encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
+            onClick={() => router.push("/dashboard/bookings?status=overdue")}
+          >
+            Voir les réservations
+          </Button>
+        </div>
+      )}
 
       {/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
       {isReceptionniste ? (

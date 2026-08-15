@@ -14,6 +14,9 @@ import {
   getBookingStatusColor,
   getPaymentStatusLabel,
   getPaymentStatusColor,
+  getOverstayLabel,
+  getOverstayColor,
+  isBookingOverdue,
   MOBILE_MONEY_OPERATORS,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
@@ -62,7 +65,16 @@ export default function BookingsPage() {
   const [cleaningModalOpen, setCleaningModalOpen] = useState(false);
   const [cleaningBookingId, setCleaningBookingId] = useState<string>("");
   const [cleaningLoading, setCleaningLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  // Prolongation de séjour (dépassement de la date de départ)
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [extendBooking, setExtendBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [extendDate, setExtendDate] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("status=overdue")) {
+      return "overdue";
+    }
+    return "all";
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -157,8 +169,10 @@ export default function BookingsPage() {
 
   // Ouvre automatiquement la modal de nouvelle réservation si ?new=1 est dans l'URL
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("new=1") && !loading) {
-      openAddModal();
+    if (typeof window !== "undefined" && !loading) {
+      if (window.location.search.includes("new=1")) {
+        openAddModal();
+      }
       // Nettoyer l'URL pour éviter de rouvrir la modal au refresh
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -206,6 +220,7 @@ export default function BookingsPage() {
       }
 
       accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined;
+      await runOverstayCheck();
       await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
       await loadInvoices(userData.tenant_id);
     } catch (err) {
@@ -248,6 +263,21 @@ export default function BookingsPage() {
     } catch (err) {
       toast.error("Impossible de charger les réservations.");
       console.error(err);
+    }
+  }
+
+  // Détection intelligente des dépassements de séjour : appelle la fonction RPC
+  // (alerte puis auto check-out après délai de grâce). Le cron pg_cron couvre
+  // déjà ce besoin ; cet appel garantit aussi la détection au chargement.
+  async function runOverstayCheck() {
+    try {
+      const supabase = createClient();
+      await supabase.rpc("check_overstays", {
+        p_alert_after_minutes: 0,
+        p_auto_checkout_after_minutes: 120,
+      });
+    } catch {
+      // Silencieux : l'échec ne doit pas bloquer l'affichage
     }
   }
 
@@ -572,6 +602,7 @@ export default function BookingsPage() {
       }
 
       setModalOpen(false);
+      await runOverstayCheck();
       loadBookings(tenantId);
     } catch {
       setError("Une erreur est survenue lors de la création de la réservation.");
@@ -614,6 +645,54 @@ export default function BookingsPage() {
       return;
     }
     await executeAction(bookingId, action);
+  }
+
+  // Ouvre la modal de prolongation d'un séjour en cours (dépassement de date)
+  function openExtendModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    const tomorrow = new Date(booking.check_out_date);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setExtendDate(tomorrow.toISOString().split("T")[0]);
+    setExtendBooking(booking);
+    setExtendModalOpen(true);
+  }
+
+  // Prolonge le séjour : nouvelle date de départ, recalcul du montant total dû.
+  async function handleExtendBooking() {
+    if (!extendBooking || !extendDate) return;
+    const nights = calculateNights(extendBooking.check_in_date, extendDate);
+    if (nights <= 0) {
+      toast.error("La nouvelle date de départ doit être après la date d'arrivée.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("extend_booking", {
+        p_booking_id: extendBooking.id,
+        p_new_check_out_date: extendDate,
+        p_user_id: userId,
+      });
+      if (error) {
+        if (error.message.includes("DOUBLE_BOOKING")) {
+          toast.error("La chambre est déjà réservée sur la période prolongée.");
+        } else if (error.message.includes("INVALID_CHECK_OUT")) {
+          toast.error("La date de départ doit être après la date d'arrivée.");
+        } else {
+          toast.error("Erreur lors de la prolongation : " + error.message);
+        }
+        return;
+      }
+      toast.success(`Séjour prolongé jusqu'au ${formatDate(extendDate)} ✓`);
+      setExtendModalOpen(false);
+      setExtendBooking(null);
+      await runOverstayCheck();
+      loadBookings(tenantId);
+    } catch (err) {
+      toast.error("Une erreur est survenue lors de la prolongation.");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Action principale (check-in / check-out) avec garde anti double-clic :
@@ -665,6 +744,7 @@ export default function BookingsPage() {
 
        toast.success("Action effectuée avec succès ✓");
        setConfirmAction(null);
+       await runOverstayCheck();
        loadBookings(tenantId);
      } catch (err) {
        toast.error("Une erreur est survenue lors de l'action.");
@@ -700,7 +780,12 @@ export default function BookingsPage() {
   }
 
   const filteredBookings = bookings.filter((b) => {
-    if (filterStatus !== "all" && b.status !== filterStatus) return false;
+    if (filterStatus === "overdue") {
+      if (b.status !== "checked_in") return false;
+      if (!(b.is_overstay || isBookingOverdue(b))) return false;
+    } else if (filterStatus !== "all" && b.status !== filterStatus) {
+      return false;
+    }
     if (startDate && b.check_in_date < startDate) return false;
     if (endDate && b.check_out_date > endDate) return false;
     if (searchQuery) {
@@ -809,6 +894,7 @@ export default function BookingsPage() {
           className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
         >
           <option value="all">Tous les statuts</option>
+          <option value="overdue">Dépassement de séjour</option>
           <option value="confirmed">Confirmée</option>
           <option value="checked_in">Arrivé</option>
           <option value="checked_out">Parti</option>
@@ -913,8 +999,10 @@ export default function BookingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                {paginatedBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                {paginatedBookings.map((b) => {
+                  const overdue = b.status === "checked_in" && (b.is_overstay || isBookingOverdue(b));
+                  return (
+                  <tr key={b.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${overdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
                     <td className="p-3">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{b.booking_code}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}</p>
@@ -939,15 +1027,27 @@ export default function BookingsPage() {
                     <td className="p-3">
                       <p className="text-sm text-slate-700 dark:text-slate-300">{formatDate(b.check_in_date)}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">→ {formatDate(b.check_out_date)}</p>
+                      {overdue && (
+                        <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
+                          Départ prévu dépassé
+                        </p>
+                      )}
                     </td>
                     <td className="p-3">
                       <p className="text-sm font-bold text-slate-900 dark:text-white">{fmt(b.total_amount)}</p>
                       <span className={`text-xs ${getPaymentStatusColor(b.payment_status)}`}>{getPaymentStatusLabel(b.payment_status)}</span>
                     </td>
                     <td className="p-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
-                        {getBookingStatusLabel(b.status)}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
+                          {getBookingStatusLabel(b.status)}
+                        </span>
+                        {overdue && (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOverstayColor()}`}>
+                            {getOverstayLabel()}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       {b.status === "cancelled" || b.status === "no_show" ? (
@@ -996,6 +1096,11 @@ export default function BookingsPage() {
                                 <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
                               </DropdownMenuItem>
                             )}
+                            {b.status === "checked_in" && (
+                              <DropdownMenuItem onSelect={() => openExtendModal(b)}>
+                                <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
+                              </DropdownMenuItem>
+                            )}
                             {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
                               <>
                                 <DropdownMenuSeparator />
@@ -1031,7 +1136,8 @@ export default function BookingsPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                );
+                })}
               </tbody>
             </table>
           </div>
@@ -1401,6 +1507,41 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setCleaningModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={confirmMidStayCleaning} loading={cleaningLoading}>
               <Sparkles className="w-4 h-4" /> Confirmer la demande
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Prolonger le séjour (dépassement de la date de départ) */}
+      <Modal
+        open={extendModalOpen}
+        onClose={() => setExtendModalOpen(false)}
+        title="Prolonger le séjour"
+        description={extendBooking ? `${extendBooking.client?.full_name || "Client"} · Ch. ${extendBooking.room?.room_number || "—"} · départ actuel le ${formatDate(extendBooking.check_out_date)}` : ""}
+      >
+        <div className="space-y-3">
+          {extendBooking && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p className="text-sm">
+                Le montant total sera recalculé sur {calculateNights(extendBooking.check_in_date, extendDate)} nuit(s) à{" "}
+                {fmt(extendBooking.negotiated_price)}/nuit. Le statut de paiement sera mis à jour automatiquement.
+              </p>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Nouvelle date de départ</label>
+            <Input
+              type="date"
+              value={extendDate}
+              min={extendBooking ? new Date(extendBooking.check_in_date).toISOString().split("T")[0] : undefined}
+              onChange={(e) => setExtendDate(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setExtendModalOpen(false)}>Annuler</Button>
+            <Button className="flex-1" onClick={handleExtendBooking} loading={saving}>
+              <Calendar className="w-4 h-4" /> Prolonger le séjour
             </Button>
           </div>
         </div>

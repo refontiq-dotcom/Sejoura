@@ -358,6 +358,35 @@ export function getBookingStatusColor(status: string): string {
 }
 
 /**
+ * Libellé d'un dépassement de séjour
+ */
+export function getOverstayLabel(): string {
+  return "Dépassement";
+}
+
+/**
+ * Couleurs Tailwind du badge « Dépassement de séjour »
+ */
+export function getOverstayColor(): string {
+  return "bg-red-600 text-white dark:bg-red-500 dark:text-white";
+}
+
+/**
+ * Détermine si une réservation arrivée a dépassé son heure de départ prévue.
+ * Calcul côté client (temps réel, indépendant du cron) ; la base de données
+ * reste la source d'autorité via la colonne is_overstay.
+ */
+export function isBookingOverdue(booking: {
+  status: string;
+  check_out_date: string;
+  check_out_time?: string;
+}): boolean {
+  if (booking.status !== "checked_in") return false;
+  const checkout = new Date(`${booking.check_out_date}T${(booking.check_out_time || "11:00").substring(0, 5)}:00`);
+  return !isNaN(checkout.getTime()) && checkout.getTime() < Date.now();
+}
+
+/**
  * Retourne les couleurs Tailwind pour un statut de paiement
  */
 export function getPaymentStatusColor(status: string): string {
