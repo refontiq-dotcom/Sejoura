@@ -408,17 +408,18 @@ export function getPlanPrice(plan: string): number {
  */
 export function getPlanLimits(plan: string): {
   maxAccommodations: number | null;
-  maxAdmins: number;
-  maxReceptionnists: number;
+  maxAdmins: number | null;
+  maxReceptionnists: number | null;
   hasCleaningModule: boolean;
   hasAdvancedStats: boolean;
   hasMultiResidences: boolean;
 } {
   const limits = getNormalizedPlanLimits(plan);
+  // maxUsers = null signifie « illimité » (plan Entreprise) : on le préserve.
   return {
     maxAccommodations: limits.maxAccommodations,
-    maxAdmins: limits.maxUsers ?? 2,
-    maxReceptionnists: limits.maxUsers ?? 2,
+    maxAdmins: limits.maxUsers,
+    maxReceptionnists: limits.maxUsers,
     hasCleaningModule: limits.hasAdvancedAccounting || limits.hasExternalApi,
     hasAdvancedStats: limits.hasAdvancedAccounting,
     hasMultiResidences: limits.maxAccommodations === null,

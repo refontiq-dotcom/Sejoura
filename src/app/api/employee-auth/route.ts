@@ -51,10 +51,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Un employé désactivé (révocation par l'employeur) ne doit jamais être
+    // réactivé automatiquement par le rattachement de session.
+    if (!matchedUser.is_active) {
+      return NextResponse.json(
+        { error: "Votre accès a été révoqué par l'employeur." },
+        { status: 403 }
+      );
+    }
+
     // Mise à jour sécurisée via la clé service_role (Admin Client)
     const updateData: Record<string, unknown> = {
       auth_user_id: authUserId,
-      is_active: true,
       activated_at: matchedUser.activated_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

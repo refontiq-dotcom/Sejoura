@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { getRoleLabel, getPlanLimits, formatDate } from "@/lib/utils";
-import { Users, Loader2, Phone, Trash2, CheckCircle2, Clock, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History } from "lucide-react";
+import { getRoleLabel, getPlanLimits, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
+import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History } from "lucide-react";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
 
 // Map userId → affectation temporaire active (si elle existe)
@@ -40,6 +40,9 @@ export default function EmployeesPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<User | null>(null);
   const [historyData, setHistoryData] = useState<(EmployeeAssignment & { accommodation?: Accommodation })[]>([]);
+  // Suppression
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -61,25 +64,32 @@ export default function EmployeesPage() {
       setTenantId(userData.tenant_id);
       setCurrentAdminId(userData.id);
 
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
+      // Whitelist de colonnes : password_hash / auth_user_id / pin_code ne doivent
+      // jamais quitter le serveur. Les requêtes sont parallélisées.
+      const [subData, accData, empData] = await Promise.all([
+        supabase
+          .from("subscriptions")
+          .select("plan")
+          .eq("tenant_id", userData.tenant_id)
+          .maybeSingle()
+          .then((r) => r.data),
+        supabase
+          .from("accommodations")
+          .select("id, name, city, tenant_id")
+          .eq("tenant_id", userData.tenant_id)
+          .order("name")
+          .then((r) => r.data),
+        supabase
+          .from("users")
+          .select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active, created_at")
+          .eq("tenant_id", userData.tenant_id)
+          .order("created_at", { ascending: false })
+          .then((r) => r.data),
+      ]);
 
-      const { data: accData } = await supabase
-        .from("accommodations")
-        .select("id, name, city, tenant_id")
-        .eq("tenant_id", userData.tenant_id)
-        .order("name");
+      if (subData) setPlan(subData.plan);
       if (accData) setAccommodations(accData as unknown as Accommodation[]);
 
-      const { data: empData } = await supabase
-        .from("users")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id)
-        .order("created_at", { ascending: false });
       if (empData) {
         const emps = empData as unknown as User[];
         setEmployees(emps);
@@ -124,34 +134,56 @@ export default function EmployeesPage() {
   }
 
   async function handleSave() {
-    if (!formData.full_name || !formData.phone) {
+    const name = formData.full_name.trim();
+    const phone = normalizePhone(formData.phone.trim());
+    if (!name || !phone) {
       toast.error("Veuillez renseigner le nom et le numéro de téléphone.");
+      return;
+    }
+    if (!isValidPhone(formData.phone.trim())) {
+      toast.error("Numéro de téléphone invalide. Utilisez un format international ou local (ex : +225 07 00 00 00 00).");
+      return;
+    }
+    if (formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error("Adresse email invalide.");
       return;
     }
     if (!formData.accommodation_id) {
       toast.error("Veuillez sélectionner l'établissement de rattachement de l'employé.");
       return;
     }
+    // Détection de doublon de téléphone (même logique de correspondance que le login employé)
+    const phoneDigits = phone.replace(/[^0-9]/g, "");
+    const duplicate = employees.some((emp) => {
+      if (!emp.phone) return false;
+      const empDigits = emp.phone.replace(/[^0-9]/g, "");
+      return empDigits === phoneDigits || empDigits.endsWith(phoneDigits) || phoneDigits.endsWith(empDigits);
+    });
+    if (duplicate) {
+      toast.error("Un employé est déjà enregistré avec ce numéro de téléphone.");
+      return;
+    }
     setLoading(true);
     try {
       const supabase = createClient();
-      await supabase.from("users").insert({
+      const { error } = await supabase.from("users").insert({
         tenant_id: tenantId,
         accommodation_id: formData.accommodation_id,
         role: formData.role,
-        full_name: formData.full_name,
-        phone: formData.phone,
-        email: formData.email || null,
+        full_name: name,
+        phone,
+        email: formData.email?.trim() || null,
         is_active: true, // Employé autorisé à se connecter et définir son code
         first_login: true,
       });
+      if (error) throw error;
 
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(formData.phone)}`;
-      
+      const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(phone)}`;
+
       setInviteData({
-        full_name: formData.full_name,
-        phone: formData.phone,
+        full_name: name,
+        phone,
         role: formData.role,
         link: generatedLink,
       });
@@ -169,9 +201,13 @@ export default function EmployeesPage() {
   }
 
   function copyInviteLink(link: string) {
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    toast.success("Lien d'invitation copié dans le presse-papier !");
+    try {
+      navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success("Lien d'invitation copié dans le presse-papier !");
+    } catch {
+      toast.error("Impossible de copier le lien. Sélectionnez-le manuellement.");
+    }
     setTimeout(() => setCopied(false), 3000);
   }
 
@@ -199,16 +235,38 @@ export default function EmployeesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Supprimer cet employé ? L'accès lui sera immédiatement révoqué.")) return;
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
     try {
       const supabase = createClient();
-      await supabase.from("users").delete().eq("id", id);
-      toast.success("Employé supprimé avec succès.");
+      const { error } = await supabase.from("users").delete().eq("id", deleteTarget.id);
+
+      if (error) {
+        // L'employé possède un historique (réservations, encaissements, dépenses…) :
+        // la suppression est bloquée par les clés étrangères NOT NULL. On révoque
+        // l'accès à la place (is_active=false), sans perdre la traçabilité.
+        const { error: deactivateError } = await supabase
+          .from("users")
+          .update({ is_active: false })
+          .eq("id", deleteTarget.id);
+
+        if (deactivateError) throw deactivateError;
+
+        toast.warning(
+          `Impossible de supprimer ${deleteTarget.full_name} (activité enregistrée). Son accès a été révoqué à la place.`
+        );
+      } else {
+        toast.success("Employé supprimé avec succès.");
+      }
+
+      setDeleteTarget(null);
       loadData();
     } catch (err) {
       toast.error("Impossible de supprimer.");
       console.error(err);
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -231,6 +289,14 @@ export default function EmployeesPage() {
     if (reassignForm.end_date && reassignForm.end_date < reassignForm.start_date) {
       toast.error("La date de fin doit être postérieure à la date de début.");
       return;
+    }
+    if (reassignForm.accommodation_id === reassignTarget.accommodation_id) {
+      toast.error(`${reassignTarget.full_name} est déjà affecté à cet établissement.`);
+      return;
+    }
+    const activeTemp = tempAssignments[reassignTarget.id];
+    if (activeTemp && activeTemp.end_date) {
+      toast.warning(`${reassignTarget.full_name} est actuellement en affectation temporaire. La nouvelle affectation prendra le relais à partir du ${formatDate(reassignForm.start_date)}.`);
     }
     setReassignLoading(true);
     try {
@@ -299,6 +365,7 @@ export default function EmployeesPage() {
   const adminCount = employees.filter((e) => e.role === "admin_residence").length;
   const recepCount = employees.filter((e) => e.role === "receptionniste").length;
   const menagereCount = employees.filter((e) => e.role === "menagere").length;
+  const formatLimit = (limit: number | null) => (limit === null ? "∞" : String(limit));
 
   const filteredEmployees = employees.filter((emp) => {
     if (filterRole !== "all" && emp.role !== filterRole) return false;
@@ -313,6 +380,14 @@ export default function EmployeesPage() {
     }
     return true;
   });
+
+  const hasActiveFilters = searchQuery !== "" || filterRole !== "all" || filterAcc !== "all";
+
+  function resetFilters() {
+    setSearchQuery("");
+    setFilterRole("all");
+    setFilterAcc("all");
+  }
 
   if (loading && employees.length === 0) {
     return (
@@ -340,12 +415,12 @@ export default function EmployeesPage() {
       </div>
 
       {/* Limites du plan */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Admins</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">{adminCount} / {limits.maxAdmins === 999 ? "∞" : limits.maxAdmins}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{adminCount} / {formatLimit(limits.maxAdmins)}</p>
             </div>
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
@@ -354,7 +429,7 @@ export default function EmployeesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Réceptionnistes</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">{recepCount} / {limits.maxReceptionnists === 999 ? "∞" : limits.maxReceptionnists}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">{recepCount} / {formatLimit(limits.maxReceptionnists)}</p>
             </div>
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
@@ -363,7 +438,10 @@ export default function EmployeesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Ménagères</p>
-               <p className="text-xl font-bold text-slate-900 dark:text-white">{menagereCount}{limits.hasCleaningModule ? ` / ${limits.maxReceptionnists === 999 ? "∞" : limits.maxReceptionnists}` : ""}</p>
+              <p className="text-xl font-bold text-slate-900 dark:text-white">
+                {menagereCount}
+                {limits.hasCleaningModule ? ` / ${formatLimit(limits.maxReceptionnists)}` : ""}
+              </p>
             </div>
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
@@ -407,12 +485,25 @@ export default function EmployeesPage() {
       {/* Liste */}
       {filteredEmployees.length === 0 ? (
         <Card className="p-12 text-center">
-          <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun employé</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ajoutez votre premier employé</p>
-          <Button onClick={() => setModalOpen(true)}>
-            <UserPlus className="w-4 h-4" /> Ajouter
-          </Button>
+          {hasActiveFilters ? (
+            <>
+              <Search className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun employé trouvé</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Aucun employé ne correspond à vos critères de recherche.</p>
+              <Button variant="outline" onClick={resetFilters}>
+                Réinitialiser les filtres
+              </Button>
+            </>
+          ) : (
+            <>
+              <Users className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Aucun employé</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ajoutez votre premier employé</p>
+              <Button onClick={() => setModalOpen(true)}>
+                <UserPlus className="w-4 h-4" /> Ajouter
+              </Button>
+            </>
+          )}
         </Card>
       ) : (
         <Card className="overflow-hidden border-t-4 border-t-[var(--primary-color,#0C1C33)]">
@@ -440,7 +531,7 @@ export default function EmployeesPage() {
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold">
-                            {emp.full_name.charAt(0)}
+                            {getInitials(emp.full_name)}
                           </div>
                           <div>
                             <p className="text-sm font-medium text-slate-900 dark:text-white">{emp.full_name}</p>
@@ -493,6 +584,7 @@ export default function EmployeesPage() {
                             onClick={() => openReassign(emp)}
                             className="p-2 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                             title="Changer d'établissement / Réaffecter"
+                            aria-label={`Réaffecter ${emp.full_name}`}
                           >
                             <ArrowLeftRight className="w-4 h-4" />
                           </button>
@@ -500,6 +592,7 @@ export default function EmployeesPage() {
                             onClick={() => openHistory(emp)}
                             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             title="Historique des affectations"
+                            aria-label={`Historique des affectations de ${emp.full_name}`}
                           >
                             <History className="w-4 h-4" />
                           </button>
@@ -517,6 +610,7 @@ export default function EmployeesPage() {
                             }}
                             className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                             title="Partager le lien d'accès"
+                            aria-label={`Partager le lien d'accès de ${emp.full_name}`}
                           >
                             <Share2 className="w-4 h-4" />
                           </button>
@@ -530,10 +624,16 @@ export default function EmployeesPage() {
                                     : "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                                 }`}
                                 title={emp.is_active ? "Révoquer l'accès" : "Réactiver l'accès"}
+                                aria-label={emp.is_active ? `Révoquer l'accès de ${emp.full_name}` : `Réactiver l'accès de ${emp.full_name}`}
                               >
                                 {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                               </button>
-                              <button onClick={() => handleDelete(emp.id)} className="p-2 rounded-lg text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors" title="Supprimer l'employé">
+                              <button
+                                onClick={() => setDeleteTarget(emp)}
+                                className="p-2 rounded-lg text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                title="Supprimer l'employé"
+                                aria-label={`Supprimer ${emp.full_name}`}
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
@@ -713,6 +813,33 @@ export default function EmployeesPage() {
             <Button variant="outline" className="w-full mt-2" onClick={() => setHistoryModalOpen(false)}>
               Fermer
             </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal de confirmation de suppression */}
+      {deleteTarget && (
+        <Modal
+          open={deleteTarget !== null}
+          onClose={() => setDeleteTarget(null)}
+          title="Supprimer l'employé"
+          description={`L'accès de ${deleteTarget.full_name} sera immédiatement révoqué.`}
+        >
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <Ban className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 dark:text-red-300">
+                Si cet employé possède un historique (réservations, encaissements, dépenses…), une suppression définitive est impossible : son accès sera révoqué à la place. L’historique des affectations n’est supprimé qu’en cas de suppression définitive.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+                Annuler
+              </Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleDelete} loading={deleteLoading}>
+                Supprimer
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
