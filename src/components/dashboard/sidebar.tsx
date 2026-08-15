@@ -177,6 +177,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => onCloseMobile?.()}
               style={{
                 backgroundColor: isActive ? "var(--main-bg)" : "transparent",
                 color: isActive ? themeStyles.activeTextColor : themeStyles.textColor,
@@ -218,6 +219,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
         {/* Paramètres Link */}
         <Link
           href="/dashboard/settings"
+          onClick={() => onCloseMobile?.()}
           style={{
             backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? "var(--main-bg)" : "transparent",
             color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,

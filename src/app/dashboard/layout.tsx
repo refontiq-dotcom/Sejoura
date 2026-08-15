@@ -455,7 +455,14 @@ export default function DashboardLayout({
         themeColor={themeColor}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onCloseMobile={() => setSidebarCollapsed(true)}
+        onCloseMobile={() => {
+          // Ne ferme le tiroir que sur mobile (< 1024px) : sur desktop la
+          // sidebar reste toujours visible (pliée ou dépliée), le clic sur
+          // un lien ne doit pas modifier son état.
+          if (typeof window !== "undefined" && window.innerWidth < 1024) {
+            setSidebarCollapsed(true);
+          }
+        }}
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
