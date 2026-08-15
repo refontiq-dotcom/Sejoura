@@ -26,6 +26,7 @@ interface HeaderProps {
   companyName?: string;
   plan?: string;
   monthlyPrice?: number;
+  scrolled?: boolean;
 }
 
 interface NotificationItem {
@@ -187,7 +188,7 @@ function ResidenceSwitcher() {
   );
 }
 
-export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan }: HeaderProps) {
+export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useLanguage();
   const t = translations[lang].header;
@@ -364,7 +365,13 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md border-b border-[var(--border)]">
+      <header
+        className={`border-b border-[var(--border)] transition-shadow duration-300 ${
+          scrolled
+            ? "bg-[var(--main-bg,var(--background))] shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+            : "bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md"
+        }`}
+      >
       <div className="flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-4">
           {onMenuClick && (

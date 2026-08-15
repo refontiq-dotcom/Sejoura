@@ -62,7 +62,7 @@ export function Breadcrumbs() {
   };
 
   return (
-    <nav className="flex items-center text-sm text-[var(--muted-foreground)] py-2.5 px-6 bg-[var(--main-bg,var(--background))]/80 border-b border-[var(--border)] backdrop-blur-sm sticky top-[73px] z-20" aria-label={t.ariaLabel}>
+    <nav className="flex items-center text-sm text-[var(--muted-foreground)] py-2.5 px-6 bg-[var(--main-bg,var(--background))] border-b border-[var(--border)]" aria-label={t.ariaLabel}>
       <ol className="flex items-center space-x-2">
         <li>
           <Link href="/dashboard" className="hover:text-[var(--primary-color,#0C1C33)] transition-colors flex items-center">

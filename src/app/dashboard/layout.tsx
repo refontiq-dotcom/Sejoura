@@ -42,6 +42,8 @@ export default function DashboardLayout({
   const [plan, setPlan] = useState("standard");
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -73,6 +75,29 @@ export default function DashboardLayout({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // En-tête "intelligent" :
+  // - Une ombre discrète + fond opaque apparaissent dès que la page est scrollée.
+  // - Sur mobile (< 1024px), l'en-tête glisse hors écran en scrollant vers le bas
+  //   pour libérer tout l'espace, et réapparaît dès qu'on remonte. On ne le
+  //   masque jamais quand le tiroir de navigation est ouvert.
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      setHeaderScrolled(y > 12);
+      const isMobile = window.innerWidth < 1024;
+      const drawerOpen = isMobile && !sidebarCollapsed;
+      if (isMobile && y > 160 && y > lastY && !drawerOpen) {
+        setHeaderHidden(true);
+      } else if (y < lastY || drawerOpen) {
+        setHeaderHidden(false);
+      }
+      lastY = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [sidebarCollapsed]);
 
   // Écouter la mise à jour du logo et de la couleur de thème depuis les Paramètres en temps réel
   useEffect(() => {
@@ -466,20 +491,27 @@ export default function DashboardLayout({
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
-        <Header
-          title={headerMeta.title}
-          subtitle={headerMeta.subtitle}
-          onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          userName={user.full_name}
-          userRole={user.role}
-          userEmail={user.email}
-          avatarUrl={user.avatar_url}
-          lastLogin={user.last_login_at}
-          companyName={companyName}
-          plan={plan}
-          monthlyPrice={monthlyPrice}
-        />
-        <Breadcrumbs />
+        <div
+          className={`sticky top-0 z-30 transition-transform duration-300 will-change-transform ${
+            headerHidden ? "-translate-y-full" : "translate-y-0"
+          }`}
+        >
+          <Header
+            title={headerMeta.title}
+            subtitle={headerMeta.subtitle}
+            onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            userName={user.full_name}
+            userRole={user.role}
+            userEmail={user.email}
+            avatarUrl={user.avatar_url}
+            lastLogin={user.last_login_at}
+            companyName={companyName}
+            plan={plan}
+            monthlyPrice={monthlyPrice}
+            scrolled={headerScrolled}
+          />
+          <Breadcrumbs />
+        </div>
         <main 
           style={{ backgroundColor: mainBg }} 
           className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
