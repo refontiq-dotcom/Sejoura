@@ -126,6 +126,7 @@ export default function EmployeePinLogin({
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isEnrollingBiometrics, setIsEnrollingBiometrics] = useState(false);
   const [showEnrollPrompt, setShowEnrollPrompt] = useState(false);
+  const shakeTimerRef = useRef<number | null>(null);
 
   // ── Couleurs dynamiques (style Wave) ────────────────────────────────────────
   const accent = accentColor || "#0C1C33";
@@ -162,7 +163,8 @@ export default function EmployeePinLogin({
   const triggerShake = useCallback((error?: string) => {
     if (error) setPinError(error);
     setShaking(true);
-    window.setTimeout(() => setShaking(false), 550);
+    if (shakeTimerRef.current) window.clearTimeout(shakeTimerRef.current);
+    shakeTimerRef.current = window.setTimeout(() => setShaking(false), 550);
   }, []);
 
   // ── Soumission finale (after-auth) ──────────────────────────────────────────
@@ -344,13 +346,17 @@ export default function EmployeePinLogin({
   }, [employee.userId, mode]);
 
   // ── Auto-prompt biométrique (mobile uniquement) ─────────────────────────────
+  // Annulé dès que l'employé commence à saisir son code PIN.
   useEffect(() => {
     if (!isMobile || mode !== "verify" || !isBiometricSupported || !biometricRegistered) return;
-    if (submittedRef.current) return;
-    setBiometricPromptVisible(true);
-    const timer = window.setTimeout(() => attemptBiometricLoginRef.current(), 700);
+    if (submittedRef.current || isAuthenticating) return;
+    if (pin.length > 0) return;
+    const timer = window.setTimeout(() => {
+      setBiometricPromptVisible(true);
+      attemptBiometricLoginRef.current();
+    }, 700);
     return () => window.clearTimeout(timer);
-  }, [isMobile, mode, isBiometricSupported, biometricRegistered]);
+  }, [isMobile, mode, isBiometricSupported, biometricRegistered, pin, isAuthenticating]);
 
   // ── Clavier physique (desktop >= 768px) ─────────────────────────────────────
   useEffect(() => {
@@ -372,6 +378,13 @@ export default function EmployeePinLogin({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onBack, pressDigit, pressBackspace]);
+
+  // ── Nettoyage du timer de shake au démontage ────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (shakeTimerRef.current) window.clearTimeout(shakeTimerRef.current);
+    };
+  }, []);
 
   // ── Focus automatique (desktop) ─────────────────────────────────────────────
   const focusTargetRef = useRef<HTMLDivElement>(null);
@@ -475,7 +488,6 @@ export default function EmployeePinLogin({
       <div
         ref={focusTargetRef}
         tabIndex={-1}
-        aria-hidden
         className="absolute w-px h-px opacity-0 pointer-events-none"
       />
 
@@ -590,9 +602,27 @@ export default function EmployeePinLogin({
 
         {/* Indice clavier physique (desktop) */}
         {!isMobile && (
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
-            <CornerDownLeft className="w-3.5 h-3.5" />
-            <span>Tapez votre code directement sur le clavier</span>
+          <div className="mt-4 flex flex-col items-center gap-3">
+            {canUseBiometrics && (
+              <button
+                onClick={() => attemptBiometricLoginRef.current()}
+                disabled={isAuthenticating || submitting}
+                className="h-11 px-5 rounded-2xl flex items-center gap-2 text-sm font-bold text-white active:scale-95 disabled:opacity-60 transition-all shadow-lg"
+                style={{ backgroundColor: isDark ? accentOnDark : accent }}
+                aria-label="Se connecter avec Face ID ou empreinte"
+              >
+                {isAuthenticating ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <FingerprintPattern className="w-5 h-5" />
+                )}
+                {isAuthenticating ? "Reconnaissance en cours…" : "Face ID / Empreinte"}
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500">
+              <CornerDownLeft className="w-3.5 h-3.5" />
+              <span>Tapez votre code directement sur le clavier</span>
+            </div>
           </div>
         )}
 
