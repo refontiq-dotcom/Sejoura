@@ -78,23 +78,41 @@ export async function POST(request: Request) {
     let publishedCount = 0;
 
     // ─── 4. Appliquer la synchronisation type → fiche publique ──────────────
+    // L'interrupteur du type pilote la visibilité (is_published). Le contenu
+    // personnalisé de la fiche (photos, badges, titre, description, WhatsApp)
+    // modifié depuis la page « Vitrine Trouvetou » est préservé : on n'écrase
+    // les photos/badges que lors de la CRÉATION d'une fiche (premiers défauts).
     for (const room of rooms || []) {
       if (isListed) {
-        // Upsert idempotent : crée la fiche si absente, sinon la met à jour.
-        const { error: upsertError } = await admin
+        const { data: existing } = await admin
           .from("trouvetou_listings")
-          .upsert(
-            {
+          .select("id")
+          .eq("unit_id", room.id)
+          .maybeSingle();
+
+        if (existing) {
+          // Fiche déjà personnalisée : on ne touche qu'à la publication.
+          const { error: updateError } = await admin
+            .from("trouvetou_listings")
+            .update({ is_published: true })
+            .eq("unit_id", room.id);
+          if (updateError) {
+            return NextResponse.json({ error: updateError.message }, { status: 500 });
+          }
+        } else {
+          // Première fiche : on initialise avec les photos/équipements du type.
+          const { error: insertError } = await admin
+            .from("trouvetou_listings")
+            .insert({
               unit_id: room.id,
               establishment_id: roomType.accommodation_id,
               is_published: true,
               featured_images: images,
               amenities_badges: badges,
-            },
-            { onConflict: "unit_id" }
-          );
-        if (upsertError) {
-          return NextResponse.json({ error: upsertError.message }, { status: 500 });
+            });
+          if (insertError) {
+            return NextResponse.json({ error: insertError.message }, { status: 500 });
+          }
         }
         publishedCount++;
       } else {

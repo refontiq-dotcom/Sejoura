@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import Link from "next/link";
 import {
   Store,
   Sparkles,
@@ -123,6 +124,15 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
   const { fmt } = useCurrency();
   const selectedOption = EXPRESS_BOOST_OPTIONS.find((o) => o.days === selectedDays)!;
 
+  // Fermeture avec la touche Échap
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   async function handleActivate() {
     setLoading(true);
     try {
@@ -151,7 +161,12 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Activer le Boost Express"
+    >
       <div className="bg-[var(--card-bg,var(--surface))] w-full max-w-lg rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/15 flex items-center justify-between">
@@ -167,6 +182,7 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
           <button
             onClick={onClose}
             className="p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-white transition-colors"
+            aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -267,6 +283,57 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Composant : Badge de statut visibilité (header)
+// Affiché hors rendu pour éviter sa recréation à chaque rendu parent.
+// Reflète l'état RÉEL des boosts (pas seulement le plan).
+// ─────────────────────────────────────────────────────────────────────────────
+interface HeaderVisibilityBadgeProps {
+  isEnterprisePlan: boolean;
+  isEssentielPlan: boolean;
+  anyExpressActive: boolean;
+  anyPermanentBoost: boolean;
+}
+
+function HeaderVisibilityBadge({
+  isEnterprisePlan,
+  isEssentielPlan,
+  anyExpressActive,
+  anyPermanentBoost,
+}: HeaderVisibilityBadgeProps) {
+  if (isEnterprisePlan && anyPermanentBoost) {
+    return (
+      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-400/40 text-amber-200">
+        <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+        <div>
+          <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Statut Visibilité</p>
+          <p className="text-sm font-bold text-white">⭐ Boosté - À la Une</p>
+        </div>
+      </div>
+    );
+  }
+  if (isEssentielPlan && anyExpressActive) {
+    return (
+      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-400/40 text-amber-200">
+        <Zap className="w-5 h-5 text-amber-400 animate-pulse" />
+        <div>
+          <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Statut Visibilité</p>
+          <p className="text-sm font-bold text-white">⚡ Boost Express Actif</p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-slate-200">
+      <Globe className="w-5 h-5 text-blue-400" />
+      <div>
+        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Statut Visibilité</p>
+        <p className="text-sm font-bold text-white">Positionnement Standard</p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page principale
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TrouvetouDashboardPage() {
@@ -299,7 +366,20 @@ export default function TrouvetouDashboardPage() {
   // Toggle Boost Entreprise (par établissement)
   const [boostSavingId, setBoostSavingId] = useState<string | null>(null);
 
+  // État d'erreur de chargement (avec bouton Réessayer)
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => { fetchData(); }, []);
+
+  // Fermeture de la modale de personnalisation avec Échap
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (modalOpen) setModalOpen(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalOpen]);
 
   async function getAccessToken(): Promise<string | null> {
     const supabase = createClient();
@@ -309,10 +389,14 @@ export default function TrouvetouDashboardPage() {
 
   async function fetchData() {
     setLoading(true);
+    setLoadError(null);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        setLoadError("Session expirée. Reconnectez-vous pour accéder à votre vitrine.");
+        return;
+      }
 
       const { data: user } = await supabase
         .from("users")
@@ -320,7 +404,10 @@ export default function TrouvetouDashboardPage() {
         .eq("auth_user_id", session.user.id)
         .single();
 
-      if (!user?.tenant_id) return;
+      if (!user?.tenant_id) {
+        setLoadError("Aucun établissement associé à votre compte.");
+        return;
+      }
       setTenantId(user.tenant_id);
 
       const res = await fetch(`/api/v1/trouvetou/listings?tenantId=${user.tenant_id}`, {
@@ -336,11 +423,11 @@ export default function TrouvetouDashboardPage() {
         setUnits(data.units || []);
         setMetrics(data.metrics || { totalViews: 0, totalWhatsappClicks: 0 });
       } else {
-        toast.error(data.error || "Erreur de chargement de la vitrine Trouvetou");
+        setLoadError(data.error || "Erreur de chargement de la vitrine Trouvetou");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de charger les données");
+      setLoadError("Impossible de charger les données. Vérifiez votre connexion.");
     } finally {
       setLoading(false);
     }
@@ -497,6 +584,21 @@ export default function TrouvetouDashboardPage() {
   }
 
   // ─── Dérivations ─────────────────────────────────────────────────────────────
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center px-4">
+        <AlertCircle className="w-8 h-8 text-red-500" />
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{loadError}</p>
+        <button
+          onClick={fetchData}
+          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
@@ -508,41 +610,7 @@ export default function TrouvetouDashboardPage() {
 
   const publishedCount = units.filter((u) => u.listing?.is_published).length;
   const anyExpressActive = accommodations.some((a) => a.is_express_boost_active);
-
-  // Badge de visibilité dans le header
-  function HeaderVisibilityBadge() {
-    if (isEnterprisePlan) {
-      return (
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-400/40 text-amber-200">
-          <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-          <div>
-            <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Statut Visibilité</p>
-            <p className="text-sm font-bold text-white">⭐ Boosté - À la Une</p>
-          </div>
-        </div>
-      );
-    }
-    if (isEssentielPlan && anyExpressActive) {
-      return (
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-400/40 text-amber-200">
-          <Zap className="w-5 h-5 text-amber-400 animate-pulse" />
-          <div>
-            <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Statut Visibilité</p>
-            <p className="text-sm font-bold text-white">⚡ Boost Express Actif</p>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-slate-200">
-        <Globe className="w-5 h-5 text-blue-400" />
-        <div>
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Statut Visibilité</p>
-          <p className="text-sm font-bold text-white">Positionnement Standard</p>
-        </div>
-      </div>
-    );
-  }
+  const anyPermanentBoost = accommodations.some((a) => a.is_permanently_boosted);
 
   return (
     <div className="space-y-8 pb-12">
@@ -580,7 +648,12 @@ export default function TrouvetouDashboardPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-            <HeaderVisibilityBadge />
+            <HeaderVisibilityBadge
+              isEnterprisePlan={isEnterprisePlan}
+              isEssentielPlan={isEssentielPlan}
+              anyExpressActive={anyExpressActive}
+              anyPermanentBoost={anyPermanentBoost}
+            />
           </div>
         </div>
       </div>
@@ -626,22 +699,25 @@ export default function TrouvetouDashboardPage() {
         </div>
       </div>
 
-      {isEssentielPlan ? (
+      {isEnterprisePlan ? (
+        // ─ Bannière ENTREPRISE : tout est débloqué, aucun upsell ─
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-900/10 p-3 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-base">
+              <Sparkles className="w-5 h-5 text-emerald-600 fill-emerald-500" />
+              <span>Vitrine complète débloquée</span>
+            </div>
+            <p className="text-sm text-emerald-700/90 dark:text-emerald-400 max-w-3xl">
+              Boost Permanent, badge <strong>À la Une</strong>, statistiques avancées
+              (vues + clics WhatsApp) et clés API externes sont inclus dans votre formule ENTREPRISE.
+            </p>
+          </div>
+        </div>
+      ) : isEssentielPlan ? (
         // ─ Bannières ESSENTIEL ─
         <div className="space-y-3">
-          {/* Compteur simple pour ESSENTIEL */}
+          {/* Statut Boost Express */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-              <div className="p-3.5 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]">
-                <Building2 className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Logements Publiés</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">
-                  {publishedCount} / {units.length}
-                </p>
-              </div>
-            </div>
             <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
               <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
                 <Zap className="w-6 h-6" />
@@ -860,6 +936,13 @@ export default function TrouvetouDashboardPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md mx-auto mt-1">
               Ajoutez des chambres et types d&apos;hébergements dans votre section Établissements pour pouvoir les publier sur Trouvetou.
             </p>
+            <Link
+              href="/dashboard/residences"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-sm"
+            >
+              <Building2 className="w-4 h-4" />
+              Accéder aux Établissements
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -885,6 +968,7 @@ export default function TrouvetouDashboardPage() {
                       <img
                         src={images[0]}
                         alt={title}
+                        loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
@@ -1008,7 +1092,12 @@ export default function TrouvetouDashboardPage() {
 
       {/* ── Modal Personnalisation Fiche ──────────────────────────────────────── */}
       {modalOpen && selectedUnit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Personnaliser la fiche Trouvetou"
+        >
             <div className="bg-[var(--card-bg,var(--surface))] w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
               {/* Header */}
               <div className="p-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
@@ -1026,6 +1115,7 @@ export default function TrouvetouDashboardPage() {
               <button
                 onClick={() => setModalOpen(false)}
                 className="p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-white transition-colors"
+                aria-label="Fermer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1131,7 +1221,7 @@ export default function TrouvetouDashboardPage() {
                   <div className="grid grid-cols-3 gap-3 pt-2">
                     {formImages.map((img, idx) => (
                       <div key={idx} className="relative group rounded-xl overflow-hidden h-24 border border-slate-200 dark:border-slate-700">
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
