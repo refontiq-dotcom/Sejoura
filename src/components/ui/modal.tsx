@@ -72,10 +72,14 @@ export function Modal({
       <div
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Modal */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || description || undefined}
         className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-xl)] animate-modal-in max-h-[90vh] flex flex-col`}
       >
         {/* Header */}

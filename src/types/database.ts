@@ -179,6 +179,7 @@ export interface Accommodation {
   boost_express_price_paid?: number | null;
   logo_url?: string | null;
   theme_color?: string | null;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 }

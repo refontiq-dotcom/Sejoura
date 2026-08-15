@@ -19,11 +19,11 @@ export default function ResidenceDetailPage() {
   const residenceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [residence, setResidence] = useState<Accommodation | null>(null);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [plan, setPlan] = useState("");
 
   const [residenceModalOpen, setResidenceModalOpen] = useState(false);
   const [roomModalOpen, setRoomModalOpen] = useState(false);
@@ -40,7 +40,13 @@ export default function ResidenceDetailPage() {
   const [editingType, setEditingType] = useState<RoomType | null>(null);
   const [roomNumberError, setRoomNumberError] = useState("");
 
-  async function loadData() {
+  useEffect(() => {
+    void loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [residenceId]);
+
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -59,13 +65,6 @@ export default function ResidenceDetailPage() {
 
       // Mode lecture seule pour les réceptionnistes
       setIsReadOnly(userData.role === "receptionniste");
-
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
 
       const { data: accData } = await supabase
         .from("accommodations")
@@ -89,30 +88,19 @@ export default function ResidenceDetailPage() {
         longitude: accData.longitude != null ? accData.longitude.toString() : "",
       });
 
-      const { data: typesData } = await supabase
-        .from("room_types")
-        .select("*")
-        .eq("accommodation_id", residenceId);
-      setRoomTypes((typesData || []) as unknown as RoomType[]);
-
-      const { data: roomsData } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("accommodation_id", residenceId)
-        .order("room_number");
-      setRooms((roomsData || []) as unknown as Room[]);
+      const [typesResult, roomsResult] = await Promise.all([
+        supabase.from("room_types").select("*").eq("accommodation_id", residenceId),
+        supabase.from("rooms").select("*").eq("accommodation_id", residenceId).order("room_number"),
+      ]);
+      setRoomTypes((typesResult.data || []) as unknown as RoomType[]);
+      setRooms((roomsResult.data || []) as unknown as Room[]);
     } catch (err) {
       toast.error("Impossible de charger les données.");
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
-
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [residenceId]);
 
   if (loading) {
     return (
@@ -129,7 +117,7 @@ export default function ResidenceDetailPage() {
           <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Établissement introuvable</h2>
-        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Cet établissement n'existe pas ou a été supprimé.</p>
+        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Cet établissement n&apos;existe pas ou a été supprimé.</p>
         <Button onClick={() => router.push("/dashboard/residences")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Retour aux établissements
         </Button>
@@ -137,7 +125,6 @@ export default function ResidenceDetailPage() {
     );
   }
 
-  const limits = { maxAccommodations: Infinity };
   const currentTypes = roomTypes.filter((rt) => rt.accommodation_id === residenceId);
 
   function openEditResidenceModal() {
@@ -153,11 +140,14 @@ export default function ResidenceDetailPage() {
   }
 
   async function handleSaveResidence() {
-    if (!residenceForm.name) return;
-    setLoading(true);
+    if (!residenceForm.name) {
+      toast.error("Le nom de l'établissement est requis.");
+      return;
+    }
+    setSaving(true);
     try {
       const supabase = createClient();
-      await supabase
+      const { error } = await supabase
         .from("accommodations")
         .update({
           name: residenceForm.name,
@@ -168,6 +158,7 @@ export default function ResidenceDetailPage() {
           longitude: residenceForm.longitude ? parseFloat(residenceForm.longitude) : null,
         })
         .eq("id", residence!.id);
+      if (error) throw error;
 
       setResidence({
         ...residence!,
@@ -184,19 +175,25 @@ export default function ResidenceDetailPage() {
       toast.error("Impossible d'enregistrer l'établissement.");
       console.error(err);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  async function handleDeleteResidence() {
+  async function handleDeleteResidence(): Promise<boolean> {
+    setSaving(true);
     try {
       const supabase = createClient();
-      await supabase.from("accommodations").delete().eq("id", residence!.id);
+      const { error } = await supabase.from("accommodations").delete().eq("id", residence!.id);
+      if (error) throw error;
       toast.success("Établissement supprimé");
       router.push("/dashboard/residences");
+      return true;
     } catch (err) {
       toast.error("Impossible de supprimer l'établissement.");
       console.error(err);
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -227,30 +224,30 @@ export default function ResidenceDetailPage() {
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
-    setLoading(true);
+    setSaving(true);
     setRoomNumberError("");
     try {
       const supabase = createClient();
-      if (editingRoom) {
-        await supabase.from("rooms").update({
-          room_number: roomForm.room_number,
-          floor: roomForm.floor ? parseInt(roomForm.floor) : null,
-          room_type_id: roomForm.room_type_id,
-        }).eq("id", editingRoom.id);
-      } else {
-        await supabase.from("rooms").insert({
-          accommodation_id: roomForm.accommodation_id,
-          room_type_id: roomForm.room_type_id,
-          room_number: roomForm.room_number,
-          floor: roomForm.floor ? parseInt(roomForm.floor) : null,
-        });
-      }
+      const { error } = editingRoom
+        ? await supabase.from("rooms").update({
+            room_number: roomForm.room_number,
+            floor: roomForm.floor ? parseInt(roomForm.floor) : null,
+            room_type_id: roomForm.room_type_id,
+          }).eq("id", editingRoom.id)
+        : await supabase.from("rooms").insert({
+            accommodation_id: roomForm.accommodation_id,
+            room_type_id: roomForm.room_type_id,
+            room_number: roomForm.room_number,
+            floor: roomForm.floor ? parseInt(roomForm.floor) : null,
+          });
+      if (error) throw error;
       setRoomModalOpen(false);
-      loadData();
+      loadData(true);
       toast.success(editingRoom ? "Chambre modifiée" : "Chambre créée");
-    } catch (err: any) {
-      const message = err?.message || "";
-      const code = err?.code || "";
+    } catch (err) {
+      const e = err as { message?: string; code?: string };
+      const message = e?.message || "";
+      const code = e?.code || "";
       if (code === "23505" || message.toLowerCase().includes("duplicate") || message.toLowerCase().includes("unique")) {
         const errorMessage = "Ce numéro de chambre est déjà utilisé. Veuillez en choisir un autre.";
         setRoomNumberError(errorMessage);
@@ -260,19 +257,25 @@ export default function ResidenceDetailPage() {
       }
       console.error(err);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
-  async function deleteRoom(id: string) {
+  async function deleteRoom(id: string): Promise<boolean> {
+    setSaving(true);
     try {
       const supabase = createClient();
-      await supabase.from("rooms").delete().eq("id", id);
+      const { error } = await supabase.from("rooms").delete().eq("id", id);
+      if (error) throw error;
       setRooms(rooms.filter((r) => r.id !== id));
       toast.success("Chambre supprimée");
+      return true;
     } catch (err) {
       toast.error("Impossible de supprimer la chambre.");
       console.error(err);
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -372,13 +375,13 @@ export default function ResidenceDetailPage() {
       toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
       return;
     }
-    setLoading(true);
+    setSaving(true);
     try {
       const supabase = createClient();
       const surface_m2 = typeForm.surface_m2 ? parseFloat(typeForm.surface_m2) : null;
       let typeId = editingType?.id || "";
       if (editingType) {
-        await supabase.from("room_types").update({
+        const { error } = await supabase.from("room_types").update({
           name: typeForm.name,
           description: typeForm.description,
           base_price: parseInt(typeForm.base_price),
@@ -388,6 +391,7 @@ export default function ResidenceDetailPage() {
           is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
           featured_images: typeForm.featured_images,
         }).eq("id", editingType.id);
+        if (error) throw error;
       } else {
         const { data: created, error: insertError } = await supabase.from("room_types").insert({
           accommodation_id: typeForm.accommodation_id,
@@ -412,13 +416,13 @@ export default function ResidenceDetailPage() {
       }
 
       setTypeModalOpen(false);
-      loadData();
+      loadData(true);
       toast.success(editingType ? "Type de chambre modifié" : "Type de chambre créé");
     } catch (err) {
       toast.error("Impossible d'enregistrer le type de chambre.");
       console.error(err);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
@@ -447,15 +451,21 @@ export default function ResidenceDetailPage() {
     }
   }
 
-  async function deleteType(id: string) {
+  async function deleteType(id: string): Promise<boolean> {
+    setSaving(true);
     try {
       const supabase = createClient();
-      await supabase.from("room_types").delete().eq("id", id);
+      const { error } = await supabase.from("room_types").delete().eq("id", id);
+      if (error) throw error;
       setRoomTypes(roomTypes.filter((rt) => rt.id !== id));
       toast.success("Type de chambre supprimé");
+      return true;
     } catch (err) {
       toast.error("Impossible de supprimer le type de chambre.");
       console.error(err);
+      return false;
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -494,9 +504,9 @@ export default function ResidenceDetailPage() {
         ) : (
           <div className="flex gap-2">
             <Button variant="outline" onClick={openEditResidenceModal}>
-              <Edit2 className="w-4 h-4" /> Modifier l'établissement
+              <Edit2 className="w-4 h-4" /> Modifier l&apos;établissement
             </Button>
-             <Button variant="outline" onClick={() => { setDeleteItem({ type: "residence", id: residence.id, name: residence.name }); setDeleteConfirmOpen(true); }} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement">
+             <Button variant="outline" onClick={() => { setDeleteItem({ type: "residence", id: residence.id, name: residence.name }); setDeleteConfirmOpen(true); }} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement" aria-label="Supprimer l'établissement">
                <Trash2 className="w-4 h-4" />
              </Button>
           </div>
@@ -533,10 +543,10 @@ export default function ResidenceDetailPage() {
                   </div>
                   {!isReadOnly && (
                     <div className="flex gap-0.5">
-                      <button onClick={() => openEditTypeModal(rt)} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre">
+                      <button onClick={() => openEditTypeModal(rt)} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre" aria-label="Modifier le type de chambre">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => { setDeleteItem({ type: "type", id: rt.id, name: rt.name }); setDeleteConfirmOpen(true); }} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre">
+                      <button onClick={() => { setDeleteItem({ type: "type", id: rt.id, name: rt.name }); setDeleteConfirmOpen(true); }} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre" aria-label="Supprimer le type de chambre">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -592,7 +602,7 @@ export default function ResidenceDetailPage() {
         {currentTypes.length === 0 ? (
           <div className="text-center py-8">
             <Tag className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Créez d'abord un type de chambre</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Créez d&apos;abord un type de chambre</p>
             {!isReadOnly && (
               <Button size="sm" onClick={openAddTypeModal}>
                 <Plus className="w-4 h-4" /> Créer un type de chambre
@@ -633,6 +643,7 @@ export default function ResidenceDetailPage() {
                                 onClick={() => openEditRoomModal(room)}
                                 className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
                                 title="Modifier la chambre"
+                                aria-label="Modifier la chambre"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
@@ -640,6 +651,7 @@ export default function ResidenceDetailPage() {
                                 onClick={() => { setDeleteItem({ type: "room", id: room.id, name: room.room_number }); setDeleteConfirmOpen(true); }}
                                 className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600"
                                 title="Supprimer la chambre"
+                                aria-label="Supprimer la chambre"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -671,7 +683,7 @@ export default function ResidenceDetailPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setResidenceModalOpen(false)}>Annuler</Button>
-              <Button className="flex-1" onClick={handleSaveResidence} loading={loading}>Enregistrer</Button>
+              <Button className="flex-1" onClick={handleSaveResidence} loading={saving}>Enregistrer</Button>
             </div>
           </div>
         </Modal>
@@ -707,7 +719,7 @@ export default function ResidenceDetailPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setRoomModalOpen(false)}>Annuler</Button>
-              <Button className="flex-1" onClick={saveRoom} loading={loading}>{editingRoom ? "Enregistrer" : "Créer"}</Button>
+              <Button className="flex-1" onClick={saveRoom} loading={saving}>{editingRoom ? "Enregistrer" : "Créer"}</Button>
             </div>
           </div>
         </Modal>
@@ -832,6 +844,7 @@ export default function ResidenceDetailPage() {
                   className={`relative w-10 h-5.5 shrink-0 rounded-full transition-colors ${typeForm.is_listed_on_trouvetou ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
                   style={{ height: 22 }}
                   aria-pressed={typeForm.is_listed_on_trouvetou}
+                  aria-label="Activer ou désactiver la diffusion Trouvetou"
                 >
                   <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${typeForm.is_listed_on_trouvetou ? "left-5.5" : "left-0.5"}`} style={{ width: 18, height: 18, top: 2 }} />
                 </button>
@@ -843,7 +856,7 @@ export default function ResidenceDetailPage() {
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)}>Annuler</Button>
-              <Button className="flex-1" onClick={saveType} loading={loading}>{editingType ? "Enregistrer" : "Créer"}</Button>
+              <Button className="flex-1" onClick={saveType} loading={saving}>{editingType ? "Enregistrer" : "Créer"}</Button>
             </div>
           </div>
         </Modal>
@@ -858,13 +871,16 @@ export default function ResidenceDetailPage() {
               className="flex-1 bg-red-600 hover:bg-red-700"
               onClick={async () => {
                 if (!deleteItem) return;
-                if (deleteItem.type === "room") await deleteRoom(deleteItem.id);
-                else if (deleteItem.type === "type") await deleteType(deleteItem.id);
-                else if (deleteItem.type === "residence") await handleDeleteResidence();
-                setDeleteConfirmOpen(false);
-                setDeleteItem(null);
+                let ok = false;
+                if (deleteItem.type === "room") ok = await deleteRoom(deleteItem.id);
+                else if (deleteItem.type === "type") ok = await deleteType(deleteItem.id);
+                else if (deleteItem.type === "residence") ok = await handleDeleteResidence();
+                if (ok) {
+                  setDeleteConfirmOpen(false);
+                  setDeleteItem(null);
+                }
               }}
-              loading={loading}
+              loading={saving}
             >
               Supprimer
             </Button>

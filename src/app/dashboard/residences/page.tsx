@@ -10,13 +10,15 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { formatAmount, getPlanLimits, getPlanLabel } from "@/lib/utils";
-import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, getCountryByNameOrCode } from "@/lib/countries";
+import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins } from "lucide-react";
-import type { Accommodation, RoomType, Room } from "@/types/database";
+import type { Accommodation, RoomType } from "@/types/database";
 
 export default function ResidencesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [residences, setResidences] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType[]>>({});
   const [roomsCount, setRoomsCount] = useState<Record<string, number>>({});
@@ -44,7 +46,8 @@ export default function ResidencesPage() {
     loadData();
   }, []);
 
-  async function loadData() {
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -52,51 +55,44 @@ export default function ResidencesPage() {
 
       const { data: userData } = await supabase
         .from("users")
-        .select("tenant_id")
+        .select("tenant_id, role")
         .eq("auth_user_id", session.user.id)
         .single();
 
       if (!userData?.tenant_id) return;
 
-      // Récupérer le plan
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
+      setIsReadOnly(userData.role === "receptionniste");
 
-      // Récupérer les établissements
-      const { data: accData } = await supabase
-        .from("accommodations")
-        .select("*")
-        .eq("tenant_id", userData.tenant_id)
-        .order("created_at", { ascending: false });
+      const [subResult, accResult] = await Promise.all([
+        supabase.from("subscriptions").select("plan").eq("tenant_id", userData.tenant_id).single(),
+        supabase
+          .from("accommodations")
+          .select("*")
+          .eq("tenant_id", userData.tenant_id)
+          .order("created_at", { ascending: false }),
+      ]);
 
+      if (subResult.data) setPlan(subResult.data.plan);
+
+      const accData = accResult.data;
       if (accData) {
         setResidences(accData as unknown as Accommodation[]);
 
         const accommodationIds = accData.map((a) => a.id);
-        const { data: allTypes } = await supabase
-          .from("room_types")
-          .select("*")
-          .in("accommodation_id", accommodationIds);
+        const [typesResult, roomsResult] = await Promise.all([
+          supabase.from("room_types").select("*").in("accommodation_id", accommodationIds),
+          supabase.from("rooms").select("accommodation_id").in("accommodation_id", accommodationIds),
+        ]);
 
         const typesMap: Record<string, RoomType[]> = {};
-        (allTypes || []).forEach((rt: RoomType) => {
+        (typesResult.data || []).forEach((rt: RoomType) => {
           if (!typesMap[rt.accommodation_id]) typesMap[rt.accommodation_id] = [];
           typesMap[rt.accommodation_id].push(rt);
         });
         setRoomTypes(typesMap);
 
-        // Charger les chambres pour compter le nombre réel par établissement
-        const { data: allRooms } = await supabase
-          .from("rooms")
-          .select("accommodation_id")
-          .in("accommodation_id", accommodationIds);
-
         const roomsMap: Record<string, number> = {};
-        (allRooms || []).forEach((r: { accommodation_id: string }) => {
+        (roomsResult.data || []).forEach((r: { accommodation_id: string }) => {
           roomsMap[r.accommodation_id] = (roomsMap[r.accommodation_id] || 0) + 1;
         });
         setRoomsCount(roomsMap);
@@ -105,14 +101,14 @@ export default function ResidencesPage() {
       toast.error("Impossible de charger les établissements.");
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   function openAddModal() {
-    if (!plan) return;
-    const limits = getPlanLimits(plan);
-    if (limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations) {
+    if (isReadOnly) return;
+    const limits = plan ? getPlanLimits(plan) : null;
+    if (limits?.maxAccommodations != null && residences.length >= limits.maxAccommodations) {
       toast.error(`Votre plan ${getPlanLabel(plan)} est limité à ${limits.maxAccommodations} établissement${limits.maxAccommodations > 1 ? "s" : ""}. Passez au plan Entreprise pour des établissements illimités.`);
       return;
     }
@@ -146,7 +142,7 @@ export default function ResidencesPage() {
       phone_code: acc.phone_code || "+225",
       language: acc.language || "fr",
       contact_phone: acc.contact_phone || "",
-      image_url: (acc as any).image_url || "",
+      image_url: acc.image_url || "",
       latitude: acc.latitude != null ? acc.latitude.toString() : "",
       longitude: acc.longitude != null ? acc.longitude.toString() : "",
     });
@@ -171,8 +167,11 @@ export default function ResidencesPage() {
   }
 
   async function handleSave() {
-    if (!formData.name) return;
-    setLoading(true);
+    if (!formData.name) {
+      toast.error("Le nom de l'établissement est requis.");
+      return;
+    }
+    setSaving(true);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -186,65 +185,53 @@ export default function ResidencesPage() {
 
       if (!userData?.tenant_id) return;
 
-      if (editingResidence) {
-        await supabase
-          .from("accommodations")
-          .update({
-            name: formData.name,
-            address: formData.address,
-            city: formData.city,
-            country: formData.country,
-            currency: formData.currency,
-            currency_symbol: formData.currency_symbol,
-            phone_code: formData.phone_code,
-            language: formData.language,
-            contact_phone: formData.contact_phone,
-            image_url: formData.image_url || null,
-            latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-            longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-          } as any)
-          .eq("id", editingResidence.id);
-      } else {
-        await supabase
-          .from("accommodations")
-          .insert({
-            tenant_id: userData.tenant_id,
-            name: formData.name,
-            address: formData.address,
-            city: formData.city,
-            country: formData.country,
-            currency: formData.currency,
-            currency_symbol: formData.currency_symbol,
-            phone_code: formData.phone_code,
-            language: formData.language,
-            contact_phone: formData.contact_phone,
-            image_url: formData.image_url || null,
-            latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-            longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-          } as any);
-      }
+      const payload = {
+        name: formData.name,
+        address: formData.address,
+        city: formData.city,
+        country: formData.country,
+        currency: formData.currency,
+        currency_symbol: formData.currency_symbol,
+        phone_code: formData.phone_code,
+        language: formData.language,
+        contact_phone: formData.contact_phone,
+        image_url: formData.image_url || null,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+      };
+
+      const { error } = editingResidence
+        ? await supabase.from("accommodations").update(payload).eq("id", editingResidence.id)
+        : await supabase.from("accommodations").insert({ ...payload, tenant_id: userData.tenant_id });
+      if (error) throw error;
 
       setModalOpen(false);
-      loadData();
+      loadData(true);
+      toast.success(editingResidence ? "Établissement modifié" : "Établissement créé");
     } catch (err) {
       toast.error("Impossible d'enregistrer l'établissement.");
       console.error(err);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
   async function handleDelete(id: string) {
+    if (!deletingId) return;
+    setSaving(true);
     try {
       const supabase = createClient();
-      await supabase.from("accommodations").delete().eq("id", id);
+      const { error } = await supabase.from("accommodations").delete().eq("id", id);
+      if (error) throw error;
       toast.success("Établissement supprimé avec succès.");
       setDeleteConfirmOpen(false);
       setDeletingId(null);
-      loadData();
+      loadData(true);
     } catch (err) {
       toast.error("Impossible de supprimer l'établissement.");
       console.error(err);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -271,9 +258,11 @@ export default function ResidencesPage() {
         </div>
         <Button 
           onClick={openAddModal}
-          disabled={!!(plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations)}
+          disabled={isReadOnly || !!(plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations)}
         >
-          {plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations ? (
+          {isReadOnly ? (
+            <><Lock className="w-4 h-4" /> Lecture seule</>
+          ) : plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations ? (
             <><Lock className="w-4 h-4" /> Limite atteinte</>
           ) : (
             <><Plus className="w-4 h-4" /> Ajouter un établissement</>
@@ -298,10 +287,16 @@ export default function ResidencesPage() {
         <Card className="p-8 text-center">
           <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-medium text-slate-900 dark:text-white mb-2">Aucun établissement</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Commencez par ajouter votre premier établissement</p>
-          <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4" /> Ajouter un établissement
-          </Button>
+          <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">
+            {isReadOnly
+              ? "Aucun établissement disponible sur votre compte."
+              : "Commencez par ajouter votre premier établissement"}
+          </p>
+          {!isReadOnly && (
+            <Button onClick={openAddModal}>
+              <Plus className="w-4 h-4" /> Ajouter un établissement
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -312,69 +307,78 @@ export default function ResidencesPage() {
               onClick={() => router.push(`/dashboard/residences/${acc.id}`)}
             >
               <div>
-                {(acc as any).image_url ? (
+                {acc.image_url ? (
                   <div className="h-24 -mx-4 -mt-4 mb-3 overflow-hidden relative">
-                    <img src={(acc as any).image_url} alt={acc.name} className="w-full h-full object-cover" />
-                    <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 text-white bg-slate-900/50 hover:bg-slate-800" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          openEditModal(acc); 
-                        }}
-                        title="Modifier l'établissement"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 text-white bg-slate-900/50 hover:bg-red-600" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setDeletingId(acc.id); 
-                          setDeleteConfirmOpen(true); 
-                        }}
-                        title="Supprimer l'établissement"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={acc.image_url} alt={acc.name} loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    {!isReadOnly && (
+                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 text-white bg-slate-900/50 hover:bg-slate-800" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            openEditModal(acc); 
+                          }}
+                          title="Modifier l'établissement"
+                          aria-label="Modifier l'établissement"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 text-white bg-slate-900/50 hover:bg-red-600" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setDeletingId(acc.id); 
+                            setDeleteConfirmOpen(true); 
+                          }}
+                          title="Supprimer l'établissement"
+                          aria-label="Supprimer l'établissement"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
                       <Building2 className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex items-center gap-1 z-10">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          openEditModal(acc); 
-                        }}
-                        title="Modifier l'établissement"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 w-7 p-0 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" 
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
-                          setDeletingId(acc.id); 
-                          setDeleteConfirmOpen(true); 
-                        }}
-                        title="Supprimer l'établissement"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    {!isReadOnly && (
+                      <div className="flex items-center gap-1 z-10">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            openEditModal(acc); 
+                          }}
+                          title="Modifier l'établissement"
+                          aria-label="Modifier l'établissement"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 text-slate-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setDeletingId(acc.id); 
+                            setDeleteConfirmOpen(true); 
+                          }}
+                          title="Supprimer l'établissement"
+                          aria-label="Supprimer l'établissement"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -435,7 +439,7 @@ export default function ResidencesPage() {
           <div>
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-0.5 flex items-center gap-1">
               <Globe className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
-              Pays de l'établissement *
+              Pays de l&apos;établissement *
             </label>
             <select
               value={formData.country}
@@ -497,7 +501,7 @@ export default function ResidencesPage() {
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
-            <Button className="flex-1" onClick={handleSave} loading={loading}>
+            <Button className="flex-1" onClick={handleSave} loading={saving}>
               {editingResidence ? "Enregistrer" : "Créer"}
             </Button>
           </div>
@@ -520,7 +524,7 @@ export default function ResidencesPage() {
             onClick={async () => {
               if (deletingId) await handleDelete(deletingId);
             }}
-            loading={loading}
+            loading={saving}
           >
             Supprimer
           </Button>
