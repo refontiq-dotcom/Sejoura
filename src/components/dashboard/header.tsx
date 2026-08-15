@@ -37,11 +37,11 @@ interface NotificationItem {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin_residence: "Gérant(e)",
-  receptionniste: "Réceptionniste",
-  menagere: "Ménagère",
-  client: "Client",
+  super_admin: "ADMIN",
+  admin_residence: "GÉRANT",
+  receptionniste: "RÉCEPTIONNISTE",
+  menagere: "MÉNAGÈRE",
+  client: "CLIENT",
 };
 
 const AVATAR_GRADIENTS = [
@@ -185,7 +185,7 @@ function ResidenceSwitcher() {
   );
 }
 
-export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, lastLogin, companyName, plan }: HeaderProps) {
+export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useLanguage();
   const t = translations[lang].header;
@@ -498,7 +498,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
             {profileOpen && (
               <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in">
-                {/* Section 1 : Infos utilisateur & badge rôle */}
+                {/* Section 1 : Infos utilisateur & rôle */}
                 <div className="p-3">
                   <div className="flex items-center gap-2.5">
                     <UserAvatar name={userName} src={avatarUrl} className="w-10 h-10" />
@@ -507,29 +507,18 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                       <p className="text-sm text-[var(--muted-foreground)] truncate">{userEmail || "—"}</p>
                     </div>
                   </div>
-                  {companyName && (
-                    <p className="mt-2 text-xs font-medium text-[var(--foreground)] truncate">{companyName}</p>
-                  )}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold capitalize">
-                      {ROLE_LABELS[userRole || ""] || userRole?.replace("_", " ") || "Membre"}
+                  <div className="mt-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold">
+                      {ROLE_LABELS[userRole || ""] || userRole?.replace("_", " ").toUpperCase() || "MEMBRE"}
                     </span>
-                    {companyName && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-medium truncate max-w-[150px]">
-                        {companyName}
-                      </span>
-                    )}
                   </div>
-                  {activeAccommodation?.name && (
-                    <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
-                      {t.activeResidence}: <span className="font-semibold text-[var(--foreground)]">{activeAccommodation.name}</span>
-                    </p>
-                  )}
-                  {lastLogin && (
-                    <p className="mt-1.5 text-[11px] text-[var(--muted-foreground)]">
-                      {t.lastLogin}: {new Date(lastLogin).toLocaleString(lang === "en" ? "en-US" : "fr-FR")}
-                    </p>
-                  )}
+                  <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]">
+                    <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+                    {t.activeResidence} :{" "}
+                    <span className="font-semibold text-[var(--foreground)] truncate">
+                      {activeAccommodation?.name || companyName || "—"}
+                    </span>
+                  </p>
                 </div>
 
                 {/* Section 2 : Plan actuel + liens Paramètres / Abonnement */}
