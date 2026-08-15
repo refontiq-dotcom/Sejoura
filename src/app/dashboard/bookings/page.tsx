@@ -884,6 +884,7 @@ export default function BookingsPage() {
                 <tr className="border-b border-slate-200 dark:border-slate-700">
                   <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Code</th>
                   <th 
+                    aria-sort={sortConfig?.key === "client" ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
                     className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("client")}
                   >
@@ -892,6 +893,7 @@ export default function BookingsPage() {
                   </th>
                   <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Chambre</th>
                   <th 
+                    aria-sort={sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
                     className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("date")}
                   >
@@ -899,6 +901,7 @@ export default function BookingsPage() {
                     {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? <ArrowUp className="w-3 h-3 ml-1 inline-block" /> : <ArrowDown className="w-3 h-3 ml-1 inline-block" />) : <ArrowUpDown className="w-3 h-3 ml-1 inline-block opacity-30" />}
                   </th>
                   <th 
+                    aria-sort={sortConfig?.key === "amount" ? (sortConfig.direction === "asc" ? "ascending" : "descending") : "none"}
                     className="text-left p-4 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                     onClick={() => requestSort("amount")}
                   >
@@ -947,6 +950,9 @@ export default function BookingsPage() {
                       </span>
                     </td>
                     <td className="p-3">
+                      {b.status === "cancelled" || b.status === "no_show" ? (
+                        <span className="block text-right text-xs text-slate-400 dark:text-slate-500">Aucune action</span>
+                      ) : (
                       <div className="flex items-center gap-1 md:gap-2 justify-end">
                         {/* Action primaire — Desktop/tablette : bouton avec libellé complet */}
                         {b.status === "confirmed" && (
@@ -1020,8 +1026,9 @@ export default function BookingsPage() {
                               </>
                             )}
                           </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

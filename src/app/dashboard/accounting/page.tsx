@@ -1630,6 +1630,7 @@ export default function AccountingPage() {
                   <thead>
                     <tr className="border-b border-zinc-800">
                       <th
+                        aria-sort={revenueSort.key === "date" ? (revenueSort.direction === "asc" ? "ascending" : "descending") : "none"}
                         className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
                         onClick={() =>
                           setRevenueSort({ key: "date", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
@@ -1641,6 +1642,7 @@ export default function AccountingPage() {
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Méthode</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Référence</th>
                       <th
+                        aria-sort={revenueSort.key === "amount" ? (revenueSort.direction === "asc" ? "ascending" : "descending") : "none"}
                         className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
                         onClick={() =>
                           setRevenueSort({ key: "amount", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
@@ -1766,12 +1768,14 @@ export default function AccountingPage() {
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Catégorie</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Établissement</th>
                       <th
+                        aria-sort={expenseSort.key === "date" ? (expenseSort.direction === "asc" ? "ascending" : "descending") : "none"}
                         className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => setExpenseSort({ key: "date", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
                       >
                         Date {expenseSort.key === "date" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
                       </th>
                       <th
+                        aria-sort={expenseSort.key === "amount" ? (expenseSort.direction === "asc" ? "ascending" : "descending") : "none"}
                         className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => setExpenseSort({ key: "amount", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
                       >
