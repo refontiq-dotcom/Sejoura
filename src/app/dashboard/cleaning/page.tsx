@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Users,
   PartyPopper,
+  CalendarRange,
 } from "lucide-react";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
@@ -593,6 +594,14 @@ export default function CleaningPage() {
                               <span className={`font-medium ${overdue ? "text-red-600" : "text-slate-700 dark:text-slate-300"}`}>
                                 {timeHM(task.alert_time)}
                               </span>
+                            </div>
+                          )}
+                          {task.next_arrival_at && (
+                            <div className="flex items-center justify-between text-indigo-600 dark:text-indigo-400">
+                              <span className="inline-flex items-center gap-1.5">
+                                <CalendarRange className="w-3.5 h-3.5" /> Prochaine arrivée
+                              </span>
+                              <span className="font-semibold">{timeHM(task.next_arrival_at)}</span>
                             </div>
                           )}
                           {active && task.claimed_at && (

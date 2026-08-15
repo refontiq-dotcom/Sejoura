@@ -44,6 +44,7 @@ import {
   MessageSquare,
   ExternalLink,
   Receipt,
+  Pencil,
 } from "lucide-react";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice } from "@/types/database";
@@ -84,6 +85,26 @@ export default function BookingsPage() {
   const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
   const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
   const [emailInput, setEmailInput] = useState("");
+  // Modification / prolongement de réservation
+  const [extendBooking, setExtendBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [extendForm, setExtendForm] = useState({
+    check_in_date: "",
+    check_out_date: "",
+    negotiated_price: "",
+    payment_method: "",
+    mobile_money_operator: "",
+    special_requests: "",
+    number_of_guests: "1",
+  });
+  const [extendSaving, setExtendSaving] = useState(false);
+  const [extendError, setExtendError] = useState("");
+  // Avertissement check-in hors fenêtre (arrivée anticipée / séjour terminé)
+  const [checkInWarn, setCheckInWarn] = useState<{ booking: Booking; early: boolean } | null>(null);
+
+  /** Date locale au format YYYY-MM-DD */
+  function toLocalDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
 
   function shareStayWhatsApp(phone: string, clientName: string, bookingCode: string) {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -150,6 +171,24 @@ export default function BookingsPage() {
     };
   }, [tenantId]);
 
+  // Détection périodique des départs dépassés (toutes les 5 min). La fonction
+  // est idempotente ; les changements de is_overdue sont remontés en temps réel
+  // par le canal bookings-realtime ci-dessus.
+  useEffect(() => {
+    if (!tenantId) return;
+    const t = setInterval(async () => {
+      try {
+        const { data: flagged, error } = await createClient().rpc("detect_overdue_checkouts");
+        if (!error && (flagged ?? 0) > 0) {
+          loadBookingsRef.current(tenantId, accommodationFilterRef.current);
+        }
+      } catch {
+        // silencieux : la détection sera retentée au prochain tick
+      }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [tenantId]);
+
   // Ouvre automatiquement la modal de nouvelle réservation si ?new=1 est dans l'URL
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.search.includes("new=1") && !loading) {
@@ -201,6 +240,8 @@ export default function BookingsPage() {
       }
 
       accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined;
+      // Marquer les séjours dont le départ est dépassé (badge + notification)
+      await supabase.rpc("detect_overdue_checkouts");
       await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
       await loadInvoices(userData.tenant_id);
     } catch (err) {
@@ -611,7 +652,29 @@ export default function BookingsPage() {
     await executeAction(bookingId, action);
   }
 
-  async function executeAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show") {
+  // Check-in : avertit si la demande est hors fenêtre de dates autorisées
+  // (arrivée anticipée avant la date prévue, ou séjour déjà terminé).
+  function handleCheckInClick(b: Booking) {
+    const now = new Date();
+    const todayStr = toLocalDateStr(now);
+    const early = b.check_in_date > todayStr;
+    const checkoutTs = new Date(`${b.check_out_date}T${(b.check_out_time || "11:00").slice(0, 5)}`).getTime();
+    const late = now.getTime() > checkoutTs;
+    if (early || late) {
+      setCheckInWarn({ booking: b, early });
+      return;
+    }
+    executeAction(b.id, "check_in");
+  }
+
+  function confirmEarlyCheckIn() {
+    if (!checkInWarn?.booking) return;
+    const bookingId = checkInWarn.booking.id;
+    setCheckInWarn(null);
+    executeAction(bookingId, "check_in", true);
+  }
+
+  async function executeAction(bookingId: string, action: "check_in" | "check_out" | "cancel" | "no_show", allowEarly = false) {
      try {
        const supabase = createClient();
        const rpcName = action === "check_in" ? "check_in_booking" :
@@ -619,9 +682,17 @@ export default function BookingsPage() {
                        action === "cancel" ? "cancel_booking" :
                        "mark_no_show";
 
-       const { error: rpcErr } = await supabase.rpc(rpcName, { p_booking_id: bookingId, p_user_id: userId });
+       const rpcArgs = action === "check_in"
+         ? { p_booking_id: bookingId, p_user_id: userId, p_allow_early: allowEarly }
+         : { p_booking_id: bookingId, p_user_id: userId };
+       const { error: rpcErr } = await supabase.rpc(rpcName, rpcArgs);
 
        if (rpcErr) {
+         // Garde-fous métier : ne jamais les contourner via un update direct
+         if (rpcErr.message.includes("EARLY_CHECK_IN") || rpcErr.message.includes("LATE_CHECK_IN")) {
+           toast.error(rpcErr.message.replace(/^(EARLY_CHECK_IN|LATE_CHECK_IN):\s*/, ""));
+           return;
+         }
          // Fallback direct sur la table bookings si la fonction RPC échoue (ex: statut intermédiaire)
          const statusMap: Record<string, string> = {
            check_in: "checked_in",
@@ -653,6 +724,100 @@ export default function BookingsPage() {
        toast.error("Une erreur est survenue lors de l'action.");
        console.error(err);
      }
+  }
+
+  // ── MODIFICATION / PROLONGEMENT DE RÉSERVATION ─────────────────────────────
+  function openExtendModal(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    setExtendBooking(b);
+    setExtendForm({
+      check_in_date: b.check_in_date,
+      check_out_date: b.check_out_date,
+      negotiated_price: b.negotiated_price.toString(),
+      payment_method: "",
+      mobile_money_operator: "",
+      special_requests: b.special_requests || "",
+      number_of_guests: String(b.number_of_guests || 1),
+    });
+    setExtendError("");
+  }
+
+  const extendNights = extendBooking
+    ? calculateNights(extendForm.check_in_date, extendForm.check_out_date)
+    : 0;
+  const extendPrice = parseInt(extendForm.negotiated_price) || 0;
+  const extendTotal = extendNights * extendPrice;
+  const extendAdditional = extendBooking ? Math.max(0, extendTotal - extendBooking.total_amount) : 0;
+  const extendBalance = extendBooking ? extendTotal - extendBooking.amount_paid : 0;
+
+  async function handleUpdateBooking() {
+    setExtendError("");
+    if (!extendBooking) return;
+    if (!extendForm.check_in_date || !extendForm.check_out_date) {
+      setExtendError("Veuillez renseigner les dates.");
+      return;
+    }
+    if (extendNights <= 0) {
+      setExtendError("La date de départ doit être après la date d'arrivée.");
+      return;
+    }
+    if (extendPrice <= 0) {
+      setExtendError("Le prix négocié doit être supérieur à 0.");
+      return;
+    }
+
+    setExtendSaving(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("update_booking", {
+        p_booking_id: extendBooking.id,
+        p_user_id: userId,
+        p_check_in_date: extendForm.check_in_date,
+        p_check_out_date: extendForm.check_out_date,
+        p_negotiated_price: extendPrice,
+        p_special_requests: extendForm.special_requests || null,
+        p_number_of_guests: parseInt(extendForm.number_of_guests) || 1,
+        p_payment_method: extendForm.payment_method || null,
+        p_mobile_money_operator:
+          extendForm.payment_method === "mobile_money" ? extendForm.mobile_money_operator || null : null,
+      });
+
+      if (error) {
+        const msg = error.message;
+        if (msg.includes("DOUBLE_BOOKING")) {
+          setExtendError("Une autre réservation occupe déjà cette chambre sur la nouvelle période.");
+        } else if (msg.includes("CHECKED_IN_DATE_CONFLICT")) {
+          setExtendError("Le client est déjà arrivé — la date d'arrivée ne peut pas être déplacée dans le futur.");
+        } else if (msg.includes("INVALID_DATES")) {
+          setExtendError("La date de départ doit être après la date d'arrivée.");
+        } else if (msg.includes("INVALID_PRICE")) {
+          setExtendError("Le prix négocié doit être supérieur à 0.");
+        } else if (msg.includes("BOOKING_NOT_MODIFIABLE")) {
+          setExtendError("Cette réservation ne peut plus être modifiée.");
+        } else {
+          setExtendError("Erreur lors de la modification : " + msg);
+        }
+        setExtendSaving(false);
+        return;
+      }
+
+      const result = data as {
+        additional_amount?: number;
+        balance_due?: number;
+        payment_recorded?: boolean;
+      } | null;
+
+      setExtendBooking(null);
+      const details: string[] = [];
+      if ((result?.additional_amount ?? 0) > 0) details.push(`supplément de ${fmt(result!.additional_amount!)}`);
+      if ((result?.balance_due ?? 0) > 0) details.push(`solde à payer : ${fmt(result!.balance_due!)}`);
+      if (result?.payment_recorded) details.push("paiement enregistré");
+      toast.success(details.length ? `Réservation modifiée — ${details.join(", ")} ✓` : "Réservation modifiée ✓");
+      loadBookings(tenantId);
+    } catch {
+      setExtendError("Une erreur est survenue lors de la modification.");
+    } finally {
+      setExtendSaving(false);
+    }
   }
 
   function exportToCSV() {
@@ -699,7 +864,7 @@ export default function BookingsPage() {
 
   const sortedBookings = [...filteredBookings].sort((a, b) => {
     if (!sortConfig) return 0;
-    let aValue: any, bValue: any;
+    let aValue: string | number, bValue: string | number;
     
     switch (sortConfig.key) {
       case 'date':
@@ -734,10 +899,6 @@ export default function BookingsPage() {
   const totalPages = Math.ceil(sortedBookings.length / ITEMS_PER_PAGE);
   const paginatedBookings = sortedBookings.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  useEffect(() => {
-    setCurrentPage(1); // Reset page on filter change
-  }, [filterStatus, searchQuery, startDate, endDate]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -766,7 +927,7 @@ export default function BookingsPage() {
             type="text"
             placeholder="Rechercher par code, client, chambre..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
           />
         </div>
@@ -775,20 +936,20 @@ export default function BookingsPage() {
           <input 
             type="date" 
             value={startDate} 
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
           <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">au</span>
           <input 
             type="date" 
             value={endDate} 
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
         </div>
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }}
           className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
         >
           <option value="all">Tous les statuts</option>
@@ -925,9 +1086,16 @@ export default function BookingsPage() {
                       <span className={`text-xs ${getPaymentStatusColor(b.payment_status)}`}>{getPaymentStatusLabel(b.payment_status)}</span>
                     </td>
                     <td className="p-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
-                        {getBookingStatusLabel(b.status)}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
+                          {getBookingStatusLabel(b.status)}
+                        </span>
+                        {b.status === "checked_in" && b.is_overdue && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                            <AlertCircle className="w-3 h-3" /> Départ dépassé
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-1 justify-end">
@@ -964,8 +1132,17 @@ export default function BookingsPage() {
                             </button>
                           )
                         )}
+                        {(b.status === "confirmed" || b.status === "checked_in") && (
+                          <button
+                            onClick={() => openExtendModal(b)}
+                            title="Modifier / Prolonger le séjour"
+                            className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                         {b.status === "confirmed" && (
-                          <button onClick={() => handleAction(b.id, "check_in")} title="Check-in" className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                          <button onClick={() => handleCheckInClick(b)} title="Check-in" className="p-2 rounded-lg text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
                             <LogIn className="w-4 h-4" />
                           </button>
                         )}
@@ -1082,7 +1259,7 @@ export default function BookingsPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Contact d'urgence</label>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Contact d&apos;urgence</label>
                       <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.emergency_contact || "—"}</p>
                     </div>
                   </div>
@@ -1354,7 +1531,7 @@ export default function BookingsPage() {
             <div>
               <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Ménage en cours de séjour</p>
               <p className="text-xs text-[var(--primary-color,#0C1C33)]/80 mt-1">
-                La chambre restera occupée. La ménagère verra la mention « Chambre occupée — vérifier avant d'entrer ».
+                La chambre restera occupée. La ménagère verra la mention « Chambre occupée — vérifier avant d&apos;entrer ».
               </p>
             </div>
           </div>
@@ -1377,7 +1554,7 @@ export default function BookingsPage() {
         <div className="space-y-3 pt-2">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-sm">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <p>Cette action est irréversible. La chambre sera immédiatement libérée pour d'autres réservations.</p>
+            <p>Cette action est irréversible. La chambre sera immédiatement libérée pour d&apos;autres réservations.</p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setConfirmAction(null)}>Retour</Button>
@@ -1392,6 +1569,185 @@ export default function BookingsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal Avertissement check-in hors fenêtre */}
+      {checkInWarn && (
+        <Modal
+          open={!!checkInWarn}
+          onClose={() => setCheckInWarn(null)}
+          title={checkInWarn.early ? "Arrivée anticipée" : "Check-in impossible — séjour terminé"}
+          size="sm"
+        >
+          <div className="space-y-3">
+            {checkInWarn.early ? (
+              <>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-sm">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p>
+                    Le check-in de <strong>{checkInWarn.booking.booking_code}</strong> est prévu le{" "}
+                    <strong>{formatDate(checkInWarn.booking.check_in_date)}</strong>. Le client se présente{" "}
+                    <strong>avant</strong> cette date (arrivée anticipée). Confirmer le check-in ?
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setCheckInWarn(null)}>Annuler</Button>
+                  <Button className="flex-1" onClick={confirmEarlyCheckIn}>
+                    Confirmer l&apos;arrivée anticipée
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p>
+                    Le séjour prévu (<strong>{formatDate(checkInWarn.booking.check_in_date)}</strong> →{" "}
+                    <strong>{formatDate(checkInWarn.booking.check_out_date)}</strong>) est déjà terminé. Utilisez{" "}
+                    <strong>« Modifier / Prolonger »</strong> pour prolonger le séjour avant le check-in, ou créez une
+                    nouvelle réservation.
+                  </p>
+                </div>
+                <Button variant="outline" className="w-full" onClick={() => setCheckInWarn(null)}>Fermer</Button>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal Modifier / Prolonger une réservation */}
+      {extendBooking && (
+        <Modal
+          open={!!extendBooking}
+          onClose={() => setExtendBooking(null)}
+          title={`Modifier / Prolonger — ${extendBooking.booking_code}`}
+          description={`${extendBooking.client?.full_name || "Client"} · Ch. ${extendBooking.room?.room_number || "—"} · ${getBookingStatusLabel(extendBooking.status)}`}
+          size="lg"
+        >
+          <div className="space-y-3">
+            {extendError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                {extendError}
+              </div>
+            )}
+
+            {/* Récapitulatif */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30 text-xs text-slate-600 dark:text-slate-300 flex flex-wrap gap-x-6 gap-y-1">
+              <span>Actuellement : {extendBooking.nights_count} nuit(s) · {fmt(extendBooking.total_amount)}</span>
+              <span>Déjà payé : {fmt(extendBooking.amount_paid)}</span>
+              {extendBooking.is_overdue && (
+                <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+                  <AlertCircle className="w-3 h-3" /> Départ en retard
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Date d'arrivée"
+                type="date"
+                value={extendForm.check_in_date}
+                disabled={extendBooking.status === "checked_in"}
+                onChange={(e) => setExtendForm({ ...extendForm, check_in_date: e.target.value })}
+              />
+              <Input
+                label="Date de départ"
+                type="date"
+                value={extendForm.check_out_date}
+                onChange={(e) => setExtendForm({ ...extendForm, check_out_date: e.target.value })}
+              />
+            </div>
+
+            <Input
+              label="Prix négocié par nuit (FCFA)"
+              type="number"
+              value={extendForm.negotiated_price}
+              onChange={(e) => setExtendForm({ ...extendForm, negotiated_price: e.target.value })}
+            />
+
+            {/* Calcul du supplément et du solde */}
+            {extendNights > 0 && (
+              <div className="space-y-1.5 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-sm text-indigo-700 dark:text-indigo-300">
+                <p>
+                  {extendNights} nuit(s) × {fmt(extendPrice)} = <strong>{fmt(extendTotal)}</strong>
+                </p>
+                {extendAdditional > 0 && (
+                  <p className="text-amber-700 dark:text-amber-300">
+                    Supplément à encaisser : <strong>{fmt(extendAdditional)}</strong>
+                  </p>
+                )}
+                <p className={extendBalance > 0 ? "font-medium text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-300"}>
+                  {extendBalance > 0
+                    ? `Solde à payer : ${fmt(extendBalance)}`
+                    : extendBalance < 0
+                    ? `Trop perçu : ${fmt(-extendBalance)}`
+                    : "Solde soldé"}
+                </p>
+              </div>
+            )}
+
+            {/* Encaissement du supplément */}
+            {extendAdditional > 0 && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Encaisser le supplément</label>
+                  <select
+                    value={extendForm.payment_method}
+                    onChange={(e) => setExtendForm({ ...extendForm, payment_method: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Ne pas encaisser maintenant</option>
+                    <option value="cash">Espèces</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="bank">Virement bancaire</option>
+                    <option value="other">Autre</option>
+                  </select>
+                </div>
+                {extendForm.payment_method === "mobile_money" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Opérateur Mobile Money</label>
+                    <select
+                      value={extendForm.mobile_money_operator}
+                      onChange={(e) => setExtendForm({ ...extendForm, mobile_money_operator: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">Sélectionner un opérateur</option>
+                      {MOBILE_MONEY_OPERATORS.map((op) => (
+                        <option key={op.value} value={op.value}>{op.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+
+            <Input
+              label="Nombre de clients"
+              type="number"
+              value={extendForm.number_of_guests}
+              onChange={(e) => setExtendForm({ ...extendForm, number_of_guests: e.target.value })}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Demandes spéciales (optionnel)</label>
+              <textarea
+                value={extendForm.special_requests}
+                onChange={(e) => setExtendForm({ ...extendForm, special_requests: e.target.value })}
+                rows={2}
+                placeholder="Lit bébé, étage élevé, etc."
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setExtendBooking(null)}>Annuler</Button>
+              <Button className="flex-1" onClick={handleUpdateBooking} loading={extendSaving}>
+                Enregistrer les modifications
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
         {/* Modal Facture */}
         {selectedBookingForInvoice && (

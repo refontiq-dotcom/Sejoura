@@ -277,6 +277,8 @@ export interface Booking {
   payment_status: PaymentStatus;
   payment_method: PaymentMethod | null;
   status: BookingStatus;
+  is_overdue: boolean;
+  overdue_since: string | null;
   number_of_guests: number;
   special_requests: string | null;
   created_by: string;
@@ -312,6 +314,7 @@ export interface CleaningTask {
   checkout_time: string | null;
   alert_time: string | null;
   force_release_time: string | null;
+  next_arrival_at: string | null;
   is_alert_sent: boolean;
   is_force_released: boolean;
   priority: number;
@@ -620,8 +623,45 @@ export interface Database {
         };
         Returns: Booking;
       };
-      check_in_booking: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
+      check_in_booking: {
+        Args: {
+          p_booking_id: string;
+          p_user_id: string;
+          p_allow_early?: boolean;
+          p_allow_late?: boolean;
+        };
+        Returns: Booking;
+      };
       check_out_booking: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
+      update_booking: {
+        Args: {
+          p_booking_id: string;
+          p_user_id: string;
+          p_check_in_date?: string;
+          p_check_out_date?: string;
+          p_negotiated_price?: number;
+          p_special_requests?: string;
+          p_number_of_guests?: number;
+          p_payment_method?: string;
+          p_mobile_money_operator?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      update_booking_api: {
+        Args: {
+          p_booking_id: string;
+          p_tenant_id: string;
+          p_check_in_date?: string;
+          p_check_out_date?: string;
+          p_negotiated_price?: number;
+          p_special_requests?: string;
+          p_number_of_guests?: number;
+          p_payment_method?: string;
+          p_mobile_money_operator?: string;
+        };
+        Returns: Record<string, unknown>;
+      };
+      detect_overdue_checkouts: { Args: Record<string, never>; Returns: number };
       cancel_booking: {
         Args: { p_booking_id: string; p_user_id: string; p_reason?: string };
         Returns: Booking;
