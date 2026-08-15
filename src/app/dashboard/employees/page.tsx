@@ -416,8 +416,8 @@ export default function EmployeesPage() {
       </div>
 
       {/* Limites du plan */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Admins</p>
@@ -426,7 +426,7 @@ export default function EmployeesPage() {
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
         </Card>
-        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Réceptionnistes</p>
@@ -435,7 +435,7 @@ export default function EmployeesPage() {
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
         </Card>
-        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500">Ménagères</p>
@@ -507,7 +507,7 @@ export default function EmployeesPage() {
           )}
         </Card>
       ) : (
-        <Card className="overflow-hidden border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

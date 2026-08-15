@@ -312,7 +312,7 @@ export default function ShiftPage() {
 
       {/* KPI Caisse */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)] col-span-1 md:col-span-1">
+        <Card className="p-3 col-span-1 md:col-span-1">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
               <Wallet className="w-6 h-6 text-[var(--primary-muted-foreground)]" />
@@ -340,7 +340,7 @@ export default function ShiftPage() {
           </div>
         </Card>
 
-        <Card className="p-3 border-t-4 border-t-green-500 dark:border-t-green-400">
+        <Card className="p-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -353,7 +353,7 @@ export default function ShiftPage() {
           </div>
         </Card>
 
-        <Card className="p-3 border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <Card className="p-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <BedDouble className="w-6 h-6 text-blue-600 dark:text-blue-400" />

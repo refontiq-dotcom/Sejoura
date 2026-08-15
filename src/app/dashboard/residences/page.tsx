@@ -303,7 +303,7 @@ export default function ResidencesPage() {
           {residences.map((acc) => (
             <Card 
               key={acc.id} 
-              className="p-3 cursor-pointer border-t-4 border-t-[var(--primary-color,#0C1C33)] hover:shadow-md overflow-hidden flex flex-col justify-between"
+              className="p-3 cursor-pointer hover:shadow-lg overflow-hidden flex flex-col justify-between"
               onClick={() => router.push(`/dashboard/residences/${acc.id}`)}
             >
               <div>

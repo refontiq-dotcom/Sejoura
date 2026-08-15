@@ -514,7 +514,7 @@ export default function ResidenceDetailPage() {
       </div>
 
       {/* Types de chambre */}
-      <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+      <Card className="p-3">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">Types de chambre</h2>
           {!isReadOnly && (
@@ -588,7 +588,7 @@ export default function ResidenceDetailPage() {
       </Card>
 
       {/* Chambres */}
-      <Card className="p-3 border-t-4 border-t-[var(--primary-color,#0C1C33)]">
+      <Card className="p-3">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-slate-900 dark:text-white">
             Chambres ({rooms.length})

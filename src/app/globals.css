@@ -316,14 +316,14 @@ html {
    sur les tokens de l'application au lieu d'imposer une interface Zinc sombre. */
 .accounting-panel {
   background: var(--surface) !important;
-  border-color: var(--border) !important;
+  border-color: var(--border-card) !important;
 }
 
 .accounting-panel [class*="bg-zinc-950"] { background-color: var(--surface) !important; }
 .accounting-panel [class*="bg-zinc-900"] { background-color: var(--surface-muted) !important; }
 .accounting-panel [class*="bg-zinc-800"] { background-color: var(--surface-active) !important; }
 .accounting-panel [class*="border-zinc-"],
-.accounting-panel [class*="divide-zinc-"] { border-color: var(--border) !important; }
+.accounting-panel [class*="divide-zinc-"] { border-color: var(--border-card) !important; }
 .accounting-panel [class*="text-zinc-100"],
 .accounting-panel [class*="text-zinc-200"],
 .accounting-panel [class*="text-white"] { color: var(--foreground) !important; }

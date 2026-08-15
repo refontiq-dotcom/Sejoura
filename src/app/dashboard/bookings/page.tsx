@@ -838,7 +838,7 @@ export default function BookingsPage() {
 
       {/* Calendrier ou Tableau */}
       {viewMode === "calendar" ? (
-        <Card className="p-3 border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <Card className="p-3">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Vue Calendrier (Réservations en cours)</h3>
           <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2">
             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
@@ -867,7 +867,7 @@ export default function BookingsPage() {
           </div>
         </Card>
       ) : (
-        <Card className="overflow-hidden border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <Card className="overflow-hidden">
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center">
             <CalendarCheck className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />

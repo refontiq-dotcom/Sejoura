@@ -211,7 +211,7 @@ export default function SubscriptionPage() {
       </div>
 
       {/* Statut actuel */}
-      <Card className={`p-4 border-t-4 border-t-[var(--primary-color,#0C1C33)] ${isExpired ? "border-red-300 dark:border-red-800" : isPending ? "border-amber-300 dark:border-amber-800" : ""}`}>
+      <Card className={`p-4 ${isExpired ? "ring-1 ring-red-200 dark:ring-red-900/40" : isPending ? "ring-1 ring-amber-200 dark:ring-amber-900/40" : ""}`}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
