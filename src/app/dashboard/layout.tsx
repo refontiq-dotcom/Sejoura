@@ -347,6 +347,13 @@ export default function DashboardLayout({
       "/dashboard/employees": d.employees,
       "/dashboard/subscription": d.subscription,
       "/dashboard/settings": { title: d.settings.pageTitle, subtitle: d.settings.pageSubtitle },
+      "/dashboard/suggestions": {
+        title: lang === "en" ? "Community Suggestions" : "Suggestions",
+        subtitle:
+          lang === "en"
+            ? "Propose and vote on community ideas"
+            : "Proposez et votez pour les idées de la communauté",
+      },
       "/dashboard/shift": {
         title: lang === "en" ? "My Shift / Cash" : "Mon Shift / Caisse",
         subtitle: lang === "en" ? "Shift overview" : "Vue d'ensemble du shift",

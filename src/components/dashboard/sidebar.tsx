@@ -50,6 +50,7 @@ const navItems: NavItem[] = [
   { label: "Comptabilité", href: "/dashboard/accounting", icon: Wallet, roles: ["admin_residence"] },
   { label: "Employés", href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },
   { label: "Vitrine Trouvetou", href: "/dashboard/trouvetou", icon: Store, roles: ["admin_residence"] },
+  { label: "Suggestions", href: "/dashboard/suggestions", icon: Lightbulb },
 ];
 
 interface SidebarProps {

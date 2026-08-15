@@ -58,6 +58,7 @@ export function Breadcrumbs() {
     employees: t.employees,
     settings: t.settings,
     subscription: t.subscription,
+    suggestions: "Suggestions",
   };
 
   return (

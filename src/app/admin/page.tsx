@@ -97,6 +97,7 @@ export default function SuperAdminPage() {
   const [statusFilter, setStatusFilter] = useState<TenantStatusFilter>("all");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
   const [page, setPage] = useState(1);
+  const [pendingIdeasCount, setPendingIdeasCount] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -170,6 +171,14 @@ export default function SuperAdminPage() {
         }));
         setPaymentRequests(enriched as unknown as PaymentRequestWithTenant[]);
       }
+
+      // Suggestions en attente de modération (badge de la Boîte à idées)
+      const { count: ideasCount } = await supabase
+        .from("feature_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "under_review")
+        .eq("hidden", false);
+      setPendingIdeasCount(ideasCount ?? 0);
 
       setLastUpdated(new Date());
     } catch {
@@ -400,6 +409,14 @@ export default function SuperAdminPage() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary-color,#0C1C33)] text-white text-xs font-bold hover:opacity-90 transition-opacity shrink-0"
           >
             <Lightbulb className="w-4 h-4" /> Boîte à idées
+            {pendingIdeasCount > 0 && (
+              <span
+                title={`${pendingIdeasCount} suggestion${pendingIdeasCount > 1 ? "s" : ""} en attente de modération`}
+                className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold leading-none"
+              >
+                {pendingIdeasCount}
+              </span>
+            )}
           </a>
           <Button size="sm" variant="outline" onClick={() => loadData(true)} className="shrink-0">
             <RefreshCw className="w-4 h-4" /> Rafraîchir
