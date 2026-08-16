@@ -13,6 +13,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [tenantName, setTenantName] = useState("");
+  const [tenantLogo, setTenantLogo] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showProfile, setShowProfile] = useState(false);
 
@@ -41,12 +42,15 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
         if (userData.tenant_id) {
           const { data: tenantData } = await supabase
             .from("tenants")
-            .select("company_name, primary_color, theme_color")
+            .select("company_name, logo_url, primary_color, theme_color")
             .eq("id", userData.tenant_id)
             .single();
 
           if (tenantData?.company_name) {
             setTenantName(tenantData.company_name);
+          }
+          if (tenantData?.logo_url) {
+            setTenantLogo(tenantData.logo_url);
           }
           if (tenantData?.primary_color) setPrimaryColor(tenantData.primary_color);
           setThemeColor(tenantData?.theme_color || null);
@@ -84,8 +88,13 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--primary-color,#0C1C33)] flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--primary-color,#0C1C33)] flex items-center justify-center overflow-hidden">
+              {tenantLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tenantLogo} alt={tenantName || "Logo résidence"} className="h-full w-full object-contain" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-white" />
+              )}
             </div>
             <div>
               <h1 className="text-sm font-bold text-slate-900 dark:text-white">{tenantName || "Séjoura Ménage"}</h1>
