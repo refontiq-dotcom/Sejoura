@@ -478,6 +478,7 @@ export default function DashboardLayout({
         companyName={companyName}
         companyLogo={companyLogo}
         themeColor={themeColor}
+        mainBg={mainBg}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         onCloseMobile={() => {

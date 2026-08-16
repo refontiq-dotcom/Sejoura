@@ -58,9 +58,12 @@ interface SidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
   onCloseMobile?: () => void;
+  /** Couleur exacte du canvas (<main>) en mode clair : l'onglet actif utilise
+   *  la MÊME valeur pour fusionner parfaitement avec le fond pastel de la page. */
+  mainBg?: string;
 }
 
-export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile }: SidebarProps) {
+export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg }: SidebarProps) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
   const t = translations[lang].sidebar;
@@ -69,6 +72,9 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
   const [loggingOut, setLoggingOut] = useState(false);
 
   const themeStyles = getSidebarThemeStyles(themeColor, theme === "dark");
+  // Couleur de fusion de l'onglet actif : la même que celle du canvas de la
+  // page. Repli sur la variable CSS (--main-bg) si non fournie.
+  const activeTabBg = mainBg || "var(--main-bg)";
 
   const isCollapsed = collapsed;
   const toggleCollapsed = () => {
@@ -104,6 +110,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           backgroundColor: themeStyles.sidebarBg,
           color: themeStyles.textColor,
           "--sidebar-bg": themeStyles.sidebarBg,
+          "--main-bg": activeTabBg,
         } as React.CSSProperties}
         className={`group flex flex-col transition-all duration-300 fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible ${
           isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-60"
@@ -179,7 +186,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
               href={item.href}
               onClick={() => onCloseMobile?.()}
               style={{
-                backgroundColor: isActive ? "var(--main-bg)" : "transparent",
+                backgroundColor: isActive ? activeTabBg : "transparent",
                 color: isActive ? themeStyles.activeTextColor : themeStyles.textColor,
               }}
               className={
@@ -221,7 +228,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           href="/dashboard/settings"
           onClick={() => onCloseMobile?.()}
           style={{
-            backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? "var(--main-bg)" : "transparent",
+            backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? activeTabBg : "transparent",
             color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,
           }}
           className={
