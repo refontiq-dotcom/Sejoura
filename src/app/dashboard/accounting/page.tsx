@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -714,6 +714,38 @@ export default function AccountingPage() {
     loadData();
   }, []);
 
+  // Temps réel : recharge dès qu'une réservation, un paiement ou une facture
+  // change (via Réservations, la caisse, le shift ou l'espace client) pour
+  // garder les statistiques et le dossier client à jour.
+  const loadDataRef = useRef(loadData);
+  loadDataRef.current = loadData;
+
+  useEffect(() => {
+    if (!tenantId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel("accounting-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
+        () => loadDataRef.current()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `tenant_id=eq.${tenantId}` },
+        () => loadDataRef.current()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "invoices", filter: `tenant_id=eq.${tenantId}` },
+        () => loadDataRef.current()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tenantId]);
+
   async function loadData() {
     try {
       const supabase = createClient();
@@ -825,7 +857,7 @@ export default function AccountingPage() {
         .from("clients")
         .select(`
           *,
-          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status)
+          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count)
         `)
         .eq("tenant_id", tid)
         .order("created_at", { ascending: false })
