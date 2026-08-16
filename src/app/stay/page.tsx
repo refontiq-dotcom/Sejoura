@@ -79,6 +79,11 @@ function firstName(fullName: string): string {
   return clean.split(/\s+/)[0];
 }
 
+function nightsBetween(checkInDate: string, checkOutDate: string): number {
+  const ms = new Date(`${checkOutDate}T00:00:00`).getTime() - new Date(`${checkInDate}T00:00:00`).getTime();
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
+
 export default function StayPage() {
   return <StayPortal />;
 }
@@ -91,6 +96,12 @@ function StayPortal() {
   const [now, setNow] = useState(() => Date.now());
   const [request, setRequest] = useState<ServiceRequestDraft | null>(null);
   const [sentRequests, setSentRequests] = useState<Record<string, number>>({});
+  // Prolongation de séjour (demande depuis l'espace client)
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [extendDate, setExtendDate] = useState("");
+  const [extendMessage, setExtendMessage] = useState("");
+  const [extendSubmitting, setExtendSubmitting] = useState(false);
+  const [extendSubmitted, setExtendSubmitted] = useState(false);
   const tokenRef = useRef<string>("");
   const lookupInFlight = useRef(false);
 
@@ -232,6 +243,54 @@ function StayPortal() {
       )}`
     : "";
 
+  // Prolongation : pré-remplit avec le lendemain du départ prévu
+  const openExtend = () => {
+    const next = new Date(`${booking.check_out_date}T00:00:00`);
+    next.setDate(next.getDate() + 1);
+    setExtendDate(next.toISOString().split("T")[0]);
+    setExtendMessage("");
+    setExtendSubmitted(false);
+    setExtendOpen(true);
+  };
+
+  const handleExtendSubmit = async () => {
+    if (!extendDate || extendSubmitting) return;
+    if (nightsBetween(booking.check_in_date, extendDate) <= booking.nights_count) {
+      window.alert("La nouvelle date de départ doit être postérieure au départ actuel.");
+      return;
+    }
+    setExtendSubmitting(true);
+    try {
+      const res = await fetch("/api/stay/extend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: tokenRef.current,
+          requested_check_out_date: extendDate,
+          message: extendMessage,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Échec de la demande");
+      setExtendSubmitted(true);
+      setTimeout(() => {
+        setExtendOpen(false);
+        setExtendSubmitted(false);
+        loadStay();
+      }, 3000);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Une erreur est survenue.");
+    } finally {
+      setExtendSubmitting(false);
+    }
+  };
+
+  // Estimation du supplément (le prix définitif est confirmé par la réception)
+  const perNightPrice =
+    booking.nights_count > 0 ? Math.round(booking.total_amount / booking.nights_count) : 0;
+  const estNights = extendDate ? nightsBetween(booking.check_in_date, extendDate) : 0;
+  const estSupplement = Math.max(0, perNightPrice * estNights - booking.total_amount);
+
   return (
     <div
       className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-[var(--background)] text-[var(--foreground)]"
@@ -340,6 +399,27 @@ function StayPortal() {
                 </>
               )}
             </div>
+
+            {/* Prolongation de séjour */}
+            {(isCheckedIn || booking.status === "confirmed") && (
+              <button
+                onClick={openExtend}
+                className="flex w-full items-center justify-between rounded-3xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm transition active:scale-[0.98] dark:border-amber-900 dark:bg-amber-900/20"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-white">
+                    <CalendarDays className="h-5 w-5" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold text-amber-900 dark:text-amber-100">Prolonger mon séjour</span>
+                    <span className="block text-xs text-amber-700 dark:text-amber-300">
+                      Besoin de rester plus longtemps ? Faites une demande à la réception.
+                    </span>
+                  </span>
+                </span>
+                <ArrowRight className="h-4 w-4 text-amber-600" />
+              </button>
+            )}
 
             {/* Informations pratiques */}
             <div className="rounded-3xl border border-[var(--border-card)] bg-white p-5 shadow-sm dark:bg-slate-900">
@@ -618,6 +698,94 @@ function StayPortal() {
             >
               {request.submitting ? "Envoi…" : "Envoyer la demande"}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Sheet de demande de prolongation de séjour ── */}
+      {extendOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => !extendSubmitting && setExtendOpen(false)}>
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-8 shadow-2xl dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-200" />
+            {extendSubmitted ? (
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  <CheckCircle2 className="h-7 w-7" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold">Demande envoyée !</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    La réception va confirmer votre prolongation. Votre date de départ sera mise à jour une fois acceptée.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-extrabold">Prolonger mon séjour</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Départ actuel le {formatDateLongFR(booking.check_out_date)}
+                    </p>
+                  </div>
+                  <button onClick={() => setExtendOpen(false)} disabled={extendSubmitting} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Nouvelle date de départ souhaitée
+                </label>
+                <input
+                  type="date"
+                  value={extendDate}
+                  min={new Date(`${booking.check_out_date}T00:00:00`).toISOString().split("T")[0]}
+                  onChange={(e) => setExtendDate(e.target.value)}
+                  className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--surface-sunken)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                />
+
+                {extendDate && (
+                  <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                    <p>
+                      <strong>{estNights}</strong> nuit{estNights > 1 ? "s" : ""} au total
+                      {estSupplement > 0 ? (
+                        <> — supplément estimé de <strong>{fmt(estSupplement)}</strong></>
+                      ) : (
+                        " — aucun supplément estimé"
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      Estimation indicative : le montant définitif sera confirmé par la réception.
+                    </p>
+                  </div>
+                )}
+
+                <textarea
+                  value={extendMessage}
+                  onChange={(e) => setExtendMessage(e.target.value)}
+                  disabled={extendSubmitting}
+                  rows={3}
+                  placeholder="Précisez votre demande (facultatif)…"
+                  className="mt-3 w-full resize-none rounded-2xl border border-[var(--input-border)] bg-[var(--surface-sunken)] p-3 text-sm outline-none focus:ring-2 focus:ring-[var(--primary-color)]"
+                />
+
+                <div className="mt-2 flex items-start gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>Votre demande est transmise à la réception, qui la confirmera et vous indiquera le supplément à régler.</span>
+                </div>
+
+                <Button
+                  className="mt-4 w-full"
+                  onClick={handleExtendSubmit}
+                  loading={extendSubmitting}
+                >
+                  {extendSubmitting ? "Envoi…" : "Envoyer la demande"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}

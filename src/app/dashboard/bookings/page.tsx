@@ -53,7 +53,13 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, PaymentStatus } from "@/types/database";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, PaymentStatus, ClientStayExtensionRequest } from "@/types/database";
+
+interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
+  client?: Client;
+  room?: Room;
+  booking?: Booking;
+}
 
 export default function BookingsPage() {
   const { fmt } = useCurrency();
@@ -71,6 +77,14 @@ export default function BookingsPage() {
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [extendBooking, setExtendBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [extendDate, setExtendDate] = useState("");
+  // Demande de prolongation à l'origine de la modal : marquée 'approved' après
+  // une prolongation réussie, pour clôturer la boucle client → personnel.
+  const [extendRequestId, setExtendRequestId] = useState<string | null>(null);
+  // Demandes de prolongation envoyées depuis l'espace client (en attente)
+  const [extensionRequests, setExtensionRequests] = useState<ExtensionRequestWithRelations[]>([]);
+  const [extensionsLoading, setExtensionsLoading] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<ExtensionRequestWithRelations | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   // Paiement du supplément lors d'une prolongation (saisi par la réceptionniste)
   const [extendPaid, setExtendPaid] = useState(false);
   const [extendAmount, setExtendAmount] = useState("");
@@ -215,6 +229,11 @@ export default function BookingsPage() {
         { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
         () => loadBookingsRef.current(tenantId, accommodationFilterRef.current)
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "client_stay_extension_requests", filter: `tenant_id=eq.${tenantId}` },
+        () => loadExtensionRequests(tenantId)
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -285,6 +304,7 @@ export default function BookingsPage() {
       await runOverstayCheck();
       await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
       await loadInvoices(userData.tenant_id);
+      await loadExtensionRequests(userData.tenant_id);
     } catch (err) {
       toast.error("Impossible de charger les données initiales.");
       console.error(err);
@@ -325,6 +345,31 @@ export default function BookingsPage() {
     } catch (err) {
       toast.error("Impossible de charger les réservations.");
       console.error(err);
+    }
+  }
+
+  // Demandes de prolongation envoyées depuis l'espace client (en attente).
+  async function loadExtensionRequests(tId: string) {
+    setExtensionsLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("client_stay_extension_requests")
+        .select(`
+          *,
+          client:clients(*),
+          room:rooms(*),
+          booking:bookings(*)
+        `)
+        .eq("tenant_id", tId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      if (data) setExtensionRequests(data as unknown as ExtensionRequestWithRelations[]);
+    } catch (err) {
+      console.error("Erreur chargement demandes de prolongation:", err);
+    } finally {
+      setExtensionsLoading(false);
     }
   }
 
@@ -721,13 +766,16 @@ export default function BookingsPage() {
     await executeAction(bookingId, action);
   }
 
-  // Ouvre la modal de prolongation d'un séjour en cours (dépassement de date)
-  function openExtendModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
-    const tomorrow = new Date(booking.check_out_date);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+  // Ouvre la modal de prolongation d'un séjour en cours (dépassement de date).
+  // Peut être appelée depuis une demande client (extensionRequest) pour pré-remplir
+  // la date demandée et marquer la demande 'approved' en cas de succès.
+  function openExtendModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }, fromRequest?: ExtensionRequestWithRelations) {
+    const tomorrow = new Date(fromRequest?.requested_check_out_date || booking.check_out_date);
+    if (!fromRequest) tomorrow.setDate(tomorrow.getDate() + 1);
     const nextDate = tomorrow.toISOString().split("T")[0];
     setExtendDate(nextDate);
     setExtendBooking(booking);
+    setExtendRequestId(fromRequest?.id ?? null);
     // Réinitialise la section paiement : supplément pré-rempli pour +1 nuit
     const nights = calculateNights(booking.check_in_date, nextDate);
     const supplement = Math.max(0, (booking.negotiated_price || 0) * nights - (booking.total_amount || 0));
@@ -808,6 +856,21 @@ export default function BookingsPage() {
       }
       // ── FIN ENREGISTREMENT PAIEMENT ────────────────────────────────────────
 
+      // Clôture la demande de prolongation issue de l'espace client
+      if (extendRequestId) {
+        const { error: reqErr } = await supabase.rpc("process_stay_extension", {
+          p_request_id: extendRequestId,
+          p_decision: "approved",
+          p_user_id: userId,
+          p_note: null,
+        });
+        if (reqErr) {
+          console.error("Erreur marquage demande de prolongation:", reqErr);
+        }
+        setExtendRequestId(null);
+        await loadExtensionRequests(tenantId);
+      }
+
       setExtendModalOpen(false);
       setExtendBooking(null);
       await runOverstayCheck();
@@ -817,6 +880,29 @@ export default function BookingsPage() {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Refuse une demande de prolongation envoyée depuis l'espace client.
+  async function handleRejectExtension() {
+    if (!rejectTarget || rejecting) return;
+    setRejecting(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("process_stay_extension", {
+        p_request_id: rejectTarget.id,
+        p_decision: "rejected",
+        p_user_id: userId,
+        p_note: null,
+      });
+      if (error) throw error;
+      toast.success("Demande de prolongation refusée.");
+      setRejectTarget(null);
+      await loadExtensionRequests(tenantId);
+    } catch (err) {
+      toast.error("Impossible de refuser la demande : " + (err as Error).message);
+    } finally {
+      setRejecting(false);
     }
   }
 
@@ -1084,6 +1170,68 @@ export default function BookingsPage() {
           <Plus className="w-4 h-4" /> Nouvelle réservation
         </Button>
       </div>
+
+      {/* Demandes de prolongation envoyées depuis l'espace client */}
+      {extensionRequests.length > 0 && (
+        <Card className={`p-4 ${extensionsLoading ? "opacity-60" : ""}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-500" />
+                Prolongations demandées par les clients
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                  {extensionRequests.length}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Le client souhaite rester plus longtemps — prolongez le séjour ou refusez la demande.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {extensionRequests.map((req) => {
+              const booking = req.booking;
+              return (
+                <div key={req.id} className="flex flex-col md:flex-row md:items-center gap-3 p-3 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-900/10">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {req.client?.full_name || "Client"}
+                      <span className="text-slate-400 dark:text-slate-500 font-normal"> · Ch. {req.room?.room_number || "—"}</span>
+                      {booking?.booking_code ? <span className="text-slate-400 dark:text-slate-500 font-normal"> · {booking.booking_code}</span> : null}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Départ actuel le <strong>{formatDate(req.booking?.check_out_date || req.requested_check_out_date)}</strong>
+                      {" "}→ souhaité le <strong className="text-amber-700 dark:text-amber-300">{formatDate(req.requested_check_out_date)}</strong>
+                    </p>
+                    {req.message ? (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 italic">« {req.message} »</p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => {
+                        const b = bookings.find((x) => x.id === req.booking_id);
+                        if (b) {
+                          openExtendModal(b, req);
+                        } else {
+                          toast.error("Réservation introuvable.");
+                        }
+                      }}
+                    >
+                      <Calendar className="w-3.5 h-3.5" /> Prolonger
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => setRejectTarget(req)}>
+                      <XCircle className="w-3.5 h-3.5" /> Refuser
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Filtres & Export */}
       <div className="flex gap-3 flex-wrap">
@@ -1850,6 +1998,34 @@ export default function BookingsPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal de confirmation de refus d'une demande de prolongation client */}
+      <Modal
+        open={!!rejectTarget}
+        onClose={() => !rejecting && setRejectTarget(null)}
+        title="Refuser la prolongation"
+        description={rejectTarget ? `${rejectTarget.client?.full_name || "Client"} · Ch. ${rejectTarget.room?.room_number || "—"} · départ souhaité le ${formatDate(rejectTarget.requested_check_out_date)}` : ""}
+      >
+        {rejectTarget && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p className="text-sm">
+                Refuser la demande de prolongation de <strong>{rejectTarget.client?.full_name || "ce client"}</strong> ?
+                Le client sera informé que son départ reste fixé au {formatDate(rejectTarget.booking?.check_out_date || rejectTarget.requested_check_out_date)}.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setRejectTarget(null)} disabled={rejecting}>
+                Annuler
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={handleRejectExtension} loading={rejecting}>
+                <XCircle className="w-4 h-4" /> Refuser
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Modal Règlement au check-out (solde restant dû) */}

@@ -487,6 +487,22 @@ export interface ClientServiceRequest {
   created_at: string;
 }
 
+export type ClientStayExtensionStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface ClientStayExtensionRequest {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string;
+  requested_check_out_date: string;
+  message: string | null;
+  status: ClientStayExtensionStatus;
+  created_at: string;
+  processed_at: string | null;
+  processed_by: string | null;
+  processed_note: string | null;
+}
+
 /**
  * Payload renvoyé par la fonction RPC get_client_stay (espace client public).
  */
@@ -724,6 +740,11 @@ export interface Database {
         Insert: Omit<ClientServiceRequest, "id" | "created_at">;
         Update: Partial<Omit<ClientServiceRequest, "id" | "created_at">>;
       };
+      client_stay_extension_requests: {
+        Row: ClientStayExtensionRequest;
+        Insert: Omit<ClientStayExtensionRequest, "id" | "created_at" | "processed_at" | "processed_by" | "processed_note">;
+        Update: Partial<Omit<ClientStayExtensionRequest, "id" | "created_at">>;
+      };
       whatsapp_messages: {
         Row: WhatsAppMessage;
         Insert: Omit<WhatsAppMessage, "id" | "created_at">;
@@ -845,6 +866,14 @@ export interface Database {
       create_service_request: {
         Args: { p_token: string; p_request_type: string; p_message?: string };
         Returns: { ok: boolean; error?: string; id?: string; request_type?: string; status?: string };
+      };
+      request_stay_extension: {
+        Args: { p_token: string; p_new_check_out_date: string; p_message?: string | null };
+        Returns: { ok: boolean; error?: string; id?: string; requested_check_out_date?: string; status?: string };
+      };
+      process_stay_extension: {
+        Args: { p_request_id: string; p_decision: string; p_user_id: string; p_note?: string | null };
+        Returns: { ok: boolean; error?: string; id?: string; status?: string };
       };
       open_shift: {
         Args: {
