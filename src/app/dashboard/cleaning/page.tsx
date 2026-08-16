@@ -424,7 +424,7 @@ export default function CleaningPage() {
   const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-4 animate-fade-in relative">
+    <div className="space-y-5 animate-fade-in relative">
       {/* Gating plan — barre fine */}
       {!hasCleaningAccess && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
@@ -443,11 +443,11 @@ export default function CleaningPage() {
             EN-TÊTE + SYNTHÈSE — bloc sombre unifié
             (un seul bloc synthétique pour les statuts et la progression)
         ==================================================================== */}
-        <div className="relative overflow-hidden rounded-2xl bg-[var(--primary-color,#0C1C33)] p-4 text-white shadow-[var(--shadow-lg)]">
+        <div className="relative overflow-hidden rounded-2xl bg-[var(--primary-color,#0C1C33)] p-5 text-white shadow-[var(--shadow-lg)]">
           <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full bg-white/5" />
           <div className="absolute right-24 -bottom-14 w-32 h-32 rounded-full bg-white/5" />
 
-          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
                 <Sparkles className="w-5 h-5 text-[#C2944E]" />
@@ -469,7 +469,7 @@ export default function CleaningPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {overdueTasks.length > 0 && (
                 <button
                   onClick={() => setFilter(filter === "alert" ? "all" : "alert")}
@@ -493,8 +493,8 @@ export default function CleaningPage() {
           </div>
 
           {/* Synthèse unique des statuts et de la progression */}
-          <div className="relative mt-4 pt-4 border-t border-white/10">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+          <div className="relative mt-5 pt-5 border-t border-white/10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
               {[
                 { label: "En attente", value: stats.pending, Icon: Clock },
                 { label: "En cours", value: stats.active, Icon: Timer },
@@ -531,10 +531,10 @@ export default function CleaningPage() {
         {/* ====================================================================
             Intelligence : interventions / prochain départ / productivité
         ==================================================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Ménagères en intervention */}
           <Card className="p-4">
-            <div className="flex items-center gap-2.5 mb-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
                 <Users className="w-4 h-4 text-blue-600" />
               </div>
@@ -546,7 +546,7 @@ export default function CleaningPage() {
             {activeMaidGroups.length === 0 ? (
               <p className="text-xs text-slate-400">Aucune intervention en ce moment.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {activeMaidGroups.slice(0, 4).map((m) => (
                   <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
                     <span className="flex items-center gap-2 min-w-0">
@@ -569,7 +569,7 @@ export default function CleaningPage() {
 
           {/* Prochain départ */}
           <Card className="p-4">
-            <div className="flex items-center gap-2.5 mb-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
                 <CalendarClock className="w-4 h-4 text-amber-600" />
               </div>
@@ -598,7 +598,7 @@ export default function CleaningPage() {
 
           {/* Productivité du jour */}
           <Card className="p-4">
-            <div className="flex items-center gap-2.5 mb-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
                 <Gauge className="w-4 h-4 text-emerald-600" />
               </div>
@@ -619,7 +619,7 @@ export default function CleaningPage() {
         </div>
 
         {/* Filtres & recherche */}
-        <div className="flex flex-col lg:flex-row gap-3">
+        <div className="flex flex-col lg:flex-row gap-4">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
@@ -647,7 +647,7 @@ export default function CleaningPage() {
             </div>
           )}
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2.5 flex-wrap">
             {[
               { key: "all", label: "Toutes" },
               { key: "pending", label: "En attente" },
@@ -682,9 +682,9 @@ export default function CleaningPage() {
                 <p className="text-[11px] text-slate-400">répartition de la charge entre vos résidences</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {perAccProgress.map((acc) => (
-                <div key={acc.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
+                <div key={acc.id} className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
                   <div className="flex items-center justify-between mb-1.5">
                     <p className="text-[13px] font-semibold text-slate-900 dark:text-white truncate">{acc.name}</p>
                     {acc.overdue > 0 && (
@@ -718,10 +718,10 @@ export default function CleaningPage() {
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
             {columns.map((col) => (
               <div key={col.key} className="flex flex-col">
-                <div className="flex items-center gap-2.5 mb-2.5">
+                <div className="flex items-center gap-2.5 mb-3">
                   <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${col.meta.chip}`}>
                     <col.icon className="w-3.5 h-3.5" />
                   </span>
@@ -729,7 +729,7 @@ export default function CleaningPage() {
                   <span className="text-[11px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-px">{col.list.length}</span>
                 </div>
 
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-3.5">
                   {col.list.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-5 text-center text-xs text-slate-400">
                       Rien ici
