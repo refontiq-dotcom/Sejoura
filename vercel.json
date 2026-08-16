@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/trouvetou/sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}
