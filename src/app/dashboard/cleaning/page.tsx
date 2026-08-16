@@ -424,73 +424,67 @@ export default function CleaningPage() {
   const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-6 animate-fade-in relative">
-      {/* Gating plan */}
+    <div className="space-y-4 animate-fade-in relative">
+      {/* Gating plan — barre fine */}
       {!hasCleaningAccess && (
-        <Card className="p-5 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-              <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Module de gestion du ménage automatique</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Ce module est réservé à la formule Entreprise. Passez à la formule Entreprise pour accéder au pool de tâches partagé.
-              </p>
-            </div>
-            <Button size="sm" onClick={() => router.push("/dashboard/subscription")}>
-              <Sparkles className="w-4 h-4" /> Débloquer avec le plan Entreprise
-            </Button>
-          </div>
-        </Card>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="flex-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+            Module ménage réservé à la formule <strong>Entreprise</strong>.
+          </p>
+          <Button size="sm" className="h-8 px-3 text-xs" onClick={() => router.push("/dashboard/subscription")}>
+            <Sparkles className="w-3.5 h-3.5" /> Débloquer
+          </Button>
+        </div>
       )}
 
       <div className={!hasCleaningAccess ? "opacity-60 pointer-events-none" : ""}>
         {/* ====================================================================
-            HERO — bandeau de synthèse
+            EN-TÊTE + SYNTHÈSE — bloc sombre unifié
+            (un seul bloc synthétique pour les statuts et la progression)
         ==================================================================== */}
-        <div className="relative overflow-hidden rounded-3xl bg-[var(--primary-color,#0C1C33)] p-6 text-white shadow-[var(--shadow-lg)]">
-          <div className="absolute -right-10 -top-12 w-48 h-48 rounded-full bg-white/5" />
-          <div className="absolute right-10 -bottom-16 w-40 h-40 rounded-full bg-white/5" />
-          <div className="absolute right-32 top-8 w-16 h-16 rounded-full bg-white/5" />
+        <div className="relative overflow-hidden rounded-2xl bg-[var(--primary-color,#0C1C33)] p-4 text-white shadow-[var(--shadow-lg)]">
+          <div className="absolute -right-8 -top-10 w-36 h-36 rounded-full bg-white/5" />
+          <div className="absolute right-24 -bottom-14 w-32 h-32 rounded-full bg-white/5" />
 
-          <div className="relative flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-widest text-white/60">{todayLabel}</p>
-              <h1 className="text-xl font-bold mt-1 flex items-center gap-2.5">
-                Suivi du ménage
-                {isReadOnly ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-white border border-white/20">
-                    <Eye className="w-3 h-3" /> Lecture seule
-                  </span>
-                ) : isAdmin ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-white border border-white/20">
-                    <Sparkle className="w-3 h-3" /> Supervision
-                  </span>
-                ) : null}
-              </h1>
-              <p className="text-xs text-white/60 mt-1 max-w-md">
-                Tâches de ménage générées automatiquement aux départs. Vue en temps réel de l&apos;avancement du pool.
-              </p>
+          <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-[#C2944E]" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-lg font-bold text-white leading-none">Suivi du ménage</h1>
+                  {isReadOnly ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-white/80 border border-white/20">
+                      <Eye className="w-3 h-3" /> Lecture seule
+                    </span>
+                  ) : isAdmin ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-white/80 border border-white/20">
+                      <Sparkle className="w-3 h-3" /> Supervision
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-white/60 mt-1">{todayLabel}</p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {nextDeparture && (
-                <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 border border-white/15 text-sm">
-                  <CalendarClock className="w-4 h-4 text-white/80" />
-                  <span className="text-xs text-white/80">Prochain départ</span>
-                  <span className="font-bold">Ch. {nextDeparture.room?.room_number || "—"}</span>
-                  <span className="text-xs font-semibold text-white/90">
-                    {timeHM(nextDeparture.checkout_time)} · {countdownTo(nextDeparture.checkout_time!, now)}
-                  </span>
-                </div>
+              {overdueTasks.length > 0 && (
+                <button
+                  onClick={() => setFilter(filter === "alert" ? "all" : "alert")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/90 text-white text-[11px] font-semibold hover:bg-red-500 transition-colors"
+                  title="Voir les tâches en retard"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" /> {overdueTasks.length} en retard
+                </button>
               )}
               <button
                 onClick={() => {
                   setRefreshing(true);
                   loadData();
                 }}
-                className="p-2.5 rounded-2xl bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors"
+                className="p-2 rounded-xl bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors"
                 title="Actualiser"
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -498,152 +492,65 @@ export default function CleaningPage() {
             </div>
           </div>
 
-          {/* Progression du jour */}
-          <div className="relative mt-6">
-            <div className="flex items-center justify-between text-[11px] font-semibold mb-1.5">
-              <span className="text-white/70 uppercase tracking-wider">Progression du jour</span>
-              <span className="text-white font-bold">{progress}%</span>
-            </div>
-            <div className="h-2.5 rounded-full bg-white/15 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#C2944E] transition-all duration-700"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="flex items-center gap-5 mt-3 text-xs">
-              <span className="flex items-center gap-1.5 text-white/80">
-                <span className="w-2 h-2 rounded-full bg-orange-400" /> {stats.pending} en attente
-              </span>
-              <span className="flex items-center gap-1.5 text-white/80">
-                <span className="w-2 h-2 rounded-full bg-blue-400" /> {stats.active} en cours
-              </span>
-              <span className="flex items-center gap-1.5 text-white/80">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" /> {stats.done} terminées
-              </span>
-              {stats.alerts > 0 && (
-                <span className="flex items-center gap-1.5 text-red-300">
-                  <AlertCircle className="w-3 h-3" /> {stats.alerts} alerte{stats.alerts > 1 ? "s" : ""}
-                </span>
-              )}
+          {/* Synthèse unique des statuts et de la progression */}
+          <div className="relative mt-4 pt-4 border-t border-white/10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5">
+              {[
+                { label: "En attente", value: stats.pending, Icon: Clock },
+                { label: "En cours", value: stats.active, Icon: Timer },
+                { label: "Terminées", value: stats.done, Icon: CheckCircle2 },
+                { label: "Alertes", value: stats.alerts, Icon: AlertCircle },
+              ].map(({ label, value, Icon }) => (
+                <div key={label} className="rounded-xl bg-white/10 border border-white/10 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-white/60 truncate">{label}</p>
+                    <Icon className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
+                  </div>
+                  <p className="text-2xl font-bold text-white leading-none mt-1.5 tabular-nums">{value}</p>
+                </div>
+              ))}
+              <div className="rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 col-span-2 sm:col-span-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-white/60">Progression</p>
+                  <TrendingUp className="w-3.5 h-3.5 text-white/50" />
+                </div>
+                <div className="flex items-end justify-between mt-1">
+                  <p className="text-2xl font-bold text-white leading-none tabular-nums">{progress}%</p>
+                  <span className="text-[10px] font-medium text-white/50 pb-0.5 tabular-nums">
+                    {stats.done}/{stats.done + stats.pending + stats.active}
+                  </span>
+                </div>
+                <div className="h-1 rounded-full bg-white/15 mt-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#C2944E] transition-all duration-700" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Bannière lecture seule réceptionniste */}
-        {isReadOnly && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-              <Eye className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Vue supervision — lecture seule</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Vous pouvez consulter l&apos;avancement du ménage en temps réel. La prise en charge et la validation des tâches sont réservées aux ménagères.
-              </p>
-            </div>
-            <Lock className="w-4 h-4 text-amber-500 ml-auto flex-shrink-0" />
-          </div>
-        )}
-
-        {/* Alerte retards */}
-        {overdueTasks.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-            </div>
-            <p className="text-xs font-medium text-red-700 dark:text-red-300">
-              <strong>{overdueTasks.length} tâche{overdueTasks.length > 1 ? "s" : ""} en retard</strong> :{" "}
-              {overdueTasks.slice(0, 3).map((t) => `Ch. ${t.room?.room_number || "—"}`).join(", ")}
-              {overdueTasks.length > 3 && ` et ${overdueTasks.length - 3} autre(s)`}
-            </p>
-          </div>
-        )}
-
-        {/* ====================================================================
-            KPIs
-        ==================================================================== */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-400">En attente</p>
-              <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-orange-500" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2 leading-none">{stats.pending}</p>
-            <p className="text-[11px] text-slate-400 mt-1.5">à prendre dans le pool</p>
-          </Card>
-
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-400">En cours</p>
-              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                <Timer className="w-4 h-4 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2 leading-none">{stats.active}</p>
-            <p className="text-[11px] text-slate-400 mt-1.5">interventions actives</p>
-          </Card>
-
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-400">Terminées (jour)</p>
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2 leading-none">{stats.done}</p>
-            <p className="text-[11px] text-slate-400 mt-1.5">aujourd&apos;hui</p>
-          </Card>
-
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-400">Alertes</p>
-              <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                <AlertCircle className="w-4 h-4 text-red-600" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2 leading-none">{stats.alerts}</p>
-            <p className="text-[11px] text-slate-400 mt-1.5">délais dépassés</p>
-          </Card>
-
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)] col-span-2 md:col-span-3 xl:col-span-1">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-slate-400">Progression</p>
-              <div className="w-9 h-9 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2 leading-none">{progress}%</p>
-            <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 mt-3 overflow-hidden">
-              <div className="h-full rounded-full bg-[var(--primary-color,#0C1C33)]" style={{ width: `${progress}%` }} />
-            </div>
-          </Card>
         </div>
 
         {/* ====================================================================
             Intelligence : interventions / prochain départ / productivité
         ==================================================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Ménagères en intervention */}
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+          <Card className="p-4">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
                 <Users className="w-4 h-4 text-blue-600" />
               </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Ménagères en intervention</p>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Ménagères en intervention</p>
                 <p className="text-[11px] text-slate-400">{stats.activeMaids} ménagère{stats.activeMaids > 1 ? "s" : ""} · {stats.active} tâche{stats.active > 1 ? "s" : ""} en cours</p>
               </div>
             </div>
             {activeMaidGroups.length === 0 ? (
               <p className="text-xs text-slate-400">Aucune intervention en ce moment.</p>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {activeMaidGroups.slice(0, 4).map((m) => (
-                  <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                  <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-[var(--primary-color,#0C1C33)] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      <span className="w-5 h-5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
                         {m.name.charAt(0).toUpperCase()}
                       </span>
                       <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{m.name}</span>
@@ -654,32 +561,32 @@ export default function CleaningPage() {
                   </div>
                 ))}
                 {activeMaidGroups.length > 4 && (
-                  <p className="text-[11px] text-slate-400 text-center pt-1">+ {activeMaidGroups.length - 4} autre{activeMaidGroups.length - 4 > 1 ? "s" : ""}</p>
+                  <p className="text-[11px] text-slate-400 text-center pt-0.5">+ {activeMaidGroups.length - 4} autre{activeMaidGroups.length - 4 > 1 ? "s" : ""}</p>
                 )}
               </div>
             )}
           </Card>
 
           {/* Prochain départ */}
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+          <Card className="p-4">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
                 <CalendarClock className="w-4 h-4 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Prochain départ</p>
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Prochain départ</p>
                 <p className="text-[11px] text-slate-400">échéance à anticiper</p>
               </div>
             </div>
             {nextDeparture ? (
-              <div className="flex items-center justify-between px-3 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900">
-                <div>
-                  <p className="text-lg font-bold text-slate-900 dark:text-white">Ch. {nextDeparture.room?.room_number || "—"}</p>
-                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                    <Building2 className="w-3 h-3" /> {nextDeparture.accommodation?.name || ""}
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900">
+                <div className="min-w-0">
+                  <p className="text-base font-bold text-slate-900 dark:text-white">Ch. {nextDeparture.room?.room_number || "—"}</p>
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                    <Building2 className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{nextDeparture.accommodation?.name || ""}</span>
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm font-bold text-amber-600">{timeHM(nextDeparture.checkout_time)}</p>
                   <p className="text-[11px] font-semibold text-slate-500">{countdownTo(nextDeparture.checkout_time!, now)}</p>
                 </div>
@@ -690,18 +597,18 @@ export default function CleaningPage() {
           </Card>
 
           {/* Productivité du jour */}
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+          <Card className="p-4">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
                 <Gauge className="w-4 h-4 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Productivité du jour</p>
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Productivité du jour</p>
                 <p className="text-[11px] text-slate-400">durée moyenne d&apos;une intervention</p>
               </div>
             </div>
             {avgMinutes !== null ? (
-              <div className="flex items-baseline gap-1.5 px-3 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900">
+              <div className="flex items-baseline gap-1.5 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900">
                 <span className="text-2xl font-bold text-emerald-600">{avgMinutes} min</span>
                 <span className="text-xs text-slate-500">en moyenne</span>
               </div>
@@ -720,7 +627,7 @@ export default function CleaningPage() {
               placeholder="Rechercher par chambre, établissement..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]/40"
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]/40"
             />
           </div>
 
@@ -730,7 +637,7 @@ export default function CleaningPage() {
               <select
                 value={accFilter}
                 onChange={(e) => setAccFilter(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]/40"
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]/40"
               >
                 <option value="all">Tous les établissements</option>
                 {accommodations.map((a) => (
@@ -751,7 +658,7 @@ export default function CleaningPage() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key as StatusFilter)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   filter === f.key
                     ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-md"
                     : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
@@ -765,32 +672,32 @@ export default function CleaningPage() {
 
         {/* Avancement par résidence — vue admin multi-établissements */}
         {isAdmin && accommodations.length > 1 && (
-          <Card className="p-5 hover:shadow-[var(--shadow-lg)]">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center">
+          <Card className="p-4">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-[var(--primary-muted)] flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Avancement par établissement</p>
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Avancement par établissement</p>
                 <p className="text-[11px] text-slate-400">répartition de la charge entre vos résidences</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
               {perAccProgress.map((acc) => (
-                <div key={acc.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{acc.name}</p>
+                <div key={acc.id} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white truncate">{acc.name}</p>
                     {acc.overdue > 0 && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 flex-shrink-0">
                         <AlertTriangle className="w-3 h-3" /> {acc.overdue}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
                     <span>{acc.done} / {acc.total} terminées</span>
                     <span className="font-bold text-slate-700 dark:text-slate-300">{acc.pct}%</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                  <div className="h-1 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                     <div className="h-full rounded-full bg-[var(--primary-color,#0C1C33)]" style={{ width: `${acc.pct}%` }} />
                   </div>
                 </div>
@@ -801,30 +708,30 @@ export default function CleaningPage() {
 
         {/* Kanban */}
         {filteredTasks.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--primary-muted)] flex items-center justify-center mx-auto mb-4">
-              <PartyPopper className="w-8 h-8 text-[var(--primary-color,#0C1C33)]" />
+          <Card className="p-8 text-center">
+            <div className="w-12 h-12 rounded-xl bg-[var(--primary-muted)] flex items-center justify-center mx-auto mb-3">
+              <PartyPopper className="w-6 h-6 text-[var(--primary-color,#0C1C33)]" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Aucune tâche de ménage</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1.5">Aucune tâche de ménage</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
               Les tâches sont créées automatiquement lors des check-outs. Dès qu&apos;un client libère une chambre, elle apparaîtra ici en temps réel.
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
             {columns.map((col) => (
               <div key={col.key} className="flex flex-col">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${col.meta.chip}`}>
-                    <col.icon className="w-4 h-4" />
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${col.meta.chip}`}>
+                    <col.icon className="w-3.5 h-3.5" />
                   </span>
-                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{col.meta.label}</h3>
-                  <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-0.5">{col.list.length}</span>
+                  <h3 className="text-[13px] font-semibold text-slate-900 dark:text-white">{col.meta.label}</h3>
+                  <span className="text-[11px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-px">{col.list.length}</span>
                 </div>
 
-                <div className="flex-1 space-y-3.5">
+                <div className="flex-1 space-y-3">
                   {col.list.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-xs text-slate-400">
+                    <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-5 text-center text-xs text-slate-400">
                       Rien ici
                     </div>
                   ) : (
@@ -841,7 +748,7 @@ export default function CleaningPage() {
                       return (
                         <Card
                           key={task.id}
-                          className={`p-4.5 pl-5 overflow-hidden relative ${overdue ? "border-red-300 dark:border-red-800" : ""}`}
+                          className={`p-4 pl-5 overflow-hidden relative ${overdue ? "border-red-300 dark:border-red-800" : ""}`}
                         >
                           {/* Barre d'accentuation latérale selon l'état */}
                           <span className={`absolute left-0 top-0 bottom-0 w-1 ${accentBar}`} />
@@ -889,7 +796,7 @@ export default function CleaningPage() {
                           </div>
 
                           {/* Délais */}
-                          <div className="mt-3.5 pt-3.5 border-t border-slate-100 dark:border-slate-700/60 space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 space-y-2 text-xs text-slate-500 dark:text-slate-400">
                             {task.checkout_time && (
                               <div className="flex items-center justify-between">
                                 <span className="inline-flex items-center gap-1.5">
@@ -944,15 +851,15 @@ export default function CleaningPage() {
                           </div>
 
                           {task.notes && (
-                            <p className="mt-3 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-400">
+                            <p className="mt-2.5 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-400">
                               {task.notes}
                             </p>
                           )}
 
                           {/* Actions */}
-                          <div className="mt-4">
+                          <div className="mt-3">
                             {isReadOnly ? (
-                              <div className={`text-center text-xs font-medium py-2.5 rounded-xl ${
+                              <div className={`text-center text-xs font-medium py-2 rounded-lg ${
                                 task.status === "pending"
                                   ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20"
                                   : active
@@ -970,7 +877,7 @@ export default function CleaningPage() {
                               <>
                                 {task.status === "pending" && (
                                   <Button
-                                    className="w-full h-10 text-xs rounded-xl"
+                                    className="w-full h-9 text-xs rounded-lg"
                                     size="sm"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
@@ -982,7 +889,7 @@ export default function CleaningPage() {
                                 {active && (
                                   <Button
                                     variant="success"
-                                    className="w-full h-10 text-xs rounded-xl"
+                                    className="w-full h-9 text-xs rounded-lg"
                                     size="sm"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
