@@ -1215,6 +1215,17 @@ export default function AccountingPage() {
     toast.success("Export CSV réussi");
   }
 
+  async function handleOpenInvoice(inv: EnrichedInvoice) {
+    try {
+      const response = await fetch(`/api/invoice/generate?bookingId=${encodeURIComponent(inv.booking_id)}`);
+      const result = await response.json();
+      if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
+      window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
+    }
+  }
+
   function exportClientsCSV() {
     if (filteredClients.length === 0) return;
     downloadCSV(
@@ -1914,7 +1925,7 @@ export default function AccountingPage() {
                           <div className="flex items-center gap-1 justify-end">
                             {inv.pdf_url && (
                               <button
-                                onClick={() => window.open(inv.pdf_url || "", "_blank")}
+                                onClick={() => handleOpenInvoice(inv)}
                                 title="Voir la facture PDF"
                                 className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
                               >
@@ -1922,14 +1933,13 @@ export default function AccountingPage() {
                               </button>
                             )}
                             {inv.pdf_url && (
-                              <a
-                                href={inv.pdf_url}
-                                download={`Facture_${inv.invoice_number}.pdf`}
+                              <button
+                                onClick={() => handleOpenInvoice(inv)}
                                 title="Télécharger la facture"
                                 className="p-1.5 rounded-md text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
                               >
                                 <Download className="w-3.5 h-3.5" />
-                              </a>
+                              </button>
                             )}
                           </div>
                         </td>
