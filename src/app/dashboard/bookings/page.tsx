@@ -53,7 +53,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import type { Accommodation, RoomType, Room, Client, Booking, Invoice } from "@/types/database";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, PaymentStatus } from "@/types/database";
 
 export default function BookingsPage() {
   const { fmt } = useCurrency();
@@ -71,6 +71,11 @@ export default function BookingsPage() {
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [extendBooking, setExtendBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [extendDate, setExtendDate] = useState("");
+  // Paiement du supplément lors d'une prolongation (saisi par la réceptionniste)
+  const [extendPaid, setExtendPaid] = useState(false);
+  const [extendAmount, setExtendAmount] = useState("");
+  const [extendPaymentMethod, setExtendPaymentMethod] = useState("");
+  const [extendMobileOperator, setExtendMobileOperator] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>(() => {
     if (typeof window !== "undefined" && window.location.search.includes("status=overdue")) {
       return "overdue";
@@ -698,12 +703,22 @@ export default function BookingsPage() {
   function openExtendModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
     const tomorrow = new Date(booking.check_out_date);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    setExtendDate(tomorrow.toISOString().split("T")[0]);
+    const nextDate = tomorrow.toISOString().split("T")[0];
+    setExtendDate(nextDate);
     setExtendBooking(booking);
+    // Réinitialise la section paiement : supplément pré-rempli pour +1 nuit
+    const nights = calculateNights(booking.check_in_date, nextDate);
+    const supplement = Math.max(0, (booking.negotiated_price || 0) * nights - (booking.total_amount || 0));
+    setExtendAmount(supplement > 0 ? String(supplement) : "");
+    setExtendPaid(false);
+    setExtendPaymentMethod("");
+    setExtendMobileOperator("");
     setExtendModalOpen(true);
   }
 
   // Prolonge le séjour : nouvelle date de départ, recalcul du montant total dû.
+  // Si la réceptionniste indique que le client a payé le supplément, le paiement
+  // est enregistré en caisse (payments) et le statut de la réservation est mis à jour.
   async function handleExtendBooking() {
     if (!extendBooking || !extendDate) return;
     const nights = calculateNights(extendBooking.check_in_date, extendDate);
@@ -714,7 +729,7 @@ export default function BookingsPage() {
     setSaving(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.rpc("extend_booking", {
+      const { data: extendedBooking, error } = await supabase.rpc("extend_booking", {
         p_booking_id: extendBooking.id,
         p_new_check_out_date: extendDate,
         p_user_id: userId,
@@ -729,7 +744,46 @@ export default function BookingsPage() {
         }
         return;
       }
-      toast.success(`Séjour prolongé jusqu'au ${formatDate(extendDate)} ✓`);
+
+      // ── ENREGISTREMENT DU PAIEMENT DU SUPPLÉMENT ──────────────────────────
+      const paidAmount = parseInt(extendAmount) || 0;
+      if (extendPaid && extendedBooking && paidAmount > 0) {
+        const nightsAdded = nights - (extendBooking.nights_count || 0);
+        const { error: payErr } = await supabase
+          .from("payments")
+          .insert({
+            tenant_id: extendedBooking.tenant_id,
+            booking_id: extendedBooking.id,
+            accommodation_id: extendBooking.room?.accommodation_id || extendedBooking.accommodation_id,
+            amount: paidAmount,
+            payment_method: extendPaymentMethod as PaymentMethod,
+            mobile_money_operator: extendPaymentMethod === "mobile_money" ? extendMobileOperator || null : null,
+            payment_date: new Date().toISOString(),
+            received_by: userId,
+            operation_type: "booking",
+            notes: `Prolongation de séjour — ${Math.max(1, nightsAdded)} nuit(s) supplémentaire(s)`,
+          });
+
+        if (payErr) {
+          // Le paiement a échoué mais la prolongation est faite → avertir sans bloquer
+          toast.error("Séjour prolongé, mais le paiement n'a pas pu être enregistré : " + payErr.message);
+        } else {
+          // Recalcule le statut de paiement avec le nouveau total
+          const newAmountPaid = (extendedBooking.amount_paid || 0) + paidAmount;
+          const newStatus: PaymentStatus =
+            newAmountPaid >= extendedBooking.total_amount ? "paid"
+              : newAmountPaid > 0 ? "partial" : "unpaid";
+          await supabase
+            .from("bookings")
+            .update({ amount_paid: newAmountPaid, payment_status: newStatus })
+            .eq("id", extendedBooking.id);
+          toast.success(`Séjour prolongé jusqu'au ${formatDate(extendDate)} — paiement de ${fmt(paidAmount)} enregistré ✓`);
+        }
+      } else {
+        toast.success(`Séjour prolongé jusqu'au ${formatDate(extendDate)} ✓`);
+      }
+      // ── FIN ENREGISTREMENT PAIEMENT ────────────────────────────────────────
+
       setExtendModalOpen(false);
       setExtendBooking(null);
       await runOverstayCheck();
@@ -1567,15 +1621,20 @@ export default function BookingsPage() {
         description={extendBooking ? `${extendBooking.client?.full_name || "Client"} · Ch. ${extendBooking.room?.room_number || "—"} · départ actuel le ${formatDate(extendBooking.check_out_date)}` : ""}
       >
         <div className="space-y-3">
-          {extendBooking && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <p className="text-sm">
-                Le montant total sera recalculé sur {calculateNights(extendBooking.check_in_date, extendDate)} nuit(s) à{" "}
-                {fmt(extendBooking.negotiated_price)}/nuit. Le statut de paiement sera mis à jour automatiquement.
-              </p>
-            </div>
-          )}
+          {extendBooking && (() => {
+            const nights = calculateNights(extendBooking.check_in_date, extendDate);
+            const newTotal = (extendBooking.negotiated_price || 0) * nights;
+            const supplement = Math.max(0, newTotal - (extendBooking.total_amount || 0));
+            return (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p className="text-sm">
+                  Total recalculé : <strong>{fmt(newTotal)}</strong> ({nights} nuit(s) × {fmt(extendBooking.negotiated_price)}).
+                  {" "}Supplément dû : <strong>{fmt(supplement)}</strong>
+                </p>
+              </div>
+            );
+          })()}
           <div>
             <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Nouvelle date de départ</label>
             <Input
@@ -1585,6 +1644,71 @@ export default function BookingsPage() {
               onChange={(e) => setExtendDate(e.target.value)}
             />
           </div>
+
+          {/* Paiement du supplément — la réceptionniste précise si le client a
+              payé et par quel moyen, sans quitter le formulaire de prolongation */}
+          <div className="pt-1 space-y-3">
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--muted)] cursor-pointer"
+              onClick={() => setExtendPaid(!extendPaid)}
+            >
+              <input
+                type="checkbox"
+                checked={extendPaid}
+                onChange={(e) => setExtendPaid(e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-4 h-4 rounded text-[var(--primary-color,#0C1C33)] focus:ring-[var(--primary-color,#0C1C33)]"
+              />
+              <div>
+                <p className="text-sm font-medium text-[var(--foreground)]">Le client a payé le supplément</p>
+                <p className="text-xs text-[var(--muted-foreground)]">Le paiement sera enregistré dans la caisse du shift.</p>
+              </div>
+            </div>
+
+            {extendPaid && (
+              <div className="space-y-3 pt-3 border-t border-[var(--border)]">
+                <Input
+                  label="Montant payé (FCFA)"
+                  type="number"
+                  value={extendAmount}
+                  onChange={(e) => setExtendAmount(e.target.value)}
+                  placeholder={extendBooking ? String(Math.max(0, (extendBooking.negotiated_price || 0) * calculateNights(extendBooking.check_in_date, extendDate) - (extendBooking.total_amount || 0))) : ""}
+                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Moyen de paiement</label>
+                  <select
+                    name="extend_payment_method"
+                    value={extendPaymentMethod}
+                    onChange={(e) => setExtendPaymentMethod(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+                  >
+                    <option value="">Sélectionner un moyen de paiement</option>
+                    <option value="cash">Espèces</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="bank">Virement bancaire</option>
+                    <option value="other">Autre</option>
+                  </select>
+                </div>
+                {extendPaymentMethod === "mobile_money" && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Opérateur Mobile Money</label>
+                    <select
+                      name="extend_mobile_operator"
+                      value={extendMobileOperator}
+                      onChange={(e) => setExtendMobileOperator(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+                    >
+                      <option value="">Sélectionner un opérateur</option>
+                      {MOBILE_MONEY_OPERATORS.map((op) => (
+                        <option key={op.value} value={op.value}>{op.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setExtendModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleExtendBooking} loading={saving}>

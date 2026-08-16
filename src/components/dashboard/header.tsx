@@ -205,6 +205,9 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
   const planLabel = getPlanLabel(plan || "free");
+  // Le plan d'abonnement et les liens Paramètres/Abonnement ne concernent que
+  // l'administrateur (gérant) — jamais les employés (réceptionnistes, ménagères).
+  const isAdminRole = userRole === "admin_residence" || userRole === "super_admin";
   const { activeAccommodation } = useAccommodation();
 
   const loadNotifications = useCallback(async () => {
@@ -571,32 +574,36 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                   </p>
                 </div>
 
-                {/* Section 2 : Plan actuel + liens Paramètres / Abonnement */}
-                <div className="border-t border-[var(--border)] p-2.5 space-y-1">
-                  <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--muted)]">
-                    <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-3.5 h-3.5 text-white" />
+                {/* Section 2 : Plan actuel + liens Paramètres / Abonnement
+                    (réservée à l'administrateur — les employés ne doivent pas
+                    voir l'abonnement) */}
+                {isAdminRole && (
+                  <div className="border-t border-[var(--border)] p-2.5 space-y-1">
+                    <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--muted)]">
+                      <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-[var(--muted-foreground)]">{t.currentPlan}</p>
+                        <p className="text-xs font-semibold text-[var(--foreground)] capitalize">{planLabel}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-[var(--muted-foreground)]">{t.currentPlan}</p>
-                      <p className="text-xs font-semibold text-[var(--foreground)] capitalize">{planLabel}</p>
-                    </div>
+                    <button
+                      onClick={() => { setProfileOpen(false); router.push("/dashboard/settings"); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                      {t.settings}
+                    </button>
+                    <button
+                      onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                    >
+                      <CreditCard className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                      {t.subscription}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => { setProfileOpen(false); router.push("/dashboard/settings"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                    {t.settings}
-                  </button>
-                  <button
-                    onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
-                  >
-                    <CreditCard className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                    {t.subscription}
-                  </button>
-                </div>
+                )}
 
                 {/* Section 3 : Déconnexion */}
                 <div className="border-t border-[var(--border)] p-1.5">

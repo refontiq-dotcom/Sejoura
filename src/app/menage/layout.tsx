@@ -72,14 +72,14 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center dashboard-bg">
         <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen dashboard-bg transition-colors duration-300">
       {/* Header mobile-first */}
       <header className="sticky top-0 z-30 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between px-4 py-3">
