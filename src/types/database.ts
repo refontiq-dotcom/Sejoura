@@ -353,14 +353,34 @@ export interface Payment {
   id: string;
   tenant_id: string;
   booking_id: string | null;
+  accommodation_id: string | null;
   amount: number;
   payment_method: PaymentMethod;
   mobile_money_operator?: string | null;
   payment_date: string;
   reference: string | null;
   received_by: string;
+  operation_type?: string;
   notes: string | null;
   created_at: string;
+}
+
+/** Shift de caisse : période d'encaissement d'une réceptionniste */
+export interface Shift {
+  id: string;
+  tenant_id: string;
+  accommodation_id: string | null;
+  receptionist_id: string;
+  opened_at: string;
+  closed_at: string | null;
+  opening_cash: number;
+  expected_cash: number | null;
+  counted_cash: number | null;
+  difference: number | null;
+  status: "open" | "closed";
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CleaningTask {
@@ -664,6 +684,11 @@ export interface Database {
         Insert: Omit<Payment, "id" | "created_at">;
         Update: Partial<Omit<Payment, "id" | "created_at">>;
       };
+      shifts: {
+        Row: Shift;
+        Insert: Omit<Shift, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Shift, "id" | "created_at" | "updated_at">>;
+      };
       cleaning_tasks: {
         Row: CleaningTask;
         Insert: Omit<CleaningTask, "id" | "created_at" | "updated_at">;
@@ -820,6 +845,19 @@ export interface Database {
       create_service_request: {
         Args: { p_token: string; p_request_type: string; p_message?: string };
         Returns: { ok: boolean; error?: string; id?: string; request_type?: string; status?: string };
+      };
+      open_shift: {
+        Args: {
+          p_user_id: string;
+          p_accommodation_id?: string | null;
+          p_opening_cash?: number;
+          p_notes?: string | null;
+        };
+        Returns: Shift;
+      };
+      close_shift: {
+        Args: { p_shift_id: string; p_counted_cash: number; p_notes?: string | null };
+        Returns: Shift;
       };
     };
   };

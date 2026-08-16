@@ -137,8 +137,6 @@ type TabKey = "overview" | "revenue" | "expenses" | "invoices" | "audit" | "clie
 type PeriodKey = "today" | "7d" | "month" | "30d" | "12m" | "custom";
 
 interface EnrichedPayment extends Payment {
-  operation_type?: string;
-  accommodation_id?: string | null;
   booking?: {
     booking_code: string;
     client_name: string;

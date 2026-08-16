@@ -30,10 +30,17 @@ import {
   Plus,
   ArrowDownCircle,
   ArrowUpCircle,
+  Power,
+  LogOut,
+  History,
+  Scale,
+  Users,
+  RefreshCw,
+  Timer,
 } from "lucide-react";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { isMobileMoney, getMobileMoneyOperatorLabel, MOBILE_MONEY_OPERATORS } from "@/lib/utils";
-import type { Payment, Booking } from "@/types/database";
+import type { Payment, Booking, Shift } from "@/types/database";
 
 interface ShiftPayment extends Payment {
   booking?: {
@@ -45,6 +52,7 @@ interface ShiftPayment extends Payment {
     total_amount: number;
     payment_status: string;
   };
+  receptionist_name?: string;
 }
 
 const METHOD_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -73,6 +81,16 @@ function formatShortDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 }
 
+function formatDateTime(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })} · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function fmtSigned(amount: number, fmt: (n: number) => string) {
+  const sign = amount > 0 ? "+" : amount < 0 ? "−" : "";
+  return `${sign}${fmt(Math.abs(amount))}`;
+}
+
 export default function ShiftPage() {
   const router = useRouter();
   const { fmt } = useCurrency();
@@ -84,7 +102,24 @@ export default function ShiftPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [payments, setPayments] = useState<ShiftPayment[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  // ── Modal opération manuelle ──────────────────────────────
+
+  // ── Shift de caisse ─────────────────────────────────────────────────────
+  const [activeShift, setActiveShift] = useState<Shift | null>(null);
+  const [closedShifts, setClosedShifts] = useState<Shift[]>([]);
+  const [openShiftsAll, setOpenShiftsAll] = useState<Shift[]>([]);
+  const [staffNames, setStaffNames] = useState<Record<string, string>>({});
+
+  // Modal ouverture de shift
+  const [openShiftModalOpen, setOpenShiftModalOpen] = useState(false);
+  const [openShiftSaving, setOpenShiftSaving] = useState(false);
+  const [openShiftForm, setOpenShiftForm] = useState({ opening_cash: "", notes: "" });
+
+  // Modal fermeture de shift (relève de caisse)
+  const [closeShiftModalOpen, setCloseShiftModalOpen] = useState(false);
+  const [closeShiftSaving, setCloseShiftSaving] = useState(false);
+  const [closeShiftForm, setCloseShiftForm] = useState({ counted_cash: "", notes: "" });
+
+  // ── Modal opération manuelle ──────────────────────────────────────────────
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
   const [manualForm, setManualForm] = useState({
@@ -94,16 +129,30 @@ export default function ShiftPage() {
     mobile_money_operator: "",
     notes: "",
   });
-  // ──────────────────────────────────────────────────
+
   const [shiftStart] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d.toISOString();
   });
-  const [now] = useState(new Date().toISOString());
 
+  // Espèces encaissées depuis l'ouverture du shift (sorties manuelles = négatives)
+  const cashSinceShiftOpen = payments
+    .filter((p) => p.payment_method === "cash" && activeShift && p.payment_date >= activeShift.opened_at)
+    .reduce((s, p) => s + p.amount, 0);
+  const expectedCashLive = (activeShift?.opening_cash || 0) + cashSinceShiftOpen;
+
+  const totalCaisse = payments.reduce((sum, p) => sum + p.amount, 0);
+  const byCash = payments.filter((p) => p.payment_method === "cash").reduce((s, p) => s + p.amount, 0);
+  const byMobileMoney = payments.filter((p) => isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
+  const byOther = payments.filter((p) => p.payment_method !== "cash" && !isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
+  const checkedIn = bookings.filter((b) => b.status === "checked_in").length;
+  const checkinsToday = bookings.filter((b) => b.check_in_date === new Date().toISOString().split("T")[0]).length;
+
+  // ── Chargement initial ────────────────────────────────────────────────────
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadData() {
@@ -124,16 +173,74 @@ export default function ShiftPage() {
       setTenantId(userData.tenant_id);
       setIsAdmin(userData.role === "admin_residence");
 
-      // Charge les paiements du shift (aujourd'hui) reçus par cet utilisateur
-      // Pour un admin, on charge tous les paiements du jour
+      const isReceptionist = userData.role === "receptionniste";
+      const isAdminUser = userData.role === "admin_residence";
+
+      // ── Shift actif (réceptionniste) ────────────────────────────────────
+      let active: Shift | null = null;
+      if (isReceptionist) {
+        const { data: shiftData } = await supabase
+          .from("shifts")
+          .select("*")
+          .eq("tenant_id", userData.tenant_id)
+          .eq("receptionist_id", userData.id)
+          .eq("status", "open")
+          .order("opened_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        active = shiftData as Shift | null;
+        setActiveShift(active);
+      } else {
+        setActiveShift(null);
+      }
+
+      // ── Historique des shifts fermés (traçabilité de qui a laissé quoi) ─
+      const { data: closedData } = await supabase
+        .from("shifts")
+        .select("*")
+        .eq("tenant_id", userData.tenant_id)
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false })
+        .limit(15);
+      setClosedShifts((closedData as Shift[]) || []);
+
+      // ── Noms des employés (pour l'historique et la vue admin) ───────────
+      const staffMap: Record<string, string> = {};
+      const { data: staffData } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .eq("tenant_id", userData.tenant_id);
+      if (staffData) {
+        staffData.forEach((u: { id: string; full_name: string }) => { staffMap[u.id] = u.full_name; });
+        setStaffNames(staffMap);
+      }
+
+      // ── Shifts ouverts en ce moment (vue admin) ─────────────────────────
+      if (isAdminUser) {
+        const { data: openData } = await supabase
+          .from("shifts")
+          .select("*")
+          .eq("tenant_id", userData.tenant_id)
+          .eq("status", "open")
+          .order("opened_at", { ascending: false });
+        setOpenShiftsAll((openData as Shift[]) || []);
+      }
+
+      // ── Paiements ───────────────────────────────────────────────────────
+      // Réceptionniste : son shift (ou la journée si aucun shift ouvert).
+      // Admin : toute la journée, tous les réceptionnistes.
+      // Les paiements d'abonnement plateforme (operation_type = subscription)
+      // sont exclus du shift de caisse.
+      const fromDate = isReceptionist && active?.opened_at ? active.opened_at : shiftStart;
       let query = supabase
         .from("payments")
         .select("*")
         .eq("tenant_id", userData.tenant_id)
-        .gte("payment_date", shiftStart)
+        .gte("payment_date", fromDate)
+        .neq("operation_type", "subscription")
         .order("payment_date", { ascending: false });
 
-      if (userData.role === "receptionniste") {
+      if (isReceptionist) {
         query = query.eq("received_by", userData.id);
       }
 
@@ -142,7 +249,10 @@ export default function ShiftPage() {
 
       // Charge les infos de booking pour chaque paiement
       const bookingIds = [...new Set(payData.map((p: Payment) => p.booking_id))];
-      let enrichedPayments: ShiftPayment[] = payData as Payment[];
+      let enrichedPayments: ShiftPayment[] = (payData as Payment[]).map((p) => ({
+        ...p,
+        receptionist_name: staffMap[p.received_by],
+      }));
 
       if (bookingIds.length > 0) {
         const { data: bookingData } = await supabase
@@ -160,8 +270,18 @@ export default function ShiftPage() {
           .in("id", bookingIds);
 
         if (bookingData) {
-          enrichedPayments = payData.map((p: Payment) => {
-            const b = (bookingData as any[]).find((bk) => bk.id === p.booking_id);
+          const bookingRows = bookingData as unknown as {
+            id: string;
+            booking_code: string;
+            check_in_date: string;
+            check_out_date: string;
+            total_amount: number;
+            payment_status: string;
+            room?: { room_number: string } | null;
+            client?: { full_name: string } | null;
+          }[];
+          enrichedPayments = (payData as Payment[]).map((p) => {
+            const b = bookingRows.find((bk) => bk.id === p.booking_id);
             return {
               ...p,
               booking: b
@@ -175,6 +295,7 @@ export default function ShiftPage() {
                     payment_status: b.payment_status,
                   }
                 : undefined,
+              receptionist_name: staffMap[p.received_by],
             };
           });
         }
@@ -194,8 +315,7 @@ export default function ShiftPage() {
         .eq("tenant_id", userData.tenant_id)
         .or(`check_in_date.eq.${today},status.eq.checked_in`);
 
-      // Filtrer par résidence active pour les réceptionnistes
-      if (userData.role === "receptionniste" && activeAccId) {
+      if (isReceptionist && activeAccId) {
         bkQuery = bkQuery.eq("accommodation_id", activeAccId);
       }
 
@@ -210,8 +330,110 @@ export default function ShiftPage() {
     }
   }
 
+  // ── Temps réel : rafraîchit les paiements dès qu'un encaissement arrive ──
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("shift-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        () => loadData()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Ouverture du shift ────────────────────────────────────────────────────
+  function openOpenShiftModal() {
+    // Suggère la reprise de caisse du dernier shift fermé (collègue)
+    const lastClosed = closedShifts[0];
+    const suggestion = lastClosed?.counted_cash ?? 0;
+    setOpenShiftForm({
+      opening_cash: suggestion > 0 ? String(suggestion) : "",
+      notes: lastClosed?.counted_cash != null
+        ? `Reprise de la caisse (${fmt(lastClosed.counted_cash)}) laissée par ${staffNames[lastClosed.receptionist_id] || "le collègue"}`
+        : "",
+    });
+    setOpenShiftModalOpen(true);
+  }
+
+  async function handleOpenShift() {
+    const opening = Math.round(Number(openShiftForm.opening_cash)) || 0;
+    if (opening < 0) {
+      toast.error("Le fond de caisse ne peut pas être négatif.");
+      return;
+    }
+    setOpenShiftSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("open_shift", {
+        p_user_id: userId,
+        p_accommodation_id: accommodationId,
+        p_opening_cash: opening,
+        p_notes: openShiftForm.notes?.trim() || null,
+      });
+      if (error) {
+        toast.error("Erreur à l'ouverture du shift : " + error.message);
+        return;
+      }
+      toast.success("Shift ouvert — fond de caisse " + fmt(opening) + " ✓");
+      setOpenShiftModalOpen(false);
+      await loadData();
+    } catch {
+      toast.error("Une erreur est survenue.");
+    } finally {
+      setOpenShiftSaving(false);
+    }
+  }
+
+  // ── Fermeture du shift (relève de caisse) ────────────────────────────────
+  function openCloseShiftModal() {
+    setCloseShiftForm({
+      counted_cash: String(expectedCashLive),
+      notes: "",
+    });
+    setCloseShiftModalOpen(true);
+  }
+
+  async function handleCloseShift() {
+    if (!activeShift) return;
+    const counted = Math.round(Number(closeShiftForm.counted_cash));
+    if (Number.isNaN(counted) || counted < 0) {
+      toast.error("La caisse comptée doit être un montant valide.");
+      return;
+    }
+    setCloseShiftSaving(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("close_shift", {
+        p_shift_id: activeShift.id,
+        p_counted_cash: counted,
+        p_notes: closeShiftForm.notes?.trim() || null,
+      });
+      if (error) {
+        toast.error("Erreur à la fermeture du shift : " + error.message);
+        return;
+      }
+      const diff = (data as Shift)?.difference ?? 0;
+      if (diff === 0) {
+        toast.success("Shift fermé — caisse exacte ✓");
+      } else {
+        toast.warning(`Shift fermé — écart de ${fmtSigned(diff, fmt)}`);
+      }
+      setCloseShiftModalOpen(false);
+      setActiveShift(null);
+      await loadData();
+    } catch {
+      toast.error("Une erreur est survenue.");
+    } finally {
+      setCloseShiftSaving(false);
+    }
+  }
+
   async function addManualOperation() {
-    const amount = parseInt(manualForm.amount);
+    const amount = Math.round(Number(manualForm.amount));
     if (!amount || amount <= 0) {
       toast.error("Le montant doit être supérieur à 0.");
       return;
@@ -243,12 +465,11 @@ export default function ShiftPage() {
       }
       toast.success(
         manualForm.operation_type === "manual_in"
-          ? `➕ Entrée de ${fmt(amount)} enregistrée ✓`
-          : `➖ Sortie de ${fmt(amount)} enregistrée ✓`
+          ? `Entrée de ${fmt(amount)} enregistrée ✓`
+          : `Sortie de ${fmt(amount)} enregistrée ✓`
       );
       setManualModalOpen(false);
       setManualForm({ operation_type: "manual_in", amount: "", payment_method: "cash", mobile_money_operator: "", notes: "" });
-      // Recharger les paiements
       await loadData();
     } catch {
       toast.error("Une erreur est survenue.");
@@ -264,14 +485,6 @@ export default function ShiftPage() {
       </div>
     );
   }
-
-  // Calculs du shift
-  const totalCaisse = payments.reduce((sum, p) => sum + p.amount, 0);
-  const byCash = payments.filter((p) => p.payment_method === "cash").reduce((s, p) => s + p.amount, 0);
-  const byMobileMoney = payments.filter((p) => isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
-  const byOther = payments.filter((p) => p.payment_method !== "cash" && !isMobileMoney(p.payment_method)).reduce((s, p) => s + p.amount, 0);
-  const checkedIn = bookings.filter((b) => b.status === "checked_in").length;
-  const checkinsToday = bookings.filter((b) => b.check_in_date === new Date().toISOString().split("T")[0]).length;
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -294,19 +507,78 @@ export default function ShiftPage() {
             <User className="w-4 h-4" />
             <span>{userName}</span>
           </div>
-          <Button onClick={() => setManualModalOpen(true)} className="gap-2">
+          <Button onClick={() => setManualModalOpen(true)} className="gap-2" variant="outline">
             <Plus className="w-4 h-4" /> Opération de caisse
           </Button>
         </div>
       </div>
 
-      {/* Bannière info admin */}
+      {/* ── Contrôle du shift (réceptionniste) ─────────────────────────────── */}
+      {!isAdmin && (
+        activeShift ? (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                <Timer className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
+                  Shift ouvert
+                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                    <Clock className="w-3 h-3" /> depuis {formatPaymentTime(activeShift.opened_at)}
+                  </span>
+                </p>
+                <p className="text-xs text-green-700/80 dark:text-green-300/80 mt-0.5">
+                  Fond de caisse {fmt(activeShift.opening_cash)} · Espèces encaissées {fmt(cashSinceShiftOpen)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 sm:ml-auto">
+              <div className="text-right">
+                <p className="text-xs text-green-700/70 dark:text-green-300/70">Caisse attendue</p>
+                <p className="text-2xl font-bold text-green-900 dark:text-green-100">{fmt(expectedCashLive)}</p>
+              </div>
+              <Button onClick={openCloseShiftModal} className="gap-2 bg-green-700 hover:bg-green-800">
+                <LogOut className="w-4 h-4" /> Fermer mon shift
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                <Power className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Aucun shift ouvert</p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                  Ouvrez votre shift pour tracer votre caisse et permettre la relève de votre collègue.
+                </p>
+              </div>
+            </div>
+            <div className="sm:ml-auto">
+              <Button onClick={openOpenShiftModal} className="gap-2">
+                <Power className="w-4 h-4" /> Ouvrir mon shift
+              </Button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* ── Vue admin : shifts ouverts en ce moment ────────────────────────── */}
       {isAdmin && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
           <ShieldAlert className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            Vue administrateur — tous les encaissements du jour sont affichés, quel que soit le réceptionniste.
-          </p>
+          <div className="text-sm text-blue-700 dark:text-blue-300">
+            <span className="font-semibold">Vue administrateur</span> — tous les encaissements du jour sont affichés, quel que soit le réceptionniste.
+            {openShiftsAll.length > 0 && (
+              <span className="flex items-center gap-1.5 mt-1 text-xs">
+                <Users className="w-3.5 h-3.5" />
+                Shifts ouverts :{" "}
+                {openShiftsAll.map((s) => `${staffNames[s.receptionist_id] || "Réceptionniste"} (${formatPaymentTime(s.opened_at)}, fond ${fmt(s.opening_cash)})`).join(" · ")}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -348,7 +620,9 @@ export default function ShiftPage() {
             <div>
               <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wide font-medium">Paiements reçus</p>
               <p className="text-3xl font-bold text-slate-900 dark:text-white">{payments.length}</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">depuis minuit</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                {isAdmin ? "aujourd'hui" : activeShift ? "depuis l'ouverture" : "depuis minuit"}
+              </p>
             </div>
           </div>
         </Card>
@@ -391,6 +665,75 @@ export default function ShiftPage() {
         </div>
       </Card>
 
+      {/* ── Historique / traçabilité des shifts ────────────────────────────── */}
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <History className="w-5 h-5 text-indigo-500" />
+            Historique des shifts
+          </h2>
+          {closedShifts.length > 0 && (
+            <span className="text-xs text-slate-400 dark:text-slate-500">{closedShifts.length} shift(s) fermé(s)</span>
+          )}
+        </div>
+        {closedShifts.length === 0 ? (
+          <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-6">
+            Aucun shift fermé pour le moment. La relève de caisse apparaîtra ici.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-700">
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Fermé le</th>
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Réceptionniste</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Ouverture</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Attendu</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Compté</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Écart</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                {closedShifts.map((s) => {
+                  const diff = s.difference ?? 0;
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="py-2.5 px-2">
+                        <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{s.closed_at ? formatDateTime(s.closed_at) : "—"}</span>
+                        </div>
+                        {s.notes && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{s.notes}</p>}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {staffNames[s.receptionist_id] || "Réceptionniste"}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right text-slate-600 dark:text-slate-300">{fmt(s.opening_cash)}</td>
+                      <td className="py-2.5 px-2 text-right text-slate-600 dark:text-slate-300">{fmt(s.expected_cash ?? 0)}</td>
+                      <td className="py-2.5 px-2 text-right font-semibold text-slate-900 dark:text-white">{fmt(s.counted_cash ?? 0)}</td>
+                      <td className="py-2.5 px-2 text-right">
+                        {diff === 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Exact
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 text-xs font-semibold ${diff > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            <Scale className="w-3.5 h-3.5" />
+                            {fmtSigned(diff, fmt)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       {/* Tableau des paiements du shift */}
       <Card className="p-3">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
@@ -412,6 +755,9 @@ export default function ShiftPage() {
                   <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Client</th>
                   <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Chambre</th>
                   <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Mode</th>
+                  {isAdmin && (
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Reçu par</th>
+                  )}
                   <th className="text-right py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Montant</th>
                   <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Statut</th>
                 </tr>
@@ -455,8 +801,15 @@ export default function ShiftPage() {
                           )}
                         </span>
                       </td>
+                      {isAdmin && (
+                        <td className="py-3 px-2">
+                          <span className="text-slate-600 dark:text-slate-300">{p.receptionist_name || "—"}</span>
+                        </td>
+                      )}
                       <td className="py-3 px-2 text-right">
-                        <span className="font-bold text-slate-900 dark:text-white">{fmt(p.amount)}</span>
+                        <span className={`font-bold ${p.amount < 0 ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+                          {fmt(p.amount)}
+                        </span>
                       </td>
                       <td className="py-3 px-2">
                         {p.booking?.payment_status === "paid" ? (
@@ -477,7 +830,7 @@ export default function ShiftPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-200 dark:border-slate-600">
-                  <td colSpan={5} className="py-3 px-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <td colSpan={isAdmin ? 7 : 6} className="py-3 px-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                     Total encaissé ce shift
                   </td>
                   <td className="py-3 px-2 text-right">
@@ -526,6 +879,111 @@ export default function ShiftPage() {
           </div>
         </Card>
       )}
+
+      {/* Modal d'ouverture de shift */}
+      <Modal
+        open={openShiftModalOpen}
+        onClose={() => setOpenShiftModalOpen(false)}
+        title="Ouvrir mon shift"
+        description="Saisissez le fond de caisse que vous reprenez avant de commencer votre service."
+      >
+        <div className="space-y-3">
+          <Input
+            label="Fond de caisse (reprise)"
+            type="number"
+            placeholder="Ex: 50000"
+            value={openShiftForm.opening_cash}
+            onChange={(e) => setOpenShiftForm({ ...openShiftForm, opening_cash: e.target.value })}
+          />
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              Note de reprise (visible par le collègue suivant)
+            </label>
+            <textarea
+              rows={3}
+              value={openShiftForm.notes}
+              onChange={(e) => setOpenShiftForm({ ...openShiftForm, notes: e.target.value })}
+              placeholder="Ex: Reprise de la caisse laissée par Marie"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-900 dark:text-white"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-3">
+            <Button variant="secondary" onClick={() => setOpenShiftModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleOpenShift} loading={openShiftSaving}>
+              <Power className="w-4 h-4" /> Ouvrir le shift
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de fermeture de shift (relève de caisse) */}
+      <Modal
+        open={closeShiftModalOpen}
+        onClose={() => setCloseShiftModalOpen(false)}
+        title="Fermer mon shift"
+        description="Comptez la caisse physique puis validez la relève pour votre collègue."
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Fond de caisse</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{fmt(activeShift?.opening_cash ?? 0)}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Espèces encaissées</p>
+              <p className="text-lg font-bold text-slate-900 dark:text-white">{fmt(cashSinceShiftOpen)}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <p className="text-xs text-green-600 dark:text-green-400 mb-1">Caisse attendue</p>
+              <p className="text-lg font-bold text-green-700 dark:text-green-300">{fmt(expectedCashLive)}</p>
+            </div>
+          </div>
+
+          <Input
+            label="Caisse comptée physiquement"
+            type="number"
+            value={closeShiftForm.counted_cash}
+            onChange={(e) => setCloseShiftForm({ ...closeShiftForm, counted_cash: e.target.value })}
+          />
+
+          {(() => {
+            const counted = Math.round(Number(closeShiftForm.counted_cash));
+            const diff = Number.isNaN(counted) ? 0 : counted - expectedCashLive;
+            if (Number.isNaN(counted)) return null;
+            return (
+              <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${diff === 0 ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800" : diff > 0 ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"}`}>
+                <Scale className="w-4 h-4" />
+                {diff === 0 ? "Caisse exacte — aucune différence" : `Écart de caisse : ${fmtSigned(diff, fmt)}`}
+              </div>
+            );
+          })()}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+              Note de relève (pour votre collègue)
+            </label>
+            <textarea
+              rows={3}
+              value={closeShiftForm.notes}
+              onChange={(e) => setCloseShiftForm({ ...closeShiftForm, notes: e.target.value })}
+              placeholder="Ex: 50000 en caisse, coffre verrouillé, clé au tiroir"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3">
+            <Button variant="secondary" onClick={() => setCloseShiftModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleCloseShift} loading={closeShiftSaving} variant="success">
+              <RefreshCw className="w-4 h-4" /> Fermer et transmettre
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal d'opération manuelle */}
       <Modal
         open={manualModalOpen}
@@ -536,7 +994,7 @@ export default function ShiftPage() {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-              Type d'opération
+              Type d&apos;opération
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -620,7 +1078,7 @@ export default function ShiftPage() {
               Annuler
             </Button>
             <Button onClick={addManualOperation} loading={manualSaving}>
-              Enregistrer l'opération
+              Enregistrer l&apos;opération
             </Button>
           </div>
         </div>

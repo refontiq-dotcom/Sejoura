@@ -136,6 +136,7 @@ export async function POST(request: Request) {
       payment_date: now,
       reference: checkout?.id ?? eventId,
       received_by: receivedBy,
+      operation_type: "subscription",
       notes: `Paiement d'abonnement Wave ${eventId}`,
     });
 

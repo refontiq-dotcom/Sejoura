@@ -76,6 +76,16 @@ export default function BookingsPage() {
   const [extendAmount, setExtendAmount] = useState("");
   const [extendPaymentMethod, setExtendPaymentMethod] = useState("");
   const [extendMobileOperator, setExtendMobileOperator] = useState("");
+  // Règlement au check-out : si un solde reste dû, la réceptionniste encaisse
+  // le reliquat (montant, moyen, opérateur) au moment du départ.
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [checkoutBooking, setCheckoutBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [checkoutSaving, setCheckoutSaving] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState({
+    amount: "",
+    payment_method: "",
+    mobile_money_operator: "",
+  });
   const [filterStatus, setFilterStatus] = useState<string>(() => {
     if (typeof window !== "undefined" && window.location.search.includes("status=overdue")) {
       return "overdue";
@@ -696,6 +706,18 @@ export default function BookingsPage() {
       setConfirmAction({ id: bookingId, action });
       return;
     }
+    // Règlement du solde avant check-out : si un montant reste dû (paiement
+    // partiel, nuits de dépassement), on ouvre la modal d'encaissement.
+    if (action === "check_out") {
+      const b = bookings.find((x) => x.id === bookingId);
+      const remaining = b ? Math.max(0, (b.total_amount || 0) - (b.amount_paid || 0)) : 0;
+      if (b && remaining > 0) {
+        setCheckoutBooking(b);
+        setCheckoutForm({ amount: String(remaining), payment_method: "cash", mobile_money_operator: "" });
+        setCheckoutModalOpen(true);
+        return;
+      }
+    }
     await executeAction(bookingId, action);
   }
 
@@ -746,7 +768,9 @@ export default function BookingsPage() {
       }
 
       // ── ENREGISTREMENT DU PAIEMENT DU SUPPLÉMENT ──────────────────────────
-      const paidAmount = parseInt(extendAmount) || 0;
+      // Math.round : si le champ contient une décimale (ex. « 83999.9 »), on
+      // arrondit au FCFA le plus proche au lieu de tronquer (parseInt → 83999).
+      const paidAmount = Math.round(Number(extendAmount)) || 0;
       if (extendPaid && extendedBooking && paidAmount > 0) {
         const nightsAdded = nights - (extendBooking.nights_count || 0);
         const { error: payErr } = await supabase
@@ -793,6 +817,106 @@ export default function BookingsPage() {
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Exécute le check-out (RPC avec repli sur mise à jour directe).
+  async function doCheckout(bookingId: string): Promise<boolean> {
+    const supabase = createClient();
+    const { error: rpcErr } = await supabase.rpc("check_out_booking", {
+      p_booking_id: bookingId,
+      p_user_id: userId,
+    });
+    if (rpcErr) {
+      const { error: uErr } = await supabase
+        .from("bookings")
+        .update({ status: "checked_out", actual_check_out: new Date().toISOString() })
+        .eq("id", bookingId);
+      if (uErr) {
+        toast.error("Impossible de confirmer le check-out : " + uErr.message);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Règle le solde restant au check-out : encaisse le reliquat (payments),
+  // puis confirme le départ. Le trigger recalcule automatiquement le statut.
+  async function handleCheckoutConfirm() {
+    const b = checkoutBooking;
+    if (!b) return;
+    const amount = Math.round(Number(checkoutForm.amount)) || 0;
+    if (amount < 0) {
+      toast.error("Le montant doit être positif.");
+      return;
+    }
+    if (amount > 0 && !checkoutForm.payment_method) {
+      toast.error("Sélectionnez un moyen de paiement.");
+      return;
+    }
+    setCheckoutSaving(true);
+    try {
+      const ok = await doCheckout(b.id);
+      if (!ok) return;
+
+      if (amount > 0) {
+        const method = checkoutForm.payment_method as PaymentMethod;
+        const supabase = createClient();
+        const { error: payErr } = await supabase
+          .from("payments")
+          .insert({
+            tenant_id: b.tenant_id,
+            booking_id: b.id,
+            accommodation_id: b.accommodation_id,
+            amount,
+            payment_method: method,
+            mobile_money_operator: method === "mobile_money" ? checkoutForm.mobile_money_operator || null : null,
+            payment_date: new Date().toISOString(),
+            received_by: userId,
+            operation_type: "booking",
+            notes: "Règlement au check-out — solde du séjour",
+          });
+
+        if (payErr) {
+          toast.error("Check-out confirmé, mais le règlement n'a pas pu être enregistré : " + payErr.message);
+        } else {
+          toast.success(`Check-out confirmé — ${fmt(amount)} encaissé ✓`);
+        }
+      } else {
+        toast.success("Check-out confirmé (aucun solde dû) ✓");
+      }
+
+      setCheckoutModalOpen(false);
+      setCheckoutBooking(null);
+      await runOverstayCheck();
+      loadBookings(tenantId);
+    } catch (err) {
+      toast.error("Une erreur est survenue lors du check-out.");
+      console.error(err);
+    } finally {
+      setCheckoutSaving(false);
+    }
+  }
+
+  // Check-out sans encaisser le solde (le client réglera plus tard) :
+  // conserve la traçabilité en laissant un solde "partial".
+  async function handleCheckoutSkip() {
+    const b = checkoutBooking;
+    if (!b) return;
+    setCheckoutSaving(true);
+    try {
+      const ok = await doCheckout(b.id);
+      if (!ok) return;
+      toast.success("Check-out confirmé (sans encaissement) ✓");
+      setCheckoutModalOpen(false);
+      setCheckoutBooking(null);
+      await runOverstayCheck();
+      loadBookings(tenantId);
+    } catch (err) {
+      toast.error("Une erreur est survenue lors du check-out.");
+      console.error(err);
+    } finally {
+      setCheckoutSaving(false);
     }
   }
 
@@ -1641,7 +1765,17 @@ export default function BookingsPage() {
               type="date"
               value={extendDate}
               min={extendBooking ? new Date(extendBooking.check_in_date).toISOString().split("T")[0] : undefined}
-              onChange={(e) => setExtendDate(e.target.value)}
+              onChange={(e) => {
+                const date = e.target.value;
+                setExtendDate(date);
+                // Resynchronise le montant pré-rempli avec le supplément réel :
+                // le champ doit suivre la date choisie, pas rester sur « +1 nuit ».
+                if (extendBooking && date) {
+                  const nights = calculateNights(extendBooking.check_in_date, date);
+                  const supplement = Math.max(0, (extendBooking.negotiated_price || 0) * nights - (extendBooking.total_amount || 0));
+                  setExtendAmount(supplement > 0 ? String(supplement) : "");
+                }
+              }}
             />
           </div>
 
@@ -1713,6 +1847,83 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setExtendModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleExtendBooking} loading={saving}>
               <Calendar className="w-4 h-4" /> Prolonger le séjour
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Règlement au check-out (solde restant dû) */}
+      <Modal
+        open={checkoutModalOpen}
+        onClose={() => setCheckoutModalOpen(false)}
+        title="Règlement au check-out"
+        description={checkoutBooking ? `${checkoutBooking.client?.full_name || "Client"} · Ch. ${checkoutBooking.room?.room_number || "—"} · ${formatDate(checkoutBooking.check_out_date)}` : ""}
+      >
+        <div className="space-y-3">
+          {checkoutBooking && (
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p>
+                  Total du séjour : <strong>{fmt(checkoutBooking.total_amount)}</strong>
+                  {" · "}Déjà réglé : <strong>{fmt(checkoutBooking.amount_paid)}</strong>
+                </p>
+                <p className="mt-1 font-semibold">
+                  Solde restant dû : <strong>{fmt(Math.max(0, checkoutBooking.total_amount - checkoutBooking.amount_paid))}</strong>
+                </p>
+              </div>
+            </div>
+          )}
+
+          <Input
+            label="Montant encaissé (FCFA)"
+            type="number"
+            value={checkoutForm.amount}
+            onChange={(e) => setCheckoutForm({ ...checkoutForm, amount: e.target.value })}
+          />
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Moyen de paiement</label>
+            <select
+              name="checkout_payment_method"
+              value={checkoutForm.payment_method}
+              onChange={(e) => setCheckoutForm({ ...checkoutForm, payment_method: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            >
+              <option value="">Sélectionner un moyen de paiement</option>
+              <option value="cash">Espèces</option>
+              <option value="mobile_money">Mobile Money</option>
+              <option value="bank">Virement bancaire</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+          {checkoutForm.payment_method === "mobile_money" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Opérateur Mobile Money</label>
+              <select
+                name="checkout_mobile_operator"
+                value={checkoutForm.mobile_money_operator}
+                onChange={(e) => setCheckoutForm({ ...checkoutForm, mobile_money_operator: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="">Sélectionner un opérateur</option>
+                {MOBILE_MONEY_OPERATORS.map((op) => (
+                  <option key={op.value} value={op.value}>{op.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleCheckoutSkip}
+              loading={checkoutSaving}
+            >
+              Confirmer sans encaisser
+            </Button>
+            <Button className="flex-1" onClick={handleCheckoutConfirm} loading={checkoutSaving}>
+              <LogOut className="w-4 h-4" /> Check-out + règlement
             </Button>
           </div>
         </div>
