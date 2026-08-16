@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import { canAccessFeature } from "@/lib/subscription-plans";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice } from "@/types/database";
 
 export default function BookingsPage() {
@@ -90,6 +91,10 @@ export default function BookingsPage() {
   const [actioningId, setActioningId] = useState<string>("");
   const [tenantId, setTenantId] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
+  // Formule d'abonnement : contrôle l'accès à l'espace client (Entreprise uniquement)
+  const [plan, setPlan] = useState("free");
+  const [portalUpsell, setPortalUpsell] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
   // Filtre de résidence appliqué au rechargement des réservations (réceptionniste
   // affecté à un établissement). Conservé dans une ref pour le rechargement
   // temps réel, qui ne doit pas se resouscrire à chaque rendu.
@@ -103,11 +108,44 @@ export default function BookingsPage() {
   const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
   const [emailInput, setEmailInput] = useState("");
 
-  function shareStayWhatsApp(phone: string, clientName: string, bookingCode: string) {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const stayLink = `${origin}/stay?code=${encodeURIComponent(bookingCode)}`;
-    const cleanPhone = (phone || "").replace(/[^0-9]/g, "");
-    const message = `Bonjour ${clientName}, bienvenue ! Voici votre lien d'accès à l'espace client pour votre séjour (Code: ${bookingCode}) :\n${stayLink}`;
+  // Génère (ou réutilise) l'accès client sécurisé d'une réservation.
+  // Formule Entreprise uniquement — sinon, propose l'upgrade.
+  async function ensureClientAccess(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    if (!canAccessFeature("clientPortal", plan)) {
+      setPortalUpsell(true);
+      return null;
+    }
+    setPortalLoading(true);
+    try {
+      const res = await fetch("/api/stay/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: b.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 403) {
+          setPortalUpsell(true);
+          return null;
+        }
+        toast.error(json?.error || "Impossible de générer l'accès client.");
+        return null;
+      }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      return { url: `${origin}${json.url}` };
+    } catch {
+      toast.error("Une erreur est survenue.");
+      return null;
+    } finally {
+      setPortalLoading(false);
+    }
+  }
+
+  async function shareStayWhatsApp(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    const access = await ensureClientAccess(b);
+    if (!access) return;
+    const cleanPhone = (b.client?.phone || "").replace(/[^0-9]/g, "");
+    const message = `Bonjour ${b.client?.full_name || "Client"}, bienvenue ! Voici votre lien d'accès à l'espace client pour votre séjour (Code: ${b.booking_code}) :\n${access.url}`;
     if (cleanPhone) {
       window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
     } else {
@@ -115,11 +153,11 @@ export default function BookingsPage() {
     }
   }
 
-  function copyStayLink(bookingCode: string) {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const stayLink = `${origin}/stay?code=${encodeURIComponent(bookingCode)}`;
-    navigator.clipboard.writeText(stayLink);
-    toast.success(`Lien du séjour ${bookingCode} copié !`);
+  async function copyStayLink(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    const access = await ensureClientAccess(b);
+    if (!access) return;
+    navigator.clipboard.writeText(access.url);
+    toast.success(`Lien du séjour ${b.booking_code} copié !`);
   }
 
   const ITEMS_PER_PAGE = 10;
@@ -195,6 +233,14 @@ export default function BookingsPage() {
       if (!userData) return;
       setTenantId(userData.tenant_id);
       setUserId(userData.id);
+
+      // Formule d'abonnement (gating espace client Entreprise)
+      const { data: subData } = await supabase
+        .from("subscriptions")
+        .select("plan")
+        .eq("tenant_id", userData.tenant_id)
+        .maybeSingle();
+      if (subData) setPlan(subData.plan);
 
       // Résoudre l'affectation active (temporaire ou permanente) pour l'utilisateur
       const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
@@ -1086,10 +1132,10 @@ export default function BookingsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Séjour</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => shareStayWhatsApp(b.client?.phone || "", b.client?.full_name || "Client", b.booking_code)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                            <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                               <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => copyStayLink(b.booking_code)}>
+                            <DropdownMenuItem onSelect={() => copyStayLink(b)}>
                               <Copy className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Copier le lien du séjour
                             </DropdownMenuItem>
                             {b.status === "checked_in" && (
@@ -1270,14 +1316,14 @@ export default function BookingsPage() {
                             <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{fmt(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => shareStayWhatsApp(selectedClient.phone || "", selectedClient.full_name, bk.booking_code)}
+                                onClick={() => shareStayWhatsApp(bk)}
                                 className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-xs flex items-center gap-1 font-medium"
                                 title="Partager WhatsApp"
                               >
                                 <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
                               </button>
                               <button
-                                onClick={() => copyStayLink(bk.booking_code)}
+                                onClick={() => copyStayLink(bk)}
                                 className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] text-xs flex items-center gap-1 font-medium"
                                 title="Copier le lien"
                               >
@@ -1671,6 +1717,37 @@ export default function BookingsPage() {
             </div>
           </Modal>
         )}
+
+        {/* Modal Upsell Espace client (formule Entreprise) */}
+        <Modal
+          open={portalUpsell}
+          onClose={() => setPortalUpsell(false)}
+          title="Espace client — Formule Entreprise"
+          size="sm"
+        >
+          <div className="space-y-4 pt-1">
+            <div className="flex items-start gap-3 rounded-xl bg-gradient-to-br from-[var(--primary-muted,#E8EDF5)] to-transparent p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-color,#0C1C33)] text-white">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                Offrez à chaque client une <strong>page séjour privée</strong>, accessible depuis son
+                mobile : infos du séjour, demandes de services et suivi du paiement, actives pendant
+                toute la durée du séjour — automatiquement prolongées en cas de prolongation.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <a href="/dashboard/subscription">
+                <Button className="w-full gap-2" loading={portalLoading}>
+                  <Sparkles className="h-4 w-4" /> Passer à la formule Entreprise
+                </Button>
+              </a>
+              <Button variant="outline" onClick={() => setPortalUpsell(false)}>
+                Plus tard
+              </Button>
+            </div>
+          </div>
+        </Modal>
     </div>
   );
 }

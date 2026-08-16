@@ -429,6 +429,69 @@ export interface ClientSession {
   created_at: string;
 }
 
+export type ClientServiceRequestType = "cleaning" | "linen" | "assistance";
+
+export interface ClientServiceRequest {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string;
+  request_type: ClientServiceRequestType;
+  message: string | null;
+  status: "pending" | "done" | "cancelled";
+  created_at: string;
+}
+
+/**
+ * Payload renvoyé par la fonction RPC get_client_stay (espace client public).
+ */
+export interface ClientStayPayload {
+  valid: boolean;
+  state: "active" | "ended" | "expired" | "cancelled" | "invalid" | "unavailable";
+  reason?: string;
+  session?: {
+    id: string;
+    expires_at: string;
+    is_overstay: boolean;
+  };
+  tenant?: {
+    company_name: string;
+    logo_url: string | null;
+    primary_color: string;
+    contact_phone: string | null;
+  };
+  accommodation?: {
+    name: string;
+    address: string | null;
+    city: string | null;
+    contact_phone: string | null;
+  };
+  room?: {
+    room_number: string;
+    floor: number | null;
+    room_type_name: string;
+    capacity: number;
+    amenities: unknown[];
+  };
+  booking?: {
+    id: string;
+    booking_code: string;
+    check_in_date: string;
+    check_out_date: string;
+    check_in_time: string;
+    check_out_time: string;
+    nights_count: number;
+    status: BookingStatus;
+    payment_status: PaymentStatus;
+    total_amount: number;
+    amount_paid: number;
+    special_requests: string | null;
+  };
+  client?: {
+    full_name: string;
+  };
+}
+
 export interface WhatsAppMessage {
   id: string;
   tenant_id: string;
@@ -605,6 +668,11 @@ export interface Database {
         Insert: Omit<ClientSession, "id" | "created_at">;
         Update: Partial<Omit<ClientSession, "id" | "created_at">>;
       };
+      client_service_requests: {
+        Row: ClientServiceRequest;
+        Insert: Omit<ClientServiceRequest, "id" | "created_at">;
+        Update: Partial<Omit<ClientServiceRequest, "id" | "created_at">>;
+      };
       whatsapp_messages: {
         Row: WhatsAppMessage;
         Insert: Omit<WhatsAppMessage, "id" | "created_at">;
@@ -714,6 +782,14 @@ export interface Database {
       sync_subscription_statuses: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      get_client_stay: {
+        Args: { p_token: string };
+        Returns: ClientStayPayload;
+      };
+      create_service_request: {
+        Args: { p_token: string; p_request_type: string; p_message?: string };
+        Returns: { ok: boolean; error?: string; id?: string; request_type?: string; status?: string };
       };
     };
   };

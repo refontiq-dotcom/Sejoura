@@ -24,6 +24,14 @@ describe("subscription-plans", () => {
     expect(canAccessFeature("trouvetouBoost", "entreprise")).toBe(true);
   });
 
+  it("réserve l'espace client (page séjour) à la formule Entreprise", () => {
+    expect(canAccessFeature("clientPortal", "free")).toBe(false);
+    expect(canAccessFeature("clientPortal", "essentiel")).toBe(false);
+    expect(canAccessFeature("clientPortal", "standard")).toBe(false);
+    expect(canAccessFeature("clientPortal", "entreprise")).toBe(true);
+    expect(canAccessFeature("clientPortal", "enterprise")).toBe(true);
+  });
+
   it("fournit les liens de paiement Wave par forfait", () => {
     expect(getWavePayLink("essentiel")).toBe(
       "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000"
