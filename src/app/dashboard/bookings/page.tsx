@@ -875,6 +875,10 @@ export default function BookingsPage() {
       setExtendBooking(null);
       await runOverstayCheck();
       loadBookings(tenantId);
+      // La prolongation change le montant total : on recharge les factures pour
+      // refléter le nouveau total (le trigger DB met à jour les brouillons et
+      // invalide le PDF, qui sera régénéré au prochain clic).
+      loadInvoices(tenantId);
     } catch (err) {
       toast.error("Une erreur est survenue lors de la prolongation.");
       console.error(err);
