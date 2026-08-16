@@ -812,6 +812,17 @@ export interface Database {
       };
       check_in_booking: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
       check_out_booking: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
+      update_booking: {
+        Args: {
+          p_booking_id: string;
+          p_user_id: string;
+          p_check_in_date?: string;
+          p_check_out_date?: string;
+          p_room_id?: string;
+          p_negotiated_price?: number;
+        };
+        Returns: Booking;
+      };
       cancel_booking: {
         Args: { p_booking_id: string; p_user_id: string; p_reason?: string };
         Returns: Booking;

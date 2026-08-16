@@ -49,6 +49,7 @@ import {
   ExternalLink,
   Receipt,
   MoreHorizontal,
+  Pencil,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -90,6 +91,15 @@ export default function BookingsPage() {
   const [extendAmount, setExtendAmount] = useState("");
   const [extendPaymentMethod, setExtendPaymentMethod] = useState("");
   const [extendMobileOperator, setExtendMobileOperator] = useState("");
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editBooking, setEditBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [editForm, setEditForm] = useState({
+    check_in_date: "",
+    check_out_date: "",
+    room_id: "",
+    negotiated_price: "",
+  });
+  const [editError, setEditError] = useState("");
   // Règlement au check-out : si un solde reste dû, la réceptionniste encaisse
   // le reliquat (montant, moyen, opérateur) au moment du départ.
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
@@ -786,6 +796,65 @@ export default function BookingsPage() {
     setExtendModalOpen(true);
   }
 
+  // Ouvre la modal de modification : pré-remplit les champs avec les valeurs
+  // actuelles et charge les chambres de l'établissement concerné.
+  function openEditModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    setEditBooking(booking);
+    setEditForm({
+      check_in_date: booking.check_in_date,
+      check_out_date: booking.check_out_date,
+      room_id: booking.room_id || "",
+      negotiated_price: String(booking.negotiated_price ?? ""),
+    });
+    setEditError("");
+    setEditModalOpen(true);
+    loadRoomsForAccommodation(booking.accommodation_id);
+  }
+
+  // Modifie la réservation (dates, chambre, prix) via la RPC update_booking.
+  async function handleSaveEdit() {
+    if (!editBooking) return;
+    const nights = calculateNights(editForm.check_in_date, editForm.check_out_date);
+    if (nights <= 0) {
+      setEditError("La date de départ doit être après la date d'arrivée.");
+      return;
+    }
+    setSaving(true);
+    setEditError("");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("update_booking", {
+        p_booking_id: editBooking.id,
+        p_user_id: userId,
+        p_check_in_date: editForm.check_in_date || null,
+        p_check_out_date: editForm.check_out_date || null,
+        p_room_id: editForm.room_id || null,
+        p_negotiated_price: editForm.negotiated_price ? Math.round(Number(editForm.negotiated_price)) : null,
+      });
+      if (error) {
+        if (error.message.includes("DOUBLE_BOOKING")) {
+          setEditError("La chambre est déjà réservée sur la nouvelle période.");
+        } else if (error.message.includes("CHECKED_IN")) {
+          setEditError("La date d'arrivée ne peut plus être modifiée une fois le client installé.");
+        } else {
+          setEditError(error.message);
+        }
+        return;
+      }
+      setEditModalOpen(false);
+      setEditBooking(null);
+      await runOverstayCheck();
+      loadBookings(tenantId);
+      loadInvoices(tenantId);
+      toast.success("Réservation modifiée.");
+    } catch (err) {
+      setEditError("Une erreur est survenue lors de la modification.");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Prolonge le séjour : nouvelle date de départ, recalcul du montant total dû.
   // Si la réceptionniste indique que le client a payé le supplément, le paiement
   // est enregistré en caisse (payments) et le statut de la réservation est mis à jour.
@@ -1478,6 +1547,11 @@ export default function BookingsPage() {
                                 <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
                               </DropdownMenuItem>
                             )}
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <DropdownMenuItem onSelect={() => openEditModal(b)}>
+                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier la réservation
+                              </DropdownMenuItem>
+                            )}
                             {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
                               <>
                                 <DropdownMenuSeparator />
@@ -1999,6 +2073,107 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setExtendModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleExtendBooking} loading={saving}>
               <Calendar className="w-4 h-4" /> Prolonger le séjour
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Modifier la réservation (dates, chambre, prix) */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title="Modifier la réservation"
+        description={editBooking ? `${editBooking.client?.full_name || "Client"} · Ch. ${editBooking.room?.room_number || "—"} · ${formatDate(editBooking.check_in_date)} → ${formatDate(editBooking.check_out_date)}` : ""}
+      >
+        <div className="space-y-3">
+          {editError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              {editError}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Date d&apos;arrivée</label>
+            <Input
+              type="date"
+              value={editForm.check_in_date}
+              disabled={editBooking?.status === "checked_in"}
+              onChange={(e) => setEditForm({ ...editForm, check_in_date: e.target.value })}
+            />
+            {editBooking?.status === "checked_in" && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Client installé : la date d&apos;arrivée ne peut plus être modifiée.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Date de départ</label>
+            <Input
+              type="date"
+              value={editForm.check_out_date}
+              min={editForm.check_in_date || undefined}
+              onChange={(e) => setEditForm({ ...editForm, check_out_date: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Chambre</label>
+            <select
+              value={editForm.room_id}
+              onChange={(e) => {
+                const room = rooms.find((r) => r.id === e.target.value);
+                const rt = roomTypes.find((t) => t.id === room?.room_type_id);
+                setEditForm({
+                  ...editForm,
+                  room_id: e.target.value,
+                  negotiated_price: rt?.base_price != null ? String(rt.base_price) : editForm.negotiated_price,
+                });
+              }}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            >
+              <option value="">Conserver la chambre actuelle ({editBooking?.room?.room_number || "—"})</option>
+              {rooms
+                .filter((r) => !editBooking || r.accommodation_id === editBooking.accommodation_id)
+                .map((r) => {
+                  const rt = roomTypes.find((t) => t.id === r.room_type_id);
+                  return (
+                    <option key={r.id} value={r.id}>
+                      Ch. {r.room_number} — {rt?.name || ""} — {rt ? fmt(rt.base_price) : ""}
+                    </option>
+                  );
+                })}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Prix par nuit (FCFA)</label>
+            <Input
+              type="number"
+              value={editForm.negotiated_price}
+              min={0}
+              onChange={(e) => setEditForm({ ...editForm, negotiated_price: e.target.value })}
+            />
+          </div>
+
+          {editBooking && (() => {
+            const nights = calculateNights(editForm.check_in_date, editForm.check_out_date);
+            const price = Number(editForm.negotiated_price) || 0;
+            if (nights <= 0 || price <= 0) return null;
+            return (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-200 border border-indigo-200 dark:border-indigo-800">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <p className="text-sm">
+                  Nouveau total : <strong>{fmt(nights * price)}</strong> ({nights} nuit(s) × {fmt(price)}).
+                  Le statut de paiement sera recalculé automatiquement.
+                </p>
+              </div>
+            );
+          })()}
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setEditModalOpen(false)}>Annuler</Button>
+            <Button className="flex-1" onClick={handleSaveEdit} loading={saving}>
+              <Pencil className="w-4 h-4" /> Enregistrer les modifications
             </Button>
           </div>
         </div>
