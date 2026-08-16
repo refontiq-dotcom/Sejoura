@@ -30,14 +30,16 @@ import {
   Lightbulb,
   Info,
   Sparkles,
+  Smartphone,
 } from "lucide-react";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
 import { SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { useLanguage } from "@/hooks/use-language";
 import { useCurrency } from "@/hooks/use-currency";
 import { translations } from "@/lib/translations";
-import type { Tenant, User as UserType } from "@/types/database";
+import type { Tenant, User as UserType, GuestInfo } from "@/types/database";
 import { IdeaBoxSection } from "@/components/dashboard/idea-box";
+import { GuestInfoEditor } from "@/components/dashboard/guest-info-editor";
 
 function themeHex(color: string) {
   return color.startsWith("#") ? color : getThemePresetById(color).sidebarBg;
@@ -447,6 +449,17 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSaveGuestInfo(info: GuestInfo) {
+    const ok = await saveTenant(
+      { guest_info: info as unknown as Record<string, unknown> },
+      { successMessage: "Conditions de l'espace client enregistrées ✓" }
+    );
+    if (ok) {
+      setTenant((prev) => (prev ? { ...prev, guest_info: info } : prev));
+    }
+    return ok;
+  }
+
   async function handleLogout() {
     try {
       const supabase = createClient();
@@ -561,6 +574,7 @@ export default function SettingsPage() {
     { key: "company",       label: sectionLabelMap["company"]       || "Entreprise",    icon: Building2 },
     { key: "account",       label: sectionLabelMap["account"]       || "Compte",         icon: User },
     { key: "appearance",    label: sectionLabelMap["appearance"]    || "Apparence",      icon: theme === "dark" ? Moon : Sun },
+    { key: "portal",        label: sectionLabelMap["portal"]        || "Espace client",  icon: Smartphone },
     { key: "notifications", label: sectionLabelMap["notifications"] || "Notifications", icon: Bell },
     { key: "billing",       label: sectionLabelMap["billing"]       || "Facturation",    icon: CreditCard },
     { key: "whatsapp",      label: sectionLabelMap["whatsapp"]      || "WhatsApp",       icon: MessageSquare },
@@ -974,6 +988,38 @@ export default function SettingsPage() {
                 </div>
               </div>
             </Card>
+          )}
+
+          {/* Espace client */}
+          {activeSection === "portal" && (
+            <div className="space-y-3">
+              <Card className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
+                    <Smartphone className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Espace client</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">
+                      Infos pratiques, règlement intérieur et numéro d&apos;urgence affichés sur la page privée
+                      de chaque réservation (accessible pendant le séjour). L&apos;aperçu à droite reproduit
+                      exactement ce que verront vos clients.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <GuestInfoEditor
+                initial={tenant?.guest_info ?? null}
+                branding={{
+                  company_name: tenant?.company_name ?? "",
+                  logo_url: tenant?.logo_url ?? null,
+                  primary_color: tenant?.primary_color ?? null,
+                }}
+                saving={saving}
+                onSave={handleSaveGuestInfo}
+              />
+            </div>
           )}
 
           {/* Notifications */}

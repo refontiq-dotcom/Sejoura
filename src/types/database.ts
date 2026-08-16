@@ -74,11 +74,36 @@ export interface Tenant {
   primary_color?: string | null;
   default_currency?: string | null;
   default_currency_symbol?: string | null;
+  guest_info?: GuestInfo | null;
   is_suspended: boolean;
   suspended_reason: string | null;
   suspended_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Une ligne d'info pratique affichée sur la page client (icône + libellé + valeur). */
+export interface GuestInfoItem {
+  icon: string;
+  label: string;
+  value: string;
+}
+
+/** Une règle du règlement intérieur affichée sur la page client. */
+export interface HouseRule {
+  title: string;
+  description?: string;
+}
+
+/**
+ * Conditions & infos client configurées par l'établissement (Paramètres →
+ * Espace client) et affichées sur la page /stay.
+ */
+export interface GuestInfo {
+  practical_info: GuestInfoItem[];
+  house_rules: HouseRule[];
+  checkin_note?: string;
+  emergency_phone?: string;
 }
 
 export interface Subscription {
@@ -459,6 +484,7 @@ export interface ClientStayPayload {
     logo_url: string | null;
     primary_color: string;
     contact_phone: string | null;
+    guest_info: GuestInfo | null;
   };
   accommodation?: {
     name: string;

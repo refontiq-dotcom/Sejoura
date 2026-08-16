@@ -28,19 +28,10 @@ import {
 } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 import { Button } from "@/components/ui/button";
-import { getThemePresetById } from "@/lib/colors";
+import { getGuestInfoIcon, resolvePrimaryColor } from "@/lib/guest-info";
 import type { ClientStayPayload } from "@/types/database";
 
 type Tab = "home" | "services" | "payment" | "contact";
-
-// Résout la couleur primaire de l'établissement : accepte un hex (#0C1C33) ou
-// un identifiant de thème ("navy") stocké en base (settings → thème).
-function resolvePrimaryColor(value?: string | null): string {
-  if (!value || !value.trim()) return "#0C1C33";
-  const clean = value.trim();
-  if (/^#[0-9a-f]{6}$/i.test(clean)) return clean;
-  return getThemePresetById(clean).sidebarBg;
-}
 
 interface ServiceRequestDraft {
   type: string;
@@ -188,6 +179,7 @@ function StayPortal() {
   const accommodation = data.accommodation!;
   const room = data.room!;
   const client = data.client!;
+  const guestInfo = data.tenant?.guest_info ?? null;
 
   const checkOutDate = new Date(`${booking.check_out_date}T${booking.check_out_time || "11:00"}`);
   const checkInDate = new Date(`${booking.check_in_date}T${booking.check_in_time || "14:00"}`);
@@ -367,10 +359,24 @@ function StayPortal() {
                     Check-in {booking.check_in_time} · Check-out {booking.check_out_time}
                   </span>
                 </li>
-                <li className="flex items-start gap-3">
-                  <Wifi className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="text-slate-600 dark:text-slate-300">Wi-Fi gratuit disponible</span>
-                </li>
+                {guestInfo?.practical_info?.length ? (
+                  guestInfo.practical_info.map((item, index) => {
+                    const Icon = getGuestInfoIcon(item.icon);
+                    return (
+                      <li key={index} className="flex items-start gap-3">
+                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                        <span className="text-slate-600 dark:text-slate-300">
+                          <span className="font-semibold">{item.label}</span> · {item.value}
+                        </span>
+                      </li>
+                    );
+                  })
+                ) : (
+                  <li className="flex items-start gap-3">
+                    <Wifi className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                    <span className="text-slate-600 dark:text-slate-300">Wi-Fi gratuit disponible</span>
+                  </li>
+                )}
                 {booking.special_requests ? (
                   <li className="flex items-start gap-3">
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
@@ -379,6 +385,37 @@ function StayPortal() {
                 ) : null}
               </ul>
             </div>
+
+            {/* Note de check-in */}
+            {guestInfo?.checkin_note ? (
+              <div className="flex items-start gap-2.5 rounded-3xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-900/20 dark:text-sky-200">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{guestInfo.checkin_note}</span>
+              </div>
+            ) : null}
+
+            {/* Règlement de l'établissement */}
+            {guestInfo?.house_rules?.length ? (
+              <div className="rounded-3xl border border-[var(--border-card)] bg-white p-5 shadow-sm dark:bg-slate-900">
+                <h3 className="mb-3 text-sm font-bold">Règlement de l&apos;établissement</h3>
+                <ol className="space-y-3 text-sm">
+                  {guestInfo.house_rules.map((rule, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <span
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                        style={{ background: primaryColor }}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="text-slate-600 dark:text-slate-300">
+                        <span className="font-semibold">{rule.title}</span>
+                        {rule.description ? <span className="text-slate-500 dark:text-slate-400"> — {rule.description}</span> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
 
             {/* Accès rapides */}
             <button
@@ -471,6 +508,21 @@ function StayPortal() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Nous sommes à votre disposition.</p>
             </div>
             <div className="space-y-3">
+              {guestInfo?.emergency_phone && (
+                <a
+                  href={`tel:${guestInfo.emergency_phone.replace(/[^0-9]/g, "")}`}
+                  className="flex w-full items-center gap-4 rounded-3xl border border-red-200 bg-red-50 p-4 shadow-sm dark:border-red-900 dark:bg-red-900/20"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500 text-white">
+                    <AlertTriangle className="h-5 w-5" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-bold text-red-800 dark:text-red-200">Urgence</span>
+                    <span className="block text-xs text-red-600 dark:text-red-300">{guestInfo.emergency_phone}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-red-400" />
+                </a>
+              )}
               {tenant.contact_phone && (
                 <a
                   href={`tel:${tenant.contact_phone.replace(/[^0-9]/g, "")}`}
