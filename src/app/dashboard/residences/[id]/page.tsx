@@ -418,6 +418,15 @@ export default function ResidenceDetailPage() {
         await syncTrouvetouForType(typeId);
       }
 
+      // Synchronisation intelligente de l'heure de sortie : dès que l'heure de
+      // départ du type change, les réservations actives (confirmées / arrivées)
+      // des chambres concernées sont mises à jour automatiquement (trigger en
+      // base). Cette RPC fournit uniquement le nombre de réservations impactées
+      // pour informer le gérant.
+      if (editingType) {
+        await syncCheckoutTimeForType(typeId);
+      }
+
       setTypeModalOpen(false);
       loadData(true);
       toast.success(editingType ? "Type de chambre modifié" : "Type de chambre créé");
@@ -451,6 +460,26 @@ export default function ResidenceDetailPage() {
     } catch (err) {
       console.error("syncTrouvetouForType error:", err);
       toast.error("Erreur lors de la synchronisation Trouvetou.");
+    }
+  }
+
+  // Applique la nouvelle heure de sortie aux réservations actives des chambres
+  // de ce type (le trigger en base fait le travail ; la RPC renvoie le nombre
+  // de réservations impactées pour le confirmer au gérant).
+  async function syncCheckoutTimeForType(typeId: string) {
+    try {
+      const supabase = createClient();
+      const { data: count, error } = await supabase.rpc("sync_room_type_checkout_time", {
+        p_room_type_id: typeId,
+      });
+      if (!error && typeof count === "number" && count > 0) {
+        toast.success(
+          `${count} réservation${count > 1 ? "s" : ""} mise${count > 1 ? "s" : ""} à jour avec la nouvelle heure de sortie.`
+        );
+      }
+    } catch (err) {
+      // Silencieux : la synchronisation automatique reste assurée par le trigger.
+      console.error("syncCheckoutTimeForType error:", err);
     }
   }
 

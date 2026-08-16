@@ -772,6 +772,10 @@ export interface Database {
       };
       mark_no_show: { Args: { p_booking_id: string; p_user_id: string }; Returns: Booking };
       check_cleaning_alerts: { Args: Record<string, never>; Returns: void };
+      sync_room_type_checkout_time: {
+        Args: { p_room_type_id: string };
+        Returns: number;
+      };
       check_overstays: {
         Args: {
           p_alert_after_minutes?: number;
