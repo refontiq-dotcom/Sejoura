@@ -54,7 +54,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, PaymentStatus, ClientStayExtensionRequest } from "@/types/database";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest } from "@/types/database";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -909,15 +909,11 @@ export default function BookingsPage() {
           // Le paiement a échoué mais la prolongation est faite → avertir sans bloquer
           toast.error("Séjour prolongé, mais le paiement n'a pas pu être enregistré : " + payErr.message);
         } else {
-          // Recalcule le statut de paiement avec le nouveau total
-          const newAmountPaid = (extendedBooking.amount_paid || 0) + paidAmount;
-          const newStatus: PaymentStatus =
-            newAmountPaid >= extendedBooking.total_amount ? "paid"
-              : newAmountPaid > 0 ? "partial" : "unpaid";
-          await supabase
-            .from("bookings")
-            .update({ amount_paid: newAmountPaid, payment_status: newStatus })
-            .eq("id", extendedBooking.id);
+          // Le trigger DB update_booking_payment_status recalcule automatiquement
+          // amount_paid et payment_status (source de vérité : somme des paiements
+          // liés à la réservation). Aucune mise à jour manuelle ici : elle
+          // écraserait le calcul du trigger avec une valeur obsolète (statut
+          // « partiel » erroné après paiement).
           toast.success(`Séjour prolongé jusqu'au ${formatDate(extendDate)} — paiement de ${fmt(paidAmount)} enregistré ✓`);
         }
       } else {
