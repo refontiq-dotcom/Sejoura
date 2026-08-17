@@ -23,6 +23,7 @@ import {
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import Link from "next/link";
 import {
   CalendarCheck,
   Plus,
@@ -57,7 +58,8 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest } from "@/types/database";
+import { ClientScoreBadge } from "@/components/client-score-badge";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -151,6 +153,10 @@ export default function BookingsPage() {
   loadBookingsRef.current = loadBookings;
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [expandedTimelineBookingId, setExpandedTimelineBookingId] = useState<string | null>(null);
+  // Scores de réputation (vue client_profiles) pour le badge du drawer client
+  const [clientProfiles, setClientProfiles] = useState<Record<string, { score: number; tier: ClientScoreTier }>>({});
+  // Fiche intelligente réservée à la formule Entreprise
+  const [hasClientProfiles, setHasClientProfiles] = useState(false);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
@@ -326,6 +332,23 @@ export default function BookingsPage() {
       }
       const { data: clientData } = await clientQuery;
       if (clientData) setClients(clientData as unknown as Client[]);
+
+      // Scores de réputation (vue client_profiles) pour le badge du drawer —
+      // réservé à la formule Entreprise.
+      const hasClientProfiles = canAccessFeature("clientSmartProfile", subData?.plan);
+      setHasClientProfiles(hasClientProfiles);
+      if (hasClientProfiles) {
+        const { data: profileData } = await supabase
+          .from("client_profiles")
+          .select("client_id, score, tier");
+        if (profileData) {
+          const map: Record<string, { score: number; tier: ClientScoreTier }> = {};
+          (profileData as { client_id: string; score: number; tier: ClientScoreTier }[]).forEach((p) => {
+            map[p.client_id] = { score: p.score, tier: p.tier };
+          });
+          setClientProfiles(map);
+        }
+      }
 
       // Pré-sélectionner la résidence si le réceptionniste n'en a qu'une
       if (userData.role === "receptionniste" && activeAccId) {
@@ -1501,6 +1524,15 @@ export default function BookingsPage() {
                         >
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client.full_name}</p>
                           <p className="text-xs text-slate-400 dark:text-slate-500">{b.client.phone || ""}</p>
+                          {hasClientProfiles && (
+                            <ClientScoreBadge
+                              score={clientProfiles[b.client.id]?.score}
+                              tier={clientProfiles[b.client.id]?.tier}
+                              clientId={b.client.id}
+                              showValue={false}
+                              className="mt-0.5"
+                            />
+                          )}
                         </button>
                       ) : (
                         <p className="text-sm text-slate-400 dark:text-slate-500">—</p>
@@ -1685,7 +1717,24 @@ export default function BookingsPage() {
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
                     {selectedClient.full_name}
                   </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Détails du client</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Détails du client</p>
+                    {hasClientProfiles && (
+                      <>
+                        <ClientScoreBadge
+                          score={clientProfiles[selectedClient.id]?.score}
+                          tier={clientProfiles[selectedClient.id]?.tier}
+                          showValue={false}
+                        />
+                        <Link
+                          href={`/dashboard/clients/${selectedClient.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Fiche intelligente
+                        </Link>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedClient(null)}

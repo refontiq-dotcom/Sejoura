@@ -20,8 +20,10 @@ import {
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { StayTimeline } from "@/components/stay-timeline";
-import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
+import { ClientScoreBadge } from "@/components/client-score-badge";
+import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier } from "@/types/database";
 import {
   LineChart,
   Line,
@@ -167,6 +169,8 @@ interface ClientWithStats extends Client {
   totalSpent: number;
   paid: number;
   balance: number;
+  score?: number | null;
+  tier?: ClientScoreTier | null;
 }
 
 type BookingBriefRow = {
@@ -906,6 +910,23 @@ export default function AccountingPage() {
             balance,
           } as ClientWithStats;
         });
+
+        // Scores de réputation (vue client_profiles) — fusionnés dans les stats
+        const { data: profiles } = await supabase
+          .from("client_profiles")
+          .select("client_id, score, tier");
+        const scoreById: Record<string, { score: number; tier: ClientScoreTier }> = {};
+        (profiles || []).forEach((p) => {
+          scoreById[p.client_id] = { score: p.score, tier: p.tier };
+        });
+        stats.forEach((c) => {
+          const s = scoreById[c.id];
+          if (s) {
+            c.score = s.score;
+            c.tier = s.tier;
+          }
+        });
+
         setClients(stats);
       }
     } catch (err) {
@@ -2070,6 +2091,7 @@ export default function AccountingPage() {
                   <thead>
                     <tr className="border-b border-zinc-800">
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Client</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Score</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Contact</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Séjours</th>
                       <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">CA total</th>
@@ -2097,6 +2119,9 @@ export default function AccountingPage() {
                               </p>
                             </div>
                           </div>
+                        </td>
+                        <td className="p-2.5">
+                          <ClientScoreBadge score={c.score} tier={c.tier} clientId={c.id} showValue={false} />
                         </td>
                         <td className="p-2.5">
                           <div className="text-xs text-zinc-400">
@@ -2321,7 +2346,16 @@ export default function AccountingPage() {
                   <User className="w-3.5 h-3.5" /> {selectedClient.nationality}
                 </span>
               )}
+              <ClientScoreBadge score={selectedClient.score} tier={selectedClient.tier} />
             </div>
+
+            {/* Lien fiche intelligente */}
+            <Link
+              href={`/dashboard/clients/${selectedClient.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Ouvrir la fiche intelligente
+            </Link>
 
             {/* Chiffres clés */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">

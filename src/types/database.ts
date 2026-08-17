@@ -406,6 +406,79 @@ export interface StayNote {
   created_at: string;
 }
 
+export type ClientScoreTier = "excellent" | "bon" | "moyen" | "a_surveiller" | "mauvais";
+
+/**
+ * Ligne de la vue client_profiles (score agrégé pour les listes / badges).
+ */
+export interface ClientProfile {
+  client_id: string;
+  tenant_id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  nationality: string | null;
+  stay_count: number;
+  total_nights: number;
+  total_revenue: number;
+  balance_due: number;
+  avg_stay_amount: number;
+  preferred_room_type: string | null;
+  last_stay_date: string | null;
+  score: number;
+  tier: ClientScoreTier;
+}
+
+export interface ClientProfileSignal {
+  tone: "positive" | "negative" | "neutral";
+  text: string;
+}
+
+export interface ClientProfileDimensions {
+  reliability: number;
+  behavior: number;
+  loyalty: number;
+  value: number;
+}
+
+/**
+ * Payload renvoyé par le RPC get_client_profile (fiche client dédiée).
+ */
+export interface ClientProfilePayload {
+  ok: boolean;
+  error?: string;
+  client?: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    email: string | null;
+    nationality: string | null;
+    id_type: string | null;
+    id_number: string | null;
+    address: string | null;
+    emergency_contact: string | null;
+    created_at: string;
+  };
+  profile?: {
+    stats: {
+      stay_count: number;
+      total_nights: number;
+      total_revenue: number;
+      total_paid: number;
+      balance_due: number;
+      avg_stay_amount: number;
+      preferred_room_type: string | null;
+      last_stay_date: string | null;
+    };
+    score: {
+      total: number;
+      tier: ClientScoreTier;
+      dimensions: ClientProfileDimensions;
+    };
+    signals: ClientProfileSignal[];
+  };
+}
+
 export interface Payment {
   id: string;
   tenant_id: string;
@@ -746,6 +819,11 @@ export interface Database {
         Row: Client;
         Insert: Omit<Client, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Client, "id" | "created_at" | "updated_at">>;
+      };
+      client_profiles: {
+        Row: ClientProfile;
+        Insert: never;
+        Update: never;
       };
       bookings: {
         Row: Booking;
