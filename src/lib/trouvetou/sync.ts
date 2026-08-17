@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -49,6 +50,7 @@ interface SyncRow {
     name: string;
     description: string | null;
     city: string | null;
+    is_active: boolean;
     tenants: {
       company_name: string | null;
       logo_url: string | null;
@@ -76,6 +78,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         name,
         description,
         city,
+        is_active,
         tenants!inner (
           company_name,
           logo_url,
@@ -95,10 +98,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
   }
 
   const rows = (data ?? []) as unknown as SyncRow[];
-
-  // Master gate : une fiche listée doit avoir au moins une photo.
-  const listedRows = rows.filter((row) => (row.featured_images ?? []).length > 0);
-  const roomTypeIds = listedRows.map((row) => row.id);
+  const roomTypeIds = rows.map((row) => row.id);
 
   // ── Disponibilité en temps réel ─────────────────────────────────────────
   // Un type est « disponible » si au moins une de ses chambres n'est ni
@@ -133,8 +133,17 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
     }
   }
 
-  const items: TrouvetouSyncItem[] = listedRows
-    .filter((row) => (roomStatusByType.get(row.id) ?? []).length > 0)
+  const items: TrouvetouSyncItem[] = rows
+    .filter((row) =>
+      isTrouvetouEligible({
+        accommodationActive: row.accommodations?.is_active === true,
+        subscriptionActive:
+          row.accommodations?.tenants?.subscriptions?.some((s) => s.status === "active") ??
+          false,
+        hasPhoto: (row.featured_images ?? []).length > 0,
+        hasRoom: (roomStatusByType.get(row.id) ?? []).length > 0,
+      })
+    )
     .map((row) => {
       const accommodation = row.accommodations;
       const tenant = accommodation.tenants;

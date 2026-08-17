@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
+import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 import type { Accommodation } from "@/types/database";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -221,18 +222,14 @@ export async function GET(request: Request) {
             typeRooms.length > 0,
         };
       })
-      .filter((t) => {
-        // Éligibilité Trouvetou (miroir exact de la sync) : établissement actif,
-        // abonnement `active`, au moins une photo et au moins une chambre. Un type
-        // qui ne remplit pas ces conditions ne s'affiche pas dans la vitrine.
-        const accActive = accActiveById.get(t.accommodation_id) === true;
-        return (
-          subActive &&
-          accActive &&
-          t.featured_images.length > 0 &&
-          t.room_count > 0
-        );
-      });
+      .filter((t) =>
+        isTrouvetouEligible({
+          accommodationActive: accActiveById.get(t.accommodation_id) === true,
+          subscriptionActive: subActive,
+          hasPhoto: t.featured_images.length > 0,
+          hasRoom: t.room_count > 0,
+        })
+      );
 
     return NextResponse.json({
       plan,
