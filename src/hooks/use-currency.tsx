@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { convertXofTo, getCurrencySymbol, getCurrencyDecimals, BASE_CURRENCY } from "@/lib/currencyConverter";
+import { useAccommodation } from "@/hooks/use-accommodation";
 
 export interface CurrencyInfo {
   code: string;
@@ -35,6 +36,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
     return DEFAULT_CURRENCY;
   });
+
+  // La devise d'affichage suit la RÉSIDENCE ACTIVE (multi-résidences) :
+  // chaque résidence a sa propre devise (accommodations.currency).
+  // Sans résidence active (onboarding), on reste sur la devise par défaut.
+  const { activeAccommodation } = useAccommodation();
+  const activeCurrency = activeAccommodation
+    ? { code: activeAccommodation.currency, symbol: activeAccommodation.currency_symbol || getCurrencySymbol(activeAccommodation.currency) }
+    : null;
+
+  useEffect(() => {
+    if (activeCurrency && (activeCurrency.code !== currency.code || activeCurrency.symbol !== currency.symbol)) {
+      setCurrencyState(activeCurrency);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCurrency?.code, activeCurrency?.symbol]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

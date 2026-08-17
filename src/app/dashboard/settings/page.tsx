@@ -31,15 +31,16 @@ import {
   Info,
   Sparkles,
   Smartphone,
+  X,
 } from "lucide-react";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
 import { SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { useLanguage } from "@/hooks/use-language";
-import { useCurrency } from "@/hooks/use-currency";
 import { translations } from "@/lib/translations";
 import type { Tenant, User as UserType, GuestInfo } from "@/types/database";
 import { IdeaBoxSection } from "@/components/dashboard/idea-box";
 import { GuestInfoEditor } from "@/components/dashboard/guest-info-editor";
+import { useAccommodation } from "@/hooks/use-accommodation";
 
 function themeHex(color: string) {
   return color.startsWith("#") ? color : getThemePresetById(color).sidebarBg;
@@ -48,7 +49,7 @@ function themeHex(color: string) {
 export default function SettingsPage() {
   const { theme, toggleTheme, setPrimaryColor: setThemePrimaryColor, setThemeColor: setThemeContextColor } = useTheme();
   const { lang, setLang } = useLanguage();
-  const { currency, setCurrency } = useCurrency();
+  const { activeAccommodation } = useAccommodation();
   const t = (translations[lang] ?? translations["fr"]).settings;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -75,6 +76,11 @@ export default function SettingsPage() {
   const companySnapshotRef = useRef<string>("");
   const [formError, setFormError] = useState("");
   const [employeeLink, setEmployeeLink] = useState<string>("");
+  // Espace client : le guest_info est configurable PAR RÉSIDENCE avec héritage
+  // de l'entreprise si la résidence n'a rien configuré.
+  const [portalGuestInfo, setPortalGuestInfo] = useState<GuestInfo | null>(null);
+  const [portalInherited, setPortalInherited] = useState(false);
+  const [portalSaving, setPortalSaving] = useState(false);
 
   const [companyForm, setCompanyForm] = useState({
     company_name: "",
@@ -163,10 +169,6 @@ export default function SettingsPage() {
             };
             setCompanyForm(companyFormInitial);
             companySnapshotRef.current = JSON.stringify(companyFormInitial);
-            // Sync devise globale depuis la BDD (multi-appareil)
-            const dbCurrency = tenantData.default_currency || "XOF";
-            const dbSymbol = tenantData.default_currency_symbol || "FCFA";
-            setCurrency({ code: dbCurrency, symbol: dbSymbol });
           }
         }
 
@@ -449,15 +451,94 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSaveGuestInfo(info: GuestInfo) {
-    const ok = await saveTenant(
-      { guest_info: info as unknown as Record<string, unknown> },
-      { successMessage: "Conditions de l'espace client enregistrées ✓" }
-    );
-    if (ok) {
-      setTenant((prev) => (prev ? { ...prev, guest_info: info } : prev));
+  // Charge le guest_info de la résidence active (hérité de l'entreprise si la
+  // résidence n'a rien configuré). Rechargé à chaque changement de résidence.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPortalGuestInfo() {
+      if (!activeAccommodation?.id) {
+        setPortalGuestInfo(tenant?.guest_info ?? null);
+        setPortalInherited(false);
+        return;
+      }
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("accommodations")
+        .select("guest_info")
+        .eq("id", activeAccommodation.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const accInfo = (data?.guest_info as GuestInfo | null) ?? null;
+      const hasOwn =
+        accInfo != null &&
+        ((accInfo.practical_info?.length ?? 0) > 0 ||
+          (accInfo.house_rules?.length ?? 0) > 0 ||
+          (accInfo.checkin_note?.trim() ?? "") !== "" ||
+          (accInfo.emergency_phone?.trim() ?? "") !== "");
+      setPortalGuestInfo(hasOwn ? accInfo : (tenant?.guest_info ?? null));
+      setPortalInherited(!hasOwn);
     }
-    return ok;
+    void loadPortalGuestInfo();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccommodation?.id, tenant?.guest_info]);
+
+  async function handleSaveGuestInfo(info: GuestInfo) {
+    setPortalSaving(true);
+    try {
+      // Résidence active : le guest_info est enregistré POUR CETTE résidence.
+      if (activeAccommodation?.id) {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from("accommodations")
+          .update({ guest_info: info as unknown as Record<string, unknown> })
+          .eq("id", activeAccommodation.id);
+        if (error) {
+          toast.error(error.message || "Impossible d'enregistrer.");
+          return false;
+        }
+        setPortalGuestInfo(info);
+        setPortalInherited(false);
+        toast.success(`Conditions de l'espace client enregistrées pour « ${activeAccommodation.name} » ✓`);
+        return true;
+      }
+      // Aucune résidence (onboarding en cours) : repli sur l'entreprise.
+      const ok = await saveTenant(
+        { guest_info: info as unknown as Record<string, unknown> },
+        { successMessage: "Conditions de l'espace client enregistrées ✓" }
+      );
+      if (ok) {
+        setTenant((prev) => (prev ? { ...prev, guest_info: info } : prev));
+        setPortalGuestInfo(info);
+        setPortalInherited(false);
+      }
+      return ok;
+    } finally {
+      setPortalSaving(false);
+    }
+  }
+
+  async function handleResetGuestInfo() {
+    if (!activeAccommodation?.id) return;
+    setPortalSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("accommodations")
+        .update({ guest_info: {} })
+        .eq("id", activeAccommodation.id);
+      if (error) {
+        toast.error(error.message || "Impossible de réinitialiser.");
+        return;
+      }
+      setPortalGuestInfo(tenant?.guest_info ?? null);
+      setPortalInherited(true);
+      toast.success(`Réinitialisé : « ${activeAccommodation.name} » hérite des conditions de l'entreprise. ✓`);
+    } finally {
+      setPortalSaving(false);
+    }
   }
 
   async function handleLogout() {
@@ -930,29 +1011,29 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-3">
                     <Settings className="w-5 h-5 text-amber-500" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Devise principale</p>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">Devise de référence</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Affichage actuel : <strong className="text-[var(--primary-color,#0C1C33)]">{currency.symbol}</strong> ({currency.code}) — appliquée instantanément
+                        Devise par défaut de l&apos;entreprise. L&apos;affichage suit la devise de la résidence
+                        active lorsque celle-ci est différente.
+                        {activeAccommodation && activeAccommodation.currency !== companyForm.default_currency && (
+                          <> Affichage actuel : <strong className="text-[var(--primary-color,#0C1C33)]">{activeAccommodation.currency_symbol}</strong> ({activeAccommodation.currency}) pour « {activeAccommodation.name} ».</>
+                        )}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {saving && <Loader2 className="w-4 h-4 animate-spin text-amber-500" />}
                     <select
-                      value={currency.code}
+                      value={companyForm.default_currency}
                       onChange={async (e) => {
                         const currCode = e.target.value;
                         const sel = SUPPORTED_CURRENCIES.find((c) => c.code === currCode);
                         const symbol = sel ? sel.symbol : currCode;
-                        setCurrency({ code: currCode, symbol });
-                        if (typeof window !== "undefined") {
-                          window.dispatchEvent(new CustomEvent("sejoura-currency-updated", { detail: { code: currCode, symbol } }));
-                        }
                         const nextForm = { ...companyForm, default_currency: currCode, default_currency_symbol: symbol };
                         setCompanyForm(nextForm);
                         const ok = await saveTenant(
                           { default_currency: currCode, default_currency_symbol: symbol },
-                          { successMessage: `Devise mise à jour : ${symbol} (${currCode}) ✓` }
+                          { successMessage: `Devise de référence mise à jour : ${symbol} (${currCode}) ✓` }
                         );
                         if (ok) companySnapshotRef.current = JSON.stringify(nextForm);
                       }}
@@ -1005,18 +1086,50 @@ export default function SettingsPage() {
                       de chaque réservation (accessible pendant le séjour). L&apos;aperçu à droite reproduit
                       exactement ce que verront vos clients.
                     </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                      {activeAccommodation
+                        ? `Configuration appliquée à la résidence « ${activeAccommodation.name} ». Chaque résidence peut avoir ses propres conditions.`
+                        : "Configuration de l'entreprise (appliquée tant qu'aucune résidence n'a ses propres conditions)."}
+                    </p>
                   </div>
                 </div>
+                {activeAccommodation && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {portalInherited ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 px-3 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                        <Info className="w-3.5 h-3.5" />
+                        Cette résidence hérite des conditions de l&apos;entreprise. Modifiez-les pour personnaliser cette résidence.
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                        <Check className="w-3.5 h-3.5" />
+                        Conditions propres à cette résidence.
+                      </span>
+                    )}
+                    {!portalInherited && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleResetGuestInfo}
+                        loading={portalSaving}
+                        disabled={!activeAccommodation}
+                      >
+                        <X className="w-3.5 h-3.5" /> Réinitialiser (hériter de l&apos;entreprise)
+                      </Button>
+                    )}
+                  </div>
+                )}
               </Card>
 
               <GuestInfoEditor
-                initial={tenant?.guest_info ?? null}
+                key={activeAccommodation?.id ?? "tenant"}
+                initial={portalGuestInfo}
                 branding={{
                   company_name: tenant?.company_name ?? "",
                   logo_url: tenant?.logo_url ?? null,
                   primary_color: tenant?.primary_color ?? null,
                 }}
-                saving={saving}
+                saving={saving || portalSaving}
                 onSave={handleSaveGuestInfo}
               />
             </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { StayTimeline } from "@/components/stay-timeline";
 import {
   formatDate,
   formatTime,
@@ -21,6 +22,8 @@ import {
   MOBILE_MONEY_OPERATORS,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useAccommodation } from "@/hooks/use-accommodation";
+import Link from "next/link";
 import {
   CalendarCheck,
   Plus,
@@ -50,11 +53,13 @@ import {
   Receipt,
   MoreHorizontal,
   Pencil,
+  History,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest } from "@/types/database";
+import { ClientScoreBadge } from "@/components/client-score-badge";
+import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -138,9 +143,20 @@ export default function BookingsPage() {
   // affecté à un établissement). Conservé dans une ref pour le rechargement
   // temps réel, qui ne doit pas se resouscrire à chaque rendu.
   const accommodationFilterRef = useRef<string | undefined>(undefined);
+  // Filtre UI de la liste : "all" = toutes les résidences, sinon id de résidence.
+  // Suit la résidence active (header) tant que l'utilisateur n'a pas choisi
+  // lui-même une valeur explicite ("all" ou une résidence précise).
+  const { activeAccommodationId } = useAccommodation();
+  const [accomFilter, setAccomFilter] = useState<string>("all");
+  const userPickedAccomRef = useRef(false);
   const loadBookingsRef = useRef(loadBookings);
   loadBookingsRef.current = loadBookings;
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [expandedTimelineBookingId, setExpandedTimelineBookingId] = useState<string | null>(null);
+  // Scores de réputation (vue client_profiles) pour le badge du drawer client
+  const [clientProfiles, setClientProfiles] = useState<Record<string, { score: number; tier: ClientScoreTier }>>({});
+  // Fiche intelligente réservée à la formule Entreprise
+  const [hasClientProfiles, setHasClientProfiles] = useState(false);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
@@ -226,6 +242,18 @@ export default function BookingsPage() {
     loadInitData();
   }, []);
 
+  // Suit la résidence active (sélecteur du header) : la liste se refiltre
+  // automatiquement tant que l'utilisateur n'a pas choisi une résidence
+  // ("all" ou précise) de manière explicite dans la liste.
+  useEffect(() => {
+    if (userPickedAccomRef.current) return;
+    const target = activeAccommodationId ?? "all";
+    setAccomFilter(target);
+    accommodationFilterRef.current = activeAccommodationId ?? undefined;
+    if (tenantId) loadBookingsRef.current(tenantId, accommodationFilterRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccommodationId]);
+
   // Temps réel : rechargement immédiat dès qu'une réservation change
   // (création, modification, check-in/out, paiement). Le rechargement est
   // effectué via une ref pour ne pas se resouscrire à chaque rendu.
@@ -305,14 +333,34 @@ export default function BookingsPage() {
       const { data: clientData } = await clientQuery;
       if (clientData) setClients(clientData as unknown as Client[]);
 
+      // Scores de réputation (vue client_profiles) pour le badge du drawer —
+      // réservé à la formule Entreprise.
+      const hasClientProfiles = canAccessFeature("clientSmartProfile", subData?.plan);
+      setHasClientProfiles(hasClientProfiles);
+      if (hasClientProfiles) {
+        const { data: profileData } = await supabase
+          .from("client_profiles")
+          .select("client_id, score, tier");
+        if (profileData) {
+          const map: Record<string, { score: number; tier: ClientScoreTier }> = {};
+          (profileData as { client_id: string; score: number; tier: ClientScoreTier }[]).forEach((p) => {
+            map[p.client_id] = { score: p.score, tier: p.tier };
+          });
+          setClientProfiles(map);
+        }
+      }
+
       // Pré-sélectionner la résidence si le réceptionniste n'en a qu'une
       if (userData.role === "receptionniste" && activeAccId) {
         setFormData((prev) => ({ ...prev, accommodation_id: activeAccId ?? "" }));
       }
 
-      accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined;
+      accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : (activeAccommodationId ?? undefined);
+      setAccomFilter(
+        userData.role === "receptionniste" ? (activeAccId ?? "all") : (activeAccommodationId ?? "all")
+      );
       await runOverstayCheck();
-      await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
+      await loadBookings(userData.tenant_id, accommodationFilterRef.current);
       await loadInvoices(userData.tenant_id);
       await loadExtensionRequests(userData.tenant_id);
     } catch (err) {
@@ -587,6 +635,7 @@ export default function BookingsPage() {
           .from("clients")
           .insert({
             tenant_id: tenantId,
+            accommodation_id: formData.accommodation_id || null,
             full_name: formData.newClientName,
             phone: formData.newClientPhone || null,
             email: formData.newClientEmail || null,
@@ -1330,6 +1379,24 @@ export default function BookingsPage() {
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
         </div>
+        {accommodations.length > 1 && (
+          <select
+            value={accomFilter}
+            onChange={(e) => {
+              userPickedAccomRef.current = true;
+              setAccomFilter(e.target.value);
+              accommodationFilterRef.current = e.target.value === "all" ? undefined : e.target.value;
+              loadBookingsRef.current(tenantId, accommodationFilterRef.current);
+            }}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            title="Filtrer par résidence"
+          >
+            <option value="all">Toutes les résidences</option>
+            {accommodations.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        )}
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -1457,6 +1524,15 @@ export default function BookingsPage() {
                         >
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client.full_name}</p>
                           <p className="text-xs text-slate-400 dark:text-slate-500">{b.client.phone || ""}</p>
+                          {hasClientProfiles && (
+                            <ClientScoreBadge
+                              score={clientProfiles[b.client.id]?.score}
+                              tier={clientProfiles[b.client.id]?.tier}
+                              clientId={b.client.id}
+                              showValue={false}
+                              className="mt-0.5"
+                            />
+                          )}
                         </button>
                       ) : (
                         <p className="text-sm text-slate-400 dark:text-slate-500">—</p>
@@ -1641,7 +1717,24 @@ export default function BookingsPage() {
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
                     {selectedClient.full_name}
                   </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Détails du client</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Détails du client</p>
+                    {hasClientProfiles && (
+                      <>
+                        <ClientScoreBadge
+                          score={clientProfiles[selectedClient.id]?.score}
+                          tier={clientProfiles[selectedClient.id]?.tier}
+                          showValue={false}
+                        />
+                        <Link
+                          href={`/dashboard/clients/${selectedClient.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Fiche intelligente
+                        </Link>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedClient(null)}
@@ -1705,9 +1798,9 @@ export default function BookingsPage() {
                   {bookings.filter(bk => bk.client_id === selectedClient.id).length === 0 ? (
                     <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Aucune réservation enregistrée.</p>
                   ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="space-y-2">
                       {bookings.filter(bk => bk.client_id === selectedClient.id).map(bk => (
-                        <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                        <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{bk.booking_code}</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
                             {formatDate(bk.check_in_date)} → {formatDate(bk.check_out_date)} — {bk.nights_count} nuit{bk.nights_count > 1 ? "s" : ""}
@@ -1715,6 +1808,13 @@ export default function BookingsPage() {
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
                             <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{fmt(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
                             <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setExpandedTimelineBookingId(expandedTimelineBookingId === bk.id ? null : bk.id)}
+                                className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] text-xs flex items-center gap-1 font-medium"
+                                title="Historique du séjour"
+                              >
+                                <History className="w-3.5 h-3.5" /> Historique
+                              </button>
                               <button
                                 onClick={() => shareStayWhatsApp(bk)}
                                 className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-xs flex items-center gap-1 font-medium"
@@ -1731,6 +1831,11 @@ export default function BookingsPage() {
                               </button>
                             </div>
                           </div>
+                          {expandedTimelineBookingId === bk.id && (
+                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                              <StayTimeline bookingId={bk.id} tenantId={tenantId} clientId={selectedClient.id} />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

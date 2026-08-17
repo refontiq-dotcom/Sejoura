@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -55,9 +56,11 @@ interface SyncRow {
     name: string;
     description: string | null;
     city: string | null;
+    is_active: boolean;
     tenants: {
       company_name: string | null;
       logo_url: string | null;
+      subscriptions: { status: string }[] | null;
     } | null;
   };
 }
@@ -100,9 +103,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         name,
         description,
         city,
+        is_active,
         tenants!inner (
           company_name,
-          logo_url
+          logo_url,
+          subscriptions!inner (
+            status
+          )
         )
       )
     `
@@ -117,16 +124,10 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   const rows = (data ?? []) as unknown as SyncRow[];
 
-  // Master gate : une fiche listée doit avoir au moins une photo ET le tenant
-  // doit disposer d'une clé API externe ACTIVE (résidence diffusée seulement
-  // si sa clé API est active).
-  const listedRows = rows.filter(
-    (row) =>
-      (row.featured_images ?? []).length > 0 &&
-      !!row.accommodations?.tenant_id &&
-      apiKeyByTenant.has(row.accommodations.tenant_id)
-  );
-  const roomTypeIds = listedRows.map((row) => row.id);
+  // La disponibilité est calculée pour toutes les lignes ; le filtrage final
+  // combine l'éligibilité métier (helper partagé) et la présence d'une clé API
+  // externe active (gating « diffusion seulement si clé active »).
+  const roomTypeIds = rows.map((row) => row.id);
 
   // ── Disponibilité en temps réel ─────────────────────────────────────────
   // Un type est « disponible » si au moins une de ses chambres n'est ni
@@ -161,12 +162,38 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
     }
   }
 
-  const items: TrouvetouSyncItem[] = listedRows
-    .filter((row) => (roomStatusByType.get(row.id) ?? []).length > 0)
+  const items: TrouvetouSyncItem[] = rows
+    .filter((row) => {
+      // Gating : le tenant doit disposer d'une clé API externe active (résidence
+      // diffusée seulement si sa clé API est active).
+      const hasActiveApiKey =
+        !!row.accommodations?.tenant_id &&
+        apiKeyByTenant.has(row.accommodations.tenant_id);
+      return (
+        hasActiveApiKey &&
+        isTrouvetouEligible({
+          accommodationActive: row.accommodations?.is_active === true,
+          subscriptionActive:
+            row.accommodations?.tenants?.subscriptions?.some((s) => s.status === "active") ??
+            false,
+          hasPhoto: (row.featured_images ?? []).length > 0,
+          hasRoom: (roomStatusByType.get(row.id) ?? []).length > 0,
+        })
+      );
+    })
     .map((row) => {
       const accommodation = row.accommodations;
       const tenant = accommodation.tenants;
       const logoUrl = tenant?.logo_url;
+      const featuredImages = Array.isArray(row.featured_images)
+        ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
+        : [];
+      const images =
+        featuredImages.length > 0
+          ? featuredImages
+          : logoUrl && logoUrl.length > 0
+            ? [logoUrl]
+            : [];
       const typeRooms = roomStatusByType.get(row.id) ?? [];
       const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
 
@@ -182,7 +209,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         description: row.description ?? accommodation.description ?? null,
         city: accommodation.city,
         base_price: row.base_price,
-        images: logoUrl && logoUrl.length > 0 ? [logoUrl] : [],
+        images,
         attributes: {
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],

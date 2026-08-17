@@ -712,11 +712,19 @@ export default function DashboardPage() {
               }
               return bookingsQuery;
             })(),
-            supabase
-              .from("payments")
-              .select("amount, payment_date, booking:bookings(accommodation_id)")
-              .eq("tenant_id", tenantId)
-              .gte("payment_date", `${twelveMonthsAgo}T00:00:00`),
+            (() => {
+              let paymentsQuery = supabase
+                .from("payments")
+                .select("amount, payment_date")
+                .eq("tenant_id", tenantId)
+                .gte("payment_date", `${twelveMonthsAgo}T00:00:00`);
+              // Filtrer par résidence active (multi-résidences) : le filtrage est
+              // fait en base via payments.accommodation_id, pas côté client.
+              if (activeAccommodationId) {
+                paymentsQuery = paymentsQuery.eq("accommodation_id", activeAccommodationId);
+              }
+              return paymentsQuery;
+            })(),
             (() => {
               let cleaningQuery = supabase
                 .from("cleaning_tasks")
@@ -764,11 +772,8 @@ export default function DashboardPage() {
         const rawPayments = (paymentsData.data || []) as unknown as {
           amount: number;
           payment_date: string;
-          booking?: { accommodation_id: string } | null;
         }[];
-        const payments = activeAccommodationId
-          ? rawPayments.filter((p) => p.booking?.accommodation_id === activeAccommodationId)
-          : rawPayments;
+        const payments = rawPayments;
         const cleaningTasks = (cleaningTasksData.data || []) as unknown as { status: string }[];
 
         const targetBookings = bookings.filter((b) => {

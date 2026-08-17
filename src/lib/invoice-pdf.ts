@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import type { BookingWithRelations, Invoice, Tenant } from "@/types/database";
+import type { BookingExtension, BookingWithRelations, Invoice, Tenant } from "@/types/database";
 import { formatDateLong } from "@/lib/utils";
 import { convertXofTo, getCurrencyDecimals, getCurrencySymbol } from "@/lib/currencyConverter";
 
@@ -7,6 +7,8 @@ export interface InvoicePdfData {
   tenant: Tenant;
   booking: BookingWithRelations;
   invoice: Invoice;
+  /** Historique des prolongations (extend_booking / dépassement), trié chronologiquement. */
+  extensions?: BookingExtension[];
 }
 
 export interface TaxRate {
@@ -70,6 +72,13 @@ function truncateToWidth(doc: PDFKit.PDFDocument, text: string, maxWidth: number
   return `${fitted}…`;
 }
 
+/** Formate une date ISO (YYYY-MM-DD) en « JJ/MM ». */
+function shortDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
  * Réduit un texte pour tenir dans une hauteur max (ex : 2 lignes) : baisse la
  * taille de police, puis tronque avec une ellipse si nécessaire.
@@ -100,7 +109,7 @@ function fitText(
 }
 
 export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
-  const { tenant, booking, invoice } = data;
+  const { tenant, booking, invoice, extensions = [] } = data;
   const client = booking.client;
   const room = booking.room;
   const roomType = booking.room_type;
@@ -330,38 +339,94 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   // Ligne basse de l'en-tête
   doc.moveTo(tableLeft, tableTop + headerH).lineTo(tableLeft + tableWidth, tableTop + headerH).stroke();
 
-  // Ligne de détail : nuitée
-  // Le total facturé (invoice.amount = booking.total_amount) fait foi : on en
+  // Lignes de détail : nuitée initiale + prolongations (facture intelligente)
+  // Le montant facturé (invoice.amount = booking.total_amount) fait foi : on en
   // déduit le prix unitaire pour garantir la cohérence tableau / sous-total /
   // taxe / total (total_amount = negotiated_price * nights_count).
   const nights = booking.nights_count || 1;
+  const baseAmount = invoice.amount || booking.total_amount || 0;
   const unitPrice =
-    booking.total_amount > 0
-      ? booking.total_amount / nights
+    baseAmount > 0
+      ? baseAmount / nights
       : booking.negotiated_price || roomType?.base_price || 0;
-  const lineTotal = unitPrice * nights;
+
+  // Construit les lignes du tableau à partir de l'historique des prolongations.
+  // segments = [ { label, qty } ] ; le nombre de nuits de la ligne initiale est
+  // déduit (nights_count - nuits prolongées) pour que la somme des lignes soit
+  // toujours exactement égale au nombre de nuits de la réservation.
+  interface InvoiceLine {
+    label: string;
+    qty: number;
+  }
+  const lines: InvoiceLine[] = [];
+
+  const sortedExtensions = [...extensions].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const extendedNights = sortedExtensions.reduce((sum, ext) => sum + ext.extra_nights, 0);
+  const initialNights = nights - extendedNights;
+
+  if (sortedExtensions.length > 0 && initialNights > 0) {
+    const firstExt = sortedExtensions[0];
+    lines.push({
+      label: `Nuitée initiale · du ${shortDate(booking.check_in_date)} au ${shortDate(firstExt.previous_check_out_date)}`,
+      qty: initialNights,
+    });
+
+    let extIndex = 1;
+    for (const ext of sortedExtensions) {
+      const isOverstay = ext.source === "overstay";
+      const name = isOverstay ? "Dépassement de séjour" : `Prolongation ${extIndex}`;
+      if (!isOverstay) extIndex += 1;
+      lines.push({
+        label: `${name} · du ${shortDate(ext.previous_check_out_date)} au ${shortDate(ext.new_check_out_date)}`,
+        qty: ext.extra_nights,
+      });
+    }
+  } else {
+    // Aucune prolongation enregistrée (séjour initial, ou données antérieures à
+    // la migration booking_extensions) : ligne unique, comportement historique.
+    lines.push({
+      label: `${roomType?.name || "Nuitée"} · du ${shortDate(booking.check_in_date)} au ${shortDate(booking.check_out_date)}`,
+      qty: nights,
+    });
+  }
+
+  // Plafond de lignes détaillées : au-delà, le reste est agrégé sur une ligne.
+  const MAX_DETAIL_LINES = 7;
+  let displayLines = lines;
+  if (lines.length > MAX_DETAIL_LINES) {
+    displayLines = lines.slice(0, MAX_DETAIL_LINES - 1);
+    const restQty = lines.slice(MAX_DETAIL_LINES - 1).reduce((sum, l) => sum + l.qty, 0);
+    displayLines.push({ label: `Prolongations suivantes · ${restQty} nuit(s)`, qty: restQty });
+  }
+
+  // Montants par ligne : la dernière absorbe l'arrondi pour que la somme soit
+  // exactement égale au sous-total facturé (baseAmount).
+  const lineAmounts = displayLines.map((l) => Math.round(l.qty * unitPrice));
+  const sumOthers = lineAmounts.slice(0, -1).reduce((a, b) => a + b, 0);
+  lineAmounts[lineAmounts.length - 1] = baseAmount > 0 ? baseAmount - sumOthers : lineAmounts[lineAmounts.length - 1];
 
   let rowTop = tableTop + headerH;
-  const textY = rowTop + (rowH - 9) / 2;
 
-  doc
-    .fontSize(9)
-    .fillColor(textColor)
-    .font("Helvetica")
-    .text(`${roomType?.name || "Nuitée"} × ${nights} nuit(s)`, tableLeft + padX, textY, {
-      width: descW - padX * 2,
-    })
-    .text(fmt(unitPrice), col1Right + padX, textY, { width: priceW - padX * 2, align: "right" })
-    .text(`${nights}`, col2Right, textY, { width: qtyW, align: "center" })
-    .text(fmt(lineTotal), col3Right + padX, textY, { width: totalW - padX * 2, align: "right" });
+  displayLines.forEach((line, i) => {
+    const textY = rowTop + (rowH - 9) / 2;
+    doc
+      .fontSize(9)
+      .fillColor(textColor)
+      .font("Helvetica")
+      .text(line.label, tableLeft + padX, textY, { width: descW - padX * 2 })
+      .text(fmt(unitPrice), col1Right + padX, textY, { width: priceW - padX * 2, align: "right" })
+      .text(`${line.qty}`, col2Right, textY, { width: qtyW, align: "center" })
+      .text(fmt(lineAmounts[i]), col3Right + padX, textY, { width: totalW - padX * 2, align: "right" });
+    rowTop += rowH;
+  });
 
-  rowTop += rowH;
-
-  // Bordures de la ligne de détail
+  // Bordures du tableau (horizontale basse + verticales sur toute la hauteur)
   doc.lineWidth(0.5).strokeColor(borderColor);
   doc.moveTo(tableLeft, rowTop).lineTo(tableLeft + tableWidth, rowTop).stroke();
   [col1Right, col2Right, col3Right].forEach((cx) => {
-    doc.moveTo(cx, rowTop - rowH).lineTo(cx, rowTop).stroke();
+    doc.moveTo(cx, tableTop).lineTo(cx, rowTop).stroke();
   });
 
   // --- Sous-total ---

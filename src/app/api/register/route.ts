@@ -3,8 +3,56 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePlan, getPlanPrice } from "@/lib/subscription-plans";
 import { getCountryByNameOrCode } from "@/lib/countries";
+import { getPlanLabel } from "@/lib/utils";
+import {
+  escapeMarkdown,
+  getTelegramAdminUrl,
+  isTelegramConfigured,
+  sendTelegramMessage,
+} from "@/lib/telegram";
 
 const TRIAL_DURATION_DAYS = 30;
+
+// Alerte Telegram "nouvelle inscription" (fire-and-forget) : un échec d'envoi
+// ne doit jamais bloquer la création du compte de la résidence.
+async function notifyNewRegistration(payload: {
+  residenceName: string;
+  managerName: string;
+  country: string;
+  phone: string;
+  email: string;
+  plan: string;
+  trialEnd: string;
+}) {
+  if (!isTelegramConfigured()) return;
+  try {
+    const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+    const trialEndDate = new Intl.DateTimeFormat("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(payload.trialEnd));
+
+    const text = [
+      "\uD83C\uDF89 *Nouvelle résidence inscrite sur Sejoura !*",
+      "",
+      `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(payload.residenceName)}`,
+      `\uD83D\uDC64 *Gérant :* ${escapeMarkdown(payload.managerName)}`,
+      `\uD83C\uDF0D *Pays :* ${escapeMarkdown(payload.country)}`,
+      `\uD83D\uDCF1 *Téléphone :* ${escapeMarkdown(payload.phone)}`,
+      `\uD83D\uDCE7 *Email :* ${escapeMarkdown(payload.email)}`,
+      `\uD83D\uDCE6 *Formule :* ${escapeMarkdown(payload.plan)}`,
+      `\u23F3 *Essai gratuit jusqu'au* ${escapeMarkdown(trialEndDate)}`,
+      "",
+      `\uD83D\uDD17 [Voir sur le Dashboard Admin](${adminUrl})`,
+    ].join("\n");
+
+    const sent = await sendTelegramMessage(text);
+    if (!sent) console.error("Telegram registration alert failed");
+  } catch (error) {
+    console.error("register telegram:", error);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -272,6 +320,17 @@ export async function POST(request: Request) {
     // 4. Profil applicatif
     const profileError = await upsertUserProfile(newTenantId);
     if (profileError) return profileError;
+
+    // 5. Alerte Telegram pour le Super Admin (nouvelle inscription)
+    await notifyNewRegistration({
+      residenceName,
+      managerName: fullName,
+      country: countryName,
+      phone,
+      email,
+      plan: getPlanLabel(plan),
+      trialEnd,
+    });
 
     return NextResponse.json({ success: true, tenantId: newTenantId, accommodationId: accommodationData.id });
   } catch (error) {

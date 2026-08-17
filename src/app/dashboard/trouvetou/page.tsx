@@ -17,9 +17,6 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Zap,
-  Phone,
-  Plus,
-  Trash2,
   Loader2,
   Clock,
   Timer,
@@ -32,29 +29,21 @@ import { useCurrency } from "@/hooks/use-currency";
 
 // ─── Types locaux ──────────────────────────────────────────────────────────────
 
-interface UnitListing {
+interface RoomTypeListing {
   id: string;
+  name: string;
+  description: string | null;
   accommodation_id: string;
-  room_number: string;
-  status: string;
-  room_type_name: string;
+  accommodation_name: string;
   base_price: number;
   capacity: number;
   amenities: string[];
   surface_m2: number | null;
-  is_listed_on_trouvetou: boolean;
   featured_images: string[];
-  listing: {
-    id: string;
-    is_published: boolean;
-    public_title: string | null;
-    public_description: string | null;
-    featured_images: string[];
-    amenities_badges: string[];
-    direct_whatsapp: string | null;
-    views_count: number | null;
-    whatsapp_clicks_count: number | null;
-  } | null;
+  is_listed_on_trouvetou: boolean;
+  room_count: number;
+  available_room_count: number;
+  is_effectively_listed: boolean;
 }
 
 interface Accommodation {
@@ -83,17 +72,6 @@ const EXPRESS_BOOST_OPTIONS = [
   { days: 3,  priceFcfa: 5_000,  label: "3 jours",   popular: true  },
   { days: 7,  priceFcfa: 10_000, label: "7 jours",   popular: false },
   { days: 14, priceFcfa: 18_000, label: "14 jours",  popular: false },
-];
-
-const DEFAULT_AMENITIES = [
-  "Wifi Haut Débit",
-  "Piscine",
-  "Groupe Électrogène",
-  "Sécurité 24/7",
-  "Parking Gratuit",
-  "Climatisation",
-  "Télévision Satellite",
-  "Cuisine Équipée",
 ];
 
 // ─── Utilitaires ───────────────────────────────────────────────────────────────
@@ -339,25 +317,14 @@ function HeaderVisibilityBadge({
 export default function TrouvetouDashboardPage() {
   const { fmt } = useCurrency();
   const [loading, setLoading]           = useState(true);
-  const [savingUnitId, setSavingUnitId] = useState<string | null>(null);
+  const [savingTypeId, setSavingTypeId] = useState<string | null>(null);
   const [plan, setPlan]                 = useState<string>("standard");
   const [isEnterprisePlan, setIsEnterprisePlan] = useState<boolean>(false);
   const [isEssentielPlan, setIsEssentielPlan]   = useState<boolean>(false);
   const [tenantId, setTenantId]         = useState<string>("");
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
-  const [units, setUnits]               = useState<UnitListing[]>([]);
+  const [types, setTypes]               = useState<RoomTypeListing[]>([]);
   const [metrics, setMetrics]           = useState({ totalViews: 0, totalWhatsappClicks: 0 });
-
-  // Modal personnalisation fiche
-  const [selectedUnit, setSelectedUnit]       = useState<UnitListing | null>(null);
-  const [modalOpen, setModalOpen]             = useState(false);
-  const [formTitle, setFormTitle]             = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formBadges, setFormBadges]           = useState<string[]>([]);
-  const [formImages, setFormImages]           = useState<string[]>([]);
-  const [newImageUrl, setNewImageUrl]         = useState("");
-  const [formWhatsapp, setFormWhatsapp]       = useState("");
-  const [savingModal, setSavingModal]         = useState(false);
 
   // Modal Boost Express
   const [boostExpressTarget, setBoostExpressTarget] = useState<Accommodation | null>(null);
@@ -370,16 +337,6 @@ export default function TrouvetouDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => { fetchData(); }, []);
-
-  // Fermeture de la modale de personnalisation avec Échap
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      if (modalOpen) setModalOpen(false);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modalOpen]);
 
   async function getAccessToken(): Promise<string | null> {
     const supabase = createClient();
@@ -420,7 +377,7 @@ export default function TrouvetouDashboardPage() {
         setIsEnterprisePlan(data.isEnterprisePlan);
         setIsEssentielPlan(data.isEssentielPlan);
         setAccommodations(data.accommodations || []);
-        setUnits(data.units || []);
+        setTypes(data.types || []);
         setMetrics(data.metrics || { totalViews: 0, totalWhatsappClicks: 0 });
       } else {
         setLoadError(data.error || "Erreur de chargement de la vitrine Trouvetou");
@@ -433,51 +390,35 @@ export default function TrouvetouDashboardPage() {
     }
   }
 
-  async function handleTogglePublish(unit: UnitListing) {
-    setSavingUnitId(unit.id);
-    const newPublished = !unit.listing?.is_published;
+  async function handleToggleListed(type: RoomTypeListing) {
+    setSavingTypeId(type.id);
+    const newListed = !type.is_listed_on_trouvetou;
     try {
-      if (newPublished) {
-        const images = unit.featured_images.length > 0
-          ? unit.featured_images
-          : (unit.listing?.featured_images || []);
-        if (!unit.is_listed_on_trouvetou) {
-          toast.error("Activez d'abord l'interrupteur Trouvetou sur le type de chambre (section Établissements).");
-          return;
-        }
-        if (images.length === 0) {
-          toast.error("Ajoutez au moins une photo au type de chambre pour publier sur Trouvetou.");
-          return;
-        }
+      if (newListed && type.featured_images.length === 0) {
+        toast.error("Ajoutez au moins une photo au type de chambre pour publier sur Trouvetou (section Établissements).");
+        return;
       }
-      const res = await fetch("/api/v1/trouvetou/listings", {
+      const res = await fetch("/api/v1/trouvetou/sync-type", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${await getAccessToken()}`,
         },
         body: JSON.stringify({
-          unit_id:             unit.id,
-          establishment_id:    unit.accommodation_id,
-          is_published:        newPublished,
-          public_title:        unit.listing?.public_title || null,
-          public_description:  unit.listing?.public_description || null,
-          featured_images:     unit.listing?.featured_images?.length
-            ? unit.listing.featured_images
-            : unit.featured_images || [],
-          amenities_badges:    unit.listing?.amenities_badges?.length
-            ? unit.listing.amenities_badges
-            : unit.amenities || [],
-          direct_whatsapp:     unit.listing?.direct_whatsapp || null,
+          roomTypeId: type.id,
+          is_listed_on_trouvetou: newListed,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         toast.success(
-          newPublished
-            ? `Le logement ${unit.room_number} est désormais publié sur Trouvetou !`
-            : `Le logement ${unit.room_number} a été dépublié.`
+          newListed
+            ? `Le type « ${type.name} » est désormais publié sur Trouvetou !`
+            : `Le type « ${type.name} » a été masqué sur Trouvetou.`
         );
+        if (data.trouvetouPush && data.trouvetouPush.ok === false) {
+          toast.error(data.trouvetouPush.error || "Fiche enregistrée mais le push Trouvetou a échoué.");
+        }
         fetchData();
       } else {
         toast.error(data.error || "Erreur de mise à jour");
@@ -485,69 +426,7 @@ export default function TrouvetouDashboardPage() {
     } catch {
       toast.error("Erreur de connexion");
     } finally {
-      setSavingUnitId(null);
-    }
-  }
-
-  function openEditModal(unit: UnitListing) {    setSelectedUnit(unit);
-    setFormTitle(unit.listing?.public_title || `${unit.room_type_name} - Chambre ${unit.room_number}`);
-    setFormDescription(unit.listing?.public_description || "");
-    setFormBadges(unit.listing?.amenities_badges?.length ? unit.listing.amenities_badges : [...unit.amenities]);
-    setFormImages(unit.listing?.featured_images || []);
-    const acc = accommodations.find((a) => a.id === unit.accommodation_id);
-    setFormWhatsapp(unit.listing?.direct_whatsapp || acc?.contact_phone || "");
-    setModalOpen(true);
-  }
-
-  function toggleBadge(badge: string) {
-    setFormBadges((prev) =>
-      prev.includes(badge) ? prev.filter((b) => b !== badge) : [...prev, badge]
-    );
-  }
-
-  function addImage() {
-    if (!newImageUrl.trim()) return;
-    setFormImages((prev) => [...prev, newImageUrl.trim()]);
-    setNewImageUrl("");
-  }
-
-  function removeImage(index: number) {
-    setFormImages((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function handleSaveModal() {
-    if (!selectedUnit) return;
-    setSavingModal(true);
-    try {
-      const res = await fetch("/api/v1/trouvetou/listings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await getAccessToken()}`,
-        },
-        body: JSON.stringify({
-          unit_id:             selectedUnit.id,
-          establishment_id:    selectedUnit.accommodation_id,
-          is_published:        selectedUnit.listing?.is_published ?? true,
-          public_title:        formTitle,
-          public_description:  formDescription,
-          featured_images:     formImages,
-          amenities_badges:    formBadges,
-          direct_whatsapp:     formWhatsapp,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Fiche publique Trouvetou enregistrée avec succès !");
-        setModalOpen(false);
-        fetchData();
-      } else {
-        toast.error(data.error || "Erreur lors de la sauvegarde");
-      }
-    } catch {
-      toast.error("Erreur serveur");
-    } finally {
-      setSavingModal(false);
+      setSavingTypeId(null);
     }
   }
 
@@ -608,7 +487,7 @@ export default function TrouvetouDashboardPage() {
     );
   }
 
-  const publishedCount = units.filter((u) => u.listing?.is_published).length;
+  const publishedCount = types.filter((t) => t.is_effectively_listed).length;
   const anyExpressActive = accommodations.some((a) => a.is_express_boost_active);
   const anyPermanentBoost = accommodations.some((a) => a.is_permanently_boosted);
 
@@ -691,9 +570,9 @@ export default function TrouvetouDashboardPage() {
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Logements Publiés</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Types Publiés</p>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
-              {publishedCount} / {units.length}
+              {publishedCount} / {types.length}
             </p>
           </div>
         </div>
@@ -918,21 +797,21 @@ export default function TrouvetouDashboardPage() {
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-600" />
-              Catalogue des Logements
+              Catalogue des Types d&apos;Hébergement
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
-              Gérez la publication individuelle et personnalisez l&apos;affichage de chaque fiche logement.
+              Un type de chambre = une annonce sur Trouvetou. L&apos;interrupteur pilote la visibilité publique et les disponibilités/tarifs Séjoura se synchronisent automatiquement.
             </p>
           </div>
           <Badge variant="outline" className="px-3 py-1 text-xs">
-            {publishedCount} publié(s) sur {units.length} logement(s)
+            {publishedCount} publié(s) sur {types.length} type(s)
           </Badge>
         </div>
 
-        {units.length === 0 ? (
+        {types.length === 0 ? (
           <div className="text-center py-12 bg-[var(--card-bg,var(--surface))] rounded-xl border border-slate-200 dark:border-slate-700">
             <Building2 className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Aucun logement trouvé</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Aucun type d&apos;hébergement trouvé</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md mx-auto mt-1">
               Ajoutez des chambres et types d&apos;hébergements dans votre section Établissements pour pouvoir les publier sur Trouvetou.
             </p>
@@ -946,18 +825,20 @@ export default function TrouvetouDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {units.map((unit) => {
-              const isPub   = unit.listing?.is_published ?? false;
-              const title   = unit.listing?.public_title || `${unit.room_type_name} ${unit.room_number}`;
-              const desc    = unit.listing?.public_description || "Pas de description spécifique renseignée.";
-              const images  = unit.listing?.featured_images || [];
-              const badges  = unit.listing?.amenities_badges?.length ? unit.listing.amenities_badges : unit.amenities;
+            {types.map((type) => {
+              const isListed = type.is_listed_on_trouvetou;
+              const isLive   = type.is_effectively_listed;
+              const title    = type.name;
+              const desc     = type.description || "Pas de description renseignée.";
+              const images   = type.featured_images || [];
+              const badges   = type.amenities || [];
+              const hasRooms = type.room_count > 0;
 
               return (
                 <div
-                  key={unit.id}
+                  key={type.id}
                   className={`group relative flex flex-col rounded-xl border transition-all duration-300 bg-[var(--card-bg,var(--surface))] overflow-hidden shadow-sm hover:shadow-md ${
-                    isPub
+                    isLive
                       ? "border-blue-500/40 dark:border-blue-500/30"
                       : "border-slate-200 dark:border-slate-700 opacity-80 hover:opacity-100"
                   }`}
@@ -981,18 +862,18 @@ export default function TrouvetouDashboardPage() {
                     {/* Badge statut */}
                     <div className="absolute top-3 left-3">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border shadow-sm ${
-                        isPub
+                        isLive
                           ? "bg-emerald-500/90 text-white border-emerald-400/30"
                           : "bg-slate-900/80 text-slate-300 border-slate-700"
                       }`}>
-                        <span className={`w-2 h-2 rounded-full ${isPub ? "bg-white animate-pulse" : "bg-slate-400"}`} />
-                        {isPub ? "En ligne" : "Masqué"}
+                        <span className={`w-2 h-2 rounded-full ${isLive ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+                        {isLive ? "En ligne" : "Masqué"}
                       </span>
                     </div>
 
                     {/* Prix */}
                     <div className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-lg text-white font-extrabold text-sm border border-white/10">
-                      {fmt(unit.base_price)} <span className="text-xs font-normal text-slate-300">/ nuit</span>
+                      {fmt(type.base_price)} <span className="text-xs font-normal text-slate-300">/ nuit</span>
                     </div>
                   </div>
 
@@ -1002,25 +883,39 @@ export default function TrouvetouDashboardPage() {
                       <div className="flex items-center justify-between">
                         <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">{title}</h3>
                       </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 truncate">{type.accommodation_name}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 line-clamp-2">{desc}</p>
                     </div>
 
-                    {/* Superficie + Interrupteur maître */}
+                    {/* Capacité + Superficie + Interrupteur */}
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {unit.surface_m2 != null && (
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                        {type.capacity} pers.
+                      </span>
+                      {type.surface_m2 != null && (
                         <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                          {unit.surface_m2} m²
+                          {type.surface_m2} m²
                         </span>
                       )}
                       <span
                         className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                          unit.is_listed_on_trouvetou
+                          isListed
                             ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
                             : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
                         }`}
-                        title="Interrupteur du type de chambre (Établissements)"
+                        title="Interrupteur du type de chambre"
                       >
-                        {unit.is_listed_on_trouvetou ? "Interrupteur ON" : "Interrupteur OFF"}
+                        {isListed ? "Interrupteur ON" : "Interrupteur OFF"}
+                      </span>
+                    </div>
+
+                    {/* Chambres + disponibilité */}
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                      <Building2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {hasRooms
+                          ? `${type.room_count} chambre(s) · ${type.available_room_count} disponible(s)`
+                          : "Aucune chambre associée"}
                       </span>
                     </div>
 
@@ -1041,46 +936,34 @@ export default function TrouvetouDashboardPage() {
                       )}
                     </div>
 
-                    {/* Métriques ENTREPRISE inline */}
-                    {isEnterprisePlan && unit.listing && (
-                      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <Eye className="w-3 h-3" /> {unit.listing.views_count ?? 0} vues
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="w-3 h-3" /> {unit.listing.whatsapp_clicks_count ?? 0} clics
-                        </span>
-                      </div>
-                    )}
-
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
                       {/* Toggle Publier */}
                       <button
-                        onClick={() => handleTogglePublish(unit)}
-                        disabled={savingUnitId === unit.id}
+                        onClick={() => handleToggleListed(type)}
+                        disabled={savingTypeId === type.id}
                         className={`flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                          isPub
+                          isListed
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                             : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
                         }`}
                       >
-                        {savingUnitId === unit.id ? (
+                        {savingTypeId === type.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : isPub ? (
+                        ) : isListed ? (
                           <><Check className="w-3.5 h-3.5" /> Publié</>
                         ) : (
                           "Publier sur Trouvetou"
                         )}
                       </button>
 
-                      {/* Bouton Personnaliser */}
-                      <button
-                        onClick={() => openEditModal(unit)}
+                      {/* Gérer le type */}
+                      <Link
+                        href={`/dashboard/residences/${type.accommodation_id}`}
                         className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors"
-                        title="Personnaliser la fiche publique"
+                        title="Gérer le type de chambre (Établissements)"
                       >
                         <Edit3 className="w-4 h-4" />
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -1089,175 +972,6 @@ export default function TrouvetouDashboardPage() {
           </div>
         )}
       </div>
-
-      {/* ── Modal Personnalisation Fiche ──────────────────────────────────────── */}
-      {modalOpen && selectedUnit && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Personnaliser la fiche Trouvetou"
-        >
-            <div className="bg-[var(--card-bg,var(--surface))] w-full max-w-2xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-              {/* Header */}
-              <div className="p-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
-              <div className="flex items-center gap-3">
-                <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600">
-                  <Edit3 className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                    Personnaliser la fiche Trouvetou
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambre {selectedUnit.room_number} ({selectedUnit.room_type_name})</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-white transition-colors"
-                aria-label="Fermer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Corps */}
-            <div className="p-4 overflow-y-auto space-y-3 flex-1">
-              {/* Titre Public */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Titre Public d&apos;accroche
-                </label>
-                <input
-                  type="text"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Ex: Suite Luxueuse avec Vue Panoramique"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Description Courte */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Description Courte
-                </label>
-                <textarea
-                  rows={3}
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Présentez les atouts de ce logement pour attirer les visiteurs..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Numéro WhatsApp */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-emerald-500" />
-                  Numéro WhatsApp de Réception des Demandes
-                </label>
-                <input
-                  type="tel"
-                  value={formWhatsapp}
-                  onChange={(e) => setFormWhatsapp(e.target.value)}
-                  placeholder="Ex: +2250700000000"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                  Les clients cliquant sur &quot;Réserver via WhatsApp&quot; sur Trouvetou seront directement redirigés vers ce numéro.
-                </p>
-              </div>
-
-              {/* Badges équipements */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Badges &amp; Équipements Clés
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {DEFAULT_AMENITIES.map((badge) => {
-                    const active = formBadges.includes(badge);
-                    return (
-                      <button
-                        type="button"
-                        key={badge}
-                        onClick={() => toggleBadge(badge)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-                          active
-                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400"
-                        }`}
-                      >
-                        {active ? "✓ " : "+ "}{badge}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Galerie Photos */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  Photos Coup de Cœur (URLs de Visuels)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/photo-..."
-                    className="flex-1 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-transparent text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={addImage}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shrink-0"
-                  >
-                    <Plus className="w-4 h-4" /> Ajouter
-                  </button>
-                </div>
-
-                {formImages.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3 pt-2">
-                    {formImages.map((img, idx) => (
-                      <div key={idx} className="relative group rounded-xl overflow-hidden h-24 border border-slate-200 dark:border-slate-700">
-                        <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(idx)}
-                          className="absolute top-1 right-1 p-1 bg-red-600/90 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-        <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveModal}
-                disabled={savingModal}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
-              >
-                {savingModal && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Enregistrer la Fiche
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Modal Boost Express ──────────────────────────────────────────────── */}
       {boostExpressModalOpen && boostExpressTarget && (

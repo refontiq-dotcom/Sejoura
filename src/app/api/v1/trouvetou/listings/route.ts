@@ -1,22 +1,33 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
-import type { Accommodation, TrouvetouListing } from "@/types/database";
-
-type RoomWithType = {
-  id: string;
-  accommodation_id: string;
-  room_number: string;
-  status: string;
-  room_types:
-    | { id: string; name: string; base_price: number; capacity: number; amenities: string[]; surface_m2: number | null; is_listed_on_trouvetou: boolean; featured_images: string[] }
-    | { id: string; name: string; base_price: number; capacity: number; amenities: string[]; surface_m2: number | null; is_listed_on_trouvetou: boolean; featured_images: string[] }[]
-    | null;
-};
+import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import type { Accommodation } from "@/types/database";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET  /api/v1/trouvetou/listings?tenantId=xxx
-// Retourne les données Trouvetou du tenant (plan-aware : ESSENTIEL vs ENTREPRISE)
+// Retourne les données Trouvetou du tenant (plan-aware : ESSENTIEL vs ENTREPRISE).
+//
+// Modèle aligné sur le portail : UN type de chambre = UNE annonce.
+// Le portail expose une fiche par `room_type` (external_id "rt:<id>") ; ce
+// endpoint renvoie donc une entrée par type, avec le nombre de chambres du type
+// et la disponibilité réelle (chambres non occupées / non couvertes par une
+// réservation active). L'ancien modèle « une fiche par chambre physique »
+// (trouvetou_listings) est abandonné : rien ne le consomme côté portail.
 // ──────────────────────────────────────────────────────────────────────────────
+
+type RoomTypeRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  base_price: number;
+  capacity: number;
+  amenities: string[] | null;
+  surface_m2: number | null;
+  is_listed_on_trouvetou: boolean;
+  featured_images: string[] | null;
+  accommodation_id: string;
+};
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -40,11 +51,12 @@ export async function GET(request: Request) {
     // 1. Récupérer l'abonnement
     const { data: subscription } = await admin
       .from("subscriptions")
-      .select("plan")
+      .select("plan, status")
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
     const plan            = subscription?.plan || "standard";
+    const subActive       = subscription?.status === "active";
     const isEnterprisePlan = plan === "entreprise" || plan === "enterprise";
     const isEssentielPlan  = plan === "essentiel";
 
@@ -52,7 +64,7 @@ export async function GET(request: Request) {
     const { data: accommodations, error: accError } = await admin
       .from("accommodations")
       .select(
-        "id, name, address, city, country, currency, currency_symbol, contact_phone, " +
+        "id, name, address, city, country, currency, currency_symbol, contact_phone, is_active, " +
         "is_boosted, boost_expires_at, " +
         "is_permanently_boosted, boost_express_expires_at, boost_express_price_paid"
       )
@@ -65,19 +77,21 @@ export async function GET(request: Request) {
     const typedAccommodations = (accommodations ?? []) as unknown as Pick<
       Accommodation,
       | "id" | "name" | "address" | "city" | "country" | "currency" | "currency_symbol"
-      | "contact_phone" | "is_boosted" | "boost_expires_at"
+      | "contact_phone" | "is_active" | "is_boosted" | "boost_expires_at"
       | "is_permanently_boosted" | "boost_express_expires_at" | "boost_express_price_paid"
     >[];
     const accIds = typedAccommodations.map((a) => a.id);
+    const emptyResponse = {
+      plan,
+      isEnterprisePlan,
+      isEssentielPlan,
+      accommodations: [],
+      types: [],
+      metrics: { totalViews: 0, totalWhatsappClicks: 0 },
+    };
+
     if (accIds.length === 0) {
-      return NextResponse.json({
-        plan,
-        isEnterprisePlan,
-        isEssentielPlan,
-        accommodations: [],
-        units: [],
-        metrics: { totalViews: 0, totalWhatsappClicks: 0 },
-      });
+      return NextResponse.json(emptyResponse);
     }
 
     // 3. Calculer les statuts boost (miroir de la vue trouvetou_boost_status)
@@ -116,91 +130,106 @@ export async function GET(request: Request) {
         boost_priority: boostPriority,
       };
     });
+    const accNameById   = new Map(typedAccommodations.map((a) => [a.id, a.name]));
+    const accActiveById = new Map(typedAccommodations.map((a) => [a.id, a.is_active === true]));
 
-    // 4. Récupérer les chambres
-    const { data: rooms, error: roomsError } = await admin
-      .from("rooms")
-      .select(`
-        id,
-        accommodation_id,
-        room_number,
-        status,
-        room_types (
-          id,
-          name,
-          base_price,
-          capacity,
-          amenities,
-          surface_m2,
-          is_listed_on_trouvetou,
-          featured_images
-        )
-      `)
+    // 4. Récupérer les types de chambre des établissements du tenant
+    const { data: roomTypes, error: rtError } = await admin
+      .from("room_types")
+      .select(
+        "id, name, description, base_price, capacity, amenities, surface_m2, " +
+        "is_listed_on_trouvetou, featured_images, accommodation_id"
+      )
       .in("accommodation_id", accIds);
 
-    if (roomsError) {
-      return NextResponse.json({ error: roomsError.message }, { status: 500 });
+    if (rtError) {
+      return NextResponse.json({ error: rtError.message }, { status: 500 });
     }
 
-    // 5. Récupérer les fiches Trouvetou existantes
-    const { data: listings, error: listError } = await admin
-      .from("trouvetou_listings")
-      .select("*")
-      .in("establishment_id", accIds);
+    const typedRoomTypes = (roomTypes ?? []) as unknown as RoomTypeRow[];
+    const typeIds = typedRoomTypes.map((rt) => rt.id);
 
-    if (listError) {
-      return NextResponse.json({ error: listError.message }, { status: 500 });
+    // 5. Disponibilité réelle : une chambre est indisponible si elle est occupée
+    //    ou couverte par une réservation active (même logique que la sync).
+    const occupiedRoomIds = new Set<string>();
+    const roomsByType = new Map<string, { id: string; status: string | null }[]>();
+
+    if (typeIds.length > 0) {
+      const { data: rooms } = await admin
+        .from("rooms")
+        .select("id, status, room_type_id")
+        .in("room_type_id", typeIds);
+
+      const allRoomIds: string[] = [];
+      for (const room of rooms ?? []) {
+        const list = roomsByType.get(room.room_type_id) ?? [];
+        list.push({ id: room.id, status: room.status });
+        roomsByType.set(room.room_type_id, list);
+        if (room.status === "occupied") occupiedRoomIds.add(room.id);
+        allRoomIds.push(room.id);
+      }
+
+      if (allRoomIds.length > 0) {
+        const { data: bookings } = await admin
+          .from("bookings")
+          .select("room_id")
+          .in("room_id", allRoomIds)
+          .in("status", ["confirmed", "checked_in"])
+          .lt("check_in_date", now.toISOString())
+          .gt("check_out_date", now.toISOString());
+        for (const booking of bookings ?? []) occupiedRoomIds.add(booking.room_id);
+      }
     }
 
-    const typedListings = (listings ?? []) as unknown as TrouvetouListing[];
-    const typedRooms    = (rooms ?? []) as unknown as RoomWithType[];
-    const listingsByUnit = new Map(typedListings.map((l) => [l.unit_id, l]));
-
-    // 6. Métriques (vues + clics WhatsApp) — masquées pour les plans non-Entreprise
+    // 6. Métriques (vues + clics WhatsApp) — héritées de l'ancien modèle
+    //    par chambre, masquées pour les plans non-Entreprise.
     let totalViews = 0;
     let totalWhatsappClicks = 0;
     if (isEnterprisePlan) {
-      typedListings.forEach((l) => {
+      const { data: listings } = await admin
+        .from("trouvetou_listings")
+        .select("views_count, whatsapp_clicks_count")
+        .in("establishment_id", accIds);
+      for (const l of listings ?? []) {
         totalViews          += l.views_count || 0;
         totalWhatsappClicks += l.whatsapp_clicks_count || 0;
-      });
+      }
     }
 
-    const unitsFormatted = typedRooms.map((room) => {
-      const listing     = listingsByUnit.get(room.id) || null;
-      const roomTypeObj = Array.isArray(room.room_types)
-        ? room.room_types[0]
-        : room.room_types;
-      return {
-        id: room.id,
-        accommodation_id: room.accommodation_id,
-        room_number: room.room_number,
-        status: room.status,
-        room_type_name: roomTypeObj?.name || "Standard",
-        base_price: roomTypeObj?.base_price || 0,
-        capacity: roomTypeObj?.capacity || 2,
-        amenities: roomTypeObj?.amenities || [],
-        surface_m2: roomTypeObj?.surface_m2 ?? null,
-        is_listed_on_trouvetou: roomTypeObj?.is_listed_on_trouvetou ?? false,
-        featured_images: roomTypeObj?.featured_images || [],
-        listing: listing
-          ? {
-              id: listing.id,
-              is_published: listing.is_published,
-              public_title: listing.public_title,
-              public_description: listing.public_description,
-              featured_images: listing.featured_images || [],
-              amenities_badges: listing.amenities_badges || [],
-              direct_whatsapp: listing.direct_whatsapp,
-              // Métriques réservées ENTREPRISE (null pour ESSENTIEL)
-              views_count: isEnterprisePlan ? listing.views_count || 0 : null,
-              whatsapp_clicks_count: isEnterprisePlan
-                ? listing.whatsapp_clicks_count || 0
-                : null,
-            }
-          : null,
-      };
-    });
+    const typesFormatted = typedRoomTypes
+      .map((rt) => {
+        const typeRooms = roomsByType.get(rt.id) ?? [];
+        const availableRooms = typeRooms.filter((r) => !occupiedRoomIds.has(r.id));
+        const featuredImages = Array.isArray(rt.featured_images) ? rt.featured_images : [];
+
+        return {
+          id: rt.id,
+          name: rt.name,
+          description: rt.description,
+          accommodation_id: rt.accommodation_id,
+          accommodation_name: accNameById.get(rt.accommodation_id) ?? "",
+          base_price: rt.base_price,
+          capacity: rt.capacity,
+          amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
+          surface_m2: rt.surface_m2,
+          featured_images: featuredImages,
+          is_listed_on_trouvetou: rt.is_listed_on_trouvetou === true,
+          room_count: typeRooms.length,
+          available_room_count: availableRooms.length,
+          is_effectively_listed:
+            rt.is_listed_on_trouvetou === true &&
+            featuredImages.length > 0 &&
+            typeRooms.length > 0,
+        };
+      })
+      .filter((t) =>
+        isTrouvetouEligible({
+          accommodationActive: accActiveById.get(t.accommodation_id) === true,
+          subscriptionActive: subActive,
+          hasPhoto: t.featured_images.length > 0,
+          hasRoom: t.room_count > 0,
+        })
+      );
 
     return NextResponse.json({
       plan,
@@ -208,98 +237,10 @@ export async function GET(request: Request) {
       isEssentielPlan,
       metrics: { totalViews, totalWhatsappClicks },
       accommodations: accommodationsWithBoostStatus,
-      units: unitsFormatted,
+      types: typesFormatted,
     });
   } catch (error) {
     console.error("GET /api/v1/trouvetou/listings error:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// POST /api/v1/trouvetou/listings
-// Upsert d'une fiche vitrine Trouvetou (accessible ESSENTIEL et ENTREPRISE)
-// ──────────────────────────────────────────────────────────────────────────────
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const {
-      unit_id,
-      establishment_id,
-      is_published,
-      public_title,
-      public_description,
-      featured_images,
-      amenities_badges,
-      direct_whatsapp,
-    } = body;
-
-    if (!unit_id || !establishment_id) {
-      return NextResponse.json(
-        { error: "unit_id et establishment_id sont requis" },
-        { status: 400 }
-      );
-    }
-
-    const admin = getServerAdmin();
-
-    // Authentification + vérification que l'établissement appartient à l'appelant
-    const user = await getServerUser(admin, request);
-    if (!user) {
-      return NextResponse.json({ error: "Authentification requise." }, { status: 401 });
-    }
-
-    const { data: accommodation } = await admin
-      .from("accommodations")
-      .select("tenant_id")
-      .eq("id", establishment_id)
-      .maybeSingle();
-
-    if (!accommodation) {
-      return NextResponse.json({ error: "Établissement introuvable." }, { status: 404 });
-    }
-    if (!user.tenantId || accommodation.tenant_id !== user.tenantId) {
-      return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
-    }
-
-    const { data: unit } = await admin
-      .from("rooms")
-      .select("accommodation_id")
-      .eq("id", unit_id)
-      .maybeSingle();
-    if (!unit || unit.accommodation_id !== establishment_id) {
-      return NextResponse.json(
-        { error: "La chambre ne correspond pas à l'établissement." },
-        { status: 400 }
-      );
-    }
-
-    const payload = {
-      unit_id,
-      establishment_id,
-      is_published: typeof is_published === "boolean" ? is_published : false,
-      public_title:        public_title   || null,
-      public_description:  public_description || null,
-      featured_images:     Array.isArray(featured_images)  ? featured_images  : [],
-      amenities_badges:    Array.isArray(amenities_badges) ? amenities_badges : [],
-      direct_whatsapp:     direct_whatsapp || null,
-      updated_at:          new Date().toISOString(),
-    };
-
-    const { data, error } = await admin
-      .from("trouvetou_listings")
-      .upsert(payload, { onConflict: "unit_id" })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Upsert error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, listing: data });
-  } catch (error) {
-    console.error("POST /api/v1/trouvetou/listings error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

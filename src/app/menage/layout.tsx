@@ -102,11 +102,20 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={toggleTheme} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+            <button
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+            >
               {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
             </button>
             <div className="relative">
-              <button onClick={() => setShowProfile(!showProfile)} className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" title="Profil">
+              <button
+                onClick={() => setShowProfile(!showProfile)}
+                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+                title="Profil"
+                aria-label="Ouvrir le profil"
+              >
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover" />
@@ -127,9 +136,6 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
                 </div>
               )}
             </div>
-            <button onClick={handleLogout} className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 md:hidden">
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </header>

@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanPrice } from "@/lib/subscription-plans";
-import { getPlanLabel } from "@/lib/utils";
+import { getPlanLabel, formatFCFA } from "@/lib/utils";
+import {
+  escapeMarkdown,
+  getTelegramAdminUrl,
+  isTelegramConfigured,
+  sendTelegramMessage,
+} from "@/lib/telegram";
 
 const ALLOWED_PLANS = ["essentiel", "entreprise", "standard", "enterprise"];
 
@@ -16,6 +22,8 @@ const ALLOWED_PLANS = ["essentiel", "entreprise", "standard", "enterprise"];
 //   2. Création d'une demande de paiement (subscription_payment_requests)
 //      avec le numéro Wave expéditeur (sender_phone)
 //   3. Notification visuelle pour le Super Admin (validation à faire)
+//   4. Alerte Telegram pour le Super Admin (si TELEGRAM_BOT_TOKEN et
+//      TELEGRAM_CHAT_ID sont configurés, cf. src/lib/telegram.ts)
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -133,6 +141,34 @@ export async function POST(request: Request) {
     type: "warning",
     link: "/admin",
   });
+
+  // 4. Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais
+  //    faire échouer la soumission de la demande côté gérant.
+  if (isTelegramConfigured()) {
+    try {
+      const planLabel = getPlanLabel(plan);
+      const contactName = tenant?.contact_name ?? "Gérant de l'établissement";
+      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+
+      const text = [
+        "\uD83D\uDD14 *Nouvelle demande d'abonnement Sejoura !*",
+        "",
+        `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(companyName)}`,
+        `\uD83D\uDC64 *Gérant :* ${escapeMarkdown(contactName)}`,
+        `\uD83D\uDCE6 *Formule :* ${escapeMarkdown(planLabel)}`,
+        `\uD83D\uDCB0 *Montant :* ${formatFCFA(amount)}`,
+        `\uD83D\uDCF1 *Numéro Wave :* ${escapeMarkdown(phone)}`,
+        "",
+        `\uD83D\uDD17 [Valider sur le Dashboard Admin](${adminUrl})`,
+      ].join("\n");
+
+      const sent = await sendTelegramMessage(text);
+      if (!sent) console.error("Telegram subscription alert failed");
+    } catch (error) {
+      // Ne jamais faire échouer la demande à cause de l'alerte
+      console.error("subscription notify-payment telegram:", error);
+    }
+  }
 
   return NextResponse.json({ success: true, alreadyPending: false, requestId: requestRow.id });
 }

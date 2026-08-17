@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
   { label: "Établissements", href: "/dashboard/residences", icon: Building2, roles: ["admin_residence"] },
   { label: "Réservations", href: "/dashboard/bookings", icon: CalendarCheck, roles: ["admin_residence", "receptionniste"] },
-  { label: "Ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste", "menagere"] },
+  { label: "Ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste"] },
   { label: "Mon Shift / Caisse", href: "/dashboard/shift", icon: ClipboardList, roles: ["receptionniste", "menagere"] },
   { label: "Comptabilité", href: "/dashboard/accounting", icon: Wallet, roles: ["admin_residence"] },
   { label: "Employés", href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },

@@ -294,4 +294,103 @@ describe("generateInvoicePdf", () => {
       expect(sorted[i + 1].y).toBeGreaterThan(sorted[i].y + lineHeight - 4);
     }
   });
+
+  it("retrace les prolongations multiples sur la facture (facture intelligente)", async () => {
+    // Séjour initial du 01/08 au 03/08 (2 nuits), puis 2 prolongations :
+    // 03/08 → 05/08 (+2 nuits), puis 05/08 → 10/08 (+5 nuits) = 9 nuits au total.
+    const extendedBooking = {
+      ...baseBooking,
+      check_out_date: "2026-08-10",
+      nights_count: 9,
+      total_amount: 54000,
+    };
+    const extendedInvoice = {
+      ...baseInvoice,
+      amount: 54000,
+      tax_amount: 0,
+      total_amount: 54000,
+    };
+    const extensions = [
+      {
+        id: "ext-1",
+        tenant_id: "t-1",
+        booking_id: "b-1",
+        previous_check_out_date: "2026-08-03",
+        new_check_out_date: "2026-08-05",
+        extra_nights: 2,
+        source: "manual" as const,
+        created_by: "u-1",
+        created_at: "2026-08-02T10:00:00Z",
+      },
+      {
+        id: "ext-2",
+        tenant_id: "t-1",
+        booking_id: "b-1",
+        previous_check_out_date: "2026-08-05",
+        new_check_out_date: "2026-08-10",
+        extra_nights: 5,
+        source: "manual" as const,
+        created_by: "u-1",
+        created_at: "2026-08-04T10:00:00Z",
+      },
+    ];
+
+    const buffer = await generateInvoicePdf({
+      tenant: baseTenant as never,
+      booking: { ...extendedBooking, ...relations } as never,
+      invoice: extendedInvoice as never,
+      extensions: extensions as never,
+    });
+
+    const text = extractPdfText(buffer);
+    // Chaque segment est retracé
+    expect(text).toContain("Nuitée initiale · du 01/08 au 03/08");
+    expect(text).toContain("Prolongation 1 · du 03/08 au 05/08");
+    expect(text).toContain("Prolongation 2 · du 05/08 au 10/08");
+    // Montants : 2 × 6 000 = 12 000 ; 2 × 6 000 = 12 000 ; 5 × 6 000 = 30 000
+    expect(text).toContain("12 000");
+    expect(text).toContain("30 000");
+    // Total inchangé
+    expect(text).toContain("54 000");
+  });
+
+  it("étiquette le dépassement de séjour sur la facture", async () => {
+    // Séjour prévu 2 nuits (01/08 → 03/08), dépassement de 2 nuits (auto check-out).
+    const overstayBooking = {
+      ...baseBooking,
+      check_out_date: "2026-08-03",
+      nights_count: 4,
+      total_amount: 24000,
+    };
+    const overstayInvoice = {
+      ...baseInvoice,
+      amount: 24000,
+      tax_amount: 0,
+      total_amount: 24000,
+    };
+    const extensions = [
+      {
+        id: "ext-ov",
+        tenant_id: "t-1",
+        booking_id: "b-1",
+        previous_check_out_date: "2026-08-03",
+        new_check_out_date: "2026-08-05",
+        extra_nights: 2,
+        source: "overstay" as const,
+        created_by: null,
+        created_at: "2026-08-04T10:00:00Z",
+      },
+    ];
+
+    const buffer = await generateInvoicePdf({
+      tenant: baseTenant as never,
+      booking: { ...overstayBooking, ...relations } as never,
+      invoice: overstayInvoice as never,
+      extensions: extensions as never,
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain("Nuitée initiale · du 01/08 au 03/08");
+    expect(text).toContain("Dépassement de séjour · du 03/08 au 05/08");
+  });
 });

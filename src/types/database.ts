@@ -240,6 +240,7 @@ export interface Accommodation {
   logo_url?: string | null;
   theme_color?: string | null;
   image_url?: string | null;
+  guest_info?: GuestInfo | null;
   created_at: string;
   updated_at: string;
 }
@@ -304,6 +305,7 @@ export interface TrouvetouListing {
 export interface Client {
   id: string;
   tenant_id: string;
+  accommodation_id: string | null;
   full_name: string;
   phone: string | null;
   email: string | null;
@@ -347,6 +349,134 @@ export interface Booking {
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+/** Une prolongation de séjour enregistrée (extend_booking ou dépassement auto). */
+export interface BookingExtension {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  previous_check_out_date: string;
+  new_check_out_date: string;
+  extra_nights: number;
+  source: "manual" | "client_request" | "overstay";
+  created_by: string | null;
+  created_at: string;
+}
+
+export type StayActivityType =
+  | "booking_created"
+  | "check_in"
+  | "check_out"
+  | "booking_extended"
+  | "overstay_detected"
+  | "overstay_auto_checkout"
+  | "service_request"
+  | "service_request_done"
+  | "stay_extension_requested"
+  | "stay_extension_approved"
+  | "stay_extension_rejected"
+  | "payment";
+
+export interface StayActivity {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string | null;
+  activity_type: StayActivityType;
+  title: string;
+  description: string | null;
+  meta: Record<string, unknown> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type StayNoteType = "incident" | "damage" | "forgotten_object" | "feedback" | "other";
+export type StayNoteSeverity = "low" | "medium" | "high";
+
+export interface StayNote {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string | null;
+  note_type: StayNoteType;
+  description: string;
+  severity: StayNoteSeverity;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type ClientScoreTier = "excellent" | "bon" | "moyen" | "a_surveiller" | "mauvais";
+
+/**
+ * Ligne de la vue client_profiles (score agrégé pour les listes / badges).
+ */
+export interface ClientProfile {
+  client_id: string;
+  tenant_id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  nationality: string | null;
+  stay_count: number;
+  total_nights: number;
+  total_revenue: number;
+  balance_due: number;
+  avg_stay_amount: number;
+  preferred_room_type: string | null;
+  last_stay_date: string | null;
+  score: number;
+  tier: ClientScoreTier;
+}
+
+export interface ClientProfileSignal {
+  tone: "positive" | "negative" | "neutral";
+  text: string;
+}
+
+export interface ClientProfileDimensions {
+  reliability: number;
+  behavior: number;
+  loyalty: number;
+  value: number;
+}
+
+/**
+ * Payload renvoyé par le RPC get_client_profile (fiche client dédiée).
+ */
+export interface ClientProfilePayload {
+  ok: boolean;
+  error?: string;
+  client?: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    email: string | null;
+    nationality: string | null;
+    id_type: string | null;
+    id_number: string | null;
+    address: string | null;
+    emergency_contact: string | null;
+    created_at: string;
+  };
+  profile?: {
+    stats: {
+      stay_count: number;
+      total_nights: number;
+      total_revenue: number;
+      total_paid: number;
+      balance_due: number;
+      avg_stay_amount: number;
+      preferred_room_type: string | null;
+      last_stay_date: string | null;
+    };
+    score: {
+      total: number;
+      tier: ClientScoreTier;
+      dimensions: ClientProfileDimensions;
+    };
+    signals: ClientProfileSignal[];
+  };
 }
 
 export interface Payment {
@@ -690,10 +820,30 @@ export interface Database {
         Insert: Omit<Client, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Client, "id" | "created_at" | "updated_at">>;
       };
+      client_profiles: {
+        Row: ClientProfile;
+        Insert: never;
+        Update: never;
+      };
       bookings: {
         Row: Booking;
         Insert: Omit<Booking, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Booking, "id" | "created_at" | "updated_at">>;
+      };
+      booking_extensions: {
+        Row: BookingExtension;
+        Insert: Omit<BookingExtension, "id" | "created_at">;
+        Update: Partial<Omit<BookingExtension, "id" | "created_at">>;
+      };
+      stay_activities: {
+        Row: StayActivity;
+        Insert: Omit<StayActivity, "id" | "created_at">;
+        Update: Partial<Omit<StayActivity, "id" | "created_at">>;
+      };
+      stay_notes: {
+        Row: StayNote;
+        Insert: Omit<StayNote, "id" | "created_at">;
+        Update: Partial<Omit<StayNote, "id" | "created_at">>;
       };
       payments: {
         Row: Payment;
@@ -779,6 +929,10 @@ export interface Database {
       };
       complete_cleaning_task: {
         Args: { p_task_id: string; p_user_id: string };
+        Returns: CleaningTask;
+      };
+      reopen_cleaning_task: {
+        Args: { p_task_id: string };
         Returns: CleaningTask;
       };
       check_double_booking: {

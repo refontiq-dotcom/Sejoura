@@ -18,8 +18,12 @@ import {
   canAccessPlanFeature,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useAccommodation } from "@/hooks/use-accommodation";
 import { useRouter } from "next/navigation";
-import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
+import Link from "next/link";
+import { StayTimeline } from "@/components/stay-timeline";
+import { ClientScoreBadge } from "@/components/client-score-badge";
+import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier } from "@/types/database";
 import {
   LineChart,
   Line,
@@ -165,6 +169,8 @@ interface ClientWithStats extends Client {
   totalSpent: number;
   paid: number;
   balance: number;
+  score?: number | null;
+  tier?: ClientScoreTier | null;
 }
 
 type BookingBriefRow = {
@@ -699,6 +705,7 @@ export default function AccountingPage() {
   const [savingExpense, setSavingExpense] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null);
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
   const [expenseForm, setExpenseForm] = useState({
     category: "utilities",
@@ -710,9 +717,22 @@ export default function AccountingPage() {
 
   const [exportingPdf, setExportingPdf] = useState(false);
 
+  // Les dépenses suivent la résidence active (sélecteur du header).
+  const { activeAccommodationId } = useAccommodation();
+  const userPickedExpAccRef = useRef(false);
+  const [expAccFilter, setExpAccFilter] = useState<string>("all");
+
   useEffect(() => {
     loadData();
   }, []);
+
+  // Suit la résidence active : les dépenses se refiltrent automatiquement
+  // tant que l'utilisateur n'a pas choisi une résidence explicite.
+  useEffect(() => {
+    if (userPickedExpAccRef.current) return;
+    setExpAccFilter(activeAccommodationId ?? "all");
+    loadDataRef.current(activeAccommodationId ?? undefined);
+  }, [activeAccommodationId]);
 
   // Temps réel : recharge dès qu'une réservation, un paiement ou une facture
   // change (via Réservations, la caisse, le shift ou l'espace client) pour
@@ -746,7 +766,7 @@ export default function AccountingPage() {
     };
   }, [tenantId]);
 
-  async function loadData() {
+  async function loadData(accId?: string) {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -772,7 +792,12 @@ export default function AccountingPage() {
       const tid = userData.tenant_id;
 
       const [exp, pay, log, inv, acc, usersRes] = await Promise.all([
-        supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300),
+        (() => {
+          const effectiveAccId = accId ?? (expAccFilter === "all" ? undefined : expAccFilter);
+          let q = supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300);
+          if (effectiveAccId) q = q.eq("accommodation_id", effectiveAccId);
+          return q;
+        })(),
         supabase.from("payments").select("*").eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
         supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(120),
         supabase.from("invoices").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
@@ -885,6 +910,23 @@ export default function AccountingPage() {
             balance,
           } as ClientWithStats;
         });
+
+        // Scores de réputation (vue client_profiles) — fusionnés dans les stats
+        const { data: profiles } = await supabase
+          .from("client_profiles")
+          .select("client_id, score, tier");
+        const scoreById: Record<string, { score: number; tier: ClientScoreTier }> = {};
+        (profiles || []).forEach((p) => {
+          scoreById[p.client_id] = { score: p.score, tier: p.tier };
+        });
+        stats.forEach((c) => {
+          const s = scoreById[c.id];
+          if (s) {
+            c.score = s.score;
+            c.tier = s.tier;
+          }
+        });
+
         setClients(stats);
       }
     } catch (err) {
@@ -1099,7 +1141,7 @@ export default function AccountingPage() {
       description: "",
       amount: "",
       expense_date: todayISO(),
-      accommodation_id: "",
+      accommodation_id: activeAccommodationId || "",
     });
     setExpenseModalOpen(true);
   }
@@ -2049,6 +2091,7 @@ export default function AccountingPage() {
                   <thead>
                     <tr className="border-b border-zinc-800">
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Client</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Score</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Contact</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Séjours</th>
                       <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">CA total</th>
@@ -2076,6 +2119,9 @@ export default function AccountingPage() {
                               </p>
                             </div>
                           </div>
+                        </td>
+                        <td className="p-2.5">
+                          <ClientScoreBadge score={c.score} tier={c.tier} clientId={c.id} showValue={false} />
                         </td>
                         <td className="p-2.5">
                           <div className="text-xs text-zinc-400">
@@ -2300,7 +2346,16 @@ export default function AccountingPage() {
                   <User className="w-3.5 h-3.5" /> {selectedClient.nationality}
                 </span>
               )}
+              <ClientScoreBadge score={selectedClient.score} tier={selectedClient.tier} />
             </div>
+
+            {/* Lien fiche intelligente */}
+            <Link
+              href={`/dashboard/clients/${selectedClient.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Ouvrir la fiche intelligente
+            </Link>
 
             {/* Chiffres clés */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2332,25 +2387,40 @@ export default function AccountingPage() {
               {selectedClient.bookings.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Aucune réservation</p>
               ) : (
-                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                <div className="space-y-2 pr-1">
                   {selectedClient.bookings.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {b.booking_code}
-                          <span className="ml-2 text-xs font-normal text-slate-400">
-                            {formatDate(b.check_in_date)} → {formatDate(b.check_out_date)}
-                          </span>
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
-                        </p>
+                    <div key={b.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">
+                            {b.booking_code}
+                            <span className="ml-2 text-xs font-normal text-slate-400">
+                              {formatDate(b.check_in_date)} → {formatDate(b.check_out_date)}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant={b.payment_status === "paid" ? "success" : b.payment_status === "partial" ? "warning" : "error"}>
+                            {b.payment_status === "paid" ? "Soldé" : b.payment_status === "partial" ? "Partiel" : b.payment_status === "refunded" ? "Remboursé" : "Impayé"}
+                          </Badge>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedBookingId(expandedBookingId === b.id ? null : b.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                          >
+                            <History className="w-3 h-3" />
+                            {expandedBookingId === b.id ? "Masquer l'historique" : "Historique du séjour"}
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <Badge variant={b.payment_status === "paid" ? "success" : b.payment_status === "partial" ? "warning" : "error"}>
-                          {b.payment_status === "paid" ? "Soldé" : b.payment_status === "partial" ? "Partiel" : b.payment_status === "refunded" ? "Remboursé" : "Impayé"}
-                        </Badge>
-                      </div>
+                      {expandedBookingId === b.id && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                          <StayTimeline bookingId={b.id} tenantId={tenantId} clientId={selectedClient.id} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

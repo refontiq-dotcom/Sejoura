@@ -229,9 +229,11 @@ export default function DashboardLayout({
           }
         }
 
-        // Protection des routes Ménage/Shift pour les Admins (masquées de leur menu)
+        // Protection des routes Shift pour les Admins (masquées de leur menu)
+        // NB : le suivi ménage (/dashboard/cleaning) est bien accessible à
+        // l'admin résidence et au réceptionniste.
         if (userData.role === "admin_residence") {
-          const staffOnlyRoutes = ["/dashboard/cleaning", "/dashboard/shift"];
+          const staffOnlyRoutes = ["/dashboard/shift"];
           if (staffOnlyRoutes.some((route) => pathname.startsWith(route))) {
             router.push("/dashboard");
             return;

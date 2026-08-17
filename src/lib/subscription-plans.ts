@@ -38,6 +38,7 @@ export function canAccessFeature(feature: string, plan?: string | null): boolean
     case "trouvetouBoost":
     case "customRoles":
     case "clientPortal":
+    case "clientSmartProfile":
       return normalized === "entreprise";
     case "cleaningModule":
     case "advancedStats":
