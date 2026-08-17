@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     title: "Nouvelle demande de validation d'abonnement",
     message: `${companyName} a déclaré un paiement Wave pour la formule ${getPlanLabel(plan)} (${amount} FCFA) depuis le numéro ${phone}. Validez l'abonnement.`,
     type: "warning",
-    link: "/admin",
+    link: "/admin/sejour",
   });
 
   // 4. Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     try {
       const planLabel = getPlanLabel(plan);
       const contactName = tenant?.contact_name ?? "Gérant de l'établissement";
-      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
 
       const text = [
         "\uD83D\uDD14 *Nouvelle demande d'abonnement Sejoura !*",

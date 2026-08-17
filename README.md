@@ -20,7 +20,9 @@ Déroulé :
    `subscription_status = 'pending'` et crée une demande dans
    `subscription_payment_requests` (avec le numéro expéditeur) + une
    notification Super Admin.
-3. Sur la page `/admin`, le Super Admin voit un bandeau d'alerte et la section
+3. Sur la page `/admin` (connexion Super Admin, mot de passe seul), le Super
+   Admin ouvre la console Séjoura via `/admin/dashboard` (hub des produits
+   Refontiq) puis `/admin/sejour`. Il voit un bandeau d'alerte et la section
    « Gestion des Abonnements » (validations en attente, avec le numéro Wave du
    gérant pour vérifier le transfert). En cliquant sur « Valider l'abonnement »,
    la RPC `validate_subscription_payment` active l'abonnement (+30 jours),
@@ -68,6 +70,22 @@ Pour l'abonnement expiré, le passage en `expired` (par `sync_subscription_statu
 `20260828_subscription_expired_telegram.sql`). Un Vercel Cron (`vercel.json`,
 toutes les minutes) vide cette file via la route `/api/cron/telegram-alerts`
 (protégée par la variable `CRON_SECRET`).
+
+### Console Super Admin (accès multi-produits)
+
+Le Super Admin se connecte via `/admin` avec un simple mot de passe (aucun e-mail
+demandé, comme le portail employé). L'e-mail du compte est résolu côté serveur
+par la variable `SUPER_ADMIN_EMAIL`, sinon le premier compte `users.role =
+'super_admin'` de la base.
+
+Une fois connecté, `/admin/dashboard` est le hub des produits Refontiq :
+- **Séjoura** (`/admin/sejour`) — console de gestion des résidences
+- **Docly** / **Schooly** — projets à venir (cartes « Prochainement »)
+
+Les alertes Telegram pointent vers `/admin?next=/admin/sejour` (ou
+`/admin/ideas`) : le lien ouvre la page de connexion puis renvoie directement
+vers la section concernée. Seules les routes `/admin/*` (sauf `/admin` lui-même)
+sont protégées par la middleware (session + rôle `super_admin`).
 
 ## 🧾 Facture intelligente (trace des prolongations)
 

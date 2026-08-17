@@ -165,7 +165,7 @@ export async function POST(request: Request) {
         .eq("id", subscription.tenant_id)
         .maybeSingle();
 
-      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
       const text = [
         "\uD83D\uDCB5 *Paiement Wave reçu — Sejoura*",
         "",

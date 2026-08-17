@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseUrl, getSupabasePublicKey } from "@/lib/supabase/env";
+import { ADMIN_LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
 
 // Routes réservées aux Administrateurs (Employeurs)
 const ADMIN_ONLY_ROUTES = [
@@ -22,7 +23,7 @@ const EMPLOYEE_ALLOWED_ROUTES = [
 ];
 
 function isAdminOnlyRoute(pathname: string): boolean {
-  if (pathname.startsWith("/admin")) return true;
+  if (pathname.startsWith("/admin") && pathname !== "/admin") return true;
   if (pathname === "/dashboard/residences") return true;
   return ADMIN_ONLY_ROUTES.some((route) => route !== "/dashboard/residences" && pathname.startsWith(route));
 }
@@ -82,12 +83,21 @@ export async function middleware(req: NextRequest) {
   const isRoot = pathname === "/";
   const isDashboard = pathname.startsWith("/dashboard");
   const isAdmin = pathname.startsWith("/admin");
+  const isAdminLogin = pathname === "/admin";
   const isMenage = pathname.startsWith("/menage");
 
   // ── NON CONNECTÉ : protéger les zones privées ──
   if (!user) {
-    if (isDashboard || isAdmin) {
+    if (isDashboard) {
       return NextResponse.redirect(new URL("/", req.url));
+    }
+    // La page /admin est la page de connexion du Super Admin (mot de passe
+    // seul) : elle reste publique. Les sous-routes de la console redirigent
+    // vers cette page de connexion avec un deep-link `next`.
+    if (isAdmin && !isAdminLogin) {
+      const loginUrl = new URL(ADMIN_LOGIN_ROUTE, req.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
     }
     if (isMenage) {
       return NextResponse.redirect(new URL("/employee-login", req.url));
@@ -105,7 +115,7 @@ export async function middleware(req: NextRequest) {
   const isEmployee = metaRole === "receptionniste" || metaRole === "menagere";
 
   // Un employé ne doit JAMAIS accéder aux routes admin
-  if (isEmployee && (isAdminOnlyRoute(pathname) || isAdmin)) {
+  if (isEmployee && (isAdminOnlyRoute(pathname) || (isAdmin && !isAdminLogin))) {
     const target = metaRole === "menagere" ? "/menage" : "/dashboard";
     if (pathname !== target) {
       return NextResponse.redirect(new URL(target, req.url));
@@ -131,13 +141,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
+  // Un Super Admin connecté qui visite /admin (page de connexion) est envoyé
+  // vers le hub des produits.
+  if (isAdminLogin && metaRole === "super_admin") {
+    return NextResponse.redirect(new URL(ADMIN_HUB_ROUTE, req.url));
+  }
+
   // Racine : rediriger les utilisateurs connectés vers leur espace.
-  // Le super admin va directement sur la console d'administration, les autres
+  // Le super admin va directement sur le hub des produits, les autres
   // sur le tableau de bord. Un gérant en cours d'onboarding (étape 2) est
   // géré par le layout du dashboard, pas par une redirection ici.
   if (user && isRoot) {
     if (metaRole === "super_admin") {
-      return NextResponse.redirect(new URL("/admin", req.url));
+      return NextResponse.redirect(new URL(ADMIN_HUB_ROUTE, req.url));
     }
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
