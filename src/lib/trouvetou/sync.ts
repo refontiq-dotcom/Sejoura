@@ -9,9 +9,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *
  * Seules les chambres des établissements actifs dont l'abonnement est
  * `active` ET dont l'interrupteur Trouvetou est ON (`is_listed_on_trouvetou`)
- * avec au moins une photo sont envoyées. L'UPSERT côté Trouvetou repose sur le
- * couple (provider_id, external_id) — `external_id = "rt:<room_type_id>"` est
- * stable, ce qui rend l'envoi idempotent.
+ * avec au moins une photo sont envoyées. De plus, le tenant doit disposer
+ * d'au moins une clé API externe ACTIVE (`external_api_keys.is_active = true`) :
+ * une résidence ne diffuse sur Trouvetou que si sa clé API est active.
+ * L'UPSERT côté Trouvetou repose sur le couple (provider_id, external_id) —
+ * `external_id = "rt:<room_type_id>"` est stable, ce qui rend l'envoi idempotent.
+ *
+ * La clé API active du tenant est transmise dans `attributes.sejoura_api_key`
+ * pour permettre la création de réservations depuis le portail (POST /bookings).
  */
 
 export interface TrouvetouSyncItem {
@@ -46,6 +51,7 @@ interface SyncRow {
   amenities: string[] | null;
   featured_images: string[] | null;
   accommodations: {
+    tenant_id: string;
     name: string;
     description: string | null;
     city: string | null;
@@ -60,6 +66,24 @@ interface SyncRow {
 async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: string | null }> {
   const admin = createAdminClient();
 
+  // 1. Clés API externes actives par tenant — requête plate : la FK
+  //    `tenants → external_api_keys` n'est pas garantie en base, on joint en JS.
+  const { data: activeKeys, error: keysError } = await admin
+    .from("external_api_keys")
+    .select("tenant_id, api_key")
+    .eq("is_active", true);
+
+  if (keysError) {
+    return { items: [], error: `Lecture des clés API Séjoura : ${keysError.message}` };
+  }
+
+  const apiKeyByTenant = new Map<string, string>();
+  for (const k of activeKeys ?? []) {
+    if (k.tenant_id && !apiKeyByTenant.has(k.tenant_id)) {
+      apiKeyByTenant.set(k.tenant_id, k.api_key);
+    }
+  }
+
   const { data, error } = await admin
     .from("room_types")
     .select(
@@ -72,6 +96,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       amenities,
       featured_images,
       accommodations!inner (
+        tenant_id,
         name,
         description,
         city,
@@ -92,8 +117,15 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   const rows = (data ?? []) as unknown as SyncRow[];
 
-  // Master gate : une fiche listée doit avoir au moins une photo.
-  const listedRows = rows.filter((row) => (row.featured_images ?? []).length > 0);
+  // Master gate : une fiche listée doit avoir au moins une photo ET le tenant
+  // doit disposer d'une clé API externe ACTIVE (résidence diffusée seulement
+  // si sa clé API est active).
+  const listedRows = rows.filter(
+    (row) =>
+      (row.featured_images ?? []).length > 0 &&
+      !!row.accommodations?.tenant_id &&
+      apiKeyByTenant.has(row.accommodations.tenant_id)
+  );
   const roomTypeIds = listedRows.map((row) => row.id);
 
   // ── Disponibilité en temps réel ─────────────────────────────────────────
@@ -138,6 +170,12 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const typeRooms = roomStatusByType.get(row.id) ?? [];
       const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
 
+      // Clé API Séjoura du tenant (active — garantie par le filtre ci-dessus).
+      // Stockée côté portail pour permettre la création de réservations (POST /bookings).
+      const sejouraApiKey = row.accommodations?.tenant_id
+        ? (apiKeyByTenant.get(row.accommodations.tenant_id) ?? null)
+        : null;
+
       return {
         external_id: `rt:${row.id}`,
         title: `${row.name} — ${accommodation.name}`,
@@ -148,6 +186,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         attributes: {
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
+          ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
       };

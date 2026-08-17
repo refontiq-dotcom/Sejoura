@@ -132,12 +132,27 @@ export async function GET(request: Request) {
         is_boosted,
         boost_expires_at,
         is_permanently_boosted,
-        boost_express_expires_at
+        boost_express_expires_at,
+        tenant_id
       `)
       .in("id", establishmentIds);
 
     if (accsError) {
       return NextResponse.json({ error: accsError.message }, { status: 500 });
+    }
+
+    // Master gate résidence : seuls les établissements dont le tenant possède
+    // une clé API EXTERNE ACTIVE sont diffusés sur Trouvetou.
+    const tenantIds = Array.from(new Set((accsData ?? []).map((a) => a.tenant_id).filter(Boolean)));
+    let activeTenantIds = new Set<string>();
+
+    if (tenantIds.length > 0) {
+      const { data: activeKeys } = await admin
+        .from("external_api_keys")
+        .select("tenant_id")
+        .in("tenant_id", tenantIds)
+        .eq("is_active", true);
+      activeTenantIds = new Set((activeKeys ?? []).map((k) => k.tenant_id));
     }
 
     const roomsById = new Map((roomsData ?? []).map((r) => [r.id, r]));
@@ -161,6 +176,10 @@ export async function GET(request: Request) {
     // 3. Filtres : master gate Trouvetou (interrupteur ON + photo), ville, équipements
     let filteredListings = listings.filter((l) => {
       const roomType = roomTypeOf(l);
+      const acc      = accOf(l);
+
+      // Master gate résidence : clé API active obligatoire
+      if (!acc?.tenant_id || !activeTenantIds.has(acc.tenant_id)) return false;
 
       // Master gate : interrupteur ON obligatoire
       if (roomType?.is_listed_on_trouvetou !== true) return false;
