@@ -1,0 +1,26 @@
+name: Trouvetou Sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appel de la synchronisation Séjoura vers Trouvetou
+        env:
+          SYNC_URL: "https://sejoura-lemon.vercel.app/api/trouvetou/sync"
+          CRON_SECRET: ${{ secrets.TROUVETOU_SYNC_SECRET }}
+        run: |
+          code=$(curl -sS -o /tmp/sync.out -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SYNC_URL")
+          echo "HTTP $code"
+          cat /tmp/sync.out
+          echo
+          if [ "$code" != "200" ]; then
+            echo "Échec de la synchronisation (HTTP $code)"
+            exit 1
+          fi
