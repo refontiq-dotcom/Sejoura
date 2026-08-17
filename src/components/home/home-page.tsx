@@ -308,8 +308,8 @@ export function HomePage() {
     }, 1200);
     if (logoClicks.current >= 4) {
       logoClicks.current = 0;
-      localStorage.setItem("sejoura_admin_intent", "/admin");
-      window.open("/admin", "_blank");
+      localStorage.setItem("sejoura_admin_intent", "/admin/dashboard");
+      window.open("/admin/dashboard", "_blank");
     }
   }
 
@@ -415,15 +415,15 @@ export function HomePage() {
         if (userData?.role === "menagere") {
           targetRoute = "/menage";
         } else if (userData?.role === "super_admin") {
-          targetRoute = "/admin";
+          targetRoute = "/admin/dashboard";
         }
       }
 
       // Intention super admin mémorisée (localStorage, partagé entre onglets)
       const adminIntent = localStorage.getItem("sejoura_admin_intent");
-      if (targetRoute !== "/menage" && adminIntent === "/admin") {
+      if (targetRoute !== "/menage" && adminIntent === "/admin/dashboard") {
         localStorage.removeItem("sejoura_admin_intent");
-        targetRoute = "/admin";
+        targetRoute = "/admin/dashboard";
       }
 
       toast.success(t.loginSuccess);

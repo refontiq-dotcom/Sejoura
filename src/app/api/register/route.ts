@@ -26,7 +26,7 @@ async function notifyNewRegistration(payload: {
 }) {
   if (!isTelegramConfigured()) return;
   try {
-    const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+    const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
     const trialEndDate = new Intl.DateTimeFormat("fr-FR", {
       day: "numeric",
       month: "short",

@@ -205,7 +205,7 @@ export default function AdminIdeasPage() {
             <RefreshCw className="w-4 h-4" /> Rafraîchir
           </Button>
           <a
-            href="/admin"
+            href="/admin/dashboard"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" /> Dashboard Admin

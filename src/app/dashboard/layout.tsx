@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
-import { LOGIN_ROUTE } from "@/lib/routes";
+import { LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
 import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -206,9 +206,9 @@ export default function DashboardLayout({
         }
 
         // Le Super Admin n'utilise pas l'espace résidence : on l'envoie sur
-        // la console d'administration (/admin)
+        // le hub des produits Refontiq (/admin/dashboard)
         if (userData.role === "super_admin") {
-          router.push("/admin");
+          router.push(ADMIN_HUB_ROUTE);
           return;
         }
 

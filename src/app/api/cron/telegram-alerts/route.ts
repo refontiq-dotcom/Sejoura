@@ -40,7 +40,7 @@ function isAuthorized(req: Request): boolean {
 }
 
 function buildMessage(alert: TelegramAlert): string {
-  const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+  const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
   const { payload } = alert;
 
   switch (alert.event_type) {
