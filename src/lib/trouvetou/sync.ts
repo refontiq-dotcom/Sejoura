@@ -135,6 +135,15 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const accommodation = row.accommodations;
       const tenant = accommodation.tenants;
       const logoUrl = tenant?.logo_url;
+      const featuredImages = Array.isArray(row.featured_images)
+        ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
+        : [];
+      const images =
+        featuredImages.length > 0
+          ? featuredImages
+          : logoUrl && logoUrl.length > 0
+            ? [logoUrl]
+            : [];
       const typeRooms = roomStatusByType.get(row.id) ?? [];
       const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
 
@@ -144,7 +153,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         description: row.description ?? accommodation.description ?? null,
         city: accommodation.city,
         base_price: row.base_price,
-        images: logoUrl && logoUrl.length > 0 ? [logoUrl] : [],
+        images,
         attributes: {
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
