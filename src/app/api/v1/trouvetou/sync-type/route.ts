@@ -8,9 +8,10 @@ import { syncListingsToTrouvetou } from "@/lib/trouvetou/sync";
 //
 // Le cahier des charges impose que l'interrupteur du type de chambre pilote la
 // visibilité sur Trouvetou. Cette route centralise la logique côté serveur :
-//   - listée  => publication (upsert) des trouvetou_listings pour TOUTES les
-//                chambres du type, avec les photos et équipements à jour.
-//   - non listée => dépublier les fiches de ce type.
+//   - si `is_listed_on_trouvetou` est fourni, elle met à jour l'interrupteur
+//     du type (avec contrôle photo obligatoire pour l'activation) ;
+//   - elle pousse ensuite l'état réel vers le portail Trouvetou (UPSERT
+//     idempotent via external_id "rt:<id>").
 //
 // Elle est idempotente (rejouable sans effet de bord) et vérifie que l'appelant
 // est bien propriétaire du type de chambre (via la session utilisateur).
@@ -21,6 +22,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const roomTypeId =
       typeof body?.roomTypeId === "string" ? body.roomTypeId.trim() : "";
+    const requestedListed =
+      typeof body?.is_listed_on_trouvetou === "boolean"
+        ? body.is_listed_on_trouvetou
+        : null;
 
     if (!roomTypeId) {
       return NextResponse.json(
@@ -40,7 +45,7 @@ export async function POST(request: Request) {
     // ─── 2. Récupérer le type + vérifier la propriété ──────────────────────
     const { data: roomType, error: roomTypeError } = await admin
       .from("room_types")
-      .select("id, is_listed_on_trouvetou, featured_images, amenities, accommodation_id")
+      .select("id, is_listed_on_trouvetou, featured_images, accommodation_id")
       .eq("id", roomTypeId)
       .maybeSingle();
 
@@ -62,73 +67,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
     }
 
-    // ─── 3. Récupérer toutes les chambres du type ───────────────────────────
-    const { data: rooms, error: roomsError } = await admin
-      .from("rooms")
-      .select("id")
-      .eq("room_type_id", roomTypeId);
-
-    if (roomsError) {
-      return NextResponse.json({ error: roomsError.message }, { status: 500 });
+    // ─── 3. Basculer l'interrupteur si demandé ──────────────────────────────
+    if (requestedListed !== null && requestedListed !== roomType.is_listed_on_trouvetou) {
+      if (requestedListed && (roomType.featured_images ?? []).length === 0) {
+        return NextResponse.json(
+          { error: "Ajoutez au moins une photo au type de chambre pour activer la diffusion sur Trouvetou." },
+          { status: 400 }
+        );
+      }
+      const { error: updateError } = await admin
+        .from("room_types")
+        .update({ is_listed_on_trouvetou: requestedListed })
+        .eq("id", roomTypeId);
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+      roomType.is_listed_on_trouvetou = requestedListed;
     }
 
     const isListed = roomType.is_listed_on_trouvetou === true;
-    const images = roomType.featured_images || [];
-    const badges = roomType.amenities || [];
 
-    let publishedCount = 0;
-
-    // ─── 4. Appliquer la synchronisation type → fiche publique ──────────────
-    // L'interrupteur du type pilote la visibilité (is_published). Le contenu
-    // personnalisé de la fiche (photos, badges, titre, description, WhatsApp)
-    // modifié depuis la page « Vitrine Trouvetou » est préservé : on n'écrase
-    // les photos/badges que lors de la CRÉATION d'une fiche (premiers défauts).
-    for (const room of rooms || []) {
-      if (isListed) {
-        const { data: existing } = await admin
-          .from("trouvetou_listings")
-          .select("id")
-          .eq("unit_id", room.id)
-          .maybeSingle();
-
-        if (existing) {
-          // Fiche déjà personnalisée : on ne touche qu'à la publication.
-          const { error: updateError } = await admin
-            .from("trouvetou_listings")
-            .update({ is_published: true })
-            .eq("unit_id", room.id);
-          if (updateError) {
-            return NextResponse.json({ error: updateError.message }, { status: 500 });
-          }
-        } else {
-          // Première fiche : on initialise avec les photos/équipements du type.
-          const { error: insertError } = await admin
-            .from("trouvetou_listings")
-            .insert({
-              unit_id: room.id,
-              establishment_id: roomType.accommodation_id,
-              is_published: true,
-              featured_images: images,
-              amenities_badges: badges,
-            });
-          if (insertError) {
-            return NextResponse.json({ error: insertError.message }, { status: 500 });
-          }
-        }
-        publishedCount++;
-      } else {
-        const { error: unpublishError } = await admin
-          .from("trouvetou_listings")
-          .update({ is_published: false })
-          .eq("unit_id", room.id);
-        if (unpublishError) {
-          return NextResponse.json({ error: unpublishError.message }, { status: 500 });
-        }
-      }
-    }
-
-    // ─── 5. Pousser vers le portail Trouvetou ───────────────────────────────
-    // L'interrupteur pilote aussi le push réel vers l'API d'ingestion Trouvetou
+    // ─── 4. Pousser vers le portail Trouvetou ───────────────────────────────
+    // L'interrupteur pilote le push réel vers l'API d'ingestion Trouvetou
     // (TROUVETOU_SYNC_URL). Un échec du push ne doit pas faire échouer la
     // publication locale : on renvoie l'état du push dans la réponse.
     let trouvetouPush: { ok: boolean; sent: number; error?: string } | null = null;
@@ -146,8 +106,6 @@ export async function POST(request: Request) {
       success: true,
       roomTypeId,
       is_listed_on_trouvetou: isListed,
-      syncedRooms: (rooms || []).length,
-      publishedCount,
       trouvetouPush,
     });
   } catch (error) {
