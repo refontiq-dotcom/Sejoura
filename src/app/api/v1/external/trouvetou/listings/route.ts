@@ -61,8 +61,9 @@ export async function GET(request: Request) {
 
     const admin = createAdminClient();
 
-    // 1. Récupérer les trouvetou_listings publiés avec tous les champs boost
-    const query = admin
+    // 1. Récupérer les trouvetou_listings publiés (requête plate — les FK vers
+    //    rooms/accommodations ne sont pas garanties en base, on joint en JS).
+    const { data: listings, error } = await admin
       .from("trouvetou_listings")
       .select(`
         id,
@@ -76,42 +77,9 @@ export async function GET(request: Request) {
         direct_whatsapp,
         views_count,
         whatsapp_clicks_count,
-        updated_at,
-        rooms (
-          id,
-          room_number,
-          status,
-          room_types (
-            id,
-            name,
-            base_price,
-            capacity,
-            amenities,
-            surface_m2,
-            is_listed_on_trouvetou,
-            featured_images
-          )
-        ),
-        accommodations (
-          id,
-          name,
-          city,
-          country,
-          address,
-          latitude,
-          longitude,
-          currency,
-          currency_symbol,
-          contact_phone,
-          is_boosted,
-          boost_expires_at,
-          is_permanently_boosted,
-          boost_express_expires_at
-        )
+        updated_at
       `)
       .eq("is_published", true);
-
-    const { data: listings, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -121,10 +89,78 @@ export async function GET(request: Request) {
       return NextResponse.json({ listings: [], total: 0 });
     }
 
-    // 2. Filtres : master gate Trouvetou (interrupteur ON + photo), ville, équipements
+    // 2. Charger les chambres (avec leur type) et les établissements associés
+    const unitIds          = listings.map((l) => l.unit_id);
+    const establishmentIds = listings.map((l) => l.establishment_id);
+
+    const { data: roomsData, error: roomsError } = await admin
+      .from("rooms")
+      .select(`
+        id,
+        room_number,
+        status,
+        room_types (
+          id,
+          name,
+          base_price,
+          capacity,
+          amenities,
+          surface_m2,
+          is_listed_on_trouvetou,
+          featured_images
+        )
+      `)
+      .in("id", unitIds);
+
+    if (roomsError) {
+      return NextResponse.json({ error: roomsError.message }, { status: 500 });
+    }
+
+    const { data: accsData, error: accsError } = await admin
+      .from("accommodations")
+      .select(`
+        id,
+        name,
+        city,
+        country,
+        address,
+        latitude,
+        longitude,
+        currency,
+        currency_symbol,
+        contact_phone,
+        is_boosted,
+        boost_expires_at,
+        is_permanently_boosted,
+        boost_express_expires_at
+      `)
+      .in("id", establishmentIds);
+
+    if (accsError) {
+      return NextResponse.json({ error: accsError.message }, { status: 500 });
+    }
+
+    const roomsById = new Map((roomsData ?? []).map((r) => [r.id, r]));
+    const accsById  = new Map((accsData ?? []).map((a) => [a.id, a]));
+
+    const roomOf = (l: { unit_id: string }) => {
+      const room = roomsById.get(l.unit_id);
+      if (!room) return undefined;
+      return {
+        ...room,
+        room_types: Array.isArray(room.room_types) ? room.room_types[0] : room.room_types,
+      };
+    };
+    const roomTypeOf = (l: { unit_id: string }) => {
+      const room = roomsById.get(l.unit_id);
+      if (!room) return undefined;
+      return Array.isArray(room.room_types) ? room.room_types[0] : room.room_types;
+    };
+    const accOf = (l: { establishment_id: string }) => accsById.get(l.establishment_id);
+
+    // 3. Filtres : master gate Trouvetou (interrupteur ON + photo), ville, équipements
     let filteredListings = listings.filter((l) => {
-      const room     = Array.isArray(l.rooms) ? l.rooms[0] : l.rooms;
-      const roomType = room && (Array.isArray(room.room_types) ? room.room_types[0] : room.room_types);
+      const roomType = roomTypeOf(l);
 
       // Master gate : interrupteur ON obligatoire
       if (roomType?.is_listed_on_trouvetou !== true) return false;
@@ -139,15 +175,14 @@ export async function GET(request: Request) {
 
     if (city) {
       filteredListings = filteredListings.filter((l) => {
-        const acc = Array.isArray(l.accommodations) ? l.accommodations[0] : l.accommodations;
+        const acc = accOf(l);
         return acc?.city?.toLowerCase() === city.toLowerCase();
       });
     }
 
     if (requestedAmenities.length > 0) {
       filteredListings = filteredListings.filter((l) => {
-        const room     = Array.isArray(l.rooms) ? l.rooms[0] : l.rooms;
-        const roomType = room && (Array.isArray(room.room_types) ? room.room_types[0] : room.room_types);
+        const roomType = roomTypeOf(l);
         const roomAmenities = (roomType?.amenities || []).map((a: string) => a.toLowerCase());
         return requestedAmenities.every((a) => roomAmenities.includes(a));
       });
@@ -180,9 +215,9 @@ export async function GET(request: Request) {
     const now = new Date();
 
     const results = filteredListings.map((item) => {
-      const room     = Array.isArray(item.rooms)          ? item.rooms[0]          : item.rooms;
-      const roomType = room && (Array.isArray(room.room_types) ? room.room_types[0] : room.room_types);
-      const acc      = Array.isArray(item.accommodations) ? item.accommodations[0] : item.accommodations;
+      const room     = roomOf(item);
+      const roomType = room?.room_types;
+      const acc      = accOf(item);
 
       // ── Logique de boost unifiée (miroir de trouvetou_boost_status) ────────
       const isPermanentlyBoosted = acc?.is_permanently_boosted === true;
