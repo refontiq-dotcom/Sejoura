@@ -94,26 +94,64 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   // Master gate : une fiche listée doit avoir au moins une photo.
   const listedRows = rows.filter((row) => (row.featured_images ?? []).length > 0);
+  const roomTypeIds = listedRows.map((row) => row.id);
 
-  const items: TrouvetouSyncItem[] = listedRows.map((row) => {
-    const accommodation = row.accommodations;
-    const tenant = accommodation.tenants;
-    const logoUrl = tenant?.logo_url;
+  // ── Disponibilité en temps réel ─────────────────────────────────────────
+  // Un type est « disponible » si au moins une de ses chambres n'est ni
+  // réservée (booking actif qui chevauche l'instant présent) ni occupée.
+  const now = new Date();
+  const occupiedRoomIds = new Set<string>();
+  const roomStatusByType = new Map<string, { id: string; status: string | null }[]>();
 
-    return {
-      external_id: `rt:${row.id}`,
-      title: `${row.name} — ${accommodation.name}`,
-      description: row.description ?? accommodation.description ?? null,
-      city: accommodation.city,
-      base_price: row.base_price,
-      images: logoUrl && logoUrl.length > 0 ? [logoUrl] : [],
-      attributes: {
-        capacity: row.capacity,
-        amenities: Array.isArray(row.amenities) ? row.amenities : [],
-      },
-      is_available: true,
-    };
-  });
+  if (roomTypeIds.length > 0) {
+    const { data: rooms } = await admin
+      .from("rooms")
+      .select("id, status, room_type_id")
+      .in("room_type_id", roomTypeIds);
+
+    for (const room of rooms ?? []) {
+      const list = roomStatusByType.get(room.room_type_id) ?? [];
+      list.push({ id: room.id, status: room.status });
+      roomStatusByType.set(room.room_type_id, list);
+      if (room.status === "occupied") occupiedRoomIds.add(room.id);
+    }
+
+    const roomIds = (rooms ?? []).map((r) => r.id);
+    if (roomIds.length > 0) {
+      const { data: bookings } = await admin
+        .from("bookings")
+        .select("room_id, check_in_date, check_out_date")
+        .in("room_id", roomIds)
+        .in("status", ["confirmed", "checked_in"])
+        .lt("check_in_date", now.toISOString())
+        .gt("check_out_date", now.toISOString());
+      for (const booking of bookings ?? []) occupiedRoomIds.add(booking.room_id);
+    }
+  }
+
+  const items: TrouvetouSyncItem[] = listedRows
+    .filter((row) => (roomStatusByType.get(row.id) ?? []).length > 0)
+    .map((row) => {
+      const accommodation = row.accommodations;
+      const tenant = accommodation.tenants;
+      const logoUrl = tenant?.logo_url;
+      const typeRooms = roomStatusByType.get(row.id) ?? [];
+      const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
+
+      return {
+        external_id: `rt:${row.id}`,
+        title: `${row.name} — ${accommodation.name}`,
+        description: row.description ?? accommodation.description ?? null,
+        city: accommodation.city,
+        base_price: row.base_price,
+        images: logoUrl && logoUrl.length > 0 ? [logoUrl] : [],
+        attributes: {
+          capacity: row.capacity,
+          amenities: Array.isArray(row.amenities) ? row.amenities : [],
+        },
+        is_available: isAvailable,
+      };
+    });
 
   return { items, error: null };
 }
