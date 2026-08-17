@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
+import { syncListingsToTrouvetou } from "@/lib/trouvetou/sync";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/trouvetou/sync-type
@@ -126,12 +127,28 @@ export async function POST(request: Request) {
       }
     }
 
+    // ─── 5. Pousser vers le portail Trouvetou ───────────────────────────────
+    // L'interrupteur pilote aussi le push réel vers l'API d'ingestion Trouvetou
+    // (TROUVETOU_SYNC_URL). Un échec du push ne doit pas faire échouer la
+    // publication locale : on renvoie l'état du push dans la réponse.
+    let trouvetouPush: { ok: boolean; sent: number; error?: string } | null = null;
+    try {
+      trouvetouPush = await syncListingsToTrouvetou();
+    } catch (err) {
+      trouvetouPush = {
+        ok: false,
+        sent: 0,
+        error: err instanceof Error ? err.message : "Erreur inconnue",
+      };
+    }
+
     return NextResponse.json({
       success: true,
       roomTypeId,
       is_listed_on_trouvetou: isListed,
       syncedRooms: (rooms || []).length,
       publishedCount,
+      trouvetouPush,
     });
   } catch (error) {
     console.error("POST /api/v1/trouvetou/sync-type error:", error);

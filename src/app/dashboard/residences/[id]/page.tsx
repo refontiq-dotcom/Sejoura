@@ -456,6 +456,13 @@ export default function ResidenceDetailPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         toast.error(data?.error || "Impossible de synchroniser la visibilité Trouvetou.");
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.trouvetouPush && data.trouvetouPush.ok === false) {
+        toast.error(
+          data.trouvetouPush.error || "Fiche locale enregistrée mais le push Trouvetou a échoué."
+        );
       }
     } catch (err) {
       console.error("syncTrouvetouForType error:", err);

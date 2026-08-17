@@ -8,8 +8,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *   room_types (chambres publiables) + accommodations + tenants + subscriptions.
  *
  * Seules les chambres des établissements actifs dont l'abonnement est
- * `active` sont envoyées. L'UPSERT côté Trouvetou repose sur le couple
- * (provider_id, external_id) — `external_id = "rt:<room_type_id>"` est
+ * `active` ET dont l'interrupteur Trouvetou est ON (`is_listed_on_trouvetou`)
+ * avec au moins une photo sont envoyées. L'UPSERT côté Trouvetou repose sur le
+ * couple (provider_id, external_id) — `external_id = "rt:<room_type_id>"` est
  * stable, ce qui rend l'envoi idempotent.
  */
 
@@ -43,6 +44,7 @@ interface SyncRow {
   base_price: number;
   capacity: number;
   amenities: string[] | null;
+  featured_images: string[] | null;
   accommodations: {
     name: string;
     description: string | null;
@@ -68,6 +70,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       base_price,
       capacity,
       amenities,
+      featured_images,
       accommodations!inner (
         name,
         description,
@@ -79,6 +82,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       )
     `
     )
+    .eq("is_listed_on_trouvetou", true)
     .eq("accommodations.is_active", true)
     .eq("accommodations.tenants.subscriptions.status", "active");
 
@@ -88,7 +92,10 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   const rows = (data ?? []) as unknown as SyncRow[];
 
-  const items: TrouvetouSyncItem[] = rows.map((row) => {
+  // Master gate : une fiche listée doit avoir au moins une photo.
+  const listedRows = rows.filter((row) => (row.featured_images ?? []).length > 0);
+
+  const items: TrouvetouSyncItem[] = listedRows.map((row) => {
     const accommodation = row.accommodations;
     const tenant = accommodation.tenants;
     const logoUrl = tenant?.logo_url;
