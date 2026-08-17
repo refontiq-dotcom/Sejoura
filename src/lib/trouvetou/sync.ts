@@ -60,7 +60,10 @@ interface SyncRow {
     tenants: {
       company_name: string | null;
       logo_url: string | null;
-      subscriptions: { status: string }[] | null;
+      subscriptions:
+        | { status: string }[]
+        | { status: string }
+        | null;
     } | null;
   };
 }
@@ -169,13 +172,19 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const hasActiveApiKey =
         !!row.accommodations?.tenant_id &&
         apiKeyByTenant.has(row.accommodations.tenant_id);
+
+      // PostgREST replie un embed à une seule ligne en objet (pas en tableau) ;
+      // on normalise donc `subscriptions` avant d'appeler `.some()`.
+      const subscriptions = row.accommodations?.tenants?.subscriptions ?? null;
+      const subscriptionActive = Array.isArray(subscriptions)
+        ? subscriptions.some((s) => s.status === "active")
+        : subscriptions?.status === "active";
+
       return (
         hasActiveApiKey &&
         isTrouvetouEligible({
           accommodationActive: row.accommodations?.is_active === true,
-          subscriptionActive:
-            row.accommodations?.tenants?.subscriptions?.some((s) => s.status === "active") ??
-            false,
+          subscriptionActive,
           hasPhoto: (row.featured_images ?? []).length > 0,
           hasRoom: (roomStatusByType.get(row.id) ?? []).length > 0,
         })
