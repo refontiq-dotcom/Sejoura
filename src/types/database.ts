@@ -349,6 +349,19 @@ export interface Booking {
   updated_at: string;
 }
 
+/** Une prolongation de séjour enregistrée (extend_booking ou dépassement auto). */
+export interface BookingExtension {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  previous_check_out_date: string;
+  new_check_out_date: string;
+  extra_nights: number;
+  source: "manual" | "client_request" | "overstay";
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface Payment {
   id: string;
   tenant_id: string;
@@ -694,6 +707,11 @@ export interface Database {
         Row: Booking;
         Insert: Omit<Booking, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Booking, "id" | "created_at" | "updated_at">>;
+      };
+      booking_extensions: {
+        Row: BookingExtension;
+        Insert: Omit<BookingExtension, "id" | "created_at">;
+        Update: Partial<Omit<BookingExtension, "id" | "created_at">>;
       };
       payments: {
         Row: Payment;

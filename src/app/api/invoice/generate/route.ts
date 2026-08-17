@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateInvoicePdf, generateInvoiceNumber } from "@/lib/invoice-pdf";
-import type { BookingWithRelations, Invoice, Tenant } from "@/types/database";
+import type { BookingExtension, BookingWithRelations, Invoice, Tenant } from "@/types/database";
 
 const INVOICE_BUCKET = "invoices";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -114,7 +114,20 @@ export async function POST(request: Request) {
         room_type: (booking.room as { room_type?: BookingWithRelations["room_type"] } | null)?.room_type,
         accommodation: booking.accommodation,
       } as BookingWithRelations;
-      const pdfBuffer = await generateInvoicePdf({ tenant: tenant as Tenant, booking: enrichedBooking, invoice });
+
+      // Historique des prolongations (lignes « Prolongation 1/2/… » de la facture)
+      const { data: extensions } = await admin
+        .from("booking_extensions")
+        .select("id, tenant_id, booking_id, previous_check_out_date, new_check_out_date, extra_nights, source, created_by, created_at")
+        .eq("booking_id", bookingId)
+        .order("created_at", { ascending: true });
+
+      const pdfBuffer = await generateInvoicePdf({
+        tenant: tenant as Tenant,
+        booking: enrichedBooking,
+        invoice,
+        extensions: (extensions ?? []) as unknown as BookingExtension[],
+      });
       const objectPath = `${user.tenant_id}/${bookingId}/${invoice.id}.pdf`;
       const { error: uploadError } = await admin.storage.from(INVOICE_BUCKET).upload(objectPath, pdfBuffer, {
         contentType: "application/pdf",

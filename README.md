@@ -69,6 +69,27 @@ Pour l'abonnement expiré, le passage en `expired` (par `sync_subscription_statu
 toutes les minutes) vide cette file via la route `/api/cron/telegram-alerts`
 (protégée par la variable `CRON_SECRET`).
 
+## 🧾 Facture intelligente (trace des prolongations)
+
+Chaque prolongation de séjour est enregistrée dans la table `booking_extensions`
+(migration `20260902_booking_extensions.sql`) :
+
+- **Prolongation manuelle ou acceptée** : `extend_booking()` écrit une ligne
+  (dates avant/après, nombre de nuits ajoutées, utilisateur).
+- **Dépassement de séjour (auto check-out)** : `check_overstays()` écrit une
+  ligne `source = 'overstay'`.
+
+La facture générée (`/api/invoice/generate`) affiche alors le détail ligne par
+ligne : « Nuitée initiale · du A au B », « Prolongation 1 · du B au C »,
+« Prolongation 2 · … », « Dépassement de séjour · … » — le total restant
+toujours identique à celui de la réservation. Les factures déjà envoyées/payées
+restent figées ; seuls les brouillons sont régénérés avec le détail (déjà le cas
+via `sync_draft_invoice_on_booking_change`).
+
+⚠️ L'historique n'est reconstitué qu'à partir de la migration : les prolongations
+antérieures n'apparaîtront pas comme lignes détaillées (la facture retombe alors
+sur une ligne unique).
+
 ### 2. Flux automatisé via API Wave Checkout (existant)
 
 Optionnel, si la clé API Wave est disponible :
