@@ -240,6 +240,7 @@ export interface Accommodation {
   logo_url?: string | null;
   theme_color?: string | null;
   image_url?: string | null;
+  guest_info?: GuestInfo | null;
   created_at: string;
   updated_at: string;
 }
@@ -304,6 +305,7 @@ export interface TrouvetouListing {
 export interface Client {
   id: string;
   tenant_id: string;
+  accommodation_id: string | null;
   full_name: string;
   phone: string | null;
   email: string | null;

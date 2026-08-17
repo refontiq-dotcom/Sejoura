@@ -18,6 +18,7 @@ import {
   canAccessPlanFeature,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useAccommodation } from "@/hooks/use-accommodation";
 import { useRouter } from "next/navigation";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
 import {
@@ -710,9 +711,22 @@ export default function AccountingPage() {
 
   const [exportingPdf, setExportingPdf] = useState(false);
 
+  // Les dépenses suivent la résidence active (sélecteur du header).
+  const { activeAccommodationId } = useAccommodation();
+  const userPickedExpAccRef = useRef(false);
+  const [expAccFilter, setExpAccFilter] = useState<string>("all");
+
   useEffect(() => {
     loadData();
   }, []);
+
+  // Suit la résidence active : les dépenses se refiltrent automatiquement
+  // tant que l'utilisateur n'a pas choisi une résidence explicite.
+  useEffect(() => {
+    if (userPickedExpAccRef.current) return;
+    setExpAccFilter(activeAccommodationId ?? "all");
+    loadDataRef.current(activeAccommodationId ?? undefined);
+  }, [activeAccommodationId]);
 
   // Temps réel : recharge dès qu'une réservation, un paiement ou une facture
   // change (via Réservations, la caisse, le shift ou l'espace client) pour
@@ -746,7 +760,7 @@ export default function AccountingPage() {
     };
   }, [tenantId]);
 
-  async function loadData() {
+  async function loadData(accId?: string) {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -772,7 +786,12 @@ export default function AccountingPage() {
       const tid = userData.tenant_id;
 
       const [exp, pay, log, inv, acc, usersRes] = await Promise.all([
-        supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300),
+        (() => {
+          const effectiveAccId = accId ?? (expAccFilter === "all" ? undefined : expAccFilter);
+          let q = supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300);
+          if (effectiveAccId) q = q.eq("accommodation_id", effectiveAccId);
+          return q;
+        })(),
         supabase.from("payments").select("*").eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
         supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(120),
         supabase.from("invoices").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
@@ -1099,7 +1118,7 @@ export default function AccountingPage() {
       description: "",
       amount: "",
       expense_date: todayISO(),
-      accommodation_id: "",
+      accommodation_id: activeAccommodationId || "",
     });
     setExpenseModalOpen(true);
   }

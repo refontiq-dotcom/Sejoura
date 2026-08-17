@@ -21,6 +21,7 @@ import {
   MOBILE_MONEY_OPERATORS,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useAccommodation } from "@/hooks/use-accommodation";
 import {
   CalendarCheck,
   Plus,
@@ -138,6 +139,12 @@ export default function BookingsPage() {
   // affecté à un établissement). Conservé dans une ref pour le rechargement
   // temps réel, qui ne doit pas se resouscrire à chaque rendu.
   const accommodationFilterRef = useRef<string | undefined>(undefined);
+  // Filtre UI de la liste : "all" = toutes les résidences, sinon id de résidence.
+  // Suit la résidence active (header) tant que l'utilisateur n'a pas choisi
+  // lui-même une valeur explicite ("all" ou une résidence précise).
+  const { activeAccommodationId } = useAccommodation();
+  const [accomFilter, setAccomFilter] = useState<string>("all");
+  const userPickedAccomRef = useRef(false);
   const loadBookingsRef = useRef(loadBookings);
   loadBookingsRef.current = loadBookings;
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -226,6 +233,18 @@ export default function BookingsPage() {
     loadInitData();
   }, []);
 
+  // Suit la résidence active (sélecteur du header) : la liste se refiltre
+  // automatiquement tant que l'utilisateur n'a pas choisi une résidence
+  // ("all" ou précise) de manière explicite dans la liste.
+  useEffect(() => {
+    if (userPickedAccomRef.current) return;
+    const target = activeAccommodationId ?? "all";
+    setAccomFilter(target);
+    accommodationFilterRef.current = activeAccommodationId ?? undefined;
+    if (tenantId) loadBookingsRef.current(tenantId, accommodationFilterRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccommodationId]);
+
   // Temps réel : rechargement immédiat dès qu'une réservation change
   // (création, modification, check-in/out, paiement). Le rechargement est
   // effectué via une ref pour ne pas se resouscrire à chaque rendu.
@@ -310,9 +329,12 @@ export default function BookingsPage() {
         setFormData((prev) => ({ ...prev, accommodation_id: activeAccId ?? "" }));
       }
 
-      accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined;
+      accommodationFilterRef.current = userData.role === "receptionniste" ? (activeAccId ?? undefined) : (activeAccommodationId ?? undefined);
+      setAccomFilter(
+        userData.role === "receptionniste" ? (activeAccId ?? "all") : (activeAccommodationId ?? "all")
+      );
       await runOverstayCheck();
-      await loadBookings(userData.tenant_id, userData.role === "receptionniste" ? (activeAccId ?? undefined) : undefined);
+      await loadBookings(userData.tenant_id, accommodationFilterRef.current);
       await loadInvoices(userData.tenant_id);
       await loadExtensionRequests(userData.tenant_id);
     } catch (err) {
@@ -587,6 +609,7 @@ export default function BookingsPage() {
           .from("clients")
           .insert({
             tenant_id: tenantId,
+            accommodation_id: formData.accommodation_id || null,
             full_name: formData.newClientName,
             phone: formData.newClientPhone || null,
             email: formData.newClientEmail || null,
@@ -1330,6 +1353,24 @@ export default function BookingsPage() {
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
         </div>
+        {accommodations.length > 1 && (
+          <select
+            value={accomFilter}
+            onChange={(e) => {
+              userPickedAccomRef.current = true;
+              setAccomFilter(e.target.value);
+              accommodationFilterRef.current = e.target.value === "all" ? undefined : e.target.value;
+              loadBookingsRef.current(tenantId, accommodationFilterRef.current);
+            }}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            title="Filtrer par résidence"
+          >
+            <option value="all">Toutes les résidences</option>
+            {accommodations.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        )}
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}

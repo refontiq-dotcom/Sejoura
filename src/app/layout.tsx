@@ -42,12 +42,12 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col bg-background text-foreground theme-transition">
         <ThemeProvider>
           <LanguageProvider>
-            <CurrencyProvider>
-              <AccommodationProvider>
+            <AccommodationProvider>
+              <CurrencyProvider>
                 {children}
                 <ThemeToaster />
-              </AccommodationProvider>
-            </CurrencyProvider>
+              </CurrencyProvider>
+            </AccommodationProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

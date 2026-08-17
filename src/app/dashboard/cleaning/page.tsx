@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessPlanFeature } from "@/lib/utils";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import { useAccommodation } from "@/hooks/use-accommodation";
 import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
 import {
   timeHM,
@@ -95,6 +96,10 @@ export default function CleaningPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [accFilter, setAccFilter] = useState<string>("all");
+  // Suit la résidence active (header) tant que l'utilisateur n'a pas choisi
+  // lui-même un filtre de résidence explicite.
+  const { activeAccommodationId } = useAccommodation();
+  const userPickedAccFilterRef = useRef(false);
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -109,6 +114,14 @@ export default function CleaningPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Suit la résidence active (sélecteur du header) : le filtre de résidence
+  // suit automatiquement tant que l'utilisateur n'a pas choisi une valeur
+  // explicite ("all" ou une résidence précise).
+  useEffect(() => {
+    if (userPickedAccFilterRef.current) return;
+    setAccFilter(activeAccommodationId ?? "all");
+  }, [activeAccommodationId]);
 
   async function loadData() {
     try {
@@ -772,7 +785,10 @@ export default function CleaningPage() {
               <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
               <select
                 value={accFilter}
-                onChange={(e) => setAccFilter(e.target.value)}
+                onChange={(e) => {
+                  userPickedAccFilterRef.current = true;
+                  setAccFilter(e.target.value);
+                }}
                 className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]/40"
               >
                 <option value="all">Tous les établissements</option>
