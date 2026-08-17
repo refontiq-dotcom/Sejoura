@@ -4,7 +4,7 @@ import { ButtonHTMLAttributes, forwardRef } from "react";
 import { Loader2 } from "lucide-react";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive" | "success" | "purple";
-type Size = "sm" | "md" | "lg" | "icon";
+type Size = "sm" | "md" | "lg" | "xl" | "icon";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -33,14 +33,16 @@ const sizeClasses: Record<Size, string> = {
   sm: "h-7 px-2.5 text-[11px] rounded-md",
   md: "h-8 px-3 text-xs rounded-md",
   lg: "h-9 px-4 text-sm rounded-lg",
+  xl: "h-12 px-4 text-sm rounded-xl",
   icon: "h-8 w-8 rounded-md",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = "", variant = "primary", size = "md", loading, children, disabled, ...props }, ref) => {
+  ({ className = "", variant = "primary", size = "md", loading, children, disabled, type = "button", ...props }, ref) => {
     return (
       <button
         ref={ref}
+        type={type}
         disabled={disabled || loading}
         className={`inline-flex items-center justify-center font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:ring-offset-2 focus:ring-offset-[var(--ring-offset)] ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}

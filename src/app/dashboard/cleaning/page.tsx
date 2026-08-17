@@ -8,6 +8,17 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessPlanFeature } from "@/lib/utils";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
+import {
+  timeHM,
+  countdownTo,
+  elapsed,
+  isOverdue,
+  isLate,
+  isDoneToday,
+  localDayKey,
+} from "@/lib/cleaning-time";
+import { estimateTaskMinutes, formatMinutes, workloadLevel } from "@/lib/cleaning-estimates";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -34,50 +45,7 @@ import {
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
 type TaskWithRelations = CleaningTask & { room?: Room; accommodation?: Accommodation };
-type StatusFilter = "all" | "pending" | "active" | "done" | "alert";
-
-// ============================================================================
-// Helpers temps
-// ============================================================================
-
-function minutesBetween(fromIso: string, now: Date): number {
-  return Math.max(0, Math.floor((now.getTime() - new Date(fromIso).getTime()) / 60000));
-}
-
-function timeHM(dateIso: string | null): string {
-  if (!dateIso) return "";
-  return new Date(dateIso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function countdownTo(dateIso: string, now: Date): string {
-  const diff = new Date(dateIso).getTime() - now.getTime();
-  if (diff <= 0) return "dépassé";
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `dans ${min} min`;
-  const h = Math.floor(min / 60);
-  return `dans ${h}h${String(min % 60).padStart(2, "0")}`;
-}
-
-function elapsed(fromIso: string, now: Date): string {
-  const min = minutesBetween(fromIso, now);
-  if (min < 1) return "< 1 min";
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  return `${h}h${String(min % 60).padStart(2, "0")}`;
-}
-
-function isOverdue(task: CleaningTask, now: Date): boolean {
-  return (
-    (task.status === "pending" || task.status === "claimed" || task.status === "in_progress") &&
-    !!task.alert_time &&
-    new Date(task.alert_time).getTime() < now.getTime()
-  );
-}
-
-function isDoneToday(task: CleaningTask, now: Date): boolean {
-  if (task.status !== "done" || !task.completed_at) return false;
-  return task.completed_at.slice(0, 10) === now.toISOString().slice(0, 10);
-}
+type StatusFilter = "all" | "pending" | "active" | "done" | "expired" | "alert";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "En attente",
@@ -106,6 +74,12 @@ const STATUS_META: Record<string, { label: string; chip: string; bar: string; te
     bar: "bg-emerald-500",
     text: "text-emerald-500",
   },
+  expired: {
+    label: "Expirées",
+    chip: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+    bar: "bg-red-500",
+    text: "text-red-500",
+  },
 };
 
 export default function CleaningPage() {
@@ -124,6 +98,8 @@ export default function CleaningPage() {
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  // Nombre de départs prévus demain, par établissement (prévision de charge)
+  const [tomorrowCheckouts, setTomorrowCheckouts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 15000);
@@ -150,7 +126,7 @@ export default function CleaningPage() {
       setUserId(userData.id);
       setTenantId(userData.tenant_id);
       setIsReadOnly(userData.role === "receptionniste");
-      setIsAdmin(userData.role === "admin_residence" || userData.role === "super_admin");
+      setIsAdmin(userData.role === "admin_residence");
 
       const { data: subData } = await supabase
         .from("subscriptions")
@@ -197,6 +173,25 @@ export default function CleaningPage() {
           setMaidNames(map);
         }
       }
+
+      // Prévision de charge : réservations avec départ prévu demain
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      let checkoutQuery = supabase
+        .from("bookings")
+        .select("accommodation_id")
+        .eq("tenant_id", userData.tenant_id)
+        .eq("check_out_date", localDayKey(tomorrow))
+        .in("status", ["confirmed", "checked_in"]);
+      if (activeAccId && userData.role !== "admin_residence") {
+        checkoutQuery = checkoutQuery.eq("accommodation_id", activeAccId);
+      }
+      const { data: checkoutData } = await checkoutQuery;
+      const counts: Record<string, number> = {};
+      (checkoutData || []).forEach((b) => {
+        counts[b.accommodation_id] = (counts[b.accommodation_id] || 0) + 1;
+      });
+      setTomorrowCheckouts(counts);
     } catch (err) {
       toast.error("Impossible de charger les données. Veuillez réessayer.");
       console.error(err);
@@ -206,22 +201,8 @@ export default function CleaningPage() {
     }
   }
 
-  // Temps réel : mise à jour dès qu'une ménagère agit
-  useEffect(() => {
-    if (!tenantId) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel("cleaning-supervision")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "cleaning_tasks", filter: `tenant_id=eq.${tenantId}` },
-        () => loadData()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [tenantId]);
+  // Temps réel : mise à jour dès qu'une ménagère agit (debouncée)
+  useCleaningRealtime(tenantId, () => loadData());
 
   async function handleClaim(taskId: string) {
     setActionTaskId(taskId);
@@ -270,6 +251,26 @@ export default function CleaningPage() {
     }
   }
 
+  async function handleReopen(taskId: string) {
+    setActionTaskId(taskId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("reopen_cleaning_task", {
+        p_task_id: taskId,
+      });
+      if (error) {
+        toast.error("Erreur : " + error.message);
+        return;
+      }
+      toast.success("Tâche relancée dans le pool.");
+      loadData();
+    } catch {
+      toast.error("Impossible de relancer la tâche.");
+    } finally {
+      setActionTaskId(null);
+    }
+  }
+
   // ============================================================================
   // Statistiques & intelligence
   // ============================================================================
@@ -286,7 +287,7 @@ export default function CleaningPage() {
     const pending = tasks.filter((t) => t.status === "pending").length;
     const active = tasks.filter((t) => t.status === "claimed" || t.status === "in_progress").length;
     const done = tasks.filter((t) => isDoneToday(t, now)).length;
-    const alerts = tasks.filter((t) => (t.is_alert_sent || isOverdue(t, now)) && t.status !== "done").length;
+    const alerts = tasks.filter((t) => (t.is_alert_sent || isLate(t, now)) && t.status !== "done").length;
     const activeMaids = new Set(tasks.filter((t) => t.claimed_by).map((t) => t.claimed_by)).size;
     return { pending, active, done, alerts, activeMaids };
   }, [tasks, now]);
@@ -299,7 +300,13 @@ export default function CleaningPage() {
   // Prochain départ parmi les tâches non terminées (intelligence opérationnelle)
   const nextDeparture = useMemo(() => {
     const upcoming = tasks
-      .filter((t) => t.status !== "done" && t.checkout_time && new Date(t.checkout_time).getTime() > now.getTime())
+      .filter(
+        (t) =>
+          t.status !== "done" &&
+          t.status !== "expired" &&
+          t.checkout_time &&
+          new Date(t.checkout_time).getTime() > now.getTime()
+      )
       .sort((a, b) => new Date(a.checkout_time!).getTime() - new Date(b.checkout_time!).getTime());
     return upcoming[0] || null;
   }, [tasks, now]);
@@ -312,7 +319,37 @@ export default function CleaningPage() {
     return Math.round(total / doneToday.length / 60000);
   }, [tasks, now]);
 
-  // Ménagères actuellement en intervention (avec leurs tâches)
+  // Contexte de productivité : moyenne sur les 7 derniers jours + tendance
+  const productivityTrend = useMemo(() => {
+    const durationsByDay = new Map<string, number[]>();
+    tasks
+      .filter((t) => t.status === "done" && t.claimed_at && t.completed_at)
+      .forEach((t) => {
+        const key = localDayKey(new Date(t.completed_at!));
+        const dur = new Date(t.completed_at!).getTime() - new Date(t.claimed_at!).getTime();
+        if (!durationsByDay.has(key)) durationsByDay.set(key, []);
+        durationsByDay.get(key)!.push(dur);
+      });
+
+    const todayKey = localDayKey(now);
+    const todayList = durationsByDay.get(todayKey) || [];
+    // Moyenne des jours précédents (dans la fenêtre de 7 jours)
+    const prevAvgs: number[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const list = durationsByDay.get(localDayKey(d));
+      if (list && list.length > 0) {
+        prevAvgs.push(list.reduce((a, b) => a + b, 0) / list.length);
+      }
+    }
+    const todayAvg =
+      todayList.length > 0 ? todayList.reduce((a, b) => a + b, 0) / todayList.length : null;
+    const weekAvg = prevAvgs.length > 0 ? prevAvgs.reduce((a, b) => a + b, 0) / prevAvgs.length : null;
+    return { todayAvg, weekAvg };
+  }, [tasks, now]);
+
+  // Ménagères actuellement en intervention (avec leurs tâches et la charge estimée)
   const activeMaidGroups = useMemo(() => {
     const map = new Map<string, TaskWithRelations[]>();
     tasks
@@ -322,7 +359,12 @@ export default function CleaningPage() {
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(t);
       });
-    return Array.from(map.entries()).map(([id, list]) => ({ id, name: maidNames[id] || "Ménagère", tasks: list }));
+    return Array.from(map.entries()).map(([id, list]) => ({
+      id,
+      name: maidNames[id] || "Ménagère",
+      tasks: list,
+      minutes: list.reduce((acc, t) => acc + estimateTaskMinutes(t), 0),
+    }));
   }, [tasks, maidNames]);
 
   // Avancement par résidence (vue admin multi-établissements)
@@ -335,7 +377,7 @@ export default function CleaningPage() {
       const active = accTasks.filter((t) => t.status === "claimed" || t.status === "in_progress").length;
       const total = done + pending + active;
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      const overdue = accTasks.filter((t) => isOverdue(t, now) && t.status !== "done").length;
+      const overdue = accTasks.filter((t) => isLate(t, now)).length;
       return { id: acc.id, name: acc.name, done, pending, active, total, pct, overdue };
     });
   }, [tasks, now, isAdmin, accommodations]);
@@ -347,8 +389,9 @@ export default function CleaningPage() {
     }
     if (filter === "pending") list = list.filter((t) => t.status === "pending");
     else if (filter === "active") list = list.filter((t) => t.status === "claimed" || t.status === "in_progress");
-    else if (filter === "done") list = list.filter((t) => t.status === "done");
-    else if (filter === "alert") list = list.filter((t) => (t.is_alert_sent || isOverdue(t, now)) && t.status !== "done");
+    else if (filter === "done") list = list.filter((t) => isDoneToday(t, now));
+    else if (filter === "expired") list = list.filter((t) => t.status === "expired");
+    else if (filter === "alert") list = list.filter((t) => (t.is_alert_sent || isLate(t, now)) && t.status !== "done");
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -362,17 +405,22 @@ export default function CleaningPage() {
   }, [tasks, filter, searchQuery, accFilter, now]);
 
   const overdueTasks = useMemo(
-    () => tasks.filter((t) => isOverdue(t, now)),
+    () => tasks.filter((t) => isLate(t, now)),
     [tasks, now]
   );
 
   // Tri intelligent des tâches par colonne
   const columns = useMemo(() => {
-    const sortColumn = (list: TaskWithRelations[], status: "pending" | "active" | "done"): TaskWithRelations[] => {
+    const sortColumn = (list: TaskWithRelations[], status: "pending" | "active" | "done" | "expired"): TaskWithRelations[] => {
       return [...list].sort((a, b) => {
         if (status === "done") {
           const aT = a.completed_at ? new Date(a.completed_at).getTime() : 0;
           const bT = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+          return bT - aT;
+        }
+        if (status === "expired") {
+          const aT = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bT = b.created_at ? new Date(b.created_at).getTime() : 0;
           return bT - aT;
         }
         if (status === "active") {
@@ -380,10 +428,13 @@ export default function CleaningPage() {
           const bClaimed = b.claimed_at ? new Date(b.claimed_at).getTime() : Number.MAX_SAFE_INTEGER;
           return aClaimed - bClaimed;
         }
-        // pending : urgences (retard) puis départ le plus proche
+        // pending : urgences (retard) puis priorité puis départ le plus proche
         const aOver = isOverdue(a, now) ? 0 : 1;
         const bOver = isOverdue(b, now) ? 0 : 1;
         if (aOver !== bOver) return aOver - bOver;
+        const bp = b.priority ?? 0;
+        const ap = a.priority ?? 0;
+        if (ap !== bp) return bp - ap;
         const aT = a.checkout_time ? new Date(a.checkout_time).getTime() : Number.MAX_SAFE_INTEGER;
         const bT = b.checkout_time ? new Date(b.checkout_time).getTime() : Number.MAX_SAFE_INTEGER;
         return aT - bT;
@@ -407,7 +458,13 @@ export default function CleaningPage() {
         key: "done" as const,
         meta: STATUS_META.done,
         icon: CheckCircle2,
-        list: sortColumn(filteredTasks.filter((t) => t.status === "done"), "done"),
+        list: sortColumn(filteredTasks.filter((t) => isDoneToday(t, now)), "done"),
+      },
+      {
+        key: "expired" as const,
+        meta: STATUS_META.expired,
+        icon: AlertTriangle,
+        list: sortColumn(filteredTasks.filter((t) => t.status === "expired"), "expired"),
       },
     ];
   }, [filteredTasks, now]);
@@ -432,7 +489,7 @@ export default function CleaningPage() {
           <p className="flex-1 text-xs font-medium text-amber-800 dark:text-amber-300">
             Module ménage réservé à la formule <strong>Entreprise</strong>.
           </p>
-          <Button size="sm" className="h-8 px-3 text-xs" onClick={() => router.push("/dashboard/subscription")}>
+          <Button size="md" onClick={() => router.push("/dashboard/subscription")}>
             <Sparkles className="w-3.5 h-3.5" /> Débloquer
           </Button>
         </div>
@@ -486,6 +543,7 @@ export default function CleaningPage() {
                 }}
                 className="p-2 rounded-xl bg-white/10 border border-white/15 text-white/80 hover:bg-white/20 transition-colors"
                 title="Actualiser"
+                aria-label="Actualiser la liste"
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
               </button>
@@ -494,7 +552,7 @@ export default function CleaningPage() {
 
           {/* Synthèse unique des statuts et de la progression */}
           <div className="relative mt-5 pt-5 border-t border-white/10">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               {[
                 { label: "En attente", value: stats.pending, Icon: Clock },
                 { label: "En cours", value: stats.active, Icon: Timer },
@@ -509,7 +567,7 @@ export default function CleaningPage() {
                   <p className="text-2xl font-bold text-white leading-none mt-1.5 tabular-nums">{value}</p>
                 </div>
               ))}
-              <div className="rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 col-span-2 sm:col-span-1">
+              <div className="rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 col-span-2 lg:col-span-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-white/60">Progression</p>
                   <TrendingUp className="w-3.5 h-3.5 text-white/50" />
@@ -529,9 +587,9 @@ export default function CleaningPage() {
         </div>
 
         {/* ====================================================================
-            Intelligence : interventions / prochain départ / productivité
+            Intelligence : interventions / prochain départ / productivité / prévisions
         ==================================================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {/* Ménagères en intervention */}
           <Card className="p-4">
             <div className="flex items-center gap-3 mb-3">
@@ -547,19 +605,28 @@ export default function CleaningPage() {
               <p className="text-xs text-slate-400">Aucune intervention en ce moment.</p>
             ) : (
               <div className="space-y-2.5">
-                {activeMaidGroups.slice(0, 4).map((m) => (
-                  <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                        {m.name.charAt(0).toUpperCase()}
+                {activeMaidGroups.slice(0, 4).map((m) => {
+                  const level = workloadLevel(m.minutes);
+                  const levelCls =
+                    level === "overloaded"
+                      ? "text-red-600"
+                      : level === "busy"
+                      ? "text-amber-600"
+                      : "text-blue-600";
+                  return (
+                    <div key={m.id} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                          {m.name.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{m.name}</span>
                       </span>
-                      <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{m.name}</span>
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 flex-shrink-0">
-                      <Timer className="w-3 h-3" /> {m.tasks.length} en cours
-                    </span>
-                  </div>
-                ))}
+                      <span className={`flex items-center gap-1 text-[11px] font-semibold flex-shrink-0 ${levelCls}`}>
+                        <Timer className="w-3 h-3" /> {m.tasks.length} · {formatMinutes(m.minutes)}
+                      </span>
+                    </div>
+                  );
+                })}
                 {activeMaidGroups.length > 4 && (
                   <p className="text-[11px] text-slate-400 text-center pt-0.5">+ {activeMaidGroups.length - 4} autre{activeMaidGroups.length - 4 > 1 ? "s" : ""}</p>
                 )}
@@ -608,13 +675,82 @@ export default function CleaningPage() {
               </div>
             </div>
             {avgMinutes !== null ? (
-              <div className="flex items-baseline gap-1.5 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900">
-                <span className="text-2xl font-bold text-emerald-600">{avgMinutes} min</span>
-                <span className="text-xs text-slate-500">en moyenne</span>
+              <div className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold text-emerald-600">{avgMinutes} min</span>
+                  <span className="text-xs text-slate-500">en moyenne</span>
+                </div>
+                {(() => {
+                  const { todayAvg, weekAvg } = productivityTrend;
+                  if (weekAvg === null || todayAvg === null) return null;
+                  const delta = Math.round((todayAvg - weekAvg) / 60000);
+                  const faster = delta < -5;
+                  const slower = delta > 5;
+                  if (faster) {
+                    return (
+                      <p className="text-[11px] font-medium text-emerald-600 mt-1">
+                        {Math.abs(delta)} min plus rapide que la moyenne des 7 derniers jours
+                      </p>
+                    );
+                  }
+                  if (slower) {
+                    return (
+                      <p className="text-[11px] font-medium text-amber-600 mt-1">
+                        {delta} min plus lent que la moyenne des 7 derniers jours
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] font-medium text-slate-500 mt-1">
+                      Conforme à la moyenne des 7 derniers jours
+                    </p>
+                  );
+                })()}
               </div>
             ) : (
               <p className="text-xs text-slate-400">Aucune tâche terminée aujourd&apos;hui pour le moment.</p>
             )}
+          </Card>
+
+          {/* Prévision de charge : départs prévus demain */}
+          <Card className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                <CalendarClock className="w-4 h-4 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white">Départs prévus demain</p>
+                <p className="text-[11px] text-slate-400">charge de ménage à anticiper</p>
+              </div>
+            </div>
+            {(() => {
+              const total = Object.values(tomorrowCheckouts).reduce((a, b) => a + b, 0);
+              if (total === 0) {
+                return <p className="text-xs text-slate-400">Aucun départ prévu demain. Calme assuré.</p>;
+              }
+              return (
+                <div className="px-3 py-2.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-900">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-bold text-violet-600">{total}</span>
+                    <span className="text-xs text-slate-500">départ{total > 1 ? "s" : ""} à préparer</span>
+                  </div>
+                  {accommodations.length > 1 && (
+                    <div className="mt-2 space-y-1">
+                      {accommodations
+                        .filter((a) => (tomorrowCheckouts[a.id] || 0) > 0)
+                        .map((a) => (
+                          <div key={a.id} className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500 truncate">{a.name}</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 flex-shrink-0">
+                              {tomorrowCheckouts[a.id]} ch.{tomorrowCheckouts[a.id] > 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </Card>
         </div>
 
@@ -653,6 +789,7 @@ export default function CleaningPage() {
               { key: "pending", label: "En attente" },
               { key: "active", label: "En cours" },
               { key: "done", label: "Terminées" },
+              { key: "expired", label: "Expirées" },
               { key: "alert", label: "Alertes" },
             ].map((f) => (
               <button
@@ -718,7 +855,7 @@ export default function CleaningPage() {
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 items-start">
             {columns.map((col) => (
               <div key={col.key} className="flex flex-col">
                 <div className="flex items-center gap-2.5 mb-3">
@@ -736,9 +873,9 @@ export default function CleaningPage() {
                     </div>
                   ) : (
                     col.list.map((task) => {
-                      const overdue = isOverdue(task, now);
+                      const late = isLate(task, now);
                       const active = task.status === "claimed" || task.status === "in_progress";
-                      const accentBar = overdue
+                      const accentBar = late
                         ? "bg-red-500"
                         : task.status === "done"
                         ? "bg-emerald-500"
@@ -748,7 +885,7 @@ export default function CleaningPage() {
                       return (
                         <Card
                           key={task.id}
-                          className={`p-4 pl-5 overflow-hidden relative ${overdue ? "border-red-300 dark:border-red-800" : ""}`}
+                          className={`p-4 pl-5 overflow-hidden relative ${late ? "border-red-300 dark:border-red-800" : ""}`}
                         >
                           {/* Barre d'accentuation latérale selon l'état */}
                           <span className={`absolute left-0 top-0 bottom-0 w-1 ${accentBar}`} />
@@ -756,7 +893,7 @@ export default function CleaningPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                overdue
+                                late
                                   ? "bg-red-100 dark:bg-red-900/30"
                                   : task.status === "done"
                                   ? "bg-emerald-100 dark:bg-emerald-900/30"
@@ -765,7 +902,7 @@ export default function CleaningPage() {
                                   : "bg-orange-100 dark:bg-orange-900/30"
                               }`}>
                                 <BedDouble className={`w-5 h-5 ${
-                                  overdue
+                                  late
                                     ? "text-red-600"
                                     : task.status === "done"
                                     ? "text-emerald-600"
@@ -784,15 +921,26 @@ export default function CleaningPage() {
                                 </p>
                               </div>
                             </div>
-                            <Badge variant={overdue ? "error" : task.status === "done" ? "success" : active ? "info" : "warning"}>
-                              {overdue ? (
-                                <>
-                                  <AlertCircle className="w-3 h-3" /> En retard
-                                </>
-                              ) : (
-                                STATUS_LABEL[task.status] || task.status
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              {(task.priority ?? 0) >= 15 && task.status !== "done" && (
+                                <Badge variant="warning">
+                                  <AlertTriangle className="w-3 h-3" /> Prioritaire
+                                </Badge>
                               )}
-                            </Badge>
+                              <Badge variant={task.status === "expired" || late ? "error" : task.status === "done" ? "success" : active ? "info" : "warning"}>
+                                {task.status === "expired" ? (
+                                  <>
+                                    <AlertTriangle className="w-3 h-3" /> Expirée
+                                  </>
+                                ) : late ? (
+                                  <>
+                                    <AlertCircle className="w-3 h-3" /> En retard
+                                  </>
+                                ) : (
+                                  STATUS_LABEL[task.status] || task.status
+                                )}
+                              </Badge>
+                            </div>
                           </div>
 
                           {/* Délais */}
@@ -804,7 +952,7 @@ export default function CleaningPage() {
                                 </span>
                                 <span className="font-medium text-slate-700 dark:text-slate-300">
                                   {timeHM(task.checkout_time)}
-                                  {!overdue && task.status !== "done" && (
+                                  {!late && task.status !== "done" && (
                                     <span className="text-[var(--primary-color,#0C1C33)] font-semibold ml-1.5">
                                       {countdownTo(task.checkout_time, now)}
                                     </span>
@@ -817,7 +965,7 @@ export default function CleaningPage() {
                                 <span className="inline-flex items-center gap-1.5">
                                   <AlertCircle className="w-3.5 h-3.5" /> Alerte
                                 </span>
-                                <span className={`font-medium ${overdue ? "text-red-600" : "text-slate-700 dark:text-slate-300"}`}>
+                                <span className={`font-medium ${late ? "text-red-600" : "text-slate-700 dark:text-slate-300"}`}>
                                   {timeHM(task.alert_time)}
                                 </span>
                               </div>
@@ -877,8 +1025,8 @@ export default function CleaningPage() {
                               <>
                                 {task.status === "pending" && (
                                   <Button
-                                    className="w-full h-9 text-xs rounded-lg"
-                                    size="sm"
+                                    className="w-full"
+                                    size="lg"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
                                     onClick={() => handleClaim(task.id)}
@@ -889,8 +1037,8 @@ export default function CleaningPage() {
                                 {active && (
                                   <Button
                                     variant="success"
-                                    className="w-full h-9 text-xs rounded-lg"
-                                    size="sm"
+                                    className="w-full"
+                                    size="lg"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
                                     onClick={() => handleComplete(task.id)}
@@ -904,9 +1052,16 @@ export default function CleaningPage() {
                                   </div>
                                 )}
                                 {task.status === "expired" && (
-                                  <div className="text-center text-xs text-red-600 dark:text-red-400 font-medium py-2">
-                                    Tâche expirée (délai dépassé)
-                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    size="lg"
+                                    loading={actionTaskId === task.id}
+                                    disabled={actionTaskId !== null}
+                                    onClick={() => handleReopen(task.id)}
+                                  >
+                                    <RefreshCw className="w-4 h-4" /> Relancer la tâche
+                                  </Button>
                                 )}
                               </>
                             )}

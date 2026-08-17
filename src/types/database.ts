@@ -799,6 +799,10 @@ export interface Database {
         Args: { p_task_id: string; p_user_id: string };
         Returns: CleaningTask;
       };
+      reopen_cleaning_task: {
+        Args: { p_task_id: string };
+        Returns: CleaningTask;
+      };
       check_double_booking: {
         Args: {
           p_room_id: string;

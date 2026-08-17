@@ -6,6 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
+import {
+  timeAgo,
+  countdownTo,
+  timeHM,
+  isOverdue,
+  isLate,
+  isDoneToday,
+} from "@/lib/cleaning-time";
 import { toast } from "sonner";
 import {
   Sparkles,
@@ -28,45 +37,6 @@ type FilterKey = "pending" | "mine" | "done";
 interface TaskWithRelations extends CleaningTask {
   room?: Room;
   accommodation?: Accommodation;
-}
-
-// ============================================================================
-// Helpers temps
-// ============================================================================
-
-function minutesBetween(fromIso: string, now: Date): number {
-  return Math.max(0, Math.floor((now.getTime() - new Date(fromIso).getTime()) / 60000));
-}
-
-function timeAgo(fromIso: string, now: Date): string {
-  const min = minutesBetween(fromIso, now);
-  if (min < 1) return "à l'instant";
-  if (min < 60) return `il y a ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `il y a ${h}h${String(min % 60).padStart(2, "0")}`;
-  return `il y a ${h}h`;
-}
-
-function countdownTo(dateIso: string, now: Date): string {
-  const diff = new Date(dateIso).getTime() - now.getTime();
-  if (diff <= 0) return "dépassé";
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return `dans ${min} min`;
-  const h = Math.floor(min / 60);
-  return `dans ${h}h${String(min % 60).padStart(2, "0")}`;
-}
-
-function timeHM(dateIso: string | null): string {
-  if (!dateIso) return "";
-  return new Date(dateIso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function isOverdue(alertTime: string | null, status: string, now: Date): boolean {
-  return (
-    (status === "pending" || status === "claimed" || status === "in_progress") &&
-    !!alertTime &&
-    new Date(alertTime).getTime() < now.getTime()
-  );
 }
 
 export default function MenagePage() {
@@ -135,22 +105,8 @@ export default function MenagePage() {
     }
   }
 
-  // Mise à jour en temps réel : nouvelle tâche, prise, terminée…
-  useEffect(() => {
-    if (!tenantId) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel("menage-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "cleaning_tasks", filter: `tenant_id=eq.${tenantId}` },
-        () => loadData()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [tenantId]);
+  // Mise à jour en temps réel : nouvelle tâche, prise, terminée… (debouncée)
+  useCleaningRealtime(tenantId, () => loadData());
 
   async function handleClaim(taskId: string) {
     setActionTaskId(taskId);
@@ -206,35 +162,59 @@ export default function MenagePage() {
   // ============================================================================
 
   const stats = useMemo(() => {
-    const pending = tasks.filter((t) => t.status === "pending");
-    const mine = tasks.filter((t) => t.claimed_by === userId && (t.status === "claimed" || t.status === "in_progress"));
-    const todayKey = new Date().toISOString().slice(0, 10);
-    const done = tasks.filter(
-      (t) => t.status === "done" && t.completed_at && t.completed_at.slice(0, 10) === todayKey
-    );
-    const overdue = tasks.filter((t) => isOverdue(t.alert_time, t.status, now));
-    return { pending: pending.length, mine: mine.length, done: done.length, overdue: overdue.length };
+    const pending = tasks.filter((t) => t.status === "pending" || t.status === "expired");
+    const active = tasks.filter((t) => t.status === "claimed" || t.status === "in_progress");
+    const mine = active.filter((t) => t.claimed_by === userId);
+    const done = tasks.filter((t) => isDoneToday(t, now));
+    const overdue = tasks.filter((t) => isLate(t, now));
+    return {
+      pending: pending.length,
+      mine: mine.length,
+      done: done.length,
+      active: active.length,
+      overdue: overdue.length,
+    };
   }, [tasks, userId, now]);
 
-  const doneTodayTotal = stats.done + stats.mine + stats.pending;
+  const doneTodayTotal = stats.done + stats.active + stats.pending;
   const progress = doneTodayTotal > 0 ? Math.round((stats.done / doneTodayTotal) * 100) : 0;
 
   const filteredTasks = useMemo(() => {
     let list: TaskWithRelations[];
     if (filter === "pending") {
-      list = tasks.filter((t) => t.status === "pending");
+      list = tasks.filter((t) => t.status === "pending" || t.status === "expired");
     } else if (filter === "mine") {
       list = tasks.filter((t) => t.claimed_by === userId && (t.status === "claimed" || t.status === "in_progress"));
     } else {
-      list = tasks.filter((t) => t.status === "done");
+      list = tasks.filter((t) => isDoneToday(t, now));
     }
-    // Trier : les plus urgentes (départ le plus proche) d'abord
+    // Trier : les plus urgentes (en retard) d'abord, puis priorité, puis
+    // départ le plus proche ; les expirées en dernier ; les terminées par
+    // ordre de fin décroissant.
     return list.sort((a, b) => {
+      if (a.status === "done" || b.status === "done") {
+        const aT = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const bT = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return bT - aT;
+      }
+      const rank = (t: CleaningTask) => (t.status === "expired" ? 2 : isOverdue(t, now) ? 0 : 1);
+      const ar = rank(a);
+      const br = rank(b);
+      if (ar !== br) return ar - br;
+      const ap = a.priority ?? 0;
+      const bp = b.priority ?? 0;
+      if (ap !== bp) return bp - ap;
       const aT = a.checkout_time ? new Date(a.checkout_time).getTime() : Number.MAX_SAFE_INTEGER;
       const bT = b.checkout_time ? new Date(b.checkout_time).getTime() : Number.MAX_SAFE_INTEGER;
       return aT - bT;
     });
-  }, [tasks, filter, userId]);
+  }, [tasks, filter, userId, now]);
+
+  // Suggestion intelligente : la tâche à prendre en priorité dans le pool
+  const suggestion = useMemo(() => {
+    if (filter !== "pending") return null;
+    return filteredTasks.find((t) => t.status === "pending") || null;
+  }, [filteredTasks, filter]);
 
   if (loading) {
     return (
@@ -244,7 +224,7 @@ export default function MenagePage() {
     );
   }
 
-  const firstName = userName.split(" ")[0] || "Bonjour";
+  const firstName = userName.trim() ? userName.trim().split(/\s+/)[0] : "";
 
   return (
     <div className="space-y-4 animate-fade-in max-w-md mx-auto">
@@ -255,7 +235,7 @@ export default function MenagePage() {
         <p className="text-xs font-medium text-white/70">
           {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
         </p>
-        <h1 className="text-lg font-bold mt-0.5">Bonjour {firstName}</h1>
+        <h1 className="text-lg font-bold mt-0.5">{firstName ? `Bonjour ${firstName}` : "Bonjour !"}</h1>
         <p className="text-xs text-white/70 mt-0.5">
           {stats.pending > 0
             ? `${stats.pending} tâche${stats.pending > 1 ? "s" : ""} en attente sur le pool`
@@ -340,6 +320,33 @@ export default function MenagePage() {
         </div>
       )}
 
+      {/* Suggestion intelligente : la tâche à prendre en priorité */}
+      {suggestion && (
+        <div className="rounded-2xl border border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] p-3.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+            <p className="text-xs font-bold text-[var(--primary-color,#0C1C33)]">
+              Suggestion : commencez par la Chambre {suggestion.room?.room_number || "—"}
+            </p>
+          </div>
+          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+            {suggestion.checkout_time
+              ? `Départ à ${timeHM(suggestion.checkout_time)} · ${countdownTo(suggestion.checkout_time, now)}`
+              : "Sans horaire de départ"}
+            {suggestion.priority >= 15 ? " · prioritaire" : ""}
+          </p>
+          <Button
+            size="xl"
+            className="w-full mt-2.5"
+            loading={actionTaskId === suggestion.id}
+            disabled={actionTaskId !== null}
+            onClick={() => handleClaim(suggestion.id)}
+          >
+            <Hand className="w-5 h-5" /> Prendre cette tâche
+          </Button>
+        </div>
+      )}
+
       {/* Liste des tâches */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
@@ -355,6 +362,7 @@ export default function MenagePage() {
             }}
             className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             title="Actualiser"
+            aria-label="Actualiser la liste"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
@@ -375,13 +383,14 @@ export default function MenagePage() {
           </Card>
         ) : (
           filteredTasks.map((task) => {
-            const overdue = isOverdue(task.alert_time, task.status, now);
+            const late = isLate(task, now);
+            const overdue = isOverdue(task, now);
             const isMine = task.claimed_by === userId;
             return (
               <Card
                 key={task.id}
                 className={`p-4 overflow-hidden ${
-                  overdue ? "border-red-300 dark:border-red-800" : ""
+                  late ? "border-red-300 dark:border-red-800" : ""
                 }`}
               >
                 {/* En-tête : chambre + statut */}
@@ -389,7 +398,7 @@ export default function MenagePage() {
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        overdue
+                        late
                           ? "bg-red-100 dark:bg-red-900/30"
                           : task.status === "done"
                           ? "bg-green-100 dark:bg-green-900/30"
@@ -400,7 +409,7 @@ export default function MenagePage() {
                     >
                       <BedDouble
                         className={`w-5 h-5 ${
-                          overdue
+                          late
                             ? "text-red-600"
                             : task.status === "done"
                             ? "text-green-600"
@@ -421,6 +430,11 @@ export default function MenagePage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
+                    {(task.priority ?? 0) >= 15 && task.status !== "done" && (
+                      <Badge variant="warning">
+                        <AlertTriangle className="w-3 h-3" /> Prioritaire
+                      </Badge>
+                    )}
                     {overdue && (
                       <Badge variant="error">
                         <AlertCircle className="w-3 h-3" /> En retard
@@ -431,7 +445,7 @@ export default function MenagePage() {
                         <CheckCircle2 className="w-3 h-3" /> Terminée
                       </Badge>
                     )}
-                    {isMine && !overdue && task.status !== "done" && (
+                    {isMine && !late && task.status !== "done" && (
                       <Badge variant="info">
                         <Sparkles className="w-3 h-3" /> En cours
                       </Badge>
@@ -475,8 +489,8 @@ export default function MenagePage() {
                 {/* Actions : gros boutons tactiles */}
                 {task.status === "pending" && (
                   <Button
-                    className="w-full h-12 text-sm rounded-xl"
-                    size="md"
+                    className="w-full"
+                    size="xl"
                     loading={actionTaskId === task.id}
                     disabled={actionTaskId !== null}
                     onClick={() => handleClaim(task.id)}
@@ -487,8 +501,8 @@ export default function MenagePage() {
                 {(task.status === "claimed" || task.status === "in_progress") && isMine && (
                   <Button
                     variant="success"
-                    className="w-full h-12 text-sm rounded-xl"
-                    size="md"
+                    className="w-full"
+                    size="xl"
                     loading={actionTaskId === task.id}
                     disabled={actionTaskId !== null}
                     onClick={() => handleComplete(task.id)}
