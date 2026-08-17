@@ -20,6 +20,7 @@ import {
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { useRouter } from "next/navigation";
+import { StayTimeline } from "@/components/stay-timeline";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking } from "@/types/database";
 import {
   LineChart,
@@ -700,6 +701,7 @@ export default function AccountingPage() {
   const [savingExpense, setSavingExpense] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null);
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
   const [expenseForm, setExpenseForm] = useState({
     category: "utilities",
@@ -2351,25 +2353,40 @@ export default function AccountingPage() {
               {selectedClient.bookings.length === 0 ? (
                 <p className="text-sm text-slate-400 py-4 text-center">Aucune réservation</p>
               ) : (
-                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                <div className="space-y-2 pr-1">
                   {selectedClient.bookings.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700">
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {b.booking_code}
-                          <span className="ml-2 text-xs font-normal text-slate-400">
-                            {formatDate(b.check_in_date)} → {formatDate(b.check_out_date)}
-                          </span>
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
-                        </p>
+                    <div key={b.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">
+                            {b.booking_code}
+                            <span className="ml-2 text-xs font-normal text-slate-400">
+                              {formatDate(b.check_in_date)} → {formatDate(b.check_out_date)}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant={b.payment_status === "paid" ? "success" : b.payment_status === "partial" ? "warning" : "error"}>
+                            {b.payment_status === "paid" ? "Soldé" : b.payment_status === "partial" ? "Partiel" : b.payment_status === "refunded" ? "Remboursé" : "Impayé"}
+                          </Badge>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedBookingId(expandedBookingId === b.id ? null : b.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
+                          >
+                            <History className="w-3 h-3" />
+                            {expandedBookingId === b.id ? "Masquer l'historique" : "Historique du séjour"}
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <Badge variant={b.payment_status === "paid" ? "success" : b.payment_status === "partial" ? "warning" : "error"}>
-                          {b.payment_status === "paid" ? "Soldé" : b.payment_status === "partial" ? "Partiel" : b.payment_status === "refunded" ? "Remboursé" : "Impayé"}
-                        </Badge>
-                      </div>
+                      {expandedBookingId === b.id && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                          <StayTimeline bookingId={b.id} tenantId={tenantId} clientId={selectedClient.id} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

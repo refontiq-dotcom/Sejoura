@@ -364,6 +364,48 @@ export interface BookingExtension {
   created_at: string;
 }
 
+export type StayActivityType =
+  | "booking_created"
+  | "check_in"
+  | "check_out"
+  | "booking_extended"
+  | "overstay_detected"
+  | "overstay_auto_checkout"
+  | "service_request"
+  | "service_request_done"
+  | "stay_extension_requested"
+  | "stay_extension_approved"
+  | "stay_extension_rejected"
+  | "payment";
+
+export interface StayActivity {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string | null;
+  activity_type: StayActivityType;
+  title: string;
+  description: string | null;
+  meta: Record<string, unknown> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type StayNoteType = "incident" | "damage" | "forgotten_object" | "feedback" | "other";
+export type StayNoteSeverity = "low" | "medium" | "high";
+
+export interface StayNote {
+  id: string;
+  tenant_id: string;
+  booking_id: string;
+  client_id: string | null;
+  note_type: StayNoteType;
+  description: string;
+  severity: StayNoteSeverity;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface Payment {
   id: string;
   tenant_id: string;
@@ -714,6 +756,16 @@ export interface Database {
         Row: BookingExtension;
         Insert: Omit<BookingExtension, "id" | "created_at">;
         Update: Partial<Omit<BookingExtension, "id" | "created_at">>;
+      };
+      stay_activities: {
+        Row: StayActivity;
+        Insert: Omit<StayActivity, "id" | "created_at">;
+        Update: Partial<Omit<StayActivity, "id" | "created_at">>;
+      };
+      stay_notes: {
+        Row: StayNote;
+        Insert: Omit<StayNote, "id" | "created_at">;
+        Update: Partial<Omit<StayNote, "id" | "created_at">>;
       };
       payments: {
         Row: Payment;

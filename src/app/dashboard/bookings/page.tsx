@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { StayTimeline } from "@/components/stay-timeline";
 import {
   formatDate,
   formatTime,
@@ -51,6 +52,7 @@ import {
   Receipt,
   MoreHorizontal,
   Pencil,
+  History,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -148,6 +150,7 @@ export default function BookingsPage() {
   const loadBookingsRef = useRef(loadBookings);
   loadBookingsRef.current = loadBookings;
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [expandedTimelineBookingId, setExpandedTimelineBookingId] = useState<string | null>(null);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
@@ -1746,9 +1749,9 @@ export default function BookingsPage() {
                   {bookings.filter(bk => bk.client_id === selectedClient.id).length === 0 ? (
                     <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Aucune réservation enregistrée.</p>
                   ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="space-y-2">
                       {bookings.filter(bk => bk.client_id === selectedClient.id).map(bk => (
-                        <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                        <div key={bk.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
                           <p className="text-sm font-medium text-slate-900 dark:text-white">{bk.booking_code}</p>
                           <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
                             {formatDate(bk.check_in_date)} → {formatDate(bk.check_out_date)} — {bk.nights_count} nuit{bk.nights_count > 1 ? "s" : ""}
@@ -1756,6 +1759,13 @@ export default function BookingsPage() {
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
                             <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{fmt(bk.total_amount)} — {getBookingStatusLabel(bk.status)}</span>
                             <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setExpandedTimelineBookingId(expandedTimelineBookingId === bk.id ? null : bk.id)}
+                                className="p-1 rounded text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] text-xs flex items-center gap-1 font-medium"
+                                title="Historique du séjour"
+                              >
+                                <History className="w-3.5 h-3.5" /> Historique
+                              </button>
                               <button
                                 onClick={() => shareStayWhatsApp(bk)}
                                 className="p-1 rounded text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-xs flex items-center gap-1 font-medium"
@@ -1772,6 +1782,11 @@ export default function BookingsPage() {
                               </button>
                             </div>
                           </div>
+                          {expandedTimelineBookingId === bk.id && (
+                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                              <StayTimeline bookingId={bk.id} tenantId={tenantId} clientId={selectedClient.id} />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
