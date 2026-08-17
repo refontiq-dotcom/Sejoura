@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "node scripts/db-push.mjs",
+    "admin:create": "node scripts/create-super-admin.mjs",
     "test": "vitest run"
   },
   "dependencies": {
