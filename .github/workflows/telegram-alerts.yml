@@ -1,0 +1,26 @@
+name: Telegram Alerts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appel de la collecte des alertes Telegram
+        env:
+          SYNC_URL: "https://sejoura-lemon.vercel.app/api/cron/telegram-alerts"
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o /tmp/alert.out -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SYNC_URL")
+          echo "HTTP $code"
+          cat /tmp/alert.out
+          echo
+          if [ "$code" != "200" ]; then
+            echo "Échec de la collecte des alertes Telegram (HTTP $code)"
+            exit 1
+          fi
