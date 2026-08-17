@@ -50,6 +50,25 @@ Pour maintenir l'état `expired`, appeler périodiquement la fonction
 `sync_subscription_statuses()` (cron Supabase / edge function) : elle bascule en
 `expired` + soft lock les abonnements dont `subscription_end_date` est dépassée.
 
+### Notifications Telegram du Super Admin
+
+À chaque événement important, le Super Admin reçoit une alerte Telegram (mêmes
+variables `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` que pour les suggestions) :
+
+| Événement | Déclencheur |
+|---|---|
+| Nouvelle suggestion | `POST /api/feature-requests/notify` |
+| Demande de validation d'abonnement | `POST /api/subscription/notify-payment` |
+| Nouvelle inscription d'établissement | `POST /api/register` |
+| Paiement Wave automatique reçu | `POST /api/webhooks/wave` (événement `checkout.session.completed`) |
+| Abonnement passé en `expired` | Trigger SQL → outbox `telegram_alerts` → Vercel Cron `/api/cron/telegram-alerts` |
+
+Pour l'abonnement expiré, le passage en `expired` (par `sync_subscription_statuses()`)
+écrit une alerte dans la table `telegram_alerts` (migration
+`20260828_subscription_expired_telegram.sql`). Un Vercel Cron (`vercel.json`,
+toutes les minutes) vide cette file via la route `/api/cron/telegram-alerts`
+(protégée par la variable `CRON_SECRET`).
+
 ### 2. Flux automatisé via API Wave Checkout (existant)
 
 Optionnel, si la clé API Wave est disponible :

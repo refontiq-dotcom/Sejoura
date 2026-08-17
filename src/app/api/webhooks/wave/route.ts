@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWaveSignature } from "@/lib/wave";
+import {
+  escapeMarkdown,
+  getTelegramAdminUrl,
+  isTelegramConfigured,
+  sendTelegramMessage,
+} from "@/lib/telegram";
+import { formatFCFA, getPlanLabel } from "@/lib/utils";
 
 export async function POST(request: Request) {
   const signatureHeader = request.headers.get("Wave-Signature");
@@ -145,6 +152,35 @@ export async function POST(request: Request) {
         { error: "Impossible d'enregistrer le paiement." },
         { status: 500 }
       );
+    }
+  }
+
+  // Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais faire
+  // échouer le traitement du webhook.
+  if (isTelegramConfigured()) {
+    try {
+      const { data: tenant } = await admin
+        .from("tenants")
+        .select("company_name")
+        .eq("id", subscription.tenant_id)
+        .maybeSingle();
+
+      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin");
+      const text = [
+        "\uD83D\uDCB5 *Paiement Wave reçu — Sejoura*",
+        "",
+        `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(tenant?.company_name || "Établissement inconnu")}`,
+        `\uD83D\uDCE6 *Formule :* ${escapeMarkdown(getPlanLabel(subscription.plan))}`,
+        `\uD83D\uDCB0 *Montant :* ${formatFCFA(amount)}`,
+        `\u23F3 *Abonnement actif pour 30 jours*`,
+        "",
+        `\uD83D\uDD17 [Voir sur le Dashboard Admin](${adminUrl})`,
+      ].join("\n");
+
+      const sent = await sendTelegramMessage(text);
+      if (!sent) console.error("Telegram wave payment alert failed");
+    } catch (error) {
+      console.error("wave webhook telegram:", error);
     }
   }
 
