@@ -52,6 +52,7 @@ interface SyncRow {
     tenants: {
       company_name: string | null;
       logo_url: string | null;
+      subscriptions: { status: string }[] | null;
     } | null;
   };
 }
@@ -77,7 +78,10 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         city,
         tenants!inner (
           company_name,
-          logo_url
+          logo_url,
+          subscriptions!inner (
+            status
+          )
         )
       )
     `
