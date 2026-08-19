@@ -1661,7 +1661,7 @@ export default function AccountingPage() {
                     placeholder="Rechercher (client, réf, réservation)"
                     value={revenueSearch}
                     onChange={(e) => setRevenueSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-56"
+                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-full sm:w-56"
                   />
                 </div>
                 <select
@@ -1708,7 +1708,48 @@ export default function AccountingPage() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Cartes mobiles */}
+              <div className="md:hidden divide-y divide-zinc-800/60">
+                {filteredPayments.map((pay) => {
+                  const isOut = pay.amount < 0;
+                  return (
+                    <div key={pay.id} className="p-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {pay.booking?.booking_code && (
+                            <span className="font-mono text-[11px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                              {pay.booking.booking_code}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-zinc-500 whitespace-nowrap">{formatDate(pay.payment_date)}</span>
+                        </div>
+                        <p className="text-xs font-medium text-zinc-100 mt-1 truncate">
+                          {pay.booking?.client_name || (pay.notes ? pay.notes : "Opération de caisse")}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <Badge variant={isOut ? "error" : "info"} className={isOut ? "!bg-red-500/15 !text-red-400" : "!bg-blue-500/15 !text-blue-400"}>
+                            {paymentMethodDisplay(pay)}
+                          </Badge>
+                          {pay.reference && <span className="text-[11px] text-zinc-500">{pay.reference}</span>}
+                        </div>
+                      </div>
+                      <p className={`text-sm font-bold flex-shrink-0 ${isOut ? "text-red-400" : "text-emerald-400"}`}>
+                        {isOut ? "-" : ""}
+                        {fmt(Math.abs(pay.amount))}
+                      </p>
+                    </div>
+                  );
+                })}
+                <div className="p-3 flex items-center justify-between border-t border-zinc-800">
+                  <span className="text-xs font-semibold text-zinc-300">Total recettes nettes</span>
+                  <span className="text-sm font-bold text-white">
+                    {fmt(filteredPayments.reduce((s, p) => s + p.amount, 0))}
+                  </span>
+                </div>
+              </div>
+              {/* Tableau desktop */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-zinc-800">
@@ -1779,6 +1820,7 @@ export default function AccountingPage() {
                   </tfoot>
                 </table>
               </div>
+              </>
             )}
           </div>
         )}
@@ -1805,7 +1847,7 @@ export default function AccountingPage() {
                     placeholder="Rechercher une dépense"
                     value={expenseSearch}
                     onChange={(e) => setExpenseSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-56"
+                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-full sm:w-56"
                   />
                 </div>
                 <select
@@ -1843,7 +1885,53 @@ export default function AccountingPage() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Cartes mobiles */}
+              <div className="md:hidden divide-y divide-zinc-800/60">
+                {filteredExpenses.map((exp) => (
+                  <div key={exp.id} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-zinc-100 truncate">{exp.description}</p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <Badge variant="theme" className="!bg-zinc-800 !text-zinc-300">
+                            {getExpenseCategoryLabel(exp.category)}
+                          </Badge>
+                          <span className="text-[11px] text-zinc-500">
+                            {accommodations.find((a) => a.id === exp.accommodation_id)?.name || "—"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mt-1">{formatDate(exp.expense_date)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-sm font-bold text-red-400">{fmt(exp.amount)}</span>
+                        <button
+                          onClick={() => openEditExpense(exp)}
+                          title="Modifier"
+                          className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingExpense(exp)}
+                          title="Supprimer"
+                          className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="p-3 flex items-center justify-between border-t border-zinc-800">
+                  <span className="text-xs font-semibold text-zinc-300">Total dépenses</span>
+                  <span className="text-sm font-bold text-red-400">
+                    {fmt(filteredExpenses.reduce((s, e) => s + e.amount, 0))}
+                  </span>
+                </div>
+              </div>
+              {/* Tableau desktop */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-zinc-800">
@@ -1915,6 +2003,7 @@ export default function AccountingPage() {
                   </tfoot>
                 </table>
               </div>
+              </>
             )}
           </div>
           </div>
@@ -1952,7 +2041,71 @@ export default function AccountingPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Cartes mobiles */}
+              <div className="md:hidden divide-y divide-zinc-800/60">
+                {filteredInvoices.map((inv) => (
+                  <div key={inv.id} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-zinc-100">{inv.invoice_number}</span>
+                          <span className="text-[11px] text-zinc-500 whitespace-nowrap">{formatDate(inv.created_at)}</span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-1 truncate">
+                          {inv.booking?.client_name || "—"}
+                          {inv.booking?.booking_code ? ` · ${inv.booking.booking_code}` : ""}
+                        </p>
+                        <Badge
+                          variant={inv.status === "paid" ? "success" : inv.status === "sent" ? "default" : inv.status === "draft" ? "info" : inv.status === "partial" ? "warning" : "error"}
+                          className={
+                            inv.status === "paid"
+                              ? "!bg-emerald-500/15 !text-emerald-400"
+                              : inv.status === "sent"
+                                ? "!bg-zinc-800 !text-zinc-300"
+                                : inv.status === "draft"
+                                  ? "!bg-blue-500/15 !text-blue-400"
+                                  : inv.status === "partial"
+                                    ? "!bg-amber-500/15 !text-amber-400"
+                                    : "!bg-red-500/15 !text-red-400"
+                          }
+                        >
+                          {INVOICE_STATUS_LABELS[inv.status] || inv.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <div className="text-right mr-1">
+                          <p className="text-sm font-bold text-zinc-100">{fmt(inv.total_amount)}</p>
+                          <p className="text-[10px] text-zinc-500">TTC</p>
+                        </div>
+                        {inv.pdf_url && (
+                          <button
+                            onClick={() => handleOpenInvoice(inv)}
+                            title="Voir la facture PDF"
+                            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {inv.pdf_url && (
+                          <button
+                            onClick={() => handleOpenInvoice(inv)}
+                            title="Télécharger la facture"
+                            className="p-1.5 rounded-md text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-1.5">
+                      Sous-total {fmt(inv.amount)} · TVA {fmt(inv.tax_amount)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {/* Tableau desktop */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-zinc-800">
@@ -2022,6 +2175,7 @@ export default function AccountingPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         )}
@@ -2086,7 +2240,84 @@ export default function AccountingPage() {
                 <p className="text-xs text-zinc-500 mt-1">Les clients apparaissent dès la première réservation</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              {/* Cartes mobiles */}
+              <div className="md:hidden divide-y divide-zinc-800/60">
+                {filteredClients.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedClient(c)}
+                    className="p-3 cursor-pointer active:bg-zinc-900/40"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs text-zinc-300 flex-shrink-0">
+                          {c.full_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-zinc-100 truncate">{c.full_name}</p>
+                          <p className="text-[11px] text-zinc-500 truncate">
+                            {c.nationality || ""} {c.nationality && c.id_type ? "•" : ""} {c.id_type || ""}
+                          </p>
+                        </div>
+                      </div>
+                      <ClientScoreBadge score={c.score} tier={c.tier} clientId={c.id} showValue={false} />
+                    </div>
+                    {c.phone && (
+                      <p className="text-[11px] text-zinc-500 mt-2 flex items-center gap-1">
+                        <Phone className="w-3 h-3" /> {c.phone}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-3 gap-2 mt-2.5 text-center">
+                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">Séjours</p>
+                        <p className="text-xs font-semibold text-zinc-200 mt-0.5">
+                          {c.stayCount} · {c.nights} nuit{c.nights > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">CA total</p>
+                        <p className="text-xs font-semibold text-zinc-100 mt-0.5 truncate">{fmt(c.totalSpent)}</p>
+                      </div>
+                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">Solde</p>
+                        {c.balance > 0 ? (
+                          <p className="text-xs font-bold text-red-400 mt-0.5 truncate">{fmt(c.balance)}</p>
+                        ) : (
+                          <p className="text-[10px] text-emerald-400 mt-0.5 flex items-center justify-center gap-0.5">
+                            <CheckCircle2 className="w-3 h-3" /> À jour
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {c.phone && (
+                      <div className="flex items-center gap-2 mt-2.5">
+                        <a
+                          href={`https://wa.me/${c.phone.replace(/[^+\d]/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Contacter sur WhatsApp"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 hover:text-emerald-300"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedClient(c);
+                          }}
+                          className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 hover:text-zinc-200"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Dossier
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Tableau desktop */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-zinc-800">
@@ -2178,6 +2409,7 @@ export default function AccountingPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </div>
         )}

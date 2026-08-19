@@ -54,6 +54,7 @@ import {
   MoreHorizontal,
   Pencil,
   History,
+  ArrowRight,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -1279,13 +1280,13 @@ export default function BookingsPage() {
 
   return (
     <div className="space-y-3 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Réservations</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">{bookings.length} réservation{bookings.length > 1 ? "s" : ""}</p>
         </div>
-        <Button onClick={openAddModal}>
-          <Plus className="w-4 h-4" /> Nouvelle réservation
+        <Button onClick={openAddModal} className="flex-shrink-0">
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nouvelle réservation</span>
         </Button>
       </div>
 
@@ -1352,8 +1353,8 @@ export default function BookingsPage() {
       )}
 
       {/* Filtres & Export */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[250px]">
+      <div className="flex flex-col md:flex-row gap-2 md:gap-3 md:flex-wrap">
+        <div className="relative flex-1 min-w-[200px] md:min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
@@ -1363,15 +1364,15 @@ export default function BookingsPage() {
             className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
           />
         </div>
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1">
-          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Du</span>
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-1 overflow-x-auto">
+          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">Du</span>
           <input 
             type="date" 
             value={startDate} 
             onChange={(e) => setStartDate(e.target.value)}
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
-          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">au</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 whitespace-nowrap">au</span>
           <input 
             type="date" 
             value={endDate} 
@@ -1379,6 +1380,7 @@ export default function BookingsPage() {
             className="text-sm bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
           />
         </div>
+        <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
         {accommodations.length > 1 && (
           <select
             value={accomFilter}
@@ -1388,7 +1390,7 @@ export default function BookingsPage() {
               accommodationFilterRef.current = e.target.value === "all" ? undefined : e.target.value;
               loadBookingsRef.current(tenantId, accommodationFilterRef.current);
             }}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
             title="Filtrer par résidence"
           >
             <option value="all">Toutes les résidences</option>
@@ -1400,7 +1402,7 @@ export default function BookingsPage() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+          className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
         >
           <option value="all">Tous les statuts</option>
           <option value="overdue">Dépassement de séjour</option>
@@ -1426,9 +1428,10 @@ export default function BookingsPage() {
             <Calendar className="w-4 h-4" />
           </button>
         </div>
-        <Button variant="outline" onClick={exportToCSV} className="gap-2">
-          <Download className="w-4 h-4" /> Export CSV
+        <Button variant="outline" onClick={exportToCSV} className="gap-2 flex-1 md:flex-none justify-center">
+          <Download className="w-4 h-4" /> <span className="sm:hidden">CSV</span><span className="hidden sm:inline">Export CSV</span>
         </Button>
+        </div>
       </div>
 
       {/* Calendrier ou Tableau */}
@@ -1473,7 +1476,179 @@ export default function BookingsPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Version mobile : cartes empilées, action principale prioritaire */}
+          <div className="md:hidden space-y-2.5 p-2.5">
+            {paginatedBookings.map((b) => {
+              const overdue = b.status === "checked_in" && (b.is_overstay || isBookingOverdue(b));
+              const primaryAction =
+                b.status === "confirmed"
+                  ? { type: "check_in" as const }
+                  : b.status === "checked_in"
+                    ? { type: "check_out" as const }
+                    : null;
+              return (
+                <div
+                  key={b.id}
+                  onClick={() => b.client && setSelectedClient(b.client)}
+                  className={`rounded-2xl border bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-sm)] overflow-hidden cursor-pointer ${
+                    overdue ? "border-red-200 dark:border-red-900/50" : "border-[var(--border-card)]"
+                  }`}
+                >
+                  {/* En-tête : client + statut */}
+                  <div className="flex items-center gap-2.5 p-3">
+                    <div className="w-9 h-9 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                      {b.client?.full_name?.charAt(0) || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                        {b.client?.full_name || "Client sans profil"}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        {b.booking_code} · {b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium ${getBookingStatusColor(b.status)}`}>
+                        {getBookingStatusLabel(b.status)}
+                      </span>
+                      {overdue && (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getOverstayColor()}`}>
+                          {getOverstayLabel()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Infos séjour + paiement */}
+                  <div className="px-3 pb-2 grid grid-cols-2 gap-2">
+                    <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Chambre</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Ch. {b.room?.room_number || "—"}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{b.room_type?.name || ""}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Paiement</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{fmt(b.total_amount)}</p>
+                      <span className={`text-[11px] ${getPaymentStatusColor(b.payment_status)}`}>{getPaymentStatusLabel(b.payment_status)}</span>
+                    </div>
+                  </div>
+
+                  {/* Dates */}
+                  <div className="px-3 pb-3">
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--surface-muted)]">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Arrivée</p>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{formatDate(b.check_in_date)}</p>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 flex-shrink-0" />
+                      <div className="min-w-0 text-right">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Départ</p>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          {formatDate(b.check_out_date)}{b.check_out_time ? ` · ${formatTime(b.check_out_time)}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {overdue && (
+                      <p className="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-1.5">
+                        Départ prévu dépassé — prolonger ou libérer la chambre
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 p-3 border-t border-[var(--border-subtle)]">
+                    {b.status === "cancelled" || b.status === "no_show" ? (
+                      <span className="flex-1 text-[11px] text-slate-400">Aucune action disponible</span>
+                    ) : (
+                      <>
+                        {primaryAction && (
+                          <Button
+                            variant={primaryAction.type === "check_in" ? "success" : "secondary"}
+                            size="sm"
+                            className={`flex-1 ${primaryAction.type === "check_out" ? "bg-orange-500 text-white hover:bg-orange-600" : ""}`}
+                            loading={actioningId === b.id}
+                            disabled={actioningId === b.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePrimaryAction(b.id, primaryAction.type);
+                            }}
+                          >
+                            {primaryAction.type === "check_in" ? (
+                              <><LogIn className="w-3.5 h-3.5" /> Check-in</>
+                            ) : (
+                              <><LogOut className="w-3.5 h-3.5" /> Check-out</>
+                            )}
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger aria-label="Plus d'actions" disabled={actioningId === b.id} className="h-10 w-10">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Séjour</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                              <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => copyStayLink(b)}>
+                              <Copy className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Copier le lien du séjour
+                            </DropdownMenuItem>
+                            {b.status === "checked_in" && (
+                              <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
+                                <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                              </DropdownMenuItem>
+                            )}
+                            {b.status === "checked_in" && (
+                              <DropdownMenuItem onSelect={() => openExtendModal(b)}>
+                                <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
+                              </DropdownMenuItem>
+                            )}
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <DropdownMenuItem onSelect={() => openEditModal(b)}>
+                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier la réservation
+                              </DropdownMenuItem>
+                            )}
+                            {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Facturation</DropdownMenuLabel>
+                                {invoicesMap[b.id]?.pdf_url ? (
+                                  <DropdownMenuItem onSelect={() => handleDownloadInvoice(invoicesMap[b.id])} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    <Receipt className="w-4 h-4" /> Télécharger la facture
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onSelect={() => handleGenerateInvoice(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    <Receipt className="w-4 h-4" /> Générer la facture PDF
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
+                                <DropdownMenuItem onSelect={() => handleAction(b.id, "cancel")} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                                  <XCircle className="w-4 h-4" /> Annuler la réservation
+                                </DropdownMenuItem>
+                                {b.status === "confirmed" && (
+                                  <DropdownMenuItem onSelect={() => handleAction(b.id, "no_show")} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                                    <UserX className="w-4 h-4" /> Marquer en no-show
+                                  </DropdownMenuItem>
+                                )}
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Version desktop : tableau */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -1664,6 +1839,7 @@ export default function BookingsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         
         {/* Pagination */}

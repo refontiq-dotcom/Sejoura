@@ -375,25 +375,26 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             : "bg-[var(--main-bg,var(--background))]/90 backdrop-blur-md"
         }`}
       >
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-3 md:px-4 py-2.5 gap-2">
+        <div className="flex items-center gap-3 min-w-0">
           {onMenuClick && (
             <button
               onClick={onMenuClick}
               className="lg:hidden p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)]"
+              aria-label="Ouvrir le menu"
             >
               <Menu className="w-5 h-5" />
             </button>
           )}
-          <div>
-            <h1 className="text-lg font-bold text-[var(--foreground)]">{title}</h1>
+          <div className="min-w-0">
+            <h1 className="text-base md:text-lg font-bold text-[var(--foreground)] truncate">{title}</h1>
             {subtitle && (
-              <p className="text-xs font-medium text-[var(--muted-foreground)] mt-0.5">{subtitle}</p>
+              <p className="text-xs font-medium text-[var(--muted-foreground)] mt-0.5 truncate hidden sm:block">{subtitle}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <div className="relative">
           <button
             onClick={() => setSearchOpen(true)}

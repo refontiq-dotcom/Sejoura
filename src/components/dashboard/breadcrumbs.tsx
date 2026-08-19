@@ -62,9 +62,9 @@ export function Breadcrumbs() {
   };
 
   return (
-    <nav className="flex items-center text-sm text-[var(--muted-foreground)] py-2.5 px-6 bg-[var(--main-bg,var(--background))] border-b border-[var(--border)]" aria-label={t.ariaLabel}>
-      <ol className="flex items-center space-x-2">
-        <li>
+    <nav className="flex items-center text-sm text-[var(--muted-foreground)] py-2.5 px-3 md:px-6 bg-[var(--main-bg,var(--background))] border-b border-[var(--border)] overflow-x-auto" aria-label={t.ariaLabel}>
+      <ol className="flex items-center space-x-2 min-w-0">
+        <li className="flex-shrink-0">
           <Link href="/dashboard" className="hover:text-[var(--primary-color,#0C1C33)] transition-colors flex items-center">
             <Home className="w-4 h-4" />
           </Link>
@@ -80,14 +80,14 @@ export function Breadcrumbs() {
             : pathNames[path] || path;
 
           return (
-            <li key={path} className="flex items-center space-x-2">
+            <li key={path} className="flex items-center space-x-2 flex-shrink-0">
               <ChevronRight className="w-4 h-4 text-[var(--muted-foreground)] opacity-50 flex-shrink-0" />
               {isLast ? (
-                <span className="font-medium text-[var(--foreground)] truncate max-w-[200px]" aria-current="page">
+                <span className="font-medium text-[var(--foreground)] truncate max-w-[140px] md:max-w-[200px]" aria-current="page">
                   {label}
                 </span>
               ) : (
-                <Link href={href} className="hover:text-[var(--primary-color,#0C1C33)] transition-colors truncate max-w-[150px]">
+                <Link href={href} className="hover:text-[var(--primary-color,#0C1C33)] transition-colors truncate max-w-[120px] md:max-w-[150px]">
                   {label}
                 </Link>
               )}

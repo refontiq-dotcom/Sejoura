@@ -604,6 +604,131 @@ function SectionHeader({
 }
 
 // ============================================================================
+// MOUVEMENTS — VUE MOBILE (cartes, < 1024px)
+// Version desktop (tableau) inchangée : le mobile empile chaque mouvement en
+// carte tactile, priorité à l'action principale (check-in/out) et au détail.
+// ============================================================================
+
+function MovementCardList({
+  movements,
+  onAction,
+  actionLoading,
+  onOpenDetails,
+  fmt,
+  isPastDate,
+  isToday,
+}: {
+  movements: Movement[];
+  onAction: (id: string, action: "check_in" | "check_out") => Promise<boolean>;
+  actionLoading: string;
+  onOpenDetails: (m: Movement) => void;
+  fmt: (n: number) => string;
+  isPastDate: boolean;
+  isToday: boolean;
+}) {
+  return (
+    <div className="md:hidden space-y-2.5 p-2.5">
+      {movements.length === 0 ? (
+        <div className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
+          {isToday
+            ? "Aucun mouvement prévu aujourd'hui"
+            : isPastDate
+              ? "Aucune activité enregistrée pour cette date"
+              : "Aucune activité prévue pour cette date"}
+        </div>
+      ) : (
+        movements.map((m) => {
+          const canAct =
+            !isPastDate &&
+            ((m.movementType === "check_in" && m.bookingStatus === "confirmed") ||
+              (m.movementType === "check_out" && m.bookingStatus === "checked_in"));
+          const isIn = m.movementType === "check_in";
+          return (
+            <div
+              key={m.id}
+              onClick={() => onOpenDetails(m)}
+              className={`rounded-2xl border bg-[var(--card-bg,var(--surface))] shadow-[var(--shadow-sm)] overflow-hidden ${
+                isIn ? "border-emerald-200 dark:border-emerald-900/50" : "border-orange-200 dark:border-orange-900/50"
+              }`}
+            >
+              {/* En-tête client */}
+              <div className="flex items-center gap-2.5 p-3">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${
+                    isIn ? "bg-emerald-500" : "bg-orange-500"
+                  }`}
+                >
+                  {m.clientName.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{m.clientName}</p>
+                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{m.bookingCode}</p>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                    isIn
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                  }`}
+                >
+                  {isIn ? <LogIn className="w-3 h-3" /> : <LogOut className="w-3 h-3" />}
+                  {m.time}
+                </span>
+              </div>
+
+              {/* Détails chambre + paiement */}
+              <div className="px-3 pb-2 grid grid-cols-2 gap-2">
+                <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Logement</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Ch. {m.roomNumber}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{m.roomType}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Paiement</p>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}>
+                    {getPaymentStatusLabel(m.paymentStatus)}
+                  </span>
+                  <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 mt-0.5">
+                    {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 p-3 border-t border-[var(--border-subtle)]">
+                {canAct ? (
+                  <Button
+                    variant={isIn ? "primary" : "secondary"}
+                    size="sm"
+                    className="flex-1"
+                    loading={actionLoading === m.id}
+                    disabled={actionLoading === m.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAction(m.id, m.movementType);
+                    }}
+                  >
+                    {isIn ? <LogIn className="w-3.5 h-3.5" /> : <LogOut className="w-3.5 h-3.5" />}
+                    {isIn ? "Effectuer le check-in" : "Effectuer le check-out"}
+                  </Button>
+                ) : (
+                  <span className="flex-1 text-[11px] font-medium text-slate-400">
+                    {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
+                  </span>
+                )}
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onOpenDetails(m); }}>
+                  Détails
+                </Button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // PAGE PRINCIPALE
 // ============================================================================
 
@@ -1337,7 +1462,19 @@ export default function DashboardPage() {
             }
           />
 
-          <div className="overflow-x-auto">
+          {/* Version mobile : cartes empilées */}
+          <MovementCardList
+            movements={movements}
+            onAction={handleMovementAction}
+            actionLoading={actionLoading}
+            onOpenDetails={(m) => setDrawerMovement(m)}
+            fmt={fmt}
+            isPastDate={isPastDate}
+            isToday={isToday}
+          />
+
+          {/* Version desktop : tableau */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
@@ -1469,7 +1606,19 @@ export default function DashboardPage() {
               }
             />
 
-            <div className="overflow-x-auto">
+            {/* Version mobile : cartes empilées */}
+            <MovementCardList
+              movements={movements}
+              onAction={handleMovementAction}
+              actionLoading={actionLoading}
+              onOpenDetails={(m) => setDrawerMovement(m)}
+              fmt={fmt}
+              isPastDate={isPastDate}
+              isToday={isToday}
+            />
+
+            {/* Version desktop : tableau */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
