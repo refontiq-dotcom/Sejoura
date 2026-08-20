@@ -127,9 +127,42 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   const rows = (data ?? []) as unknown as SyncRow[];
 
-  // La disponibilité est calculée pour toutes les lignes ; le filtrage final
-  // combine l'éligibilité métier (helper partagé) et la présence d'une clé API
-  // externe active (gating « diffusion seulement si clé active »).
+  // ── Auto-provision des clés API ─────────────────────────────────────────
+  // Certains tenants ont activé "Publier sur Trouvetou" mais n'ont pas encore
+  // de clé API externe. On la génère automatiquement pour que la synchro
+  // ne les ignore plus.
+  const tenantsNeedingKeys = new Set<string>();
+  for (const row of rows) {
+    const tId = row.accommodations?.tenant_id;
+    if (tId && !apiKeyByTenant.has(tId)) {
+      tenantsNeedingKeys.add(tId);
+    }
+  }
+
+  if (tenantsNeedingKeys.size > 0) {
+    const crypto = require("crypto");
+    const newKeysData = Array.from(tenantsNeedingKeys).map((tId) => ({
+      tenant_id: tId,
+      name: "Clé API Trouvetou (Générée automatiquement)",
+      api_key: crypto.randomBytes(24).toString("hex"),
+      scopes: ["availability", "bookings"],
+      is_active: true,
+    }));
+
+    const { data: insertedKeys, error: insertError } = await admin
+      .from("external_api_keys")
+      .insert(newKeysData)
+      .select("tenant_id, api_key");
+
+    if (!insertError && insertedKeys) {
+      for (const k of insertedKeys) {
+        apiKeyByTenant.set(k.tenant_id, k.api_key);
+      }
+    } else {
+      console.error("Erreur auto-provisioning clés API:", insertError);
+    }
+  }
+
   const roomTypeIds = rows.map((row) => row.id);
 
   // ── Disponibilité en temps réel ─────────────────────────────────────────
