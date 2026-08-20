@@ -248,8 +248,8 @@ export default function ResidencesPage() {
   return (
     <div className="space-y-3 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Établissements</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">
             {residences.length} établissement{residences.length > 1 ? "s" : ""}
@@ -259,13 +259,15 @@ export default function ResidencesPage() {
         <Button 
           onClick={openAddModal}
           disabled={isReadOnly || !!(plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations)}
+          className="flex-shrink-0"
+          size="sm"
         >
           {isReadOnly ? (
-            <><Lock className="w-4 h-4" /> Lecture seule</>
+            <><Lock className="w-4 h-4" /> <span className="hidden sm:inline">Lecture seule</span></>
           ) : plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations ? (
-            <><Lock className="w-4 h-4" /> Limite atteinte</>
+            <><Lock className="w-4 h-4" /> <span className="hidden sm:inline">Limite atteinte</span></>
           ) : (
-            <><Plus className="w-4 h-4" /> Ajouter un établissement</>
+            <><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ajouter un établissement</span></>
           )}
         </Button>
       </div>
@@ -299,11 +301,11 @@ export default function ResidencesPage() {
           )}
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {residences.map((acc) => (
             <Card 
               key={acc.id} 
-              className="p-3 cursor-pointer hover:shadow-lg overflow-hidden flex flex-col justify-between"
+              className="p-3 cursor-pointer hover:shadow-lg overflow-hidden flex flex-col justify-between min-w-0"
               onClick={() => router.push(`/dashboard/residences/${acc.id}`)}
             >
               <div>
@@ -383,7 +385,7 @@ export default function ResidencesPage() {
                 )}
               </div>
 
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1.5">{acc.name}</h3>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1.5 truncate">{acc.name}</h3>
 
               <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
                 {(acc.address || acc.city) && (
@@ -397,7 +399,7 @@ export default function ResidencesPage() {
                 {acc.contact_phone && (
                   <div className="flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>{acc.contact_phone}</span>
+                    <span className="truncate">{acc.contact_phone}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">
