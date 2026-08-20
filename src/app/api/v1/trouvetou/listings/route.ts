@@ -181,18 +181,20 @@ export async function GET(request: Request) {
       }
     }
 
-    // 6. Métriques (vues + clics WhatsApp) — héritées de l'ancien modèle
-    //    par chambre, masquées pour les plans non-Entreprise.
-    let totalViews = 0;
-    let totalWhatsappClicks = 0;
-    if (isEnterprisePlan) {
-      const { data: listings } = await admin
-        .from("trouvetou_listings")
-        .select("views_count, whatsapp_clicks_count")
-        .in("establishment_id", accIds);
-      for (const l of listings ?? []) {
-        totalViews          += l.views_count || 0;
-        totalWhatsappClicks += l.whatsapp_clicks_count || 0;
+    // 6. Métriques réelles dynamiques — réservations reçues depuis Trouvetou et chiffre d'affaires associé
+    let totalTrouvetouBookings = 0;
+    let totalTrouvetouRevenue = 0;
+
+    if (allRoomIds.length > 0) {
+      const { data: trouvetouBookings } = await admin
+        .from("bookings")
+        .select("total_amount")
+        .in("room_id", allRoomIds)
+        .neq("status", "cancelled");
+
+      totalTrouvetouBookings = trouvetouBookings?.length || 0;
+      for (const b of trouvetouBookings ?? []) {
+        totalTrouvetouRevenue += b.total_amount || 0;
       }
     }
 
@@ -235,7 +237,10 @@ export async function GET(request: Request) {
       plan,
       isEnterprisePlan,
       isEssentielPlan,
-      metrics: { totalViews, totalWhatsappClicks },
+      metrics: {
+        totalTrouvetouBookings,
+        totalTrouvetouRevenue,
+      },
       accommodations: accommodationsWithBoostStatus,
       types: typesFormatted,
     });

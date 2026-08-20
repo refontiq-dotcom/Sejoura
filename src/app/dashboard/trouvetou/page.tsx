@@ -23,6 +23,8 @@ import {
   AlertCircle,
   ChevronRight,
   Lock,
+  CalendarCheck,
+  Banknote,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCurrency } from "@/hooks/use-currency";
@@ -324,7 +326,7 @@ export default function TrouvetouDashboardPage() {
   const [tenantId, setTenantId]         = useState<string>("");
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [types, setTypes]               = useState<RoomTypeListing[]>([]);
-  const [metrics, setMetrics]           = useState({ totalViews: 0, totalWhatsappClicks: 0 });
+  const [metrics, setMetrics]           = useState({ totalTrouvetouBookings: 0, totalTrouvetouRevenue: 0 });
 
   // Modal Boost Express
   const [boostExpressTarget, setBoostExpressTarget] = useState<Accommodation | null>(null);
@@ -378,7 +380,7 @@ export default function TrouvetouDashboardPage() {
         setIsEssentielPlan(data.isEssentielPlan);
         setAccommodations(data.accommodations || []);
         setTypes(data.types || []);
-        setMetrics(data.metrics || { totalViews: 0, totalWhatsappClicks: 0 });
+        setMetrics(data.metrics || { totalTrouvetouBookings: 0, totalTrouvetouRevenue: 0 });
       } else {
         setLoadError(data.error || "Erreur de chargement de la vitrine Trouvetou");
       }
@@ -537,40 +539,38 @@ export default function TrouvetouDashboardPage() {
         </div>
       </div>
 
-      {/* ── Statistiques (ENTREPRISE) ou Bannières (autres plans) ───────────── */}
+      {/* ── Statistiques dynamiques Trouvetou ───────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
-            <Eye className="w-6 h-6" />
+          <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+            <CalendarCheck className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Vues Fiches Publics</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Réservations Trouvetou</p>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
-              {isEnterprisePlan ? metrics.totalViews : "—"}
+              {metrics.totalTrouvetouBookings}
             </p>
           </div>
-          {!isEnterprisePlan && <Lock className="w-4 h-4 text-slate-400 ml-auto" />}
         </div>
 
         <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
-            <MessageSquare className="w-6 h-6" />
+          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+            <Banknote className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Demandes WhatsApp</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Chiffre d'Affaires Trouvetou</p>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
-              {isEnterprisePlan ? metrics.totalWhatsappClicks : "—"}
+              {fmt(metrics.totalTrouvetouRevenue)}
             </p>
           </div>
-          {!isEnterprisePlan && <Lock className="w-4 h-4 text-slate-400 ml-auto" />}
         </div>
 
         <div className="bg-[var(--card-bg,var(--surface))] p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
-          <div className={`p-3.5 rounded-xl ${isEnterprisePlan ? "bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"}`}>
+          <div className="p-3.5 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-muted-foreground)]">
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Types Publiés</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Types Publiés</p>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
               {publishedCount} / {types.length}
             </p>
