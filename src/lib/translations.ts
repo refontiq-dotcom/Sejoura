@@ -23,7 +23,7 @@ export const translations = {
         { label: "Tableau de bord", href: "/dashboard" },
         { label: "Établissements", href: "/dashboard/residences" },
         { label: "Réservations", href: "/dashboard/bookings" },
-        { label: "Ménage", href: "/dashboard/cleaning" },
+        { label: "Suivi ménage", href: "/dashboard/cleaning" },
         { label: "Mon Shift / Caisse", href: "/dashboard/shift" },
         { label: "Comptabilité", href: "/dashboard/accounting" },
         { label: "Employés", href: "/dashboard/employees" },
