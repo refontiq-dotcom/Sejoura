@@ -508,7 +508,7 @@ export default function CleaningPage() {
         </div>
       )}
 
-      <div className={!hasCleaningAccess ? "opacity-60 pointer-events-none" : ""}>
+      <div className={`space-y-5 ${!hasCleaningAccess ? "opacity-60 pointer-events-none" : ""}`}>
         {/* ====================================================================
             EN-TÊTE + SYNTHÈSE — bloc sombre unifié
             (un seul bloc synthétique pour les statuts et la progression)
