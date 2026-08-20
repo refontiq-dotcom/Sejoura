@@ -684,21 +684,15 @@ export default function ShiftPage() {
         ) : (
           <>
           {/* Cartes mobiles */}
-          <div className="md:hidden space-y-2.5">
+          <div className="md:hidden grid grid-cols-2 gap-2.5">
             {closedShifts.map((s) => {
               const diff = s.difference ?? 0;
               return (
-                <div key={s.id} className="rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        {staffNames[s.receptionist_id] || "Réceptionniste"}
-                      </p>
-                      <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        {s.closed_at ? formatDateTime(s.closed_at) : "—"}
-                      </p>
-                    </div>
+                <div key={s.id} className="rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] p-3 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                      {staffNames[s.receptionist_id] || "Réceptionniste"}
+                    </p>
                     <div className="flex-shrink-0 text-right">
                       {diff === 0 ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
@@ -712,21 +706,25 @@ export default function ShiftPage() {
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mt-2.5">
-                    <div className="p-2 rounded-lg bg-[var(--surface-muted)]">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Ouverture</p>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{fmt(s.opening_cash)}</p>
+                  <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{s.closed_at ? formatDateTime(s.closed_at) : "—"}</span>
+                  </p>
+                  <div className="space-y-1 mt-2">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Ouverture</span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{fmt(s.opening_cash)}</span>
                     </div>
-                    <div className="p-2 rounded-lg bg-[var(--surface-muted)]">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Attendu</p>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{fmt(s.expected_cash ?? 0)}</p>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Attendu</span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{fmt(s.expected_cash ?? 0)}</span>
                     </div>
-                    <div className="p-2 rounded-lg bg-[var(--surface-muted)]">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Compté</p>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white mt-0.5">{fmt(s.counted_cash ?? 0)}</p>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Compté</span>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white truncate">{fmt(s.counted_cash ?? 0)}</span>
                     </div>
                   </div>
-                  {s.notes && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">{s.notes}</p>}
+                  {s.notes && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 truncate">{s.notes}</p>}
                 </div>
               );
             })}
@@ -800,72 +798,60 @@ export default function ShiftPage() {
         ) : (
           <>
           {/* Cartes mobiles */}
-          <div className="md:hidden space-y-2.5">
+          <div className="md:hidden grid grid-cols-2 gap-2.5">
             {payments.map((p) => {
               const methodInfo = METHOD_LABELS[p.payment_method] || METHOD_LABELS.other;
               const MethodIcon = methodInfo.icon;
               return (
-                <div key={p.id} className="rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-[11px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg">
-                          {p.booking?.booking_code || "—"}
-                        </span>
-                        <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                          <Clock className="w-3 h-3" />
-                          {formatPaymentTime(p.payment_date)}
-                        </span>
-                      </div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white mt-1 truncate">
-                        {p.booking?.client_name || "—"}
-                      </p>
-                      {p.booking?.room_number ? (
-                        <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          <BedDouble className="w-3 h-3" />
-                          Ch. {p.booking.room_number}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-slate-400 mt-0.5">—</p>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 text-right">
-                      <p className={`font-bold ${p.amount < 0 ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
-                        {fmt(p.amount)}
-                      </p>
-                      {p.booking?.payment_status === "paid" ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-600 dark:text-green-400 mt-0.5">
-                          <CheckCircle2 className="w-3 h-3" /> Soldé
-                        </span>
-                      ) : p.booking?.payment_status === "partial" ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-600 dark:text-orange-400 mt-0.5">
-                          <ArrowRight className="w-3 h-3" /> Partiel
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">—</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-2.5 flex-wrap">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${METHOD_COLORS[p.payment_method] || METHOD_COLORS.other}`}>
-                      <MethodIcon className="w-3 h-3" />
-                      {methodInfo.label}
-                      {p.payment_method === "mobile_money" && p.mobile_money_operator && (
-                        <span className="opacity-80">· {getMobileMoneyOperatorLabel(p.mobile_money_operator)}</span>
-                      )}
+                <div key={p.id} className="rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] p-3 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-mono text-[11px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-lg truncate">
+                      {p.booking?.booking_code || "—"}
                     </span>
-                    {isAdmin && (
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {p.receptionist_name || "—"}
-                      </span>
-                    )}
+                    <span className={`flex-shrink-0 font-bold ${p.amount < 0 ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+                      {fmt(p.amount)}
+                    </span>
                   </div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white mt-1 truncate">
+                    {p.booking?.client_name || "—"}
+                  </p>
+                  {p.booking?.room_number ? (
+                    <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      <BedDouble className="w-3 h-3 flex-shrink-0" />
+                      Ch. {p.booking.room_number}
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 mt-0.5">—</p>
+                  )}
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium mt-2 ${METHOD_COLORS[p.payment_method] || METHOD_COLORS.other}`}>
+                    <MethodIcon className="w-3 h-3" />
+                    {methodInfo.label}
+                    {p.payment_method === "mobile_money" && p.mobile_money_operator && (
+                      <span className="opacity-80">· {getMobileMoneyOperatorLabel(p.mobile_money_operator)}</span>
+                    )}
+                  </span>
+                  {isAdmin && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 truncate">
+                      {p.receptionist_name || "—"}
+                    </p>
+                  )}
+                  {p.booking?.payment_status === "paid" ? (
+                    <p className="inline-flex items-center gap-1 text-[11px] font-medium text-green-600 dark:text-green-400 mt-1">
+                      <CheckCircle2 className="w-3 h-3" /> Soldé
+                    </p>
+                  ) : p.booking?.payment_status === "partial" ? (
+                    <p className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-600 dark:text-orange-400 mt-1">
+                      <ArrowRight className="w-3 h-3" /> Partiel
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">—</p>
+                  )}
                 </div>
               );
             })}
-            <div className="flex items-center justify-between p-3 rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))]">
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total encaissé ce shift</span>
-              <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{fmt(totalCaisse)}</span>
+            <div className="flex flex-col gap-0.5 items-start justify-center p-3 rounded-2xl border border-[var(--border-card)] bg-[var(--card-bg,var(--surface))] min-w-0">
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Total encaissé ce shift</span>
+              <span className="text-base font-bold text-indigo-600 dark:text-indigo-400">{fmt(totalCaisse)}</span>
             </div>
           </div>
           {/* Tableau desktop */}
