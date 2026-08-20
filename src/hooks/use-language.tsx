@@ -14,21 +14,25 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Toujours initialiser à "fr" pour correspondre au rendu serveur (évite les mismatches d'hydratation)
-  const [lang, setLangState] = useState<Lang>("fr");
+export function LanguageProvider({ children, initialLang = "fr" }: { children: ReactNode; initialLang?: Lang }) {
+  // Initialiser avec la langue fournie par le serveur (via le cookie)
+  const [lang, setLangState] = useState<Lang>(initialLang);
 
   // Lire la préférence stockée uniquement après l'hydratation côté client
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
+    // Si localStorage contient une langue différente de celle du serveur, on l'applique
     if (stored === "en" || stored === "fr") {
-      setLangState(stored);
+      if (stored !== lang) {
+        setLangState(stored);
+      }
     }
-  }, []);
+  }, []); // On ne met volontairement pas `lang` dans les dépendances pour éviter une boucle
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEY, lang);
+    document.cookie = `${STORAGE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`;
     document.documentElement.lang = lang;
   }, [lang]);
 

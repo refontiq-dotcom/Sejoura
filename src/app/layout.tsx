@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -53,14 +54,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const langCookie = cookieStore.get("sejoura-lang")?.value;
+  const initialLang = (langCookie === "en" || langCookie === "fr") ? langCookie : "fr";
+
   return (
     <html
-      lang="fr"
+      lang={initialLang}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} antialiased`}
     >
@@ -71,7 +76,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground theme-transition">
         <ThemeProvider>
-          <LanguageProvider>
+          <LanguageProvider initialLang={initialLang}>
             <AccommodationProvider>
               <CurrencyProvider>
                 {children}
