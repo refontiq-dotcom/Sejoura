@@ -7,6 +7,7 @@ import { CurrencyProvider } from "@/hooks/use-currency";
 import { AccommodationProvider } from "@/hooks/use-accommodation";
 import { InlineScript } from "@/components/inline-script";
 import { ThemeToaster } from "@/components/providers/theme-toaster";
+import { PwaRegister } from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +24,33 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#0C1C33",
 };
 
 export const metadata: Metadata = {
   title: "Séjoura by Refontiq — Gestion d'établissements",
   description: "Application SaaS de gestion d'établissements et de chambres",
+  applicationName: "Séjoura",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: {
+      url: "/icons/apple-touch-icon.png",
+      sizes: "180x180",
+      type: "image/png",
+    },
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Séjoura",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -57,6 +80,7 @@ export default function RootLayout({
             </AccommodationProvider>
           </LanguageProvider>
         </ThemeProvider>
+        <PwaRegister />
       </body>
     </html>
   );
