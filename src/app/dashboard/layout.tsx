@@ -81,7 +81,7 @@ export default function DashboardLayout({
 
         let { data: userData } = await supabase
           .from("users")
-          .select("id, auth_user_id, role, full_name, phone, email, is_active, activated_at, tenant_id, accommodation_id")
+          .select("id, auth_user_id, role, full_name, phone, email, is_active, activated_at, tenant_id, accommodation_id, onboarding_completed")
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
 
@@ -214,18 +214,10 @@ export default function DashboardLayout({
             setMonthlyPrice(subData.monthly_price || 0);
           }
 
-          // Le tenant seul ne suffit pas : une inscription interrompue pouvait
-          // laisser un gérant sans établissement, ce qui doit relancer l'étape 2.
-          const { data: accommodation } = await supabase
-            .from("accommodations")
-            .select("id")
-            .eq("tenant_id", userData.tenant_id)
-            .limit(1)
-            .maybeSingle();
-          setNeedsOnboarding(userData.role === "admin_residence" && !accommodation);
+          setNeedsOnboarding(userData.role === "admin_residence" && userData.onboarding_completed === false);
         } else {
           // L'onboarding est strictement réservé au rôle admin_residence (propriétaires/gestionnaires)
-          setNeedsOnboarding(!isEmployee && userData.role === "admin_residence");
+          setNeedsOnboarding(userData.role === "admin_residence" && userData.onboarding_completed === false);
         }
 
         setLoading(false);

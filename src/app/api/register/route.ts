@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     // double soumission ou de re-soumission après un échec réseau.
     const { data: existingUser } = await admin
       .from("users")
-      .select("id, tenant_id")
+      .select("id, tenant_id, onboarding_completed")
       .eq("auth_user_id", session.user.id)
       .maybeSingle();
 
@@ -62,6 +62,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Impossible de vérifier votre établissement existant." }, { status: 500 });
       }
       if (existingAccommodation) {
+        if (!existingUser.onboarding_completed) {
+          await admin.from("users").update({ onboarding_completed: true }).eq("id", existingUser.id);
+        }
         return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: existingAccommodation.id });
       }
 
@@ -89,6 +92,13 @@ export async function POST(request: Request) {
 
       if (accommodationError || !accommodation) {
         return NextResponse.json({ error: "Impossible de finaliser la création de l'établissement." }, { status: 500 });
+      }
+      const { error: completeError } = await admin
+        .from("users")
+        .update({ onboarding_completed: true, full_name: fullName, phone, email })
+        .eq("id", existingUser.id);
+      if (completeError) {
+        return NextResponse.json({ error: "Établissement créé, mais l'onboarding n'a pas pu être finalisé." }, { status: 500 });
       }
       return NextResponse.json({ success: true, tenantId: existingUser.tenant_id, accommodationId: accommodation.id, recovered: true });
     }
@@ -173,6 +183,7 @@ export async function POST(request: Request) {
       email,
       is_active: true,
       activated_at: now,
+      onboarding_completed: true,
     };
     const { error: userError } = existingUser
       ? await admin.from("users").update(profilePayload).eq("id", existingUser.id)
