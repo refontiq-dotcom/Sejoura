@@ -450,8 +450,8 @@ export default function EmployeesPage() {
       </div>
 
       {/* Barre de recherche & filtres */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[250px]">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 w-full sm:w-auto sm:min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
