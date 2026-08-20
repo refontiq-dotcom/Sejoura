@@ -1,6 +1,6 @@
 "use client";
 
-import { getThemePresetById, THEME_PRESETS, deriveUltraLightColor, derivePastelColor } from "@/lib/colors";
+import { getThemePresetById, THEME_PRESETS, derivePastelColor } from "@/lib/colors";
 import {
   createContext,
   useContext,
@@ -81,14 +81,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       );
       const preset = getThemePresetById(storedThemeColor);
       const sidebarBg = isCustomHex ? storedThemeColor : preset.sidebarBg;
-      const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : preset.contentBg;
+      const contentBg = isCustomHex ? derivePastelColor(sidebarBg) : preset.contentBg;
       document.documentElement.style.setProperty("--sidebar-bg", sidebarBg);
       document.documentElement.style.setProperty("--primary-color", sidebarBg);
       // En mode clair, le fond principal de la page Dashboard suit la couleur
       // pastel choisie (nuance dérivée), sinon le pastel du thème.
       const mainBg =
         storedTheme !== "dark" && isValidHex(storedColor)
-          ? deriveUltraLightColor(storedColor)
+          ? derivePastelColor(storedColor)
           : storedTheme === "dark"
             ? "#090D16"
             : contentBg;
@@ -146,7 +146,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           themeColor.trim().length === 7 &&
           !THEME_PRESETS.some((p) => p.sidebarBg.toLowerCase() === themeColor!.trim().toLowerCase());
         const sidebarBg = isCustomHex ? themeColor.trim() : getThemePresetById(themeColor).sidebarBg;
-        const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : getThemePresetById(themeColor).contentBg;
+        const contentBg = isCustomHex ? derivePastelColor(sidebarBg) : getThemePresetById(themeColor).contentBg;
 
         // En mode sombre, on adapte les couleurs dynamiques :
         // - --primary-color devient la couleur dorée pour être visible sur fond sombre
@@ -156,7 +156,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const dynamicLight = isDark
           ? "#090D16"
           : isValidHex(primaryColor)
-            ? deriveUltraLightColor(primaryColor)
+            ? derivePastelColor(primaryColor)
             : contentBg;
 
         root.style.setProperty("--sidebar-bg", sidebarBg);

@@ -195,7 +195,7 @@ export function getSidebarThemeStyles(themeIdOrColor?: string | null, isDarkMode
     themeIdOrColor.trim().length === 7 &&
     !THEME_PRESETS.some((p) => p.sidebarBg.toLowerCase() === themeIdOrColor.trim().toLowerCase());
   const sidebarBg = isCustomHex ? themeIdOrColor.trim() : preset.sidebarBg;
-  const contentBg = isCustomHex ? deriveUltraLightColor(sidebarBg) : preset.contentBg;
+  const contentBg = isCustomHex ? derivePastelColor(sidebarBg) : preset.contentBg;
   const hoverBg = deriveHoverColor(sidebarBg);
 
   if (isDarkMode) {

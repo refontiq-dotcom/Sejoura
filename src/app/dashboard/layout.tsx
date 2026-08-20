@@ -13,7 +13,7 @@ import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
-import { getSidebarThemeStyles, deriveUltraLightColor } from "@/lib/colors";
+import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -416,7 +416,7 @@ export default function DashboardLayout({
     theme === "dark"
       ? activeTheme.mainBg
       : isPrimaryHex
-        ? deriveUltraLightColor(primaryColor)
+        ? derivePastelColor(primaryColor)
         : activeTheme.mainBg;
 
   useEffect(() => {
