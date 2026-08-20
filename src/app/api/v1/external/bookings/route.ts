@@ -197,18 +197,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Réutiliser le client s'il existe (même téléphone) sinon le créer
+    // 3. Réutiliser le client s'il existe (même téléphone ET même nom) sinon le créer.
+    //    Règle stricte : on ne réutilise un profil que si le téléphone est fourni
+    //    ET que le nom correspond (insensible à la casse, espaces ignorés).
+    //    Si le téléphone est absent → toujours créer un nouveau client, afin
+    //    d'éviter de fusionner des voyageurs différents sous un même profil.
     const phone = guest.phone ? String(guest.phone).trim() : null;
+    const fullNameNorm = guest.full_name.trim().toLowerCase();
     let clientId: string | null = null;
 
     if (phone) {
-      const { data: existingClient } = await admin
+      const { data: existingClients } = await admin
         .from("clients")
-        .select("id")
+        .select("id, full_name")
         .eq("tenant_id", tenantId)
-        .eq("phone", phone)
-        .maybeSingle();
-      if (existingClient) clientId = existingClient.id;
+        .eq("phone", phone);
+
+      // Chercher un client avec le même téléphone ET le même nom (évite la
+      // fusion de deux personnes différentes qui auraient le même téléphone).
+      const matched = (existingClients ?? []).find(
+        (c) => c.full_name.trim().toLowerCase() === fullNameNorm
+      );
+      if (matched) clientId = matched.id;
     }
 
     if (!clientId) {
