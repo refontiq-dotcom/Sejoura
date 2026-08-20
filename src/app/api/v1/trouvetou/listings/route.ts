@@ -153,6 +153,7 @@ export async function GET(request: Request) {
     //    ou couverte par une réservation active (même logique que la sync).
     const occupiedRoomIds = new Set<string>();
     const roomsByType = new Map<string, { id: string; status: string | null }[]>();
+    const allRoomIds: string[] = [];
 
     if (typeIds.length > 0) {
       const { data: rooms } = await admin
@@ -160,7 +161,6 @@ export async function GET(request: Request) {
         .select("id, status, room_type_id")
         .in("room_type_id", typeIds);
 
-      const allRoomIds: string[] = [];
       for (const room of rooms ?? []) {
         const list = roomsByType.get(room.room_type_id) ?? [];
         list.push({ id: room.id, status: room.status });
