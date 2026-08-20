@@ -372,6 +372,16 @@ export default function ResidenceDetailPage() {
       toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
+
+    const nameLower = typeForm.name.trim().toLowerCase();
+    const isDuplicate = roomTypes.some(
+      (rt) => rt.name.trim().toLowerCase() === nameLower && rt.id !== editingType?.id
+    );
+    if (isDuplicate) {
+      toast.error("Un type de chambre avec ce nom existe déjà dans cette résidence.");
+      return;
+    }
+
     if (typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
       toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
       return;
