@@ -1,0 +1,10 @@
+# CLÉS D'INTÉGRATION TROUVETOU — GÉNÉRÉES LE 2026-08-20T13:17:49.306Z
+# ⚠️  NE PAS COMMITTER CE FICHIER — il est dans .gitignore
+
+# === Variables pour Vercel SÉJOURA ===
+TROUVETOU_SYNC_URL=https://trouvetou.vercel.app/api/v1/sync
+TROUVETOU_API_KEY=tv_live_974e0629-c0e6-4baa-a729-47f436ba990d.yR3Z9sHf9pIHrEy5ss2FqPy7ZunGnqDSQkBo5yWIBNI
+TROUVETOU_SYNC_SECRET=e69e5bacf621cebcd8149837922590e4
+
+# === Provider ID Trouvetou (pour référence) ===
+PROVIDER_ID=974e0629-c0e6-4baa-a729-47f436ba990d

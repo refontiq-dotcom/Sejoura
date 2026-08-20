@@ -116,6 +116,33 @@ export default function BookingsPage() {
     payment_method: "",
     mobile_money_operator: "",
   });
+
+  // Check-in enrichi : saisie / complément d'identité du client lors de son arrivée
+  const [checkinModalOpen, setCheckinModalOpen] = useState(false);
+  const [checkinBooking, setCheckinBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [checkinSaving, setCheckinSaving] = useState(false);
+  const [checkinForm, setCheckinForm] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    id_type: "",
+    id_number: "",
+    nationality: "",
+    emergency_contact: "",
+  });
+
+  // Mode édition client dans le tiroir d'informations
+  const [editingClientInDrawer, setEditingClientInDrawer] = useState(false);
+  const [drawerClientForm, setDrawerClientForm] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    id_type: "",
+    id_number: "",
+    nationality: "",
+    emergency_contact: "",
+  });
+  const [drawerClientSaving, setDrawerClientSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>(() => {
     if (typeof window !== "undefined" && window.location.search.includes("status=overdue")) {
       return "overdue";
@@ -811,6 +838,27 @@ export default function BookingsPage() {
       setConfirmAction({ id: bookingId, action });
       return;
     }
+
+    // Check-in : ouvrir la modal de confirmation d'arrivée & complément d'identité client
+    if (action === "check_in") {
+      const b = bookings.find((x) => x.id === bookingId);
+      if (b) {
+        setCheckinBooking(b);
+        const c = b.client;
+        setCheckinForm({
+          full_name: c?.full_name || "",
+          phone: c?.phone || "",
+          email: c?.email || "",
+          id_type: c?.id_type || "",
+          id_number: c?.id_number || "",
+          nationality: c?.nationality || "",
+          emergency_contact: c?.emergency_contact || "",
+        });
+        setCheckinModalOpen(true);
+        return;
+      }
+    }
+
     // Règlement du solde avant check-out : si un montant reste dû (paiement
     // partiel, nuits de dépassement), on ouvre la modal d'encaissement.
     if (action === "check_out") {
@@ -824,6 +872,79 @@ export default function BookingsPage() {
       }
     }
     await executeAction(bookingId, action);
+  }
+
+  // Valide le Check-in avec mise à jour facultative des informations client (CNI, etc.)
+  async function handleConfirmCheckin() {
+    if (!checkinBooking) return;
+    setCheckinSaving(true);
+    try {
+      const supabase = createClient();
+      if (checkinBooking.client_id) {
+        const { error: clientErr } = await supabase
+          .from("clients")
+          .update({
+            full_name: checkinForm.full_name.trim(),
+            phone: checkinForm.phone.trim() || null,
+            email: checkinForm.email.trim() || null,
+            id_type: checkinForm.id_type || null,
+            id_number: checkinForm.id_number.trim() || null,
+            nationality: checkinForm.nationality.trim() || null,
+            emergency_contact: checkinForm.emergency_contact.trim() || null,
+          })
+          .eq("id", checkinBooking.client_id);
+
+        if (clientErr) {
+          toast.error("Erreur lors de la mise à jour des informations du client : " + clientErr.message);
+          setCheckinSaving(false);
+          return;
+        }
+      }
+
+      setCheckinModalOpen(false);
+      await executeAction(checkinBooking.id, "check_in");
+    } catch {
+      toast.error("Erreur lors du Check-in.");
+    } finally {
+      setCheckinSaving(false);
+    }
+  }
+
+  // Sauvegarde des modifications du client depuis le drawer latéral
+  async function handleSaveDrawerClient() {
+    if (!selectedClient) return;
+    setDrawerClientSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: updatedClient, error: err } = await supabase
+        .from("clients")
+        .update({
+          full_name: drawerClientForm.full_name.trim(),
+          phone: drawerClientForm.phone.trim() || null,
+          email: drawerClientForm.email.trim() || null,
+          id_type: drawerClientForm.id_type || null,
+          id_number: drawerClientForm.id_number.trim() || null,
+          nationality: drawerClientForm.nationality.trim() || null,
+          emergency_contact: drawerClientForm.emergency_contact.trim() || null,
+        })
+        .eq("id", selectedClient.id)
+        .select()
+        .single();
+
+      if (err) {
+        toast.error("Erreur lors de la mise à jour : " + err.message);
+        return;
+      }
+
+      toast.success("Informations client mises à jour avec succès ✓");
+      setSelectedClient(updatedClient);
+      setEditingClientInDrawer(false);
+      loadBookings(tenantId);
+    } catch {
+      toast.error("Erreur de sauvegarde.");
+    } finally {
+      setDrawerClientSaving(false);
+    }
   }
 
   // Ouvre la modal de prolongation d'un séjour en cours (dépassement de date).
@@ -1888,13 +2009,37 @@ export default function BookingsPage() {
             <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 shadow-2xl flex flex-col">
 
               {/* Header */}
-              <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
-                    {selectedClient.full_name}
-                  </h2>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Détails du client</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+                      {selectedClient.full_name}
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!editingClientInDrawer) {
+                          setDrawerClientForm({
+                            full_name: selectedClient.full_name || "",
+                            phone: selectedClient.phone || "",
+                            email: selectedClient.email || "",
+                            id_type: selectedClient.id_type || "",
+                            id_number: selectedClient.id_number || "",
+                            nationality: selectedClient.nationality || "",
+                            emergency_contact: selectedClient.emergency_contact || "",
+                          });
+                        }
+                        setEditingClientInDrawer(!editingClientInDrawer);
+                      }}
+                      className="h-8 px-2.5 text-xs gap-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      {editingClientInDrawer ? "Annuler" : "Modifier"}
+                    </Button>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Détails du client</p>
                     {hasClientProfiles && (
                       <>
                         <ClientScoreBadge
@@ -1913,7 +2058,10 @@ export default function BookingsPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedClient(null)}
+                  onClick={() => {
+                    setSelectedClient(null);
+                    setEditingClientInDrawer(false);
+                  }}
                   className="ml-4 p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex-shrink-0"
                   aria-label="Fermer"
                 >
@@ -1922,51 +2070,127 @@ export default function BookingsPage() {
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {editingClientInDrawer ? (
+                  /* Formulaire d'édition directe */
+                  <div className="space-y-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Modifier les informations client</h3>
+                    <Input
+                      label="Nom & Prénom"
+                      value={drawerClientForm.full_name}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, full_name: e.target.value })}
+                      placeholder="Nom complet"
+                    />
+                    <Input
+                      label="Téléphone"
+                      value={drawerClientForm.phone}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, phone: e.target.value })}
+                      placeholder="+221 ..."
+                    />
+                    <Input
+                      label="Email"
+                      type="email"
+                      value={drawerClientForm.email}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, email: e.target.value })}
+                      placeholder="client@exemple.com"
+                    />
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de pièce d'identité</label>
+                      <select
+                        value={drawerClientForm.id_type}
+                        onChange={(e) => setDrawerClientForm({ ...drawerClientForm, id_type: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+                      >
+                        <option value="">Non renseigné</option>
+                        <option value="CNI">Carte Nationale d'Identité (CNI)</option>
+                        <option value="Passeport">Passeport</option>
+                        <option value="Permis de conduire">Permis de conduire</option>
+                        <option value="Carte consulaire">Carte consulaire / Séjour</option>
+                        <option value="Autre">Autre document</option>
+                      </select>
+                    </div>
+                    <Input
+                      label="Numéro de pièce"
+                      value={drawerClientForm.id_number}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, id_number: e.target.value })}
+                      placeholder="N° CNI ou Passeport"
+                    />
+                    <Input
+                      label="Nationalité"
+                      value={drawerClientForm.nationality}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, nationality: e.target.value })}
+                      placeholder="Ex: Sénégalaise..."
+                    />
+                    <Input
+                      label="Contact d'urgence"
+                      value={drawerClientForm.emergency_contact}
+                      onChange={(e) => setDrawerClientForm({ ...drawerClientForm, emergency_contact: e.target.value })}
+                      placeholder="Proche à contacter"
+                    />
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" className="flex-1" onClick={() => setEditingClientInDrawer(false)}>
+                        Annuler
+                      </Button>
+                      <Button className="flex-1" onClick={handleSaveDrawerClient} loading={drawerClientSaving}>
+                        Enregistrer
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Contact */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Contact</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Téléphone principal</label>
+                          <p className="text-sm text-slate-900 dark:text-white">{selectedClient.phone || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Email</label>
+                          {selectedClient.email ? (
+                            <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.email}</p>
+                          ) : (
+                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                              Non renseigné
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Contact d'urgence</label>
+                          <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.emergency_contact || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Contact */}
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Contact</h3>
-                  <div className="space-y-3">
+                    {/* Pièce d'identité & Nationalité */}
                     <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Téléphone principal</label>
-                      <p className="text-sm text-slate-900 dark:text-white">{selectedClient.phone || "—"}</p>
+                      <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Identité & Nationalité</h3>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Pièce</label>
+                          <p className="text-sm text-slate-900 dark:text-white">{selectedClient.id_type || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Numéro de pièce</label>
+                          <p className="text-sm text-slate-900 dark:text-white break-words">
+                            {selectedClient.id_number ? (
+                              selectedClient.id_number
+                            ) : (
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                ⚠️ CNI/Passeport manquant
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nationalité</label>
+                        <p className="text-sm text-slate-900 dark:text-white">{selectedClient.nationality || "—"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Email</label>
-                      {selectedClient.email ? (
-                        <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.email}</p>
-                      ) : (
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                          Non renseigné
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Contact d'urgence</label>
-                      <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.emergency_contact || "—"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pièce d'identité & Nationalité */}
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Identité & Nationalité</h3>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Pièce</label>
-                      <p className="text-sm text-slate-900 dark:text-white">{selectedClient.id_type || "—"}</p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Numéro de pièce</label>
-                      <p className="text-sm text-slate-900 dark:text-white break-words">{selectedClient.id_number || "—"}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-1">Nationalité</label>
-                    <p className="text-sm text-slate-900 dark:text-white">{selectedClient.nationality || "—"}</p>
-                  </div>
-                </div>
+                  </>
+                )}
 
                 {/* Historique des réservations */}
                 <div>
@@ -2451,6 +2675,96 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setEditModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSaveEdit} loading={saving}>
               <Pencil className="w-4 h-4" /> Enregistrer les modifications
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Check-in enrichi : confirmation d'arrivée & complément d'identité client */}
+      <Modal
+        open={checkinModalOpen}
+        onClose={() => setCheckinModalOpen(false)}
+        title="Confirmation de Check-in (Arrivée)"
+        description={checkinBooking ? `Réservation ${checkinBooking.booking_code} · Ch. ${checkinBooking.room?.room_number || "—"} · Arrivée le ${formatDate(checkinBooking.check_in_date)}` : ""}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 text-xs">
+            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Check-in du client à la réception</p>
+              <p className="mt-0.5">Vérifiez et complétez les informations d'identité du client (CNI/Passeport) avant de valider son entrée dans l'établissement.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Nom & Prénom"
+              value={checkinForm.full_name}
+              onChange={(e) => setCheckinForm({ ...checkinForm, full_name: e.target.value })}
+              placeholder="Nom complet"
+              required
+            />
+            <Input
+              label="Téléphone"
+              value={checkinForm.phone}
+              onChange={(e) => setCheckinForm({ ...checkinForm, phone: e.target.value })}
+              placeholder="+221 ..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Email"
+              type="email"
+              value={checkinForm.email}
+              onChange={(e) => setCheckinForm({ ...checkinForm, email: e.target.value })}
+              placeholder="client@exemple.com"
+            />
+            <Input
+              label="Nationalité"
+              value={checkinForm.nationality}
+              onChange={(e) => setCheckinForm({ ...checkinForm, nationality: e.target.value })}
+              placeholder="Ex: Sénégalaise, Ivoirienne..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de pièce d'identité</label>
+              <select
+                value={checkinForm.id_type}
+                onChange={(e) => setCheckinForm({ ...checkinForm, id_type: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="">Sélectionner un type</option>
+                <option value="CNI">Carte Nationale d'Identité (CNI)</option>
+                <option value="Passeport">Passeport</option>
+                <option value="Permis de conduire">Permis de conduire</option>
+                <option value="Carte consulaire">Carte consulaire / Séjour</option>
+                <option value="Autre">Autre document</option>
+              </select>
+            </div>
+            <Input
+              label="Numéro de pièce"
+              value={checkinForm.id_number}
+              onChange={(e) => setCheckinForm({ ...checkinForm, id_number: e.target.value })}
+              placeholder="N° de la pièce"
+            />
+          </div>
+
+          <Input
+            label="Contact d'urgence (Optionnel)"
+            value={checkinForm.emergency_contact}
+            onChange={(e) => setCheckinForm({ ...checkinForm, emergency_contact: e.target.value })}
+            placeholder="Nom et numéro du proche"
+          />
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setCheckinModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleConfirmCheckin} loading={checkinSaving}>
+              <LogIn className="w-4 h-4 mr-1.5" /> Valider le Check-in
             </Button>
           </div>
         </div>
