@@ -88,7 +88,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // pastel choisie (nuance dérivée), sinon le pastel du thème.
       const mainBg =
         storedTheme !== "dark" && isValidHex(storedColor)
-          ? derivePastelColor(storedColor)
+          ? deriveUltraLightColor(storedColor)
           : storedTheme === "dark"
             ? "#090D16"
             : contentBg;
@@ -146,7 +146,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const dynamicLight = isDark
           ? "#090D16"
           : isValidHex(primaryColor)
-            ? derivePastelColor(primaryColor)
+            ? deriveUltraLightColor(primaryColor)
             : contentBg;
 
         root.style.setProperty("--sidebar-bg", sidebarBg);
