@@ -108,9 +108,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    function handlePrimaryColorUpdated(e: Event) {
+      const color = (e as CustomEvent<{ primaryColor: string }>).detail?.primaryColor;
+      if (color) {
+        setPrimaryColorState(color);
+        localStorage.setItem("sejoura-primary-color", color);
+      }
+    }
+
     window.addEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+    window.addEventListener("sejoura-primary-color-updated", handlePrimaryColorUpdated);
     return () => {
       window.removeEventListener("sejoura-theme-color-updated", handleThemeColorUpdated);
+      window.removeEventListener("sejoura-primary-color-updated", handlePrimaryColorUpdated);
     };
   }, []);
 
