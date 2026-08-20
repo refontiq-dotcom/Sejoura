@@ -843,18 +843,7 @@ export default function BookingsPage() {
     if (action === "check_in") {
       const b = bookings.find((x) => x.id === bookingId);
       if (b) {
-        setCheckinBooking(b);
-        const c = b.client;
-        setCheckinForm({
-          full_name: c?.full_name || "",
-          phone: c?.phone || "",
-          email: c?.email || "",
-          id_type: c?.id_type || "",
-          id_number: c?.id_number || "",
-          nationality: c?.nationality || "",
-          emergency_contact: c?.emergency_contact || "",
-        });
-        setCheckinModalOpen(true);
+        openCompleteClientModal(b);
         return;
       }
     }
@@ -872,6 +861,57 @@ export default function BookingsPage() {
       }
     }
     await executeAction(bookingId, action);
+  }
+
+  // Ouvre la modal pour compléter / modifier la fiche client
+  function openCompleteClientModal(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    setCheckinBooking(b);
+    const c = b.client;
+    setCheckinForm({
+      full_name: c?.full_name || "",
+      phone: c?.phone || "",
+      email: c?.email || "",
+      id_type: c?.id_type || "",
+      id_number: c?.id_number || "",
+      nationality: c?.nationality || "",
+      emergency_contact: c?.emergency_contact || "",
+    });
+    setCheckinModalOpen(true);
+  }
+
+  // Enregistre uniquement les informations client (sans changer le statut de la réservation)
+  async function handleSaveClientOnly() {
+    if (!checkinBooking || !checkinBooking.client_id) return;
+    setCheckinSaving(true);
+    try {
+      const supabase = createClient();
+      const { error: clientErr } = await supabase
+        .from("clients")
+        .update({
+          full_name: checkinForm.full_name.trim(),
+          phone: checkinForm.phone.trim() || null,
+          email: checkinForm.email.trim() || null,
+          id_type: checkinForm.id_type || null,
+          id_number: checkinForm.id_number.trim() || null,
+          nationality: checkinForm.nationality.trim() || null,
+          emergency_contact: checkinForm.emergency_contact.trim() || null,
+        })
+        .eq("id", checkinBooking.client_id);
+
+      if (clientErr) {
+        toast.error("Erreur lors de la mise à jour : " + clientErr.message);
+        setCheckinSaving(false);
+        return;
+      }
+
+      toast.success("Fiche client enregistrée avec succès ✓");
+      setCheckinModalOpen(false);
+      loadBookings(tenantId);
+    } catch {
+      toast.error("Erreur lors de la sauvegarde.");
+    } finally {
+      setCheckinSaving(false);
+    }
   }
 
   // Valide le Check-in avec mise à jour facultative des informations client (CNI, etc.)
@@ -1856,6 +1896,11 @@ export default function BookingsPage() {
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBookingStatusColor(b.status)}`}>
                           {getBookingStatusLabel(b.status)}
                         </span>
+                        {!b.client?.id_number && (b.status === "confirmed" || b.status === "checked_in") && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                            ⚠️ CNI/Passeport manquant
+                          </span>
+                        )}
                         {overdue && (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOverstayColor()}`}>
                             {getOverstayLabel()}
@@ -1868,6 +1913,13 @@ export default function BookingsPage() {
                         <span className="block text-right text-xs text-slate-400 dark:text-slate-500">Aucune action</span>
                       ) : (
                       <div className="flex items-center gap-1 md:gap-2 justify-end">
+                        {/* Bouton intelligent : Compléter la fiche avant Check-in si CNI manquante */}
+                        {b.status === "confirmed" && !b.client?.id_number && (
+                          <Button size="sm" variant="outline" className="hidden md:inline-flex text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40" onClick={() => openCompleteClientModal(b)}>
+                            <Pencil className="w-3.5 h-3.5 mr-1" /> Compléter la fiche
+                          </Button>
+                        )}
+
                         {/* Action primaire — Desktop/tablette : bouton avec libellé complet */}
                         {b.status === "confirmed" && (
                           <Button size="sm" variant="success" className="hidden md:inline-flex" onClick={() => handlePrimaryAction(b.id, "check_in")} loading={actioningId === b.id}>
@@ -1880,7 +1932,12 @@ export default function BookingsPage() {
                           </Button>
                         )}
 
-                        {/* Action primaire — Mobile : icône compacte à grand tap target */}
+                        {/* Action primaire — Mobile : icône compacte */}
+                        {b.status === "confirmed" && !b.client?.id_number && (
+                          <Button size="icon" variant="ghost" className="md:hidden h-10 w-10 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40" onClick={() => openCompleteClientModal(b)} aria-label="Compléter la fiche">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
                         {b.status === "confirmed" && (
                           <Button size="icon" variant="ghost" className="md:hidden h-10 w-10 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handlePrimaryAction(b.id, "check_in")} loading={actioningId === b.id} aria-label="Check-in">
                             <LogIn className="w-4 h-4" />
@@ -1899,6 +1956,11 @@ export default function BookingsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Séjour</DropdownMenuLabel>
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
+                                <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                               <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
                             </DropdownMenuItem>
@@ -1917,7 +1979,7 @@ export default function BookingsPage() {
                             )}
                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <DropdownMenuItem onSelect={() => openEditModal(b)}>
-                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier la réservation
+                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier les dates / tarifs
                               </DropdownMenuItem>
                             )}
                             {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
@@ -2759,12 +2821,15 @@ export default function BookingsPage() {
             placeholder="Nom et numéro du proche"
           />
 
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setCheckinModalOpen(false)}>
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCheckinModalOpen(false)}>
               Annuler
             </Button>
+            <Button variant="secondary" className="flex-1" onClick={handleSaveClientOnly} loading={checkinSaving}>
+              <Pencil className="w-4 h-4 mr-1.5" /> Enregistrer la fiche
+            </Button>
             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleConfirmCheckin} loading={checkinSaving}>
-              <LogIn className="w-4 h-4 mr-1.5" /> Valider le Check-in
+              <LogIn className="w-4 h-4 mr-1.5" /> Enregistrer & Check-in
             </Button>
           </div>
         </div>
