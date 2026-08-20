@@ -394,14 +394,14 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3 md:gap-3.5 flex-shrink-0">
           <div className="relative">
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors w-9 lg:w-56"
+            className="flex items-center justify-center lg:justify-start gap-2 px-2.5 lg:px-3 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 text-[var(--muted-foreground)] transition-all shadow-xs w-9 lg:w-56"
             aria-label={t.searchPlaceholder}
           >
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="text-xs flex-1 text-left hidden lg:inline">{t.searchPlaceholder}</span>
             <kbd className="hidden lg:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)]">
               <span className="text-[10px]">⌘</span>K
@@ -414,7 +414,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           <div className="relative" ref={helpRef}>
             <button
               onClick={() => setHelpOpen(!helpOpen)}
-              className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+              className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
               aria-label="Aide & support"
               title="Aide & support"
             >
@@ -446,7 +446,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+            className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
             aria-label={t.themeToggle}
           >
             {theme === "light" ? (
@@ -459,12 +459,12 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           <div className="relative" ref={notifRef}>
             <button
               onClick={() => setNotifOpen(!notifOpen)}
-            className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)] transition-colors relative"
-            aria-label={t.notifications}
+              className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs relative"
+              aria-label={t.notifications}
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold shadow-xs">
                   {unreadCount}
                 </span>
               )}
@@ -539,14 +539,14 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             )}
           </div>
 
-          <div className="relative" ref={profileRef}>
+          <div className="relative flex-shrink-0" ref={profileRef}>
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="relative w-8 h-8 rounded-full hover:ring-2 hover:ring-[var(--primary-color,#0C1C33)] ring-offset-2 ring-offset-[var(--main-bg,var(--background))] transition-all focus:outline-none focus-visible:ring-2"
+              className="relative w-9 h-9 rounded-full hover:ring-2 hover:ring-[var(--primary-color,#0C1C33)] ring-offset-2 ring-offset-[var(--main-bg,var(--background))] transition-all focus:outline-none focus-visible:ring-2 flex-shrink-0"
               aria-label={t.profile}
               title={userName || "Profil"}
             >
-              <UserAvatar name={userName} src={avatarUrl} className="w-8 h-8" />
+              <UserAvatar name={userName} src={avatarUrl} className="w-9 h-9" />
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-[var(--main-bg,var(--background))]" />
             </button>
 

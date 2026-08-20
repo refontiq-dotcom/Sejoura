@@ -799,7 +799,7 @@ export default function CleaningPage() {
             </div>
           )}
 
-          <div className="flex gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
             {[
               { key: "all", label: "Toutes" },
               { key: "pending", label: "En attente" },
@@ -811,7 +811,7 @@ export default function CleaningPage() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key as StatusFilter)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${
                   filter === f.key
                     ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-md"
                     : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
