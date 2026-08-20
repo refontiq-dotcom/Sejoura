@@ -328,7 +328,7 @@ function KpiCard({
   const style = KPI_STYLES[variant];
 
   return (
-    <Card className={`p-4 rounded-2xl border-0 shadow-[var(--shadow-md)] transition-all hover:shadow-[var(--shadow-lg)] ${style.card}`}>
+    <div className={`p-4 rounded-2xl border-0 shadow-[var(--shadow-md)] transition-all hover:shadow-[var(--shadow-lg)] ${style.card}`}>
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${style.iconBg}`}>
@@ -358,7 +358,7 @@ function KpiCard({
       {sub && (
         <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3 truncate">{sub}</p>
       )}
-    </Card>
+    </div>
   );
 }
 
