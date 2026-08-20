@@ -273,41 +273,92 @@ function defaultRange(key: PeriodKey): { start: string; end: string } {
 // Sous-composants (KPIs, graphiques, sélecteur de période)
 // ============================================================================
 
+interface KpiCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  delta?: number | null;
+  badge?: string;
+  variant?: "emerald" | "rose" | "blue" | "amber" | "purple";
+}
+
+const KPI_STYLES: Record<NonNullable<KpiCardProps["variant"]>, {
+  card: string;
+  iconBg: string;
+  badge: "success" | "danger" | "info" | "warning" | "purple";
+}> = {
+  emerald: {
+    card: "bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 ring-1 ring-emerald-200 dark:ring-emerald-900/40",
+    iconBg: "bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300",
+    badge: "success",
+  },
+  rose: {
+    card: "bg-gradient-to-br from-rose-100 to-red-100 dark:from-rose-950/50 dark:to-slate-900 ring-1 ring-rose-200 dark:ring-rose-900/40",
+    iconBg: "bg-rose-500 text-white ring-1 ring-rose-600/30 dark:bg-rose-500/25 dark:text-rose-300",
+    badge: "danger",
+  },
+  blue: {
+    card: "bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 ring-1 ring-blue-200 dark:ring-blue-900/40",
+    iconBg: "bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300",
+    badge: "info",
+  },
+  amber: {
+    card: "bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-950/50 dark:to-slate-900 ring-1 ring-amber-200 dark:ring-amber-900/40",
+    iconBg: "bg-amber-500 text-white ring-1 ring-amber-600/30 dark:bg-amber-500/25 dark:text-amber-300",
+    badge: "warning",
+  },
+  purple: {
+    card: "bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 ring-1 ring-violet-200 dark:ring-violet-900/40",
+    iconBg: "bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300",
+    badge: "purple",
+  },
+};
+
 function KpiCard({
   icon: Icon,
   label,
   value,
   sub,
   delta,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-  delta?: number | null;
-}) {
+  badge,
+  variant = "blue",
+}: KpiCardProps) {
   const positive = delta != null && delta >= 0;
+  const style = KPI_STYLES[variant];
+
   return (
-    <div className="p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-zinc-400 font-medium">
-          <Icon className="w-3.5 h-3.5 text-zinc-500" />
-          {label}
-        </span>
-        {delta != null && (
+    <Card className={`p-4 rounded-2xl border-0 shadow-[var(--shadow-md)] transition-all hover:shadow-[var(--shadow-lg)] ${style.card}`}>
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${style.iconBg}`}>
+            <Icon className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none truncate">{value}</p>
+            <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1 truncate">{label}</p>
+          </div>
+        </div>
+        {badge ? (
+          <Badge variant={style.badge}>{badge}</Badge>
+        ) : delta != null ? (
           <span
-            className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
-              positive ? "text-emerald-400" : "text-red-400"
+            className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+              positive
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                : "bg-rose-500/15 text-rose-700 dark:text-rose-300"
             }`}
           >
-            {positive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-            {Math.abs(delta).toFixed(1)}%
+            {positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {positive ? "+" : ""}
+            {delta.toFixed(1)}%
           </span>
-        )}
+        ) : null}
       </div>
-      <p className="text-lg font-bold text-white tracking-tight">{value}</p>
-      {sub && <p className="text-[11px] text-zinc-500 mt-1 truncate">{sub}</p>}
-    </div>
+      {sub && (
+        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3 truncate">{sub}</p>
+      )}
+    </Card>
   );
 }
 
@@ -1438,13 +1489,15 @@ export default function AccountingPage() {
           </div>
 
           {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               icon={TrendingUp}
               label="Recettes"
               value={fmt(totalRevenue)}
               sub={`${activeMethodCount} mode(s) de paiement`}
               delta={revenueDelta}
+              variant="emerald"
+              badge="Recettes"
             />
             <KpiCard
               icon={TrendingDown}
@@ -1452,30 +1505,36 @@ export default function AccountingPage() {
               value={fmt(totalOutflows)}
               sub={
                 totalExpenses > 0 && cashOut > 0
-                  ? `charges ${fmt(totalExpenses)} · sorties de caisse ${fmt(cashOut)}`
+                  ? `charges ${fmt(totalExpenses)} · sorties ${fmt(cashOut)}`
                   : cashOut > 0
-                    ? `dont ${fmt(cashOut)} de sorties de caisse`
+                    ? `dont ${fmt(cashOut)} sorties de caisse`
                     : "charges de la période"
               }
               delta={expenseDelta}
+              variant="rose"
+              badge="Sorties"
             />
             <KpiCard
               icon={Wallet}
               label="Bénéfice net"
               value={fmt(netProfit)}
-              sub={totalRevenue > 0 ? `marge ${margin.toFixed(1)}%` : "sur la période"}
+              sub={totalRevenue > 0 ? `marge brute ${margin.toFixed(1)}%` : "sur la période"}
+              variant="blue"
+              badge={totalRevenue > 0 ? `Marge ${margin.toFixed(1)}%` : "Bénéfice"}
             />
             <KpiCard
               icon={AlertTriangle}
               label="Créances clients"
               value={fmt(receivable)}
               sub={`${bookings.filter((b) => (b.status === "confirmed" || b.status === "checked_in") && b.total_amount > b.amount_paid).length} réservation(s) impayée(s)`}
+              variant="amber"
+              badge="Créances"
             />
           </div>
 
           {/* Répartition par mode de paiement */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3.5 py-2.5 rounded-xl bg-zinc-900/50 border border-zinc-800/80">
-            <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Modes de paiement</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Modes de paiement</span>
             {[
               { method: "cash", label: "Espèces", icon: Banknote },
               { method: "mobile_money", label: "Mobile Money", icon: Smartphone, aggregate: true },
@@ -1484,25 +1543,25 @@ export default function AccountingPage() {
             ].map(({ method, label, icon: Icon, aggregate }) => {
               if (aggregate) {
                 return (
-                  <div key={method} className="relative group flex items-center gap-1.5 cursor-help">
-                    <Icon className="w-3.5 h-3.5 text-zinc-500" />
-                    <span className="text-[11px] text-zinc-400">{label}</span>
-                    <span className="text-xs font-semibold text-white">{mobileMoneyTotal > 0 ? fmt(mobileMoneyTotal) : "—"}</span>
+                  <div key={method} className="relative group flex items-center gap-2 cursor-help bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{label}</span>
+                    <span className="text-xs font-extrabold text-slate-900 dark:text-white tabular-nums">{mobileMoneyTotal > 0 ? fmt(mobileMoneyTotal) : "—"}</span>
                     {mobileMoneyTotal > 0 && (
-                      <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 hidden group-hover:block w-max rounded-lg border border-zinc-700 bg-zinc-900 p-2 shadow-xl">
-                        <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
+                      <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-20 hidden group-hover:block w-max rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-xl">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                           Détail Mobile Money · Wave · Orange Money · MTN Money · Moov Money · Pi-SPI
                         </p>
                         {MOBILE_MONEY_OPERATORS.map((op) => (
-                          <div key={op.value} className="flex items-center justify-between gap-6 text-[11px]">
-                            <span className="text-zinc-400">{op.label}</span>
-                            <span className="font-semibold text-white">{mobileMoneyBreakdown[op.value] ? fmt(mobileMoneyBreakdown[op.value]) : "—"}</span>
+                          <div key={op.value} className="flex items-center justify-between gap-6 text-[11px] py-0.5">
+                            <span className="text-slate-600 dark:text-slate-400">{op.label}</span>
+                            <span className="font-bold text-slate-900 dark:text-white tabular-nums">{mobileMoneyBreakdown[op.value] ? fmt(mobileMoneyBreakdown[op.value]) : "—"}</span>
                           </div>
                         ))}
                         {mobileMoneyBreakdown["mobile_money"] > 0 && (
-                          <div className="flex items-center justify-between gap-6 text-[11px]">
-                            <span className="text-zinc-400">Opérateur non précisé</span>
-                            <span className="font-semibold text-white">{fmt(mobileMoneyBreakdown["mobile_money"])}</span>
+                          <div className="flex items-center justify-between gap-6 text-[11px] py-0.5">
+                            <span className="text-slate-600 dark:text-slate-400">Opérateur non précisé</span>
+                            <span className="font-bold text-slate-900 dark:text-white tabular-nums">{fmt(mobileMoneyBreakdown["mobile_money"])}</span>
                           </div>
                         )}
                       </div>
@@ -1512,17 +1571,17 @@ export default function AccountingPage() {
               }
               const val = byMethod[method] || 0;
               return (
-                <div key={method} className="flex items-center gap-1.5">
-                  <Icon className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-[11px] text-zinc-400">{label}</span>
-                  <span className="text-xs font-semibold text-white">{val > 0 ? fmt(val) : "—"}</span>
+                <div key={method} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{label}</span>
+                  <span className="text-xs font-extrabold text-slate-900 dark:text-white tabular-nums">{val > 0 ? fmt(val) : "—"}</span>
                 </div>
               );
             })}
           </div>
 
           {/* Onglets */}
-          <div className="flex gap-0.5 p-1 bg-zinc-900/80 rounded-lg border border-zinc-800 overflow-x-auto">
+          <div className="flex gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/60 overflow-x-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.key;
@@ -1530,18 +1589,18 @@ export default function AccountingPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                     active
-                      ? "bg-white text-zinc-900"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-[var(--primary-color,#0C1C33)] text-white shadow-md"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-4 h-4" />
                   {tab.label}
                   {tab.badge != null && tab.badge > 0 && (
                     <span
-                      className={`px-1.5 py-px rounded-full text-[10px] font-bold ${
-                        active ? "bg-zinc-900/10 text-zinc-900" : "bg-zinc-800 text-zinc-400"
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        active ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
                       }`}
                     >
                       {tab.badge}
@@ -1555,88 +1614,88 @@ export default function AccountingPage() {
         {/* ============ VUE D'ENSEMBLE ============ */}
         {activeTab === "overview" && (
           <div className="space-y-4">
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
+            <Card className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <h2 className="text-[13px] font-semibold text-zinc-200 flex items-center gap-2">
-                  <ArrowLeftRight className="w-4 h-4 text-zinc-500" /> Entrées vs Sorties (jour par jour)
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ArrowLeftRight className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Entrées vs Sorties (jour par jour)
                 </h2>
-                <span className="text-[11px] text-zinc-500">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                   {formatDate(startDate)} → {formatDate(endDate)}
                 </span>
               </div>
               <DailyCashFlowChart data={dailySeries} fmt={fmt} />
-            </div>
+            </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
-                <h2 className="text-[13px] font-semibold text-zinc-200 mb-3 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-400" /> Flux de trésorerie (12 mois)
+              <Card className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Flux de trésorerie (12 mois)
                 </h2>
                 <CashFlowChart data={monthlySeries} fmt={fmt} />
-              </div>
-              <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
-                <h2 className="text-[13px] font-semibold text-zinc-200 mb-3 flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4 text-red-400" /> Répartition des dépenses
+              </Card>
+              <Card className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <TrendingDown className="w-4 h-4 text-rose-600 dark:text-rose-400" /> Répartition des dépenses
                 </h2>
                 <CategoryBreakdown items={categoryBreakdown} fmt={fmt} />
-              </div>
+              </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
+              <Card className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-[13px] font-semibold text-zinc-200">Dernières dépenses</h2>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Dernières dépenses</h2>
                   <button
                     onClick={() => setActiveTab("expenses")}
-                    className="text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                    className="text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:underline transition-colors"
                   >
                     Tout voir →
                   </button>
                 </div>
                 {filteredExpenses.length === 0 ? (
-                  <p className="text-sm text-zinc-500 text-center py-8">Aucune dépense sur la période</p>
+                  <p className="text-xs text-slate-400 text-center py-8">Aucune dépense sur la période</p>
                 ) : (
                   <div className="space-y-2">
                     {filteredExpenses.slice(0, 5).map((exp) => (
-                      <div key={exp.id} className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/50">
+                      <div key={exp.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-zinc-100 truncate">{exp.description}</p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{exp.description}</p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
                             {getExpenseCategoryLabel(exp.category)} • {formatDate(exp.expense_date)}
                           </p>
                         </div>
-                        <p className="text-sm font-bold text-red-400 flex-shrink-0">{fmt(exp.amount)}</p>
+                        <p className="text-xs font-extrabold text-rose-600 dark:text-rose-400 flex-shrink-0 tabular-nums">{fmt(exp.amount)}</p>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
 
-              <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
+              <Card className="p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-[13px] font-semibold text-zinc-200">Dernières recettes</h2>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Dernières recettes</h2>
                   <button
                     onClick={() => setActiveTab("revenue")}
-                    className="text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                    className="text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:underline transition-colors"
                   >
                     Tout voir →
                   </button>
                 </div>
                 {filteredPayments.length === 0 ? (
-                  <p className="text-sm text-zinc-500 text-center py-8">Aucune recette sur la période</p>
+                  <p className="text-xs text-slate-400 text-center py-8">Aucune recette sur la période</p>
                 ) : (
                   <div className="space-y-2">
                     {filteredPayments.slice(0, 5).map((pay) => (
-                      <div key={pay.id} className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/50">
+                      <div key={pay.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-zinc-100 truncate">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                             {pay.booking?.client_name || "Opération de caisse"}
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
                             {paymentMethodDisplay(pay)} • {formatDate(pay.payment_date)}
                           </p>
                         </div>
-                        <p className={`text-sm font-bold ${pay.amount < 0 ? "text-red-400" : "text-emerald-400"} flex-shrink-0`}>
+                        <p className={`text-xs font-extrabold ${pay.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"} flex-shrink-0 tabular-nums`}>
                           {pay.amount < 0 ? "-" : ""}
                           {fmt(Math.abs(pay.amount))}
                         </p>
@@ -1644,7 +1703,7 @@ export default function AccountingPage() {
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
           </div>
         )}
