@@ -50,20 +50,21 @@ import type { CleaningTask, Room, Accommodation } from "@/types/database";
 type TaskWithRelations = CleaningTask & { room?: Room; accommodation?: Accommodation };
 type StatusFilter = "all" | "pending" | "active" | "done" | "expired" | "alert";
 
-export default function CleaningPage() {
-  const router = useRouter();
-  const { lang } = useLanguage();
-  const t = (translations[lang] ?? translations["fr"]).cleaning;
-
-  const STATUS_LABEL: Record<string, string> = {
+const getStatusLabel = (lang: string, status: string): string => {
+  const t = (translations[lang as Lang] ?? translations["fr"]).cleaning;
+  const labels: Record<string, string> = {
     pending: t.stats.pending,
     claimed: t.stats.inProgress,
     in_progress: t.stats.inProgress,
     done: t.stats.done,
     expired: t.expired,
   };
+  return labels[status] || status;
+};
 
-  const STATUS_META: Record<string, { label: string; chip: string; bar: string; text: string }> = {
+const getStatusMeta = (lang: string) => {
+  const t = (translations[lang as Lang] ?? translations["fr"]).cleaning;
+  return {
     pending: {
       label: t.stats.pending,
       chip: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
@@ -89,6 +90,28 @@ export default function CleaningPage() {
       text: "text-red-500",
     },
   };
+};
+
+export default function CleaningPage() {
+  const router = useRouter();
+  const { lang } = useLanguage();
+  const t = (translations[lang] ?? translations["fr"]).cleaning;
+
+  const [loading, setLoading] = useState(true);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [tasks, setTasks] = useState<TaskWithRelations[]>([]);
+  const [maidNames, setMaidNames] = useState<Record<string, string>>({});
+  const [userId, setUserId] = useState("");
+  const [tenantId, setTenantId] = useState("");
+  const [plan, setPlan] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [accFilter, setAccFilter] = useState<string>("all");
+  // Suit la résidence active (header) tant que l'utilisateur n'a pas choisi
+  // lui-même un filtre de résidence explicite.
+  const { activeAccommodationId } = useAccommodation();
+  const userPickedAccFilterRef = useRef(false);
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -446,25 +469,25 @@ export default function CleaningPage() {
     return [
       {
         key: "pending" as const,
-        meta: STATUS_META.pending,
+        meta: getStatusMeta(lang).pending,
         icon: Clock,
         list: sortColumn(filteredTasks.filter((t) => t.status === "pending"), "pending"),
       },
       {
         key: "active" as const,
-        meta: STATUS_META.active,
+        meta: getStatusMeta(lang).active,
         icon: Timer,
         list: sortColumn(filteredTasks.filter((t) => t.status === "claimed" || t.status === "in_progress"), "active"),
       },
       {
         key: "done" as const,
-        meta: STATUS_META.done,
+        meta: getStatusMeta(lang).done,
         icon: CheckCircle2,
         list: sortColumn(filteredTasks.filter((t) => isDoneToday(t, now)), "done"),
       },
       {
         key: "expired" as const,
-        meta: STATUS_META.expired,
+        meta: getStatusMeta(lang).expired,
         icon: AlertTriangle,
         list: sortColumn(filteredTasks.filter((t) => t.status === "expired"), "expired"),
       },
@@ -941,9 +964,9 @@ export default function CleaningPage() {
                                   <>
                                     <AlertCircle className="w-3 h-3" /> {t.overdueLabel}
                                   </>
-                                ) : (
-                                  STATUS_LABEL[task.status] || task.status
-                                )}
+                                 ) : (
+                                   getStatusLabel(lang, task.status) || task.status
+                                 )}
                               </Badge>
                             </div>
                           </div>
