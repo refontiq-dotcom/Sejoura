@@ -41,7 +41,23 @@ export default function DashboardLayout({
   const [primaryColor, setPrimaryColor] = useState<string>("");
   const [plan, setPlan] = useState("standard");
   const [monthlyPrice, setMonthlyPrice] = useState(0);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 1024;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth < 1024) {
+        setSidebarCollapsed(true);
+      }
+    }
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [headerHidden, setHeaderHidden] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
