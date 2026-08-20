@@ -286,7 +286,7 @@ interface KpiCardProps {
 const KPI_STYLES: Record<NonNullable<KpiCardProps["variant"]>, {
   card: string;
   iconBg: string;
-  badge: "success" | "danger" | "info" | "warning" | "purple";
+  badge: "success" | "error" | "info" | "warning" | "purple";
 }> = {
   emerald: {
     card: "bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 ring-1 ring-emerald-200 dark:ring-emerald-900/40",
@@ -296,7 +296,7 @@ const KPI_STYLES: Record<NonNullable<KpiCardProps["variant"]>, {
   rose: {
     card: "bg-gradient-to-br from-rose-100 to-red-100 dark:from-rose-950/50 dark:to-slate-900 ring-1 ring-rose-200 dark:ring-rose-900/40",
     iconBg: "bg-rose-500 text-white ring-1 ring-rose-600/30 dark:bg-rose-500/25 dark:text-rose-300",
-    badge: "danger",
+    badge: "error",
   },
   blue: {
     card: "bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 ring-1 ring-blue-200 dark:ring-blue-900/40",
@@ -1464,7 +1464,7 @@ export default function AccountingPage() {
         </div>
 
         {/* Panneau Smart & Compact */}
-        <div className="accounting-panel mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 md:p-4 space-y-4">
+        <div className="mt-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 p-4 space-y-5">
           {/* Sélecteur de période */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-wrap">
             <PeriodSelector
