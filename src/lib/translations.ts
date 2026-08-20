@@ -64,7 +64,7 @@ export const translations = {
       residences: "Établissements",
       rooms: "Chambres",
       bookings: "Réservations",
-      cleaning: "Ménage",
+      cleaning: "Suivi ménage",
       accounting: "Comptabilité",
       employees: "Employés",
       settings: "Paramètres",
@@ -179,7 +179,7 @@ export const translations = {
       actions: "Actions",
     },
     cleaning: {
-      title: "Ménage",
+      title: "Suivi ménage",
       subtitleStandard: "Module de gestion du ménage automatique",
       proRequiredTitle: "Module Pro requis",
       proRequiredCopy: "Le module de ménage automatique avec pool de tâches partagé est disponible à partir du plan Entreprise.",
