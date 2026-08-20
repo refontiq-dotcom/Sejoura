@@ -55,6 +55,7 @@ import {
   Pencil,
   History,
   ArrowRight,
+  Info,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -1673,6 +1674,11 @@ export default function BookingsPage() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium ${getBookingStatusColor(b.status)}`}>
                         {getBookingStatusLabel(b.status)}
                       </span>
+                      {!b.client?.id_number && (b.status === "confirmed" || b.status === "checked_in") && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                          ⚠️ CNI manquant
+                        </span>
+                      )}
                       {overdue && (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getOverstayColor()}`}>
                           {getOverstayLabel()}
@@ -1723,6 +1729,20 @@ export default function BookingsPage() {
                       <span className="flex-1 text-[11px] text-slate-400">Aucune action disponible</span>
                     ) : (
                       <>
+                        {/* Bouton Compléter la fiche avant Check-in si CNI/Passeport manquant */}
+                        {b.status === "confirmed" && !b.client?.id_number && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCompleteClientModal(b);
+                            }}
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Compléter
+                          </Button>
+                        )}
                         {primaryAction && (
                           <Button
                             variant={primaryAction.type === "check_in" ? "success" : "secondary"}
@@ -1748,6 +1768,11 @@ export default function BookingsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Séjour</DropdownMenuLabel>
+                            {(b.status === "confirmed" || b.status === "checked_in") && (
+                              <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
+                                <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                               <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
                             </DropdownMenuItem>
@@ -1766,7 +1791,7 @@ export default function BookingsPage() {
                             )}
                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <DropdownMenuItem onSelect={() => openEditModal(b)}>
-                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier la réservation
+                                <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier les dates / tarifs
                               </DropdownMenuItem>
                             )}
                             {(b.status === "confirmed" || b.status === "checked_in" || b.status === "checked_out") && (
