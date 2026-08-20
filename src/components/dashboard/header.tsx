@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
+import { translations, type Lang } from "@/lib/translations";
 import { LOGIN_ROUTE, EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getPlanLabel } from "@/lib/utils";
@@ -39,13 +39,7 @@ interface NotificationItem {
   link?: string | null;
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "ADMIN",
-  admin_residence: "GÉRANT",
-  receptionniste: "RÉCEPTIONNISTE",
-  menagere: "MÉNAGÈRE",
-  client: "CLIENT",
-};
+const ROLE_LABELS = (lang: string): Record<string, string> => (translations[lang as Lang] ?? translations.fr).header.roleLabels as Record<string, string>;
 
 const AVATAR_GRADIENTS = [
   "from-blue-500 to-indigo-600",
@@ -334,12 +328,12 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         .eq("is_read", false);
 
       if (error) {
-        toast.error("Impossible de marquer les notifications comme lues.");
+        toast.error(t.markAllReadError);
         return;
       }
 
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      toast.success("Toutes les notifications ont été marquées comme lues.");
+      toast.success(t.markAllReadSuccess);
     } catch {
       toast.error("Une erreur est survenue.");
     }
@@ -355,7 +349,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       const isEmployee = userRole === "receptionniste" || userRole === "menagere";
       window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
-      toast.error("Impossible de se déconnecter.");
+      toast.error(t.logoutError);
     }
   }
 
@@ -415,31 +409,31 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             <button
               onClick={() => setHelpOpen(!helpOpen)}
               className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
-              aria-label="Aide & support"
-              title="Aide & support"
+               aria-label={t.helpTitle}
+               title={t.helpTitle}
             >
               <HelpCircle className="w-4 h-4" />
             </button>
 
             {helpOpen && (
               <div className="absolute right-0 mt-1.5 w-64 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-1.5">
-                <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
-                  Aide &amp; Support
-                </p>
+                 <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                   {t.helpTitle}
+                 </p>
                 <button
                   onClick={() => { setHelpOpen(false); setIdeaCategory("bug_report"); setIdeaModalOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                 >
-                  <Bug className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                  Signaler un problème
-                </button>
+                   <Bug className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                   {t.reportProblem}
+                 </button>
                 <button
                   onClick={() => { setHelpOpen(false); setIdeaCategory("new_feature"); setIdeaModalOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                 >
-                  <Wand2 className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                  Suggérer une fonctionnalité
-                </button>
+                   <Wand2 className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                   {t.suggestFeature}
+                 </button>
               </div>
             )}
           </div>
@@ -563,7 +557,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                   </div>
                   <div className="mt-3">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[var(--primary-color,#0C1C33)] text-white text-[10px] font-semibold">
-                      {ROLE_LABELS[userRole || ""] || userRole?.replace("_", " ").toUpperCase() || "MEMBRE"}
+                      {ROLE_LABELS(lang)[userRole || ""] || userRole?.replace("_", " ").toUpperCase() || "MEMBRE"}
                     </span>
                   </div>
                   <p className="mt-3 flex items-center gap-1.5 text-[11px] text-[var(--muted-foreground)]">

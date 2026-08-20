@@ -4,6 +4,7 @@
 
 import { canAccessFeature, getPlanLimits as getNormalizedPlanLimits, getPlanPrice as getNormalizedPlanPrice, normalizePlan } from "@/lib/subscription-plans";
 import { formatPrice, getCurrencySymbol } from "@/lib/currencyConverter";
+import { type Lang } from "./translations";
 
 export { formatPrice };
 
@@ -64,8 +65,8 @@ export function formatFCFA(amount: number): string {
  * Formate un montant sans le suffixe
  * Ex: 15000 -> "15 000"
  */
-export function formatNumber(amount: number): string {
-  return new Intl.NumberFormat("fr-FR", {
+export function formatNumber(amount: number, lang: Lang = "fr"): string {
+  return new Intl.NumberFormat(lang, {
     maximumFractionDigits: 0,
   }).format(amount || 0);
 }
@@ -74,9 +75,9 @@ export function formatNumber(amount: number): string {
  * Formate une date ISO en format français
  * Ex: "2024-01-15" -> "15 janv. 2024"
  */
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date, lang: Lang = "fr"): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(lang, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -87,9 +88,9 @@ export function formatDate(date: string | Date): string {
  * Formate une date ISO en format français long
  * Ex: "2024-01-15" -> "15 janvier 2024"
  */
-export function formatDateLong(date: string | Date): string {
+export function formatDateLong(date: string | Date, lang: Lang = "fr"): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(lang, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -110,9 +111,9 @@ export function formatTime(time: string): string {
  * Formate une date et heure
  * Ex: "2024-01-15T14:30:00Z" -> "15 janv. 2024 à 14:30"
  */
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date, lang: Lang = "fr"): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(lang, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -191,87 +192,87 @@ export function truncate(text: string, length: number): string {
 /**
  * Retourne le libellé d'un statut de réservation
  */
-export function getBookingStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    confirmed: "Confirmée",
-    cancelled: "Annulée",
-    no_show: "No-show",
-    checked_in: "Arrivé",
-    checked_out: "Parti",
+export function getBookingStatusLabel(status: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    confirmed: { fr: "Confirmée", en: "Confirmed" },
+    cancelled: { fr: "Annulée", en: "Cancelled" },
+    no_show: { fr: "No-show", en: "No-show" },
+    checked_in: { fr: "Arrivé", en: "Checked in" },
+    checked_out: { fr: "Parti", en: "Checked out" },
   };
-  return labels[status] || status;
+  return labels[status]?.[lang] || status;
 }
 
 /**
  * Retourne le libellé d'un statut de paiement
  */
-export function getPaymentStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    unpaid: "Non payé",
-    partial: "Partiel",
-    paid: "Payé",
-    refunded: "Remboursé",
+export function getPaymentStatusLabel(status: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    unpaid: { fr: "Non payé", en: "Unpaid" },
+    partial: { fr: "Partiel", en: "Partial" },
+    paid: { fr: "Payé", en: "Paid" },
+    refunded: { fr: "Remboursé", en: "Refunded" },
   };
-  return labels[status] || status;
+  return labels[status]?.[lang] || status;
 }
 
 /**
  * Retourne le libellé d'un statut de chambre
  */
-export function getRoomStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    available: "Disponible",
-    occupied: "Occupée",
-    alert: "Alerte",
-    cleaning: "En nettoyage",
+export function getRoomStatusLabel(status: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    available: { fr: "Disponible", en: "Available" },
+    occupied: { fr: "Occupée", en: "Occupied" },
+    alert: { fr: "Alerte", en: "Alert" },
+    cleaning: { fr: "En nettoyage", en: "Cleaning" },
   };
-  return labels[status] || status;
+  return labels[status]?.[lang] || status;
 }
 
 /**
  * Retourne le libellé d'un rôle
  */
-export function getRoleLabel(role: string): string {
-  const labels: Record<string, string> = {
-    super_admin: "Super Admin",
-    admin_residence: "Admin Établissement",
-    receptionniste: "Réceptionniste",
-    menagere: "Ménagère",
-    client: "Client",
+export function getRoleLabel(role: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    super_admin: { fr: "Super Admin", en: "Super Admin" },
+    admin_residence: { fr: "Admin Établissement", en: "Property Admin" },
+    receptionniste: { fr: "Réceptionniste", en: "Receptionist" },
+    menagere: { fr: "Ménagère", en: "Cleaner" },
+    client: { fr: "Client", en: "Client" },
   };
-  return labels[role] || role;
+  return labels[role]?.[lang] || role;
 }
 
 /**
  * Retourne le libellé d'un plan d'abonnement
  */
-export function getPlanLabel(plan: string): string {
+export function getPlanLabel(plan: string, lang: Lang = "fr"): string {
   const normalized = normalizePlan(plan);
-  const labels: Record<string, string> = {
-    free: "Gratuit",
-    trial: "Essai gratuit",
-    standard: "Essentiel",
-    essentiel: "Essentiel",
-    enterprise: "Entreprise",
-    entreprise: "Entreprise",
+  const labels: Record<string, Record<string, string>> = {
+    free: { fr: "Gratuit", en: "Free" },
+    trial: { fr: "Essai gratuit", en: "Free trial" },
+    standard: { fr: "Essentiel", en: "Essentiel" },
+    essentiel: { fr: "Essentiel", en: "Essentiel" },
+    enterprise: { fr: "Entreprise", en: "Enterprise" },
+    entreprise: { fr: "Entreprise", en: "Enterprise" },
   };
-  return labels[normalized] || plan;
+  return labels[normalized]?.[lang] || plan;
 }
 
 /**
  * Retourne le libellé d'un statut d'abonnement (paiement semi-automatisé)
  */
-export function getSubscriptionStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    pending: "En attente de validation",
-    active: "Actif",
-    expired: "Expiré",
-    trial: "Essai gratuit",
-    overdue: "En retard",
-    suspended: "Suspendu",
-    cancelled: "Annulé",
+export function getSubscriptionStatusLabel(status: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    pending: { fr: "En attente de validation", en: "Pending validation" },
+    active: { fr: "Actif", en: "Active" },
+    expired: { fr: "Expiré", en: "Expired" },
+    trial: { fr: "Essai gratuit", en: "Free trial" },
+    overdue: { fr: "En retard", en: "Overdue" },
+    suspended: { fr: "Suspendu", en: "Suspended" },
+    cancelled: { fr: "Annulé", en: "Cancelled" },
   };
-  return labels[status] || status;
+  return labels[status]?.[lang] || status;
 }
 
 /**
@@ -305,42 +306,43 @@ export function isMobileMoney(method: string): boolean {
  * Retourne le libellé d'un opérateur Mobile Money
  * (retombe sur « Mobile Money » si aucun opérateur n'est renseigné).
  */
-export function getMobileMoneyOperatorLabel(operator: string | null | undefined): string {
-  if (!operator) return "Mobile Money";
-  if (operator === "mobile_money") return "Opérateur non précisé";
-  return MOBILE_MONEY_OPERATORS.find((o) => o.value === operator)?.label || operator;
+export function getMobileMoneyOperatorLabel(operator: string | null | undefined, lang: Lang = "fr"): string {
+  if (!operator) return lang === "en" ? "Mobile Money" : "Mobile Money";
+  if (operator === "mobile_money") return lang === "en" ? "Operator not specified" : "Opérateur non précisé";
+  const label = MOBILE_MONEY_OPERATORS.find((o) => o.value === operator)?.label;
+  return label || operator;
 }
 
 /**
  * Retourne le libellé d'une méthode de paiement
  */
-export function getPaymentMethodLabel(method: string): string {
-  const labels: Record<string, string> = {
-    cash: "Espèces",
-    wave: "Wave",
-    pi_spi: "Pi-SPI",
-    mobile_money: "Mobile Money",
-    bank: "Virement",
-    other: "Autre",
+export function getPaymentMethodLabel(method: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    cash: { fr: "Espèces", en: "Cash" },
+    wave: { fr: "Wave", en: "Wave" },
+    pi_spi: { fr: "PI-SPI", en: "PI-SPI" },
+    mobile_money: { fr: "Mobile Money", en: "Mobile Money" },
+    bank: { fr: "Virement", en: "Transfer" },
+    other: { fr: "Autre", en: "Other" },
   };
-  return labels[method] || method;
+  return labels[method]?.[lang] || method;
 }
 
 /**
  * Retourne le libellé d'une catégorie de dépense
  */
-export function getExpenseCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    salaries: "Salaires",
-    utilities: "Charges",
-    maintenance: "Maintenance",
-    supplies: "Fournitures",
-    marketing: "Marketing",
-    rent: "Loyer",
-    taxes: "Taxes",
-    other: "Autre",
+export function getExpenseCategoryLabel(category: string, lang: Lang = "fr"): string {
+  const labels: Record<string, Record<string, string>> = {
+    salaries: { fr: "Salaires", en: "Salaries" },
+    utilities: { fr: "Charges", en: "Utilities" },
+    maintenance: { fr: "Maintenance", en: "Maintenance" },
+    supplies: { fr: "Fournitures", en: "Supplies" },
+    marketing: { fr: "Marketing", en: "Marketing" },
+    rent: { fr: "Loyer", en: "Rent" },
+    taxes: { fr: "Taxes", en: "Taxes" },
+    other: { fr: "Autre", en: "Other" },
   };
-  return labels[category] || category;
+  return labels[category]?.[lang] || category;
 }
 
 /**
@@ -360,8 +362,8 @@ export function getBookingStatusColor(status: string): string {
 /**
  * Libellé d'un dépassement de séjour
  */
-export function getOverstayLabel(): string {
-  return "Dépassement";
+export function getOverstayLabel(lang: Lang = "fr"): string {
+  return lang === "en" ? "Overstay" : "Dépassement";
 }
 
 /**

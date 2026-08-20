@@ -51,6 +51,7 @@ export default function SettingsPage() {
   const { lang, setLang } = useLanguage();
   const { activeAccommodation } = useAccommodation();
   const t = (translations[lang] ?? translations["fr"]).settings;
+  const common = (translations[lang] ?? translations["fr"]).common;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -668,8 +669,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-3 animate-fade-in">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Paramètres</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">Gérez votre compte et votre entreprise</p>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">{t.pageTitle}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">{t.pageSubtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -708,28 +709,28 @@ export default function SettingsPage() {
           {activeSection === "company" && (
             <div className="space-y-3">
               <Card className="p-4">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Informations de l'entreprise</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Modifiez les détails de votre entreprise</p>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.companyInfo}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.companyHelp}</p>
 
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Nom de l'entreprise" value={companyForm.company_name} onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })} />
-                    <Input label="Nom du contact" value={companyForm.contact_name} onChange={(e) => setCompanyForm({ ...companyForm, contact_name: e.target.value })} />
+                    <Input label={t.companyName} value={companyForm.company_name} onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })} />
+                    <Input label={t.contactName} value={companyForm.contact_name} onChange={(e) => setCompanyForm({ ...companyForm, contact_name: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Email" type="email" value={companyForm.contact_email} onChange={(e) => setCompanyForm({ ...companyForm, contact_email: e.target.value })} />
-                    <Input label="Téléphone" value={companyForm.contact_phone} onChange={(e) => setCompanyForm({ ...companyForm, contact_phone: e.target.value })} />
+                    <Input label={t.email} type="email" value={companyForm.contact_email} onChange={(e) => setCompanyForm({ ...companyForm, contact_email: e.target.value })} />
+                    <Input label={t.phone} value={companyForm.contact_phone} onChange={(e) => setCompanyForm({ ...companyForm, contact_phone: e.target.value })} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Ville" value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} />
-                    <Input label="Adresse" value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} />
+                    <Input label={t.city} value={companyForm.city} onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })} />
+                    <Input label={t.address} value={companyForm.address} onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })} />
                   </div>
                   {formError && (
                     <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
                   )}
                   <div className="flex justify-end pt-2">
                     <Button onClick={handleSaveCompany} loading={saving} disabled={!companyForm.company_name.trim()}>
-                      <Save className="w-4 h-4" /> Enregistrer
+                      <Save className="w-4 h-4" /> {t.save}
                     </Button>
                   </div>
                 </div>
@@ -738,8 +739,8 @@ export default function SettingsPage() {
               <Card className="p-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Logo de l'entreprise</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Téléversez un logo pour personnaliser l’interface.</p>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.logoUpload}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{t.logoUploadHelp}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -747,7 +748,7 @@ export default function SettingsPage() {
                       onClick={() => fileInputRef.current?.click()}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                     >
-                      <span>Choisir un fichier</span>
+                      <span>{t.logoSelectFile}</span>
                     </button>
                     <input
                       ref={fileInputRef}
@@ -769,7 +770,7 @@ export default function SettingsPage() {
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                        Aucun logo
+                         {t.noLogo}
                       </div>
                     )}
                   </div>
@@ -777,28 +778,28 @@ export default function SettingsPage() {
                   <div className="flex flex-col justify-between gap-4">
                     <div>
                       {logoFile && (
-                        <p className="text-sm text-slate-600 dark:text-slate-300">Fichier sélectionné : {logoFile.name}</p>
+                         <p className="text-sm text-slate-600 dark:text-slate-300">{t.fileSelected} {logoFile.name}</p>
                       )}
                       {!logoFile && tenant?.logo_url && (
-                        <p className="text-sm text-slate-600 dark:text-slate-300">Logo actuel chargé depuis votre espace.</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">{t.currentLogoLoaded}</p>
                       )}
-                      <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Formats supportés : PNG, JPG, SVG, WEBP — taille max 2 Mo.</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{t.formatsSupported}</p>
                       {logoError && (
                         <p className="mt-2 text-sm text-red-600 dark:text-red-400">{logoError}</p>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={handleUploadLogo} loading={logoUploading} disabled={!logoFile || !!logoError}>
-                        Téléverser le logo
-                      </Button>
+                       <Button onClick={handleUploadLogo} loading={logoUploading} disabled={!logoFile || !!logoError}>
+                         {t.logoUploadButton}
+                       </Button>
                       {logoFile && (
-                        <Button variant="secondary" onClick={() => {
-                          setLogoFile(null);
-                          setLogoPreviewUrl(tenant?.logo_url || null);
-                          setLogoError("");
-                        }}>
-                          Annuler
-                        </Button>
+                         <Button variant="secondary" onClick={() => {
+                           setLogoFile(null);
+                           setLogoPreviewUrl(tenant?.logo_url || null);
+                           setLogoError("");
+                         }}>
+                            {common.cancel}
+                         </Button>
                       )}
                     </div>
                   </div>
@@ -811,8 +812,8 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-3">
                     <ExternalLink className="w-5 h-5 text-indigo-500" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Lien de connexion employés</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">URL que les employés utilisent pour se connecter au portail</p>
+                       <p className="text-sm font-medium text-slate-900 dark:text-white">{t.employeeLoginLink}</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{t.employeeLoginLinkHelp}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -843,15 +844,15 @@ export default function SettingsPage() {
 
           {activeSection === "account" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Informations du compte</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Vos informations personnelles</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.accountInfo}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.accountHelp}</p>
 
               <div className="space-y-3">
-                <Input label="Nom complet" value={accountForm.full_name} onChange={(e) => setAccountForm({ ...accountForm, full_name: e.target.value })} />
-                <Input label="Téléphone" value={accountForm.phone} onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })} />
-                <Input label="Email" type="email" value={accountForm.email} onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })} />
+                <Input label={t.fullName} value={accountForm.full_name} onChange={(e) => setAccountForm({ ...accountForm, full_name: e.target.value })} />
+                <Input label={t.phone} value={accountForm.phone} onChange={(e) => setAccountForm({ ...accountForm, phone: e.target.value })} />
+                <Input label={t.email} type="email" value={accountForm.email} onChange={(e) => setAccountForm({ ...accountForm, email: e.target.value })} />
                 <div className="flex justify-end pt-2">
-                  <Button onClick={handleSaveAccount} loading={saving}>Enregistrer</Button>
+                  <Button onClick={handleSaveAccount} loading={saving}>{t.save}</Button>
                 </div>
               </div>
             </Card>
@@ -859,27 +860,27 @@ export default function SettingsPage() {
 
           {activeSection === "appearance" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Apparence</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Personnalisez l'apparence de l'interface et les couples de couleurs</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.appearance}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{t.appearanceHelp}</p>
 
                <div className="space-y-3">
                  {/* ---- Couleurs du portail ---- */}
                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 space-y-3">
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Palette className="w-5 h-5 text-indigo-500" />
-                      Couleurs du portail
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      La couleur pastel règle le fond de la page Dashboard avec une nuance claire dérivée de la couleur choisie. La version foncée règle le menu latéral et le haut de page.
-                    </p>
+                     <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                       <Palette className="w-5 h-5 text-indigo-500" />
+                       {t.portalColorsTitle}
+                     </h3>
+                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                       {t.portalColorsHelp}
+                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Couleur pastel
-                      </label>
+                       <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                         {t.pastelColor}
+                       </label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
@@ -897,9 +898,9 @@ export default function SettingsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Version foncée (Sidebar & En-tête)
-                      </label>
+                       <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                         {t.darkVersion}
+                       </label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
@@ -919,7 +920,7 @@ export default function SettingsPage() {
 
                   {/* Presets rapides de couleurs */}
                   <div className="pt-2">
-                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Thèmes de couleurs prédéfinis :</p>
+                     <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">{t.presetColorThemes}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                       {[
                         { id: "ocean", name: "Océan", main: "#0d9488", dark: "#134e4a" },
@@ -965,8 +966,8 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-3">
                     {theme === "dark" ? <Moon className="w-5 h-5 text-indigo-400" /> : <Sun className="w-5 h-5 text-yellow-500" />}
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Mode d'affichage</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Basculer entre le mode clair et sombre</p>
+                       <p className="text-sm font-medium text-slate-900 dark:text-white">{t.displayMode}</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400">{t.themeHelp}</p>
                     </div>
                   </div>
                   <button
@@ -981,8 +982,8 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-3">
                     <Globe className="w-5 h-5 text-indigo-500" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Langue de l'application</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Choisir la langue d'affichage — appliquée instantanément</p>
+                       <p className="text-sm font-medium text-slate-900 dark:text-white">{t.appLanguage}</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400">{t.chooseLanguage}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1011,14 +1012,13 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-3">
                     <Settings className="w-5 h-5 text-amber-500" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Devise de référence</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Devise par défaut de l&apos;entreprise. L&apos;affichage suit la devise de la résidence
-                        active lorsque celle-ci est différente.
-                        {activeAccommodation && activeAccommodation.currency !== companyForm.default_currency && (
-                          <> Affichage actuel : <strong className="text-[var(--primary-color,#0C1C33)]">{activeAccommodation.currency_symbol}</strong> ({activeAccommodation.currency}) pour « {activeAccommodation.name} ».</>
-                        )}
-                      </p>
+                       <p className="text-sm font-medium text-slate-900 dark:text-white">{t.referenceCurrency}</p>
+                       <p className="text-xs text-slate-500 dark:text-slate-400">
+                         {t.referenceCurrencyHelp}
+                         {activeAccommodation && activeAccommodation.currency !== companyForm.default_currency && (
+                           <> {lang === "en" ? "Current display" : "Affichage actuel"} : <strong className="text-[var(--primary-color,#0C1C33)]">{activeAccommodation.currency_symbol}</strong> ({activeAccommodation.currency}) {lang === "en" ? "for" : "pour"} « {activeAccommodation.name} ».</>
+                         )}
+                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1047,25 +1047,25 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <Button
-                    onClick={() => {
-                      const last = lastSavedColorsRef.current;
-                      const unchanged =
-                        last &&
-                        last.primaryColor === primaryColor &&
-                        last.themeColor === themeHex(themeColor);
-                      if (unchanged) {
-                        toast.success("L'apparence est déjà enregistrée ✓");
-                        return;
-                      }
-                      persistColors(primaryColor, themeColor, { successMessage: "Apparence enregistrée ✓" });
-                    }}
-                    loading={saving}
-                    className="text-white hover:brightness-110"
-                    style={{ backgroundColor: themeHex(themeColor) }}
-                  >
-                    <Save className="w-4 h-4 mr-2" /> Enregistrer l'apparence
-                  </Button>
+                    <Button
+                      onClick={() => {
+                        const last = lastSavedColorsRef.current;
+                        const unchanged =
+                          last &&
+                          last.primaryColor === primaryColor &&
+                          last.themeColor === themeHex(themeColor);
+                        if (unchanged) {
+                          toast.success(lang === "en" ? "Appearance already saved ✓" : "L'apparence est déjà enregistrée ✓");
+                          return;
+                        }
+                        persistColors(primaryColor, themeColor, { successMessage: lang === "en" ? "Appearance saved ✓" : "Apparence enregistrée ✓" });
+                      }}
+                      loading={saving}
+                      className="text-white hover:brightness-110"
+                      style={{ backgroundColor: themeHex(themeColor) }}
+                    >
+                      <Save className="w-4 h-4 mr-2" /> {t.saveAppearance}
+                    </Button>
                 </div>
               </div>
             </Card>
@@ -1079,43 +1079,41 @@ export default function SettingsPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
                     <Smartphone className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Espace client</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">
-                      Infos pratiques, règlement intérieur et numéro d&apos;urgence affichés sur la page privée
-                      de chaque réservation (accessible pendant le séjour). L&apos;aperçu à droite reproduit
-                      exactement ce que verront vos clients.
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                      {activeAccommodation
-                        ? `Configuration appliquée à la résidence « ${activeAccommodation.name} ». Chaque résidence peut avoir ses propres conditions.`
-                        : "Configuration de l'entreprise (appliquée tant qu'aucune résidence n'a ses propres conditions)."}
-                    </p>
-                  </div>
+                   <div>
+                     <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t.guestPortal}</h2>
+                     <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">
+                       {t.guestPortalHelp}
+                     </p>
+                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                       {activeAccommodation
+                         ? (lang === "en" ? `Applied to residence « {name} ». Each residence can have its own conditions.` : `Configuration appliquée à la résidence « {name} ». Chaque résidence peut avoir ses propres conditions.`).replace("{name}", activeAccommodation.name)
+                         : (lang === "en" ? "Company configuration (applied as long as no residence has its own conditions)." : "Configuration de l'entreprise (appliquée tant qu'aucune résidence n'a ses propres conditions).")}
+                     </p>
+                   </div>
                 </div>
                 {activeAccommodation && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {portalInherited ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 px-3 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-300">
-                        <Info className="w-3.5 h-3.5" />
-                        Cette résidence hérite des conditions de l&apos;entreprise. Modifiez-les pour personnaliser cette résidence.
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                        <Check className="w-3.5 h-3.5" />
-                        Conditions propres à cette résidence.
-                      </span>
-                    )}
+                     {portalInherited ? (
+                       <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 px-3 py-1 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                         <Info className="w-3.5 h-3.5" />
+                         {t.inheritedFromCompany}
+                       </span>
+                     ) : (
+                       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                         <Check className="w-3.5 h-3.5" />
+                         {t.ownConditions}
+                       </span>
+                     )}
                     {!portalInherited && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleResetGuestInfo}
-                        loading={portalSaving}
-                        disabled={!activeAccommodation}
-                      >
-                        <X className="w-3.5 h-3.5" /> Réinitialiser (hériter de l&apos;entreprise)
-                      </Button>
+                       <Button
+                         variant="secondary"
+                         size="sm"
+                         onClick={handleResetGuestInfo}
+                         loading={portalSaving}
+                         disabled={!activeAccommodation}
+                       >
+                         <X className="w-3.5 h-3.5" /> {t.resetInherit}
+                       </Button>
                     )}
                   </div>
                 )}
@@ -1137,9 +1135,9 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           {activeSection === "notifications" && (
-            <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Notifications</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Gérez vos préférences de notifications</p>
+              <Card className="p-4">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.notificationsTitle}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.notificationsHelp}</p>
 
               <div className="space-y-3">
                 {[
@@ -1179,10 +1177,10 @@ export default function SettingsPage() {
           {/* Facturation */}
           {activeSection === "billing" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Facturation</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Gérez votre abonnement et vos paiements</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.billingTitle}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.billingHelp}</p>
               <Button onClick={() => window.location.href = "/dashboard/subscription"}>
-                <CreditCard className="w-4 h-4" /> Gérer l'abonnement
+                <CreditCard className="w-4 h-4" /> {t.billingButton}
               </Button>
             </Card>
           )}
@@ -1190,21 +1188,21 @@ export default function SettingsPage() {
           {/* WhatsApp */}
           {activeSection === "whatsapp" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">WhatsApp Business</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Configuration de l'API WhatsApp Business de Meta</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.whatsappTitle}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.whatsappHelp}</p>
 
                 <div className="space-y-3">
                   <div className="p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                      ⚠ L'API WhatsApp Business nécessite un compte Meta Business et un numéro de téléphone vérifié.
-                    </p>
+                     <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                       ⚠ {lang === "en" ? "WhatsApp Business API requires a Meta Business account and a verified phone number." : "L'API WhatsApp Business nécessite un compte Meta Business et un numéro de téléphone vérifié."}
+                     </p>
                   </div>
                   <Input label="Token API" placeholder="EAAxxxxxxxxxxxxx" value={whatsappForm.apiToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, apiToken: e.target.value })} />
                   <Input label="Numéro de téléphone ID" placeholder="1234567890" value={whatsappForm.phoneId} onChange={(e) => setWhatsappForm({ ...whatsappForm, phoneId: e.target.value })} />
                   <Input label="Token de vérification Webhook" placeholder="sejoura_verify_token" value={whatsappForm.webhookVerifyToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, webhookVerifyToken: e.target.value })} />
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleSaveWhatsApp}>Enregistrer</Button>
-                </div>
+                   <div className="flex justify-end pt-2">
+                     <Button onClick={handleSaveWhatsApp}>{t.save}</Button>
+                 </div>
               </div>
             </Card>
           )}
@@ -1212,8 +1210,8 @@ export default function SettingsPage() {
           {/* Intégrations */}
           {activeSection === "integrations" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Intégrations</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Connectez Séjoura à vos outils tiers</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.integrationsTitle}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.integrationsHelp}</p>
 
               <div className="space-y-3">
                 {[
@@ -1235,9 +1233,9 @@ export default function SettingsPage() {
                       integ.status === "partial"
                         ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
                         : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 dark:text-slate-500"
-                    }`}>
-                      {integ.status === "partial" ? "Partiel" : "Bientôt disponible"}
-                    </span>
+                     }`}>
+                       {integ.status === "partial" ? t.statusPartial : t.comingSoon}
+                     </span>
                   </div>
                 ))}
               </div>
@@ -1247,17 +1245,17 @@ export default function SettingsPage() {
           {/* Sécurité */}
           {activeSection === "security" && (
             <Card className="p-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Sécurité</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">Gérez votre mot de passe et la sécurité</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.securityTitle}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.securityHelp}</p>
 
-              <div className="space-y-3">
-                <Input label="Mot de passe actuel" type="password" placeholder="••••••••" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} />
-                <Input label="Nouveau mot de passe" type="password" placeholder="••••••••" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} />
-                <Input label="Confirmer le mot de passe" type="password" placeholder="••••••••" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} />
-                <div className="flex justify-end pt-2">
-                  <Button onClick={handleSavePassword} loading={saving}>Modifier le mot de passe</Button>
+                <div className="space-y-3">
+                  <Input label={t.passwordCurrent} type="password" placeholder="••••••••" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} />
+                  <Input label={t.passwordNew} type="password" placeholder="••••••••" value={passwordForm.newPassword} onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} />
+                  <Input label={t.passwordConfirm} type="password" placeholder="••••••••" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} />
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSavePassword} loading={saving}>{t.passwordUpdate}</Button>
+                  </div>
                 </div>
-              </div>
             </Card>
           )}
 
@@ -1268,10 +1266,10 @@ export default function SettingsPage() {
           {activeSection === "about" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-                {t?.aboutTitle || "À propos"}
+                {t.aboutTitle}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">
-                {t?.aboutHelp || "Informations sur la version de Séjoura"}
+                {t.aboutHelp}
               </p>
 
               <div className="space-y-3">
@@ -1287,9 +1285,9 @@ export default function SettingsPage() {
 
                 <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between py-1.5">
-                    <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                      {t?.aboutVersionLabel || "Version"}
-                    </span>
+                     <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                       {t.aboutVersionLabel}
+                     </span>
                     <span className="text-sm font-semibold text-slate-900 dark:text-white">v{APP_VERSION}</span>
                   </div>
                 </div>
@@ -1299,7 +1297,7 @@ export default function SettingsPage() {
                   className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/40 transition-all"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  {t?.aboutTermsLink || "Consulter les CGU"}
+                   {t.aboutTermsLink}
                 </a>
               </div>
             </Card>

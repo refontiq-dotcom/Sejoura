@@ -31,11 +31,14 @@ import {
   getPaymentStatusColor,
   getRoomStatusLabel,
   getRoomStatusChartColor,
+  getPaymentMethodLabel,
   canAccessPlanFeature,
   isBookingOverdue,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import { useLanguage } from "@/hooks/use-language";
+import { translations, type Lang } from "@/lib/translations";
 import { convertXofTo, getCurrencyDecimals } from "@/lib/currencyConverter";
 import { createClient } from "@/lib/supabase/client";
 import { DashboardSkeletons } from "@/components/ui/skeletons";
@@ -96,11 +99,11 @@ function toLocalDateStr(value: string): string {
   return toLocalISODate(d);
 }
 
-/** Formate un montant sans symbole de devise (converti depuis XOF, locale fr-FR) */
-function formatAmountOnly(amountInXof: number, currencyCode: string): string {
+/** Formate un montant sans symbole de devise (converti depuis XOF) */
+function formatAmountOnly(amountInXof: number, currencyCode: string, lang: Lang = "fr"): string {
   const converted = convertXofTo(amountInXof, currencyCode);
   const decimals = getCurrencyDecimals(currencyCode);
-  return new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(converted || 0);
+  return new Intl.NumberFormat(lang, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(converted || 0);
 }
 
 interface RoomStatusData {
@@ -146,14 +149,8 @@ function ClientDrawer({
   fmt: (n: number) => string;
   isPastDate: boolean;
 }) {
-  const paymentLabel: Record<string, string> = {
-    cash: "Espèces",
-    wave: "Wave",
-    pi_spi: "PI-SPI",
-    mobile_money: "Mobile Money",
-    bank: "Virement",
-    other: "Autre",
-  };
+  const { lang } = useLanguage();
+  const dt = (translations[lang] ?? translations["fr"]).dashboard;
 
   return (
     <>
@@ -186,15 +183,15 @@ function ClientDrawer({
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {/* Infos client */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <User className="w-3.5 h-3.5" /> Informations client
-            </h3>
+              <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+               <User className="w-3.5 h-3.5" /> {dt.clientInfo}
+             </h3>
             <div className="space-y-2">
               {movement.clientPhone && (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                   <Phone className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Téléphone</p>
+                     <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.phone}</p>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientPhone}</p>
                   </div>
                 </div>
@@ -203,7 +200,7 @@ function ClientDrawer({
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                   <Mail className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Email</p>
+                     <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.email}</p>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientEmail}</p>
                   </div>
                 </div>
@@ -212,7 +209,7 @@ function ClientDrawer({
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                   <Info className="w-4 h-4 text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Nationalité</p>
+                     <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.nationality}</p>
                     <p className="text-sm font-medium text-slate-900 dark:text-white">{movement.clientNationality}</p>
                   </div>
                 </div>
@@ -222,43 +219,43 @@ function ClientDrawer({
 
           {/* Chambre */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <BedDouble className="w-3.5 h-3.5" /> Séjour
-            </h3>
+              <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+               <BedDouble className="w-3.5 h-3.5" /> {dt.stay}
+             </h3>
             <div className="p-4 rounded-xl bg-[var(--primary-muted)] border border-[var(--primary-color)]/20 space-y-3">
               <div className="flex justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambre</span>
+                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.room}</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">Ch. {movement.roomNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Type</span>
+                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.roomType}</span>
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.roomType}</span>
               </div>
               {movement.checkInDate && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Arrivée</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.arrival}</span>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {new Date(movement.checkInDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                     {new Date(movement.checkInDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long" })}
                   </span>
                 </div>
               )}
               {movement.checkOutDate && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Départ</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.departure}</span>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {new Date(movement.checkOutDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
+                     {new Date(movement.checkOutDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long" })}
                   </span>
                 </div>
               )}
               {movement.nightsCount && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Durée</span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.nightsCount} nuit{movement.nightsCount > 1 ? "s" : ""}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.duration}</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.nightsCount} {dt.nights}{movement.nightsCount > 1 ? (lang === "en" ? "s" : "s") : ""}</span>
                 </div>
               )}
               {movement.numberOfGuests && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Voyageurs</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.guests}</span>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.numberOfGuests}</span>
                 </div>
               )}
@@ -267,30 +264,30 @@ function ClientDrawer({
 
           {/* Paiement */}
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <CreditCard className="w-3.5 h-3.5" /> Paiement
-            </h3>
+              <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+               <CreditCard className="w-3.5 h-3.5" /> {dt.payment}
+             </h3>
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 space-y-3">
               <div className="flex justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Montant total</span>
+                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.totalAmount}</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">{fmt(movement.totalAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Encaissé</span>
+                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.collected}</span>
                 <span className={`text-sm font-bold ${movement.amountPaid >= movement.totalAmount ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"}`}>
                   {fmt(movement.amountPaid)}
                 </span>
               </div>
               {movement.paymentMethod && (
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Mode</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.method}</span>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {paymentLabel[movement.paymentMethod] || movement.paymentMethod}
+                     {getPaymentMethodLabel(movement.paymentMethod, lang)}
                   </span>
                 </div>
               )}
               <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between">
-                <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Statut</span>
+                 <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.status}</span>
                 <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                   movement.paymentStatus === "paid"
                     ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
@@ -298,7 +295,7 @@ function ClientDrawer({
                     ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                     : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                 }`}>
-                  {movement.paymentStatus === "paid" ? "Soldé" : movement.paymentStatus === "partial" ? "Partiel" : "Non payé"}
+                   {movement.paymentStatus === "paid" ? dt.paid : movement.paymentStatus === "partial" ? dt.partial : dt.unpaid}
                 </span>
               </div>
             </div>
@@ -307,7 +304,7 @@ function ClientDrawer({
           {/* Demandes spéciales */}
           {movement.specialRequests && (
             <section>
-              <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">Demandes spéciales</h3>
+               <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">{dt.specialRequests}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800">
                 {movement.specialRequests}
               </p>
@@ -331,9 +328,9 @@ function ClientDrawer({
               }}
             >
               {movement.movementType === "check_in" ? (
-                <><LogIn className="w-4 h-4" /> Effectuer le Check-in</>
+                <><LogIn className="w-4 h-4" /> {dt.checkInAction}</>
               ) : (
-                <><LogOut className="w-4 h-4" /> Effectuer le Check-out</>
+                <><LogOut className="w-4 h-4" /> {dt.checkOutAction}</>
               )}
             </Button>
           </div>
@@ -418,7 +415,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
 // LINE CHART (SVG natif)
 // ============================================================================
 
-function LineChart({ data, fmt, currencyCode }: { data: MonthlyRevenueData[]; fmt: (amount: number) => string; currencyCode: string }) {
+function LineChart({ data, fmt, currencyCode, lang }: { data: MonthlyRevenueData[]; fmt: (amount: number) => string; currencyCode: string; lang: Lang }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   if (data.length === 0) {
@@ -483,7 +480,7 @@ function LineChart({ data, fmt, currencyCode }: { data: MonthlyRevenueData[]; fm
               textAnchor="end"
               className="text-xs fill-slate-400"
             >
-               {formatAmountOnly(line.value, currencyCode)}
+               {formatAmountOnly(line.value, currencyCode, lang)}
             </text>
           </g>
         ))}
@@ -626,16 +623,18 @@ function MovementCardList({
   isPastDate: boolean;
   isToday: boolean;
 }) {
+  const { lang } = useLanguage();
+  const dt = (translations[lang] ?? translations["fr"]).dashboard;
   return (
-    <div className="md:hidden space-y-2.5 p-2.5">
-      {movements.length === 0 ? (
-        <div className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
-          {isToday
-            ? "Aucun mouvement prévu aujourd'hui"
-            : isPastDate
-              ? "Aucune activité enregistrée pour cette date"
-              : "Aucune activité prévue pour cette date"}
-        </div>
+          <div className="md:hidden space-y-2.5 p-2.5">
+            {movements.length === 0 ? (
+              <div className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
+                {isToday
+                  ? dt.noMovementsToday
+                  : isPastDate
+                    ? dt.noMovementsPast
+                    : dt.noMovementsFuture}
+              </div>
       ) : (
         movements.map((m) => {
           const canAct =
@@ -679,14 +678,14 @@ function MovementCardList({
               {/* Détails chambre + paiement */}
               <div className="px-3 pb-2 grid grid-cols-2 gap-2">
                 <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Logement</p>
+                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{dt.movements.accommodation}</p>
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">Ch. {m.roomNumber}</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{m.roomType}</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-[var(--surface-muted)]">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Paiement</p>
+                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{dt.movements.payment}</p>
                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}>
-                    {getPaymentStatusLabel(m.paymentStatus)}
+                    {getPaymentStatusLabel(m.paymentStatus, lang)}
                   </span>
                   <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 mt-0.5">
                     {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
@@ -709,16 +708,16 @@ function MovementCardList({
                     }}
                   >
                     {isIn ? <LogIn className="w-3.5 h-3.5" /> : <LogOut className="w-3.5 h-3.5" />}
-                    {isIn ? "Effectuer le check-in" : "Effectuer le check-out"}
+                    {isIn ? dt.checkInAction : dt.checkOutAction}
                   </Button>
                 ) : (
-                  <span className="flex-1 text-[11px] font-medium text-slate-400">
-                    {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
-                  </span>
+                   <span className="flex-1 text-[11px] font-medium text-slate-400">
+                              {m.bookingStatus === "checked_out" ? dt.completed : m.bookingStatus === "cancelled" ? dt.cancelled : m.bookingStatus === "checked_in" ? dt.onSite : dt.confirmed}
+                   </span>
                 )}
-                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onOpenDetails(m); }}>
-                  Détails
-                </Button>
+                 <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onOpenDetails(m); }}>
+                   {dt.details}
+                 </Button>
               </div>
             </div>
           );
@@ -734,6 +733,8 @@ function MovementCardList({
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { lang } = useLanguage();
+  const t = (translations[lang] ?? translations["fr"]).dashboard;
   const { currency, fmt } = useCurrency();
   const { activeAccommodationId } = useAccommodation();
   const [loading, setLoading] = useState(true);
@@ -1014,13 +1015,13 @@ export default function DashboardPage() {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           currentKeys.push(key);
-          labelByKey[key] = d.toLocaleString("fr-FR", { month: "short" });
+          labelByKey[key] = d.toLocaleString(lang, { month: "short" });
         }
         for (let i = 11; i >= 6; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           prevKeys.push(key);
-          labelByKey[key] = d.toLocaleString("fr-FR", { month: "short" });
+          labelByKey[key] = d.toLocaleString(lang, { month: "short" });
         }
 
         payments.forEach((p) => {
@@ -1047,7 +1048,7 @@ export default function DashboardPage() {
       } finally {
         if (!isSilent) setLoading(false);
       }
-  }, [activeAccommodationId]);
+  }, [activeAccommodationId, lang]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1109,7 +1110,7 @@ export default function DashboardPage() {
   const isToday = selectedDate === todayStr;
   const isPastDate = selectedDate < todayStr;
   const isReceptionniste = userRole === "receptionniste";
-  const formattedSelectedDate = new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", {
+  const formattedSelectedDate = new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -1155,10 +1156,10 @@ export default function DashboardPage() {
         <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Erreur de chargement</h2>
-        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Une erreur est survenue lors de la récupération de vos données.</p>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t.error.title}</h2>
+        <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">{t.error.copy}</p>
         <Button onClick={() => loadDashboardData(false, selectedDate)} className="gap-2">
-          <RefreshCw className="w-4 h-4" /> Réessayer
+          <RefreshCw className="w-4 h-4" /> {t.error.retry}
         </Button>
       </div>
     );
@@ -1170,13 +1171,13 @@ export default function DashboardPage() {
         <div className="w-20 h-20 rounded-full bg-[var(--primary-muted)] flex items-center justify-center mb-2">
           <Sparkles className="w-10 h-10 text-[var(--primary-color,#0C1C33)]" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white text-center">Bienvenue sur Séjoura !</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white text-center">{t.welcomeTitle}</h2>
         <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md text-center">
-          {"Pour commencer à utiliser votre tableau de bord, vous devez d'abord créer votre premier établissement et y ajouter des chambres."}
+          {t.welcomeCopy}
         </p>
         <div className="pt-4">
           <Button onClick={() => router.push("/dashboard/residences")} className="gap-2" size="lg">
-            <PlusCircle className="w-5 h-5" /> Ajouter un établissement
+            <PlusCircle className="w-5 h-5" /> {t.addFirstResidence}
           </Button>
         </div>
       </div>
@@ -1193,13 +1194,13 @@ export default function DashboardPage() {
           </div>
           <div className="leading-tight">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 capitalize">{formattedSelectedDate}</p>
-            <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-              {isToday
-                ? "Aujourd'hui"
-                : isPastDate
-                  ? "Activités passées"
-                  : "Activités à venir"}
-            </p>
+             <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+               {isToday
+                 ? t.today
+                 : isPastDate
+                   ? t.pastActivities
+                   : t.upcomingActivities}
+             </p>
           </div>
         </div>
 
@@ -1253,10 +1254,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              {overstayCount} séjour{overstayCount > 1 ? "s" : ""} en dépassement
+              {overstayCount} {t.overstay.title.replace("{count}", String(overstayCount))}
             </p>
             <p className="text-xs text-red-600/80 dark:text-red-400/80 truncate">
-              Client{overstayCount > 1 ? "s" : ""} encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.
+              {t.overstay.subtitle.replace("{count}", String(overstayCount))}
             </p>
           </div>
           <Button
@@ -1264,8 +1265,8 @@ export default function DashboardPage() {
             variant="outline"
             className="flex-shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
             onClick={() => router.push("/dashboard/bookings?status=overdue")}
-          >
-            Voir les réservations
+            >
+            {t.overstay.viewBookings}
           </Button>
         </div>
       )}
@@ -1282,7 +1283,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.expectedCheckins}</p>
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Arrivées prévues</p>
+                 <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.arrivalsExpected}</p>
               </div>
             </div>
           </Card>
@@ -1295,7 +1296,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.expectedCheckouts}</p>
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Départs prévus</p>
+                 <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.departuresExpected}</p>
               </div>
             </div>
           </Card>
@@ -1308,7 +1309,7 @@ export default function DashboardPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.cleaningPending}</p>
-                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Chambres à nettoyer</p>
+                 <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.roomsToClean}</p>
               </div>
             </div>
           </Card>
@@ -1338,10 +1339,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{kpis.occupancyRate}%</p>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{"Taux d'occupation"}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.occupancyRate}</p>
                 </div>
               </div>
-              <Badge variant="info">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+              <Badge variant="info">{isToday ? t.today : isPastDate ? t.pastActivities : t.upcomingActivities}</Badge>
             </div>
             <div className="mt-3">
               <div className="h-1.5 bg-white/70 dark:bg-slate-800/80 rounded-full overflow-hidden ring-1 ring-blue-500/10">
@@ -1350,7 +1351,7 @@ export default function DashboardPage() {
                   style={{ width: `${kpis.occupancyRate}%` }}
                 />
               </div>
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5">Pourcentage de chambres occupées</p>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5">{t.percentageOccupied}</p>
             </div>
           </Card>
 
@@ -1363,15 +1364,17 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none truncate">
-                    {formatAmountOnly(kpis.dailyRevenue, currency.code)}
+                    {formatAmountOnly(kpis.dailyRevenue, currency.code, lang)}
                   </p>
-                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">Encaissements du jour</p>
+                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.kpis.dailyRevenue}</p>
                 </div>
               </div>
               <Badge variant="success">{currency.code}</Badge>
             </div>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
-              {isToday ? `${currency.symbol} encaissés aujourd'hui` : `${currency.symbol} encaissés le ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+              {isToday
+                ? t.kpis.dailyRevenueCopy
+                : `${currency.symbol} ${lang === "en" ? "collected" : "encaissés"} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
             </p>
           </Card>
 
@@ -1390,22 +1393,22 @@ export default function DashboardPage() {
                         <LogIn className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckins}</span>
                       </div>
-                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Arrivées</p>
+                       <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{t.arrivalsExpected}</p>
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <LogOut className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                         <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.expectedCheckouts}</span>
                       </div>
-                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Départs</p>
+                       <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{t.departuresExpected}</p>
                     </div>
                   </div>
                 </div>
               </div>
-              <Badge variant="warning">{isToday ? "Aujourd'hui" : isPastDate ? "Passé" : "À venir"}</Badge>
+               <Badge variant="warning">{isToday ? t.today : isPastDate ? t.pastActivities : t.upcomingActivities}</Badge>
             </div>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
-              {isToday ? "Arrivées et départs prévus" : "Arrivées et départs enregistrés"}
+              {isToday ? t.expectedArrivalsDepartures : t.recordedArrivalsDepartures}
             </p>
           </Card>
 
@@ -1424,22 +1427,22 @@ export default function DashboardPage() {
                         <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                         <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningPending}</span>
                       </div>
-                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">À nettoyer</p>
+                       <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{t.kpis.toClean}</p>
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         <span className="text-xl font-extrabold tabular-nums text-slate-900 dark:text-white">{kpis.cleaningDone}</span>
                       </div>
-                      <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">Prêtes</p>
+                       <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{t.kpis.ready}</p>
                     </div>
                   </div>
                 </div>
               </div>
               <Badge variant="purple">Ménage</Badge>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">Statut de propreté des chambres</p>
-          </Card>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">{t.cleanlinessStatus}</p>
+            </Card>
         </div>
       )}
 
@@ -1450,10 +1453,10 @@ export default function DashboardPage() {
           <SectionHeader
             icon={<LogIn className="w-5 h-5" />}
             iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
-            title={isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
-            subtitle={isToday
-              ? "Arrivées et départs prévus aujourd'hui"
-              : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
+             title={isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture}
+             subtitle={isToday
+               ? t.movements.subtitle
+               : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
             action={
               <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
                 Voir tout
@@ -1479,19 +1482,19 @@ export default function DashboardPage() {
               <thead>
                 <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                    Client
+                    {t.movements.client}
                   </th>
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                    Logement
+                    {t.movements.accommodation}
                   </th>
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                    Heure
+                    {t.movements.time}
                   </th>
                   <th className="text-left p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                    Paiement
+                    {t.movements.payment}
                   </th>
                   <th className="text-right p-2.5 text-[11px] font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                    Actions
+                    {t.movements.action}
                   </th>
                 </tr>
               </thead>
@@ -1546,7 +1549,7 @@ export default function DashboardPage() {
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
                         >
-                          {getPaymentStatusLabel(m.paymentStatus)}
+                          {getPaymentStatusLabel(m.paymentStatus, lang)}
                         </span>
                         <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
                           {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
@@ -1568,7 +1571,7 @@ export default function DashboardPage() {
                               handleMovementAction(m.id, m.movementType);
                             }}
                           >
-                            {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                             {m.movementType === "check_in" ? t.checkInAction : t.checkOutAction}
                           </Button>
                         )}
                         <Button
@@ -1576,7 +1579,7 @@ export default function DashboardPage() {
                           size="sm"
                           onClick={() => setDrawerMovement(m)}
                         >
-                          Détails
+                          {t.details}
                         </Button>
                       </div>
                     </td>
@@ -1594,13 +1597,13 @@ export default function DashboardPage() {
             <SectionHeader
               icon={<LogIn className="w-5 h-5" />}
               iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
-              title={isToday ? "Mouvements du jour" : isPastDate ? "Activités passées" : "Activités à venir"}
+              title={isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture}
               subtitle={isToday
-                ? "Arrivées et départs prévus aujourd'hui"
-                : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}
+                ? t.movements.subtitle
+                : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
               action={
                 <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
-                  Voir tout
+                  {t.movements.viewAll}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               }
@@ -1691,7 +1694,7 @@ export default function DashboardPage() {
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(m.paymentStatus)}`}
                           >
-                            {getPaymentStatusLabel(m.paymentStatus)}
+                            {getPaymentStatusLabel(m.paymentStatus, lang)}
                           </span>
                           <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
                             {fmt(m.amountPaid)} / {fmt(m.totalAmount)}
@@ -1705,7 +1708,7 @@ export default function DashboardPage() {
                           (m.movementType === "check_out" && m.bookingStatus === "checked_in")
                         ) ? (
                           <Badge variant={m.bookingStatus === "checked_out" ? "success" : m.bookingStatus === "cancelled" ? "error" : "info"}>
-                            {m.bookingStatus === "checked_out" ? "Terminé" : m.bookingStatus === "cancelled" ? "Annulé" : m.bookingStatus === "checked_in" ? "Sur place" : "Confirmé"}
+                                     {m.bookingStatus === "checked_out" ? t.completed : m.bookingStatus === "cancelled" ? t.cancelled : m.bookingStatus === "checked_in" ? t.onSite : t.confirmed}
                           </Badge>
                         ) : (
                           <Button
@@ -1718,7 +1721,7 @@ export default function DashboardPage() {
                               handleMovementAction(m.id, m.movementType);
                             }}
                           >
-                            {m.movementType === "check_in" ? "Check-in" : "Check-out"}
+                             {m.movementType === "check_in" ? t.checkInAction : t.checkOutAction}
                           </Button>
                         )}
                       </td>
@@ -1734,8 +1737,8 @@ export default function DashboardPage() {
             <SectionHeader
               icon={<Sparkles className="w-5 h-5" />}
               iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-violet-500/20"
-              title="État du parc"
-              subtitle="Répartition en temps réel"
+              title={t.kpis.roomStatus}
+              subtitle={t.kpis.roomStatusCopy}
             />
 
             <div className="p-4 md:p-5">
@@ -1751,7 +1754,7 @@ export default function DashboardPage() {
                         style={{ backgroundColor: getRoomStatusChartColor(item.status) }}
                       />
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {getRoomStatusLabel(item.status)}
+                         {getRoomStatusLabel(item.status, lang)}
                       </span>
                     </div>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-100 tabular-nums">
@@ -1769,10 +1772,10 @@ export default function DashboardPage() {
         <Card className="p-4 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Fonctionnalités Entreprise disponibles</p>
-              <p className="text-sm text-amber-700 dark:text-amber-300">La comptabilité avancée, le boost Trouvetou et l’API Séjoura sont réservés à la formule Entreprise.</p>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t.enterpriseFeaturesAvailable}</p>
+              <p className="text-sm text-amber-700 dark:text-amber-300">{t.advancedAccountingReserved}</p>
             </div>
-            <Button variant="primary" onClick={() => router.push("/dashboard/subscription")}>Passer à la formule Entreprise</Button>
+            <Button variant="primary" onClick={() => router.push("/dashboard/subscription")}>{t.switchToEnterprise}</Button>
           </div>
         </Card>
       )}
@@ -1783,8 +1786,8 @@ export default function DashboardPage() {
           <SectionHeader
             icon={<Wallet className="w-5 h-5" />}
             iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-500/20"
-            title="Suivi des recettes mensuelles"
-            subtitle={`Évolution des encaissements (en ${currency.symbol})`}
+            title={t.revenueTracking}
+            subtitle={t.revenueTrend.replace("{currency}", currency.symbol)}
             action={
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 ring-1 ring-emerald-500/20">
                 <TrendingUp className={`w-4 h-4 ${trendPercentage >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`} />
@@ -1796,7 +1799,7 @@ export default function DashboardPage() {
           />
 
           <div className="p-4 md:p-5">
-            <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} />
+            <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} lang={lang} />
           </div>
         </SectionCard>
       )}
