@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
     ]);
 
-    const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/ideas");
+    const adminUrl = getTelegramAdminUrl("https://sejoura-lemon.vercel.app/admin/ideas");
 
     const text = [
       "\uD83D\uDCA1 *Nouvelle suggestion Sejoura !*",

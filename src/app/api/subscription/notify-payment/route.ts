@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     try {
       const planLabel = getPlanLabel(plan);
       const contactName = tenant?.contact_name ?? "Gérant de l'établissement";
-      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
+      const adminUrl = getTelegramAdminUrl("https://sejoura-lemon.vercel.app/admin/sejour");
 
       const text = [
         "\uD83D\uDD14 *Nouvelle demande d'abonnement Sejoura !*",
