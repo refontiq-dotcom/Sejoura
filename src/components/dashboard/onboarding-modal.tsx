@@ -76,6 +76,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     try {

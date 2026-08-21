@@ -356,6 +356,7 @@ export function HomePage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     clearErrors();
 
     const newErrors: typeof errors = {};
@@ -443,6 +444,7 @@ export function HomePage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     clearErrors();
 
     const newErrors: typeof errors = {};
