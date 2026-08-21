@@ -16,12 +16,7 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS booking_source booking_source NOT NULL DEFAULT 'manual';
 
 -- 3. Mise à jour de la fonction create_booking pour accepter la source
-DROP FUNCTION IF EXISTS create_booking(
-  UUID, UUID, UUID, UUID, DATE, DATE, INTEGER, INTEGER, INTEGER, INTEGER, UUID, TIME, TIME, INTEGER, TEXT
-);
-DROP FUNCTION IF EXISTS create_booking(
-  UUID, UUID, UUID, UUID, DATE, DATE, INTEGER, INTEGER, INTEGER, INTEGER, UUID, TIME, TIME, INTEGER, TEXT, booking_status
-);
+DROP FUNCTION IF EXISTS create_booking CASCADE;
 
 CREATE OR REPLACE FUNCTION create_booking(
   p_tenant_id UUID,
