@@ -416,3 +416,4 @@ export async function POST(request: Request) {
     console.error("POST /api/v1/external/bookings error:", error);
     return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }
+}
