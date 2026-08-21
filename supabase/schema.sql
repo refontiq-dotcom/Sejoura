@@ -1183,13 +1183,6 @@ CREATE POLICY "cleaning_tasks_update_menagere" ON cleaning_tasks
     AND get_current_user_role() = 'menagere'
   );
 
--- Admin et réceptionniste peuvent update
-CREATE POLICY "cleaning_tasks_update_staff" ON cleaning_tasks
-  FOR UPDATE USING (
-    tenant_id = get_current_user_tenant_id()
-    AND get_current_user_role() IN ('admin_residence', 'receptionniste')
-  );
-
 -- ----------------------------------------------------------------------------
 -- 23k. POLITIQUES RLS — expenses
 -- ----------------------------------------------------------------------------
@@ -1346,18 +1339,19 @@ RETURNS cleaning_tasks AS $$
 DECLARE
   v_task cleaning_tasks;
 BEGIN
-  -- Verrouiller la ligne de manière exclusive
+  IF get_current_user_role() != 'menagere' THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seules les ménagères peuvent prendre une tâche';
+  END IF;
+
   SELECT * INTO v_task
   FROM cleaning_tasks
   WHERE id = p_task_id AND status = 'pending'
   FOR UPDATE SKIP LOCKED;
 
-  -- Si aucune tâche trouvée (déjà prise ou n'existe pas)
   IF NOT FOUND THEN
     RETURN NULL;
   END IF;
 
-  -- Marquer la tâche comme claimée
   UPDATE cleaning_tasks
   SET
     status = 'claimed',
@@ -1383,7 +1377,10 @@ DECLARE
   v_room_id UUID;
   v_accommodation_id UUID;
 BEGIN
-  -- Vérifier que la tâche appartient bien à la ménagère
+  IF get_current_user_role() != 'menagere' THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seules les ménagères peuvent terminer une tâche';
+  END IF;
+
   SELECT * INTO v_task
   FROM cleaning_tasks
   WHERE id = p_task_id AND claimed_by = p_user_id
@@ -1393,7 +1390,6 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- Marquer comme terminée
   UPDATE cleaning_tasks
   SET
     status = 'done',
@@ -1402,7 +1398,6 @@ BEGIN
   WHERE id = p_task_id
   RETURNING * INTO v_task;
 
-  -- Mettre la chambre en disponible
   UPDATE rooms SET status = 'available'
   WHERE id = v_task.room_id;
 

@@ -150,7 +150,7 @@ export default function CleaningPage() {
       if (!userData) return;
       setUserId(userData.id);
       setTenantId(userData.tenant_id);
-      setIsReadOnly(userData.role === "receptionniste");
+      setIsReadOnly(userData.role === "receptionniste" || userData.role === "admin_residence");
       setIsAdmin(userData.role === "admin_residence");
 
       const { data: subData } = await supabase
