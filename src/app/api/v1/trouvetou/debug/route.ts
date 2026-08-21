@@ -5,6 +5,12 @@ import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/v1/trouvetou/debug
+ * Diagnostic : liste tous les types de chambre avec is_listed_on_trouvetou = true
+ * et explique pourquoi chacun est inclus, exclu, ou masqué (is_available = false)
+ * dans le catalogue Trouvetou.
+ */
 export async function GET(request: Request) {
   const secret = process.env.TROUVETOU_SYNC_SECRET;
   const provided = request.headers.get("x-sync-secret");
@@ -14,6 +20,7 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
 
+  // 1. Clés API actives par tenant
   const { data: activeKeys } = await admin
     .from("external_api_keys")
     .select("tenant_id, api_key")
@@ -26,6 +33,7 @@ export async function GET(request: Request) {
     }
   }
 
+  // 2. Tous les types de chambre publiés
   const { data, error } = await admin
     .from("room_types")
     .select(`
@@ -44,20 +52,45 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // 3. Chambres avec statut
   const allTypeIds = (data ?? []).map((r: { id: string }) => r.id);
   const { data: rooms } = await admin
     .from("rooms")
-    .select("id, room_type_id")
+    .select("id, room_type_id, status")
     .in(
       "room_type_id",
       allTypeIds.length > 0 ? allTypeIds : ["00000000-0000-0000-0000-000000000000"]
     );
 
   const roomCountByType = new Map<string, number>();
+  const roomsByType = new Map<string, { id: string; status: string | null }[]>();
+  const occupiedRoomIds = new Set<string>();
+
   for (const r of rooms ?? []) {
     roomCountByType.set(r.room_type_id, (roomCountByType.get(r.room_type_id) ?? 0) + 1);
+    const list = roomsByType.get(r.room_type_id) ?? [];
+    list.push({ id: r.id, status: r.status });
+    roomsByType.set(r.room_type_id, list);
+    if (r.status === "occupied") occupiedRoomIds.add(r.id);
   }
 
+  // 4. Réservations actives en cours (confirmed ou checked_in)
+  const allRoomIds = (rooms ?? []).map((r) => r.id);
+  const now = new Date().toISOString();
+  if (allRoomIds.length > 0) {
+    const { data: activeBookings } = await admin
+      .from("bookings")
+      .select("room_id")
+      .in("room_id", allRoomIds)
+      .in("status", ["confirmed", "checked_in"])
+      .lte("check_in", now)
+      .gte("check_out", now);
+    for (const b of activeBookings ?? []) {
+      occupiedRoomIds.add(b.room_id);
+    }
+  }
+
+  // 5. Analyser chaque type
   type AnyRow = Record<string, unknown>;
 
   const result = (data ?? []).map((rt: AnyRow) => {
@@ -88,6 +121,12 @@ export async function GET(request: Request) {
       .filter(([, v]) => !v)
       .map(([k]) => k);
 
+    const typeRooms = roomsByType.get(rt.id as string) ?? [];
+    const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
+    const occupiedInType = typeRooms
+      .filter((r) => occupiedRoomIds.has(r.id))
+      .map((r) => r.id);
+
     return {
       room_type_id: rt.id,
       room_type_name: rt.name,
@@ -98,19 +137,28 @@ export async function GET(request: Request) {
       blockedBy: eligible ? [] : blockedBy,
       checks,
       room_count: roomCountByType.get(rt.id as string) ?? 0,
+      is_available: isAvailable,
+      // true = annonce visible sur Trouvetou, false = masquée
+      will_show_on_trouvetou: eligible && isAvailable,
+      occupied_rooms_count: occupiedInType.length,
     };
   });
 
-  const eligible = result.filter((r) => r.eligible);
-  const blocked = result.filter((r) => !r.eligible);
+  const visibleOnTrouvetou = result.filter((r) => r.will_show_on_trouvetou);
+  const hiddenUnavailable = result.filter((r) => r.eligible && !r.is_available);
+  const blockedIneligible = result.filter((r) => !r.eligible);
 
   return NextResponse.json({
     summary: {
       total_listed: result.length,
-      will_sync: eligible.length,
-      blocked: blocked.length,
+      visible_on_trouvetou: visibleOnTrouvetou.length,
+      hidden_unavailable: hiddenUnavailable.length,
+      blocked_ineligible: blockedIneligible.length,
     },
-    eligible,
-    blocked,
+    visible_on_trouvetou: visibleOnTrouvetou,
+    // Annonces éligibles mais masquées car toutes les chambres sont occupées/réservées
+    hidden_unavailable: hiddenUnavailable,
+    // Annonces bloquées pour non-conformité (pas de photo, pas de chambre, etc.)
+    blocked_ineligible: blockedIneligible,
   });
 }
