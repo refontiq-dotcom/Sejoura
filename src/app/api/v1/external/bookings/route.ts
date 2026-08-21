@@ -294,6 +294,7 @@ export async function POST(request: Request) {
       p_special_requests: special_requests ? String(special_requests) : null,
       p_created_by: ownerUser.id,
       p_initial_status: initialStatus,
+      p_booking_source: 'external',
     });
 
     if (bookingErr) {

@@ -44,6 +44,8 @@ export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 export type PaymentMethod = "cash" | "wave" | "pi_spi" | "mobile_money" | "bank" | "other";
 
+export type BookingSource = "manual" | "external" | "client_request";
+
 export type ExpenseCategory =
   | "salaries"
   | "utilities"
@@ -340,6 +342,7 @@ export interface Booking {
   amount_paid: number;
   payment_status: PaymentStatus;
   payment_method: PaymentMethod | null;
+  booking_source: BookingSource;
   status: BookingStatus;
   number_of_guests: number;
   special_requests: string | null;

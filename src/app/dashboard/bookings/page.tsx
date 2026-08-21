@@ -729,6 +729,7 @@ export default function BookingsPage() {
         p_number_of_guests: parseInt(formData.number_of_guests) || 1,
         p_special_requests: formData.special_requests || null,
         p_created_by: userId,
+        p_booking_source: 'manual',
       });
 
       if (bookingErr) {
@@ -1729,8 +1730,8 @@ export default function BookingsPage() {
                       <span className="flex-1 text-[11px] text-slate-400">Aucune action disponible</span>
                     ) : (
                       <>
-                        {/* Bouton Compléter la fiche avant Check-in si CNI/Passeport manquant */}
-                        {b.status === "confirmed" && !b.client?.id_number && (
+                         {/* Bouton Compléter la fiche avant Check-in si CNI/Passeport manquant (hors réservation en ligne) */}
+                         {b.status === "confirmed" && !b.client?.id_number && b.booking_source !== 'external' && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1923,7 +1924,7 @@ export default function BookingsPage() {
                         </span>
                         {!b.client?.id_number && (b.status === "confirmed" || b.status === "checked_in") && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                            ⚠️ CNI/Passeport manquant
+                            ⚠️
                           </span>
                         )}
                         {overdue && (
@@ -1938,8 +1939,8 @@ export default function BookingsPage() {
                         <span className="block text-right text-xs text-slate-400 dark:text-slate-500">Aucune action</span>
                       ) : (
                       <div className="flex items-center gap-1 md:gap-2 justify-end">
-                        {/* Bouton intelligent : Compléter la fiche avant Check-in si CNI manquante */}
-                        {b.status === "confirmed" && !b.client?.id_number && (
+                         {/* Bouton intelligent : Compléter la fiche avant Check-in si CNI manquante (hors réservation en ligne) */}
+                         {b.status === "confirmed" && !b.client?.id_number && b.booking_source !== 'external' && (
                           <Button size="sm" variant="outline" className="hidden md:inline-flex text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40" onClick={() => openCompleteClientModal(b)}>
                             <Pencil className="w-3.5 h-3.5 mr-1" /> Compléter la fiche
                           </Button>
@@ -1957,8 +1958,8 @@ export default function BookingsPage() {
                           </Button>
                         )}
 
-                        {/* Action primaire — Mobile : icône compacte */}
-                        {b.status === "confirmed" && !b.client?.id_number && (
+                         {/* Action primaire — Mobile : icône compacte */}
+                         {b.status === "confirmed" && !b.client?.id_number && b.booking_source !== 'external' && (
                           <Button size="icon" variant="ghost" className="md:hidden h-10 w-10 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40" onClick={() => openCompleteClientModal(b)} aria-label="Compléter la fiche">
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -2265,7 +2266,7 @@ export default function BookingsPage() {
                               selectedClient.id_number
                             ) : (
                               <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                                ⚠️ CNI/Passeport manquant
+                                ⚠️
                               </span>
                             )}
                           </p>
