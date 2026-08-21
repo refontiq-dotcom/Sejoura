@@ -69,6 +69,16 @@ export class WavePaymentService implements PaymentProvider {
    * }
    */
   async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
+    if (this.apiKey.startsWith("mock_")) {
+      console.log("[Wave] Mode simulation (clé mock_) détecté.");
+      return {
+        success: true,
+        transactionId: `mock_wave_session_${Math.random().toString(36).substring(7)}`,
+        checkoutUrl: `https://pay.wave.com/m/mock_session?ref=${params.reference}`,
+        rawResponse: { simulated: true }
+      };
+    }
+
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     try {

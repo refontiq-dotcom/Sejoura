@@ -29,6 +29,7 @@ export interface TrouvetouSyncItem {
   images: string[];
   attributes: Record<string, unknown>;
   is_available: boolean;
+  category_slug?: string | null;
 }
 
 export interface TrouvetouSyncResult {
@@ -274,6 +275,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
+        category_slug: accommodation.description === "bnb" ? "residence" : "hotel",
       };
     });
 

@@ -121,6 +121,8 @@ export async function POST(request: Request) {
       number_of_guests,
       special_requests,
       guest,
+      payment_method, // 'online' | 'offline'
+      payment_provider, // 'wave' | 'orange_money' | 'mtn' | 'moov_africa' | 'pi_spi'
     } = body;
 
     if (!room_type_id || !check_in_date || !check_out_date) {
@@ -180,7 +182,7 @@ export async function POST(request: Request) {
         .from("bookings")
         .select("room_id")
         .in("room_id", roomIds)
-        .in("status", ["confirmed", "checked_in"])
+        .in("status", ["pending_payment", "confirmed", "checked_in"])
         .lt("check_in_date", check_out_date)
         .gt("check_out_date", check_in_date);
 
@@ -198,10 +200,6 @@ export async function POST(request: Request) {
     }
 
     // 3. Réutiliser le client s'il existe (même téléphone ET même nom) sinon le créer.
-    //    Règle stricte : on ne réutilise un profil que si le téléphone est fourni
-    //    ET que le nom correspond (insensible à la casse, espaces ignorés).
-    //    Si le téléphone est absent → toujours créer un nouveau client, afin
-    //    d'éviter de fusionner des voyageurs différents sous un même profil.
     const phone = guest.phone ? String(guest.phone).trim() : null;
     const fullNameNorm = guest.full_name.trim().toLowerCase();
     let clientId: string | null = null;
@@ -213,8 +211,6 @@ export async function POST(request: Request) {
         .eq("tenant_id", tenantId)
         .eq("phone", phone);
 
-      // Chercher un client avec le même téléphone ET le même nom (évite la
-      // fusion de deux personnes différentes qui auraient le même téléphone).
       const matched = (existingClients ?? []).find(
         (c) => c.full_name.trim().toLowerCase() === fullNameNorm
       );
@@ -242,7 +238,7 @@ export async function POST(request: Request) {
       clientId = newClient.id;
     }
 
-    // 4. Résoudre created_by : on cherche un admin de la résidence, sinon n'importe quel utilisateur actif
+    // 4. Résoudre created_by
     let { data: ownerUser } = await admin
       .from("users")
       .select("id")
@@ -270,7 +266,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Calculs (prix = prix de base du type, pas de négociation côté portail)
+    // 5. Calculs
     const nights = Math.max(
       1,
       Math.round((new Date(check_out_date).getTime() - new Date(check_in_date).getTime()) / 86_400_000)
@@ -278,7 +274,11 @@ export async function POST(request: Request) {
     const basePrice = roomType.base_price || 0;
     const totalAmount = basePrice * nights;
 
-    // 6. Créer la réservation (RPC : anti double-booking + code SJ-YYYY-NNNN)
+    // Déterminer le statut initial
+    const isOnlinePayment = payment_method === "online";
+    const initialStatus = isOnlinePayment ? "pending_payment" : "confirmed";
+
+    // 6. Créer la réservation
     const { data: booking, error: bookingErr } = await admin.rpc("create_booking", {
       p_tenant_id: tenantId,
       p_accommodation_id: roomType.accommodation_id,
@@ -293,6 +293,7 @@ export async function POST(request: Request) {
       p_number_of_guests: parseInt(String(number_of_guests), 10) || 1,
       p_special_requests: special_requests ? String(special_requests) : null,
       p_created_by: ownerUser.id,
+      p_initial_status: initialStatus,
     });
 
     if (bookingErr) {
@@ -300,6 +301,122 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: "Cette chambre vient d'être réservée pour ces dates", code: "DOUBLE_BOOKING" },
           { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: `Erreur DB lors de la création de la réservation: ${bookingErr.message || JSON.stringify(bookingErr)}` },
+        { status: 500 }
+      );
+    }
+
+    // 7. Si paiement en ligne demandé, on tente d'initialiser le paiement
+    if (isOnlinePayment) {
+      if (!payment_provider) {
+        // Nettoyage en cas d'erreur
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json(
+          { error: "Le paramètre payment_provider est requis pour un paiement en ligne" },
+          { status: 400 }
+        );
+      }
+
+      const { getPaymentService } = await import("@/lib/payments");
+      const service = await getPaymentService(tenantId, payment_provider as any);
+
+      if (!service) {
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json(
+          { error: `Le mode de paiement ${payment_provider} n'est pas activé ou configuré pour cette résidence` },
+          { status: 400 }
+        );
+      }
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sejoura-lemon.vercel.app";
+      const webhookUrl = `${appUrl}/api/v1/webhooks/payments?provider=${payment_provider}`;
+
+      const paymentResult = await service.initiatePayment({
+        amount: totalAmount,
+        reference: booking.booking_code,
+        customerPhone: phone || undefined,
+        description: `Réservation Séjoura ${booking.booking_code}`,
+        returnUrl: `${appUrl}/stay/booking-success?code=${booking.booking_code}`,
+        cancelUrl: `${appUrl}/stay/booking-cancelled?code=${booking.booking_code}`,
+        webhookUrl,
+      });
+
+      // Si l'initiation du paiement a échoué (hors simulation/stub)
+      // Note : les stubs renvoient success: false avec un message, mais pour nos tests et simulations,
+      // nous voulons que le script de test puisse fonctionner. Si le service est configuré avec un stub qui échoue
+      // explicitement pour cause de configuration manquante, on lève l'erreur.
+      if (!paymentResult.success) {
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json(
+          { error: `Impossible d'initier le paiement : ${paymentResult.error}` },
+          { status: 502 }
+        );
+      }
+
+      // Enregistrer la transaction
+      const { error: txnErr } = await admin
+        .from("online_payment_transactions")
+        .insert({
+          tenant_id: tenantId,
+          booking_id: booking.id,
+          provider: payment_provider,
+          provider_transaction_id: paymentResult.transactionId || null,
+          amount: totalAmount,
+          status: "pending",
+          checkout_url: paymentResult.checkoutUrl || null,
+        });
+
+      if (txnErr) {
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json(
+          { error: "Erreur lors de la création de la transaction de paiement" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        booking: {
+          id: booking.id,
+          booking_code: booking.booking_code,
+          status: booking.status,
+          check_in_date: booking.check_in_date,
+          check_out_date: booking.check_out_date,
+          total_amount: booking.total_amount,
+          number_of_guests: booking.number_of_guests,
+          room_id: booking.room_id,
+          client_id: booking.client_id,
+        },
+        payment: {
+          provider: payment_provider,
+          checkout_url: paymentResult.checkoutUrl,
+          transaction_id: paymentResult.transactionId,
+        }
+      }, { status: 201 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      booking: {
+        id: booking.id,
+        booking_code: booking.booking_code,
+        status: booking.status,
+        check_in_date: booking.check_in_date,
+        check_out_date: booking.check_out_date,
+        total_amount: booking.total_amount,
+        number_of_guests: booking.number_of_guests,
+        room_id: booking.room_id,
+        client_id: booking.client_id,
+      },
+    }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/v1/external/bookings error:", error);
+    return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
+  }
+}         { status: 409 }
         );
       }
       return NextResponse.json(
