@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
+import { useCleaningActions } from "@/hooks/use-cleaning-actions";
 import {
   timeAgo,
   countdownTo,
@@ -15,7 +16,6 @@ import {
   isLate,
   isDoneToday,
 } from "@/lib/cleaning-time";
-import { toast } from "sonner";
 import {
   Sparkles,
   Loader2,
@@ -46,9 +46,19 @@ export default function MenagePage() {
   const [userName, setUserName] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [filter, setFilter] = useState<FilterKey>("pending");
-  const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
+
+  const { actionTaskId, claim, complete } = useCleaningActions(tenantId, {
+    onClaimDone: () => {
+      setFilter("mine");
+      loadData();
+    },
+    onCompleteDone: () => {
+      setFilter("done");
+      loadData();
+    },
+  });
 
   // Horloge pour les temps relatifs / délais
   useEffect(() => {
@@ -107,55 +117,6 @@ export default function MenagePage() {
 
   // Mise à jour en temps réel : nouvelle tâche, prise, terminée… (debouncée)
   useCleaningRealtime(tenantId, () => loadData());
-
-  async function handleClaim(taskId: string) {
-    setActionTaskId(taskId);
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc("claim_cleaning_task", {
-        p_task_id: taskId,
-        p_user_id: userId,
-      });
-      if (error) {
-        toast.error("Erreur : " + error.message);
-        return;
-      }
-      if (!data) {
-        toast.error("Cette tâche vient d'être prise par une autre ménagère.");
-        loadData();
-        return;
-      }
-      toast.success("Tâche prise en charge !");
-      setFilter("mine");
-      loadData();
-    } catch {
-      toast.error("Impossible de prendre la tâche.");
-    } finally {
-      setActionTaskId(null);
-    }
-  }
-
-  async function handleComplete(taskId: string) {
-    setActionTaskId(taskId);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc("complete_cleaning_task", {
-        p_task_id: taskId,
-        p_user_id: userId,
-      });
-      if (error) {
-        toast.error("Erreur : " + error.message);
-        return;
-      }
-      toast.success("Tâche terminée, bravo !");
-      setFilter("done");
-      loadData();
-    } catch {
-      toast.error("Impossible de marquer la tâche comme terminée.");
-    } finally {
-      setActionTaskId(null);
-    }
-  }
 
   // ============================================================================
   // Statistiques
@@ -340,7 +301,7 @@ export default function MenagePage() {
             className="w-full mt-2.5"
             loading={actionTaskId === suggestion.id}
             disabled={actionTaskId !== null}
-            onClick={() => handleClaim(suggestion.id)}
+            onClick={() => claim(suggestion.id)}
           >
             <Hand className="w-5 h-5" /> Prendre cette tâche
           </Button>
@@ -493,7 +454,7 @@ export default function MenagePage() {
                     size="xl"
                     loading={actionTaskId === task.id}
                     disabled={actionTaskId !== null}
-                    onClick={() => handleClaim(task.id)}
+                    onClick={() => claim(task.id)}
                   >
                     <Hand className="w-5 h-5" /> Prendre la tâche
                   </Button>
@@ -505,7 +466,7 @@ export default function MenagePage() {
                     size="xl"
                     loading={actionTaskId === task.id}
                     disabled={actionTaskId !== null}
-                    onClick={() => handleComplete(task.id)}
+                    onClick={() => complete(task.id)}
                   >
                     <CheckCircle2 className="w-5 h-5" /> Marquer terminée
                   </Button>

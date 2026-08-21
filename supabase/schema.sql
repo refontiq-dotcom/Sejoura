@@ -1169,13 +1169,6 @@ CREATE POLICY "cleaning_tasks_select_own" ON cleaning_tasks
 CREATE POLICY "cleaning_tasks_select_super_admin" ON cleaning_tasks
   FOR SELECT USING (is_super_admin());
 
--- Admin et réceptionniste peuvent créer des tâches
-CREATE POLICY "cleaning_tasks_insert_own" ON cleaning_tasks
-  FOR INSERT WITH CHECK (
-    tenant_id = get_current_user_tenant_id()
-    AND get_current_user_role() IN ('admin_residence', 'receptionniste')
-  );
-
 -- Ménagères peuvent update (claim, complete) — verrou de concurrence via la condition
 CREATE POLICY "cleaning_tasks_update_menagere" ON cleaning_tasks
   FOR UPDATE USING (
@@ -1400,6 +1393,49 @@ BEGIN
 
   UPDATE rooms SET status = 'available'
   WHERE id = v_task.room_id;
+
+  RETURN v_task;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ----------------------------------------------------------------------------
+-- 25b. FONCTION: Relancer une tâche de ménage expirée
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION reopen_cleaning_task(
+  p_task_id UUID
+)
+RETURNS cleaning_tasks AS $$
+DECLARE
+  v_task cleaning_tasks;
+BEGIN
+  IF get_current_user_role() != 'menagere' THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: Seules les ménagères peuvent relancer une tâche';
+  END IF;
+
+  SELECT * INTO v_task
+  FROM cleaning_tasks
+  WHERE id = p_task_id AND status = 'expired'
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  UPDATE cleaning_tasks
+  SET
+    status = 'pending',
+    claimed_by = NULL,
+    claimed_at = NULL,
+    completed_by = NULL,
+    completed_at = NULL,
+    is_alert_sent = FALSE,
+    is_force_released = FALSE,
+    alert_time = NOW() + INTERVAL '1 hour 30 minutes',
+    force_release_time = NOW() + INTERVAL '2 hours'
+  WHERE id = p_task_id
+  RETURNING * INTO v_task;
+
+  UPDATE rooms SET status = 'cleaning' WHERE id = v_task.room_id;
 
   RETURN v_task;
 END;
@@ -1631,7 +1667,7 @@ BEGIN
   -- Marquer les tâches en alerte si le délai de 1h30 est dépassé
   UPDATE cleaning_tasks
   SET is_alert_sent = TRUE
-  WHERE status IN ('pending', 'claimed')
+  WHERE status IN ('pending', 'claimed', 'in_progress')
     AND alert_time IS NOT NULL
     AND alert_time < NOW()
     AND is_alert_sent = FALSE;
@@ -1641,7 +1677,7 @@ BEGIN
   SET status = 'alert'
   WHERE id IN (
     SELECT room_id FROM cleaning_tasks
-    WHERE status IN ('pending', 'claimed')
+    WHERE status IN ('pending', 'claimed', 'in_progress')
       AND alert_time < NOW()
       AND is_alert_sent = TRUE
   );

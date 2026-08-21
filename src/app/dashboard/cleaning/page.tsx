@@ -10,6 +10,7 @@ import { canAccessPlanFeature } from "@/lib/utils";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
+import { useCleaningActions } from "@/hooks/use-cleaning-actions";
 import { useLanguage } from "@/hooks/use-language";
 import { translations, type Lang } from "@/lib/translations";
 import {
@@ -112,9 +113,14 @@ export default function CleaningPage() {
   // lui-même un filtre de résidence explicite.
   const { activeAccommodationId } = useAccommodation();
   const userPickedAccFilterRef = useRef(false);
-  const [actionTaskId, setActionTaskId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
+
+  const { actionTaskId, claim, complete, reopen } = useCleaningActions(tenantId, {
+    onClaimDone: loadData,
+    onCompleteDone: loadData,
+    onReopenDone: loadData,
+  });
   // Nombre de départs prévus demain, par établissement (prévision de charge)
   const [tomorrowCheckouts, setTomorrowCheckouts] = useState<Record<string, number>>({});
 
@@ -228,73 +234,6 @@ export default function CleaningPage() {
 
   // Temps réel : mise à jour dès qu'une ménagère agit (debouncée)
   useCleaningRealtime(tenantId, () => loadData());
-
-  async function handleClaim(taskId: string) {
-    setActionTaskId(taskId);
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc("claim_cleaning_task", {
-        p_task_id: taskId,
-        p_user_id: userId,
-      });
-      if (error) {
-        toast.error("Erreur : " + error.message);
-        return;
-      }
-      if (!data) {
-        toast.error("Cette tâche a déjà été prise par une ménagère.");
-        loadData();
-        return;
-      }
-      toast.success("Tâche prise en charge.");
-      loadData();
-    } catch {
-      toast.error("Impossible de prendre la tâche.");
-    } finally {
-      setActionTaskId(null);
-    }
-  }
-
-  async function handleComplete(taskId: string) {
-    setActionTaskId(taskId);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc("complete_cleaning_task", {
-        p_task_id: taskId,
-        p_user_id: userId,
-      });
-      if (error) {
-        toast.error("Erreur : " + error.message);
-        return;
-      }
-      toast.success("Tâche marquée comme terminée.");
-      loadData();
-    } catch {
-      toast.error("Impossible de marquer la tâche comme terminée.");
-    } finally {
-      setActionTaskId(null);
-    }
-  }
-
-  async function handleReopen(taskId: string) {
-    setActionTaskId(taskId);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc("reopen_cleaning_task", {
-        p_task_id: taskId,
-      });
-      if (error) {
-        toast.error("Erreur : " + error.message);
-        return;
-      }
-      toast.success("Tâche relancée dans le pool.");
-      loadData();
-    } catch {
-      toast.error("Impossible de relancer la tâche.");
-    } finally {
-      setActionTaskId(null);
-    }
-  }
 
   // ============================================================================
   // Statistiques & intelligence
@@ -1057,7 +996,7 @@ export default function CleaningPage() {
                                     size="lg"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
-                                    onClick={() => handleClaim(task.id)}
+                                    onClick={() => claim(task.id)}
                                   >
                                     <Hand className="w-4 h-4" /> {t.claimTask}
                                   </Button>
@@ -1069,7 +1008,7 @@ export default function CleaningPage() {
                                     size="lg"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
-                                    onClick={() => handleComplete(task.id)}
+                                    onClick={() => complete(task.id)}
                                   >
                                      <CheckCircle2 className="w-4 h-4" /> {t.markCompleted}
                                   </Button>
@@ -1086,7 +1025,7 @@ export default function CleaningPage() {
                                     size="lg"
                                     loading={actionTaskId === task.id}
                                     disabled={actionTaskId !== null}
-                                    onClick={() => handleReopen(task.id)}
+                                    onClick={() => reopen(task.id)}
                                   >
                                      <RefreshCw className="w-4 h-4" /> {t.reopenTask}
                                   </Button>

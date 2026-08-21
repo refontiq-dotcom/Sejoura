@@ -8,7 +8,12 @@
 -- 1. Supprimer la politique UPDATE qui autorise admin + réceptionniste
 DROP POLICY IF EXISTS "cleaning_tasks_update_staff" ON cleaning_tasks;
 
--- 2. RPC claim_cleaning_task : vérifier que l'appelant est une ménagère
+-- 2. Supprimer la politique INSERT qui autorise admin + réceptionniste
+--    Les créations légitimes passent par le RPC request_mid_stay_cleaning
+--    ou les triggers DB (checkout, modification de réservation).
+DROP POLICY IF EXISTS "cleaning_tasks_insert_own" ON cleaning_tasks;
+
+-- 3. RPC claim_cleaning_task : vérifier que l'appelant est une ménagère
 CREATE OR REPLACE FUNCTION claim_cleaning_task(
   p_task_id UUID,
   p_user_id UUID
