@@ -381,7 +381,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             </button>
           )}
           <div className="min-w-0">
-            <h1 className="text-base md:text-lg font-bold text-[var(--foreground)] truncate">{title}</h1>
+            <h1 suppressHydrationWarning className="text-base md:text-lg font-bold text-[var(--foreground)] truncate">{title}</h1>
             {subtitle && (
               <p className="text-xs font-medium text-[var(--muted-foreground)] mt-0.5 truncate hidden sm:block">{subtitle}</p>
             )}

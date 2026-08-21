@@ -29,7 +29,11 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
   const [residenceType, setResidenceType] = useState("bnb");
   const [residenceLocation, setResidenceLocation] = useState("");
   const [country, setCountry] = useState("Côte d'Ivoire");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(() => {
+    // Pré-remplir l'indicatif du pays par défaut au chargement
+    const defaultCountry = SUPPORTED_COUNTRIES.find((c) => c.name === "Côte d'Ivoire");
+    return defaultCountry ? `${defaultCountry.phoneCode} ` : "";
+  });
   const [loading, setLoading] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const cityRef = useRef<HTMLDivElement>(null);
@@ -45,9 +49,15 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (userRole && userRole !== "admin_residence") {
-    return null;
-  }
+  // Si l'utilisateur n'est pas un admin résidence, l'onboarding ne s'applique
+  // pas. On notifie le parent pour lever le blur/overlay au lieu de rendre
+  // un composant vide qui bloquerait l'écran.
+  const isNonAdmin = Boolean(userRole && userRole !== "admin_residence");
+  useEffect(() => {
+    if (isNonAdmin) onComplete();
+  }, [isNonAdmin, onComplete]);
+
+  if (isNonAdmin) return null;
 
   function handleCountryChange(countryName: string) {
     setCountry(countryName);

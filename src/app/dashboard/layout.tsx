@@ -63,6 +63,8 @@ export default function DashboardLayout({
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  // Heure locale du navigateur pour le greeting (évite le décalage UTC côté serveur)
+  const [localHour, setLocalHour] = useState(() => new Date().getHours());
 
   // L'étape 2 (onboarding) est décidée côté serveur via le client admin
   // (service_role) pour être insensible aux politiques RLS du navigateur.
@@ -78,6 +80,12 @@ export default function DashboardLayout({
       return false;
     }
   }
+
+  // Mettre à jour l'heure locale toutes les 5 min pour le greeting
+  useEffect(() => {
+    const id = setInterval(() => setLocalHour(new Date().getHours()), 5 * 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -205,7 +213,16 @@ export default function DashboardLayout({
           setAuthUserId(session.user.id);
           // L'onboarding ne doit s'afficher QUE pour les véritables administrateurs
           // créateurs d'espace : la décision fiable vient du serveur (service_role).
-          setNeedsOnboarding(await fetchOnboardingStatus());
+          const serverNeedsOnboarding = await fetchOnboardingStatus();
+          // Croiser avec le localStorage : si l'utilisateur a explicitement
+          // fermé le modal, on respecte sa décision jusqu'à la prochaine session.
+          let dismissed = false;
+          try {
+            dismissed = localStorage.getItem(`sejoura-onboarding-dismissed-${session.user.id}`) === "1";
+          } catch {
+            // Non bloquant
+          }
+          setNeedsOnboarding(serverNeedsOnboarding && !dismissed);
           setLoading(false);
           return;
         }
@@ -341,7 +358,14 @@ export default function DashboardLayout({
         // Le tenant seul ne suffit pas pour décider si l'étape 2 est terminée :
         // la présence d'un établissement est vérifiée côté serveur (service_role)
         // pour ne jamais renvoyer un compte déjà configuré vers l'onboarding.
-        setNeedsOnboarding(await fetchOnboardingStatus());
+        const serverNeedsOnboarding = await fetchOnboardingStatus();
+        let dismissed = false;
+        try {
+          dismissed = localStorage.getItem(`sejoura-onboarding-dismissed-${session.user.id}`) === "1";
+        } catch {
+          // Non bloquant
+        }
+        setNeedsOnboarding(serverNeedsOnboarding && !dismissed);
 
         setLoading(false);
       } catch (err) {
@@ -366,7 +390,7 @@ export default function DashboardLayout({
     const p = pathname || "/dashboard";
 
     if (p === "/dashboard") {
-      const hour = new Date().getHours();
+      const hour = localHour;
       const isDay = hour >= 6 && hour < 18;
       const greeting = lang === "en" ? (isDay ? "Good morning" : "Good evening") : isDay ? "Bonjour" : "Bonsoir";
       const todayLabel = new Date().toLocaleDateString(lang === "en" ? "en-US" : "fr-FR", {
@@ -441,6 +465,16 @@ export default function DashboardLayout({
   // blocage. Le tableau de bord gère lui-même l'état "aucun établissement".
   function handleOnboardingDismiss() {
     setNeedsOnboarding(false);
+    // Persister le refus dans localStorage pour ne pas re-bloquer l'utilisateur
+    // lors des navigations futures ( tant que le profil n'est pas créé côté serveur,
+    // le prochain fetchOnboardingStatus() retouvera "true" ).
+    if (authUserId) {
+      try {
+        localStorage.setItem(`sejoura-onboarding-dismissed-${authUserId}`, "1");
+      } catch {
+        // Non bloquant
+      }
+    }
   }
 
   if (loading) {
@@ -549,7 +583,17 @@ export default function DashboardLayout({
           email={user?.email || ""}
           fullName={user?.full_name || ""}
           userRole={user?.role}
-          onComplete={handleOnboardingComplete}
+          onComplete={() => {
+            // Réinitialiser le flag de refus quand l'onboarding est complété
+            if (authUserId) {
+              try {
+                localStorage.removeItem(`sejoura-onboarding-dismissed-${authUserId}`);
+              } catch {
+                // Non bloquant
+              }
+            }
+            handleOnboardingComplete();
+          }}
           onClose={handleOnboardingDismiss}
         />
       )}

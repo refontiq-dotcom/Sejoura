@@ -511,6 +511,10 @@ export function HomePage() {
         // Compte créé et connecté : l'étape 2 (configuration de l'établissement)
         // s'affiche automatiquement dans le tableau de bord.
         toast.success(t.signupSuccess);
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setAgreeTerms(false);
         setLoading(false);
         setTimeout(() => router.push("/dashboard"), 800);
         return;
