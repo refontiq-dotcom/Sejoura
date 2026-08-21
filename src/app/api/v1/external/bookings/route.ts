@@ -242,8 +242,8 @@ export async function POST(request: Request) {
       clientId = newClient.id;
     }
 
-    // 4. Résoudre created_by : un utilisateur admin de la résidence (owner)
-    const { data: ownerUser } = await admin
+    // 4. Résoudre created_by : on cherche un admin de la résidence, sinon n'importe quel utilisateur actif
+    let { data: ownerUser } = await admin
       .from("users")
       .select("id")
       .eq("tenant_id", tenantId)
@@ -253,8 +253,19 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!ownerUser) {
+      const { data: fallbackUser } = await admin
+        .from("users")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      ownerUser = fallbackUser;
+    }
+
+    if (!ownerUser) {
       return NextResponse.json(
-        { error: "Aucun administrateur actif trouvé pour cette résidence" },
+        { error: "Aucun utilisateur actif trouvé pour cette résidence (impossible d'assigner le créateur de la réservation)" },
         { status: 500 }
       );
     }
@@ -292,7 +303,7 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json(
-        { error: "Erreur lors de la création de la réservation" },
+        { error: `Erreur DB lors de la création de la réservation: ${bookingErr.message || JSON.stringify(bookingErr)}` },
         { status: 500 }
       );
     }
