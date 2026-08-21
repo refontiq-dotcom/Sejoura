@@ -403,7 +403,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </button>
           </div>
 
-          <ResidenceSwitcher />
+          {isAdminRole && <ResidenceSwitcher />}
 
           <div className="relative" ref={helpRef}>
             <button
