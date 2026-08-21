@@ -1127,6 +1127,7 @@ export default function DashboardPage() {
       const { error: rpcErr } = await supabase.rpc(rpcName, {
         p_booking_id: bookingId,
         p_user_id: userId,
+        ...(rpcName === "check_in_booking" ? { p_allow_early: false, p_allow_late: false } : {}),
       });
 
       if (rpcErr) {

@@ -784,6 +784,8 @@ export default function BookingsPage() {
         const { error: checkInErr } = await supabase.rpc("check_in_booking", {
           p_booking_id: booking.id,
           p_user_id: userId,
+          p_allow_early: false,
+          p_allow_late: false,
         });
         if (checkInErr) {
           toast.error("La réservation a été créée mais le check-in immédiat a échoué: " + checkInErr.message);
@@ -1308,7 +1310,11 @@ export default function BookingsPage() {
                        action === "cancel" ? "cancel_booking" :
                        "mark_no_show";
 
-       const { error: rpcErr } = await supabase.rpc(rpcName, { p_booking_id: bookingId, p_user_id: userId });
+       const { error: rpcErr } = await supabase.rpc(rpcName, {
+         p_booking_id: bookingId,
+         p_user_id: userId,
+         ...(rpcName === "check_in_booking" ? { p_allow_early: false, p_allow_late: false } : {}),
+       });
 
        if (rpcErr) {
          // Fallback direct sur la table bookings si la fonction RPC échoue (ex: statut intermédiaire)
