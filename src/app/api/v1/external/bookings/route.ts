@@ -416,31 +416,3 @@ export async function POST(request: Request) {
     console.error("POST /api/v1/external/bookings error:", error);
     return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }
-}         { status: 409 }
-        );
-      }
-      return NextResponse.json(
-        { error: `Erreur DB lors de la création de la réservation: ${bookingErr.message || JSON.stringify(bookingErr)}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      booking: {
-        id: booking.id,
-        booking_code: booking.booking_code,
-        status: booking.status,
-        check_in_date: booking.check_in_date,
-        check_out_date: booking.check_out_date,
-        total_amount: booking.total_amount,
-        number_of_guests: booking.number_of_guests,
-        room_id: booking.room_id,
-        client_id: booking.client_id,
-      },
-    }, { status: 201 });
-  } catch (error) {
-    console.error("POST /api/v1/external/bookings error:", error);
-    return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
-  }
-}
