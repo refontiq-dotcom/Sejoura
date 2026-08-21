@@ -308,16 +308,25 @@ export default function BookingsPage() {
   }, [tenantId]);
 
   // Ouvre automatiquement la modal de nouvelle réservation si ?new=1 est dans l'URL
+  // Ouvre le check-in si ?checkin=<bookingId> est dans l'URL
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
-      if (window.location.search.includes("new=1")) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("new") === "1") {
         openAddModal();
+      }
+      const checkinId = params.get("checkin");
+      if (checkinId) {
+        const target = bookings.find((b) => b.id === checkinId);
+        if (target && (target.status === "confirmed")) {
+          openCompleteClientModal(target);
+        }
       }
       // Nettoyer l'URL pour éviter de rouvrir la modal au refresh
       window.history.replaceState({}, "", window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, bookings]);
 
   async function loadInitData() {
     try {

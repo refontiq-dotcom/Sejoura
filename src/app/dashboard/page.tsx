@@ -80,6 +80,7 @@ interface Movement {
   nightsCount?: number;
   numberOfGuests?: number;
   specialRequests?: string;
+  clientIncomplete?: boolean;
 }
 
 // ============================================================================
@@ -321,7 +322,8 @@ function ClientDrawer({
               className="w-full"
               variant={movement.movementType === "check_in" ? "primary" : "secondary"}
               loading={actionLoading === movement.id}
-              disabled={actionLoading === movement.id}
+              disabled={actionLoading === movement.id || (movement.movementType === "check_in" && movement.clientIncomplete)}
+              title={movement.movementType === "check_in" && movement.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
               onClick={async () => {
                 const success = await onAction(movement.id, movement.movementType);
                 if (success) onClose();
@@ -701,7 +703,8 @@ function MovementCardList({
                     size="sm"
                     className="flex-1"
                     loading={actionLoading === m.id}
-                    disabled={actionLoading === m.id}
+                    disabled={actionLoading === m.id || (isIn && m.clientIncomplete)}
+                    title={isIn && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAction(m.id, m.movementType);
@@ -968,6 +971,7 @@ export default function DashboardPage() {
             nightsCount: b.nights_count,
             numberOfGuests: b.number_of_guests,
             specialRequests: b.special_requests || undefined,
+            clientIncomplete: !b.client?.id_number,
           };
           const entries: Movement[] = [];
           if (b.check_in_date === targetDate) {
@@ -1120,23 +1124,27 @@ export default function DashboardPage() {
   async function handleMovementAction(movementId: string, action: "check_in" | "check_out"): Promise<boolean> {
     // L'id du mouvement est suffixé ("<bookingId>-in" / "<bookingId>-out")
     const bookingId = movementId.replace(/-(in|out)$/, "");
+
+    // Le check-in redirige vers la page réservations pour le flow complet
+    if (action === "check_in") {
+      router.push(`/dashboard/bookings?checkin=${bookingId}`);
+      return true;
+    }
+
     setActionLoading(movementId);
     try {
       const supabase = createClient();
-      const rpcName = action === "check_in" ? "check_in_booking" : "check_out_booking";
-      const { error: rpcErr } = await supabase.rpc(rpcName, {
+      const { error: rpcErr } = await supabase.rpc("check_out_booking", {
         p_booking_id: bookingId,
         p_user_id: userId,
-        ...(rpcName === "check_in_booking" ? { p_allow_early: false, p_allow_late: false } : {}),
       });
 
       if (rpcErr) {
-        // La RPC applique les gardes de statut et écrit dans audit_logs : on ne la contourne pas
-        toast.error("Impossible d'effectuer l'action : " + rpcErr.message);
+        toast.error("Impossible d'effectuer le check-out : " + rpcErr.message);
         return false;
       }
 
-      toast.success(action === "check_in" ? "Check-in effectué avec succès ✓" : "Check-out effectué avec succès ✓");
+      toast.success("Check-out effectué avec succès ✓");
       loadDashboardData(true, selectedDate);
       return true;
     } catch {
@@ -1566,7 +1574,8 @@ export default function DashboardPage() {
                             variant={m.movementType === "check_in" ? "primary" : "secondary"}
                             size="sm"
                             loading={actionLoading === m.id}
-                            disabled={actionLoading === m.id}
+                            disabled={actionLoading === m.id || (m.movementType === "check_in" && m.clientIncomplete)}
+                            title={m.movementType === "check_in" && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMovementAction(m.id, m.movementType);
@@ -1716,7 +1725,8 @@ export default function DashboardPage() {
                             variant={m.movementType === "check_in" ? "primary" : "secondary"}
                             size="sm"
                             loading={actionLoading === m.id}
-                            disabled={actionLoading === m.id}
+                            disabled={actionLoading === m.id || (m.movementType === "check_in" && m.clientIncomplete)}
+                            title={m.movementType === "check_in" && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMovementAction(m.id, m.movementType);
