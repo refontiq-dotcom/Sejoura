@@ -41,6 +41,7 @@ import type { Tenant, User as UserType, GuestInfo } from "@/types/database";
 import { IdeaBoxSection } from "@/components/dashboard/idea-box";
 import { GuestInfoEditor } from "@/components/dashboard/guest-info-editor";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import { PaymentGatewaysSection } from "@/components/dashboard/payment-gateways";
 
 function themeHex(color: string) {
   return color.startsWith("#") ? color : getThemePresetById(color).sidebarBg;
@@ -659,6 +660,7 @@ export default function SettingsPage() {
     { key: "portal",        label: sectionLabelMap["portal"]        || "Espace client",  icon: Smartphone },
     { key: "notifications", label: sectionLabelMap["notifications"] || "Notifications", icon: Bell },
     { key: "billing",       label: sectionLabelMap["billing"]       || "Facturation",    icon: CreditCard },
+    { key: "payments",      label: "Paiements en ligne",                                icon: Smartphone },
     { key: "whatsapp",      label: sectionLabelMap["whatsapp"]      || "WhatsApp",       icon: MessageSquare },
     { key: "integrations",  label: sectionLabelMap["integrations"]  || "Intégrations",  icon: Globe },
     { key: "security",      label: sectionLabelMap["security"]      || "Sécurité",      icon: Shield },
@@ -1205,6 +1207,19 @@ export default function SettingsPage() {
                  </div>
               </div>
             </Card>
+          )}
+
+          {/* Paiements en ligne */}
+          {activeSection === "payments" && (
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Paiements en ligne</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                  Configurez vos passerelles de paiement pour accepter les réservations payantes depuis Trouvetou.
+                </p>
+              </div>
+              <PaymentGatewaysSection />
+            </div>
           )}
 
           {/* Intégrations */}
