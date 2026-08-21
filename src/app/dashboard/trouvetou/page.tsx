@@ -45,6 +45,7 @@ interface RoomTypeListing {
   is_listed_on_trouvetou: boolean;
   room_count: number;
   available_room_count: number;
+  is_available: boolean;
   is_effectively_listed: boolean;
 }
 
@@ -859,8 +860,8 @@ export default function TrouvetouDashboardPage() {
                       </div>
                     )}
 
-                    {/* Badge statut */}
-                    <div className="absolute top-3 left-3">
+                    {/* Badge statut visibilité */}
+                    <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border shadow-sm ${
                         isLive
                           ? "bg-emerald-500/90 text-white border-emerald-400/30"
@@ -869,6 +870,17 @@ export default function TrouvetouDashboardPage() {
                         <span className={`w-2 h-2 rounded-full ${isLive ? "bg-white animate-pulse" : "bg-slate-400"}`} />
                         {isLive ? "En ligne" : "Masqué"}
                       </span>
+                      {/* Badge disponibilité */}
+                      {hasRooms && (
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border shadow-sm ${
+                          type.is_available
+                            ? "bg-blue-500/90 text-white border-blue-400/30"
+                            : "bg-orange-600/90 text-white border-orange-500/30"
+                        }`}>
+                          <span className={`w-2 h-2 rounded-full ${type.is_available ? "bg-white" : "bg-orange-200"}`} />
+                          {type.is_available ? "Disponible" : "Occupé"}
+                        </span>
+                      )}
                     </div>
 
                     {/* Prix */}

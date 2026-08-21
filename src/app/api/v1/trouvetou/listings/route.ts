@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
-import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 import type { Accommodation } from "@/types/database";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -31,11 +30,21 @@ type RoomTypeRow = {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
+    const tenantId   = searchParams.get("tenantId");
+    const checkInRaw  = searchParams.get("check_in");
+    const checkOutRaw = searchParams.get("check_out");
 
     if (!tenantId) {
       return NextResponse.json({ error: "tenantId est requis" }, { status: 400 });
     }
+
+    // Plage de dates pour le calcul de disponibilité.
+    // Si check_in et check_out sont fournis (format ISO date), on recherche les
+    // réservations qui chevauchent cette plage.
+    // Sinon, on reste sur l'instant présent (comportement historique).
+    const checkIn  = checkInRaw  ? new Date(checkInRaw)  : null;
+    const checkOut = checkOutRaw ? new Date(checkOutRaw) : null;
+    const useDateRange = checkIn !== null && checkOut !== null && checkIn < checkOut;
 
     const admin = getServerAdmin();
 
@@ -149,8 +158,17 @@ export async function GET(request: Request) {
     const typedRoomTypes = (roomTypes ?? []) as unknown as RoomTypeRow[];
     const typeIds = typedRoomTypes.map((rt) => rt.id);
 
-    // 5. Disponibilité réelle : une chambre est indisponible si elle est occupée
-    //    ou couverte par une réservation active (même logique que la sync).
+    // 5. Disponibilité réelle.
+    //
+    // Si des dates de séjour sont fournies (check_in / check_out) :
+    //   → une chambre est indisponible si une réservation active chevauche
+    //     la plage demandée (check_in_date < checkOut ET check_out_date > checkIn).
+    //   → le statut physique "occupied" n'est PAS pris en compte seul : seule
+    //     la réservation fait foi pour l'horizon demandé.
+    //
+    // Sinon (pas de dates) :
+    //   → comportement historique : chambre occupée si status = "occupied" OU
+    //     si une réservation couvre l'instant présent.
     const occupiedRoomIds = new Set<string>();
     const roomsByType = new Map<string, { id: string; status: string | null }[]>();
     const allRoomIds: string[] = [];
@@ -165,18 +183,33 @@ export async function GET(request: Request) {
         const list = roomsByType.get(room.room_type_id) ?? [];
         list.push({ id: room.id, status: room.status });
         roomsByType.set(room.room_type_id, list);
-        if (room.status === "occupied") occupiedRoomIds.add(room.id);
+        // Statut physique "occupied" pris en compte uniquement en mode instantané.
+        if (!useDateRange && room.status === "occupied") occupiedRoomIds.add(room.id);
         allRoomIds.push(room.id);
       }
 
       if (allRoomIds.length > 0) {
-        const { data: bookings } = await admin
+        // Filtrage des réservations qui bloquent la disponibilité.
+        let bookingQuery = admin
           .from("bookings")
           .select("room_id")
           .in("room_id", allRoomIds)
-          .in("status", ["confirmed", "checked_in"])
-          .lt("check_in_date", now.toISOString())
-          .gt("check_out_date", now.toISOString());
+          .in("status", ["confirmed", "checked_in"]);
+
+        if (useDateRange) {
+          // Chevauchement : la réservation commence avant la fin du séjour
+          // ET se termine après le début du séjour.
+          bookingQuery = bookingQuery
+            .lt("check_in_date",  checkOut!.toISOString())
+            .gt("check_out_date", checkIn!.toISOString());
+        } else {
+          // Mode instantané : la réservation couvre l'instant présent.
+          bookingQuery = bookingQuery
+            .lt("check_in_date",  now.toISOString())
+            .gt("check_out_date", now.toISOString());
+        }
+
+        const { data: bookings } = await bookingQuery;
         for (const booking of bookings ?? []) occupiedRoomIds.add(booking.room_id);
       }
     }
@@ -198,40 +231,38 @@ export async function GET(request: Request) {
       }
     }
 
-    const typesFormatted = typedRoomTypes
-      .map((rt) => {
-        const typeRooms = roomsByType.get(rt.id) ?? [];
-        const availableRooms = typeRooms.filter((r) => !occupiedRoomIds.has(r.id));
-        const featuredImages = Array.isArray(rt.featured_images) ? rt.featured_images : [];
+    // Tous les types de chambre sont retournés, qu'ils soient éligibles ou non.
+    // La disponibilité (is_available) reflète la plage de dates demandée.
+    // Le portail Trouvetou affiche la fiche avec le badge "Disponible / Occupé"
+    // sans jamais la masquer entièrement.
+    const typesFormatted = typedRoomTypes.map((rt) => {
+      const typeRooms      = roomsByType.get(rt.id) ?? [];
+      const availableRooms = typeRooms.filter((r) => !occupiedRoomIds.has(r.id));
+      const featuredImages = Array.isArray(rt.featured_images) ? rt.featured_images : [];
+      // Un type est disponible si au moins une de ses chambres n'est pas occupée.
+      const isAvailable = availableRooms.length > 0;
 
-        return {
-          id: rt.id,
-          name: rt.name,
-          description: rt.description,
-          accommodation_id: rt.accommodation_id,
-          accommodation_name: accNameById.get(rt.accommodation_id) ?? "",
-          base_price: rt.base_price,
-          capacity: rt.capacity,
-          amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
-          surface_m2: rt.surface_m2,
-          featured_images: featuredImages,
-          is_listed_on_trouvetou: rt.is_listed_on_trouvetou === true,
-          room_count: typeRooms.length,
-          available_room_count: availableRooms.length,
-          is_effectively_listed:
-            rt.is_listed_on_trouvetou === true &&
-            featuredImages.length > 0 &&
-            typeRooms.length > 0,
-        };
-      })
-      .filter((t) =>
-        isTrouvetouEligible({
-          accommodationActive: accActiveById.get(t.accommodation_id) === true,
-          subscriptionActive: subActive,
-          hasPhoto: t.featured_images.length > 0,
-          hasRoom: t.room_count > 0,
-        })
-      );
+      return {
+        id: rt.id,
+        name: rt.name,
+        description: rt.description,
+        accommodation_id: rt.accommodation_id,
+        accommodation_name: accNameById.get(rt.accommodation_id) ?? "",
+        base_price: rt.base_price,
+        capacity: rt.capacity,
+        amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
+        surface_m2: rt.surface_m2,
+        featured_images: featuredImages,
+        is_listed_on_trouvetou: rt.is_listed_on_trouvetou === true,
+        room_count: typeRooms.length,
+        available_room_count: availableRooms.length,
+        is_available: isAvailable,
+        is_effectively_listed:
+          rt.is_listed_on_trouvetou === true &&
+          featuredImages.length > 0 &&
+          typeRooms.length > 0,
+      };
+    });
 
     return NextResponse.json({
       plan,

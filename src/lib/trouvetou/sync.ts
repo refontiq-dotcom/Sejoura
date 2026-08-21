@@ -165,9 +165,17 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   const roomTypeIds = rows.map((row) => row.id);
 
-  // ── Disponibilité en temps réel ─────────────────────────────────────────
-  // Un type est « disponible » si au moins une de ses chambres n'est ni
-  // réservée (booking actif qui chevauche l'instant présent) ni occupée.
+  // ── Disponibilité ──────────────────────────────────────────────────────────
+  // `is_available` envoyé à Trouvetou = "ce type possède au moins une chambre
+  // physique et peut accepter des réservations futures".
+  //
+  // On ne masque PAS une fiche parce que toutes ses chambres sont occupées
+  // MAINTENANT : la vraie vérification de disponibilité sur des dates précises
+  // est déléguée à POST /api/v1/external/bookings qui renvoie 409 si aucune
+  // chambre n'est libre sur la période demandée.
+  //
+  // On calcule quand même le nombre de chambres non occupées *maintenant* pour
+  // l'exposer dans `attributes.available_rooms_count` (information temps-réel).
   const now = new Date();
   const occupiedRoomIds = new Set<string>();
   const roomStatusByType = new Map<string, { id: string; status: string | null }[]>();
@@ -189,7 +197,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
     if (roomIds.length > 0) {
       const { data: bookings } = await admin
         .from("bookings")
-        .select("room_id, check_in_date, check_out_date")
+        .select("room_id")
         .in("room_id", roomIds)
         .in("status", ["confirmed", "checked_in"])
         .lt("check_in_date", now.toISOString())
@@ -237,7 +245,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
             ? [logoUrl]
             : [];
       const typeRooms = roomStatusByType.get(row.id) ?? [];
-      const isAvailable = typeRooms.some((r) => !occupiedRoomIds.has(r.id));
+      // `is_available` = le type possède au moins une chambre physique.
+      // Que ces chambres soient toutes occupées *maintenant* n'a pas d'importance :
+      // un client peut réserver pour une date future et le portail vérifiera
+      // la disponibilité réelle sur ses dates via POST /external/bookings.
+      const isAvailable = typeRooms.length > 0;
+      // Nombre de chambres libres à cet instant (info temps-réel dans attributes).
+      const availableNow = typeRooms.filter((r) => !occupiedRoomIds.has(r.id)).length;
 
       // Clé API Séjoura du tenant (active — garantie par le filtre ci-dessus).
       // Stockée côté portail pour permettre la création de réservations (POST /bookings).
@@ -255,6 +269,8 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         attributes: {
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
+          total_rooms: typeRooms.length,
+          available_rooms_now: availableNow,
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
