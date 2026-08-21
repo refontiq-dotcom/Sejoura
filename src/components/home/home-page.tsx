@@ -896,7 +896,7 @@ export function HomePage() {
   ];
 
   return (
-    <div className="relative h-screen w-full overflow-hidden flex flex-col justify-between py-3 px-6 md:px-12 text-white">
+    <div className="relative h-screen w-full overflow-y-auto flex flex-col justify-between py-3 px-4 sm:px-6 md:px-12 text-white">
       {/* Full-screen panoramic background with dark overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
         <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
@@ -1059,17 +1059,17 @@ export function HomePage() {
           </div>
 
           {/* Right side — Floating auth card */}
-          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-4 sm:p-5 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-140px)] overflow-y-auto">
+          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-5 sm:p-5 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-100px)] overflow-y-auto">
             {/* Tab switcher */}
             <div>
               <div
-                className="flex bg-slate-100 dark:bg-[#262626] p-1 rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
+                className="flex bg-slate-100 dark:bg-[#262626] p-1.5 rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
                 role="tablist"
                 aria-label={lang === "fr" ? "Authentification" : "Authentication"}
               >
                 <button
                   onClick={() => setMode("login")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`flex-1 py-2.5 sm:py-2 text-sm sm:text-xs font-bold rounded-lg transition-all duration-300 ${
                     mode === "login"
                       ? "bg-blue-600 text-white shadow-md"
                       : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
@@ -1082,7 +1082,7 @@ export function HomePage() {
                 </button>
                 <button
                   onClick={() => setMode("signup")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`flex-1 py-2.5 sm:py-2 text-sm sm:text-xs font-bold rounded-lg transition-all duration-300 ${
                     mode === "signup"
                       ? "bg-blue-600 text-white shadow-md"
                       : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
@@ -1121,7 +1121,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="contact@sejoura.com"
-                        className={`w-full px-3.5 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                        className={`w-full px-3.5 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.email
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1152,7 +1152,7 @@ export function HomePage() {
                             clearErrors();
                           }}
                           placeholder="••••••••"
-                          className={`w-full px-3.5 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          className={`w-full px-3.5 py-3 sm:py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
                             errors.password
                               ? "border-red-400 dark:border-red-500"
                               : "border-slate-200 dark:border-[#404040]"
@@ -1172,29 +1172,29 @@ export function HomePage() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] pt-1 pb-1">
-                      <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer hover:text-slate-700 dark:hover:text-[#e8e8e8] transition-colors">
-                        <input
-                          type="checkbox"
-                          name="remember"
-                          checked={remember}
-                          onChange={(e) => setRemember(e.target.checked)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3 h-3 cursor-pointer"
-                        />
-                        {t.rememberMe}
-                      </label>
-                      <Link
-                        href="/auth/forgot-password"
-                        className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                      >
-                        {t.forgotPassword}
-                      </Link>
-                    </div>
+                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 text-[11px] pt-1 pb-1">
+                       <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer hover:text-slate-700 dark:hover:text-[#e8e8e8] transition-colors">
+                         <input
+                           type="checkbox"
+                           name="remember"
+                           checked={remember}
+                           onChange={(e) => setRemember(e.target.checked)}
+                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3.5 h-3.5 sm:w-3 sm:h-3 cursor-pointer"
+                         />
+                         {t.rememberMe}
+                       </label>
+                       <Link
+                         href="/auth/forgot-password"
+                         className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                       >
+                         {t.forgotPassword}
+                       </Link>
+                     </div>
 
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full py-3.5 sm:py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs sm:text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1224,7 +1224,7 @@ export function HomePage() {
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={loading}
-                    className="w-full py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                    className="w-full py-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs sm:text-xs"
                   >
                     {loading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1272,7 +1272,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="contact@sejoura.com"
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                        className={`w-full px-3 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.email
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1303,7 +1303,7 @@ export function HomePage() {
                             clearErrors();
                           }}
                           placeholder="••••••••"
-                          className={`w-full px-3 py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                          className={`w-full px-3 py-3 sm:py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
                             errors.password
                               ? "border-red-400 dark:border-red-500"
                               : "border-slate-200 dark:border-[#404040]"
@@ -1343,7 +1343,7 @@ export function HomePage() {
                           clearErrors();
                         }}
                         placeholder="••••••••"
-                        className={`w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${
+                        className={`w-full px-3 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
                           errors.confirmPassword
                             ? "border-red-400 dark:border-red-500"
                             : "border-slate-200 dark:border-[#404040]"
@@ -1375,7 +1375,7 @@ export function HomePage() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full mt-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full mt-1 py-3.5 sm:py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs sm:text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {loading ? (
                         <>
@@ -1408,7 +1408,7 @@ export function HomePage() {
                       type="button"
                       onClick={handleGoogleAuth}
                       disabled={loading}
-                      className="w-full py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs"
+                      className="w-full py-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs sm:text-xs"
                     >
                       {loading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
