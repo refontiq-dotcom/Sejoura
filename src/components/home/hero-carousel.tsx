@@ -90,7 +90,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full max-w-md rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md shadow-lg p-3 sm:p-5 flex flex-col overflow-hidden min-h-[140px] sm:min-h-[180px] focus:outline-none focus:ring-2 focus:ring-white/40"
+      className="relative w-full max-w-md rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md shadow-lg p-3 sm:p-5 flex flex-col overflow-hidden min-h-[170px] sm:min-h-[210px] focus:outline-none focus:ring-2 focus:ring-white/40"
       tabIndex={0}
       role="region"
       aria-label="Carrousel de présentation"
@@ -107,7 +107,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       onTouchEnd={handleTouchEnd}
     >
       {/* Slide content */}
-      <div className="relative overflow-hidden h-[95px] sm:h-[120px]">
+      <div className="relative overflow-hidden h-[120px] sm:h-[150px]">
         <div
           className="absolute inset-0 flex items-center gap-4 sm:gap-5 animate-hero-slide"
           key={index}
@@ -115,7 +115,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           aria-atomic="true"
         >
           {/* Image with error fallback */}
-          <div className="relative w-32 h-24 sm:w-36 sm:h-28 rounded-xl overflow-hidden shrink-0 shadow border border-white/20 bg-white/5">
+          <div className="relative w-28 h-24 sm:w-32 sm:h-28 rounded-xl overflow-hidden shrink-0 shadow border border-white/20 bg-white/5">
             {imgErrors[index] ? (
               <div className="w-full h-full flex items-center justify-center bg-white/10 text-white/50 text-[10px] font-medium text-center px-2">
                 {slide.title.split(" ").slice(0, 3).join(" ")}
