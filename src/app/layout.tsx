@@ -9,6 +9,7 @@ import { AccommodationProvider } from "@/hooks/use-accommodation";
 import { InlineScript } from "@/components/inline-script";
 import { ThemeToaster } from "@/components/providers/theme-toaster";
 import { PwaRegister } from "@/components/pwa-register";
+import { OfflineBanner } from "@/components/offline-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -140,6 +141,7 @@ export default async function RootLayout({
           </LanguageProvider>
         </ThemeProvider>
         <PwaRegister />
+        <OfflineBanner />
       </body>
     </html>
   );
