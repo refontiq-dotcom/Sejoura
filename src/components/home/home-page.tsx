@@ -83,7 +83,7 @@ const messages: Record<Lang, Record<string, string>> = {
     terms: "CGU",
     privateInfo: "Vos informations restent privées",
     // Footer
-    footerRights: "© 2026 Séjoura — Tous droits réservés. Zéro frais d'installation.",
+    footerRights: "© 2026 Séjoura — Une solution Refontiq. Tous droits réservés. Zéro frais d'installation.",
     footerContact: "Abidjan, Côte d'Ivoire • Contact : +225 00 00 00 00 00",
     // Modal
     closeModal: "Fermer & Revenir au portail",
@@ -153,7 +153,7 @@ const messages: Record<Lang, Record<string, string>> = {
     acceptTerms: "I accept the",
     terms: "Terms",
     privateInfo: "Your information stays private",
-    footerRights: "© 2026 Séjoura — All rights reserved. Zero setup fees.",
+    footerRights: "© 2026 Séjoura — A Refontiq solution. All rights reserved. Zero setup fees.",
     footerContact: "Abidjan, Côte d'Ivoire • Contact: +225 00 00 00 00 00",
     closeModal: "Close & Return to portal",
     emailInvalid: "Invalid email address.",
