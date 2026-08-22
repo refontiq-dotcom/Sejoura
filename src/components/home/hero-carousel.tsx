@@ -37,12 +37,12 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   return (
     <div
-      className="relative w-full max-w-md rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md shadow-lg p-4 sm:p-5 flex flex-col"
+      className="relative w-full max-w-md rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md shadow-lg p-4 sm:p-5 flex flex-col overflow-hidden min-h-[160px] sm:min-h-[180px]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="relative overflow-hidden">
-        <div key={index} className="flex items-center gap-4 sm:gap-5 animate-hero-slide" aria-live="polite">
+      <div className="relative overflow-hidden h-[110px] sm:h-[120px]">
+        <div key={index} className="absolute inset-0 flex items-center gap-4 sm:gap-5 animate-hero-slide" aria-live="polite">
           <div className="relative w-32 h-24 sm:w-36 sm:h-28 rounded-xl overflow-hidden shrink-0 shadow border border-white/20">
             <Image
               src={slide.image}
@@ -52,12 +52,12 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               className="object-cover"
             />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <span className="inline-block px-2 py-0.5 rounded-full bg-white/20 border border-white/30 text-[9px] font-bold text-white uppercase tracking-widest">
               {slide.badge}
             </span>
-            <p className="mt-1.5 text-sm font-bold text-white leading-snug">{slide.title}</p>
-            <p className="mt-1 text-[11px] text-blue-100 leading-relaxed">{slide.desc}</p>
+            <p className="mt-1.5 text-sm font-bold text-white leading-snug line-clamp-2">{slide.title}</p>
+            <p className="mt-1 text-[11px] text-blue-100 leading-relaxed line-clamp-2">{slide.desc}</p>
           </div>
         </div>
       </div>

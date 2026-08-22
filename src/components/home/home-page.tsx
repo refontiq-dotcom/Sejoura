@@ -1069,34 +1069,36 @@ export function HomePage() {
             {/* Tab switcher */}
             <div>
               <div
-                className="flex bg-slate-100 dark:bg-[#262626] p-1.5 rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
+                className="flex bg-slate-100 dark:bg-[#262626] p-1.5 sm:p-1.5 rounded-2xl sm:rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
                 role="tablist"
                 aria-label={lang === "fr" ? "Authentification" : "Authentication"}
               >
                 <button
                   onClick={() => setMode("login")}
-                  className={`flex-1 py-2.5 sm:py-2 text-sm sm:text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`flex-1 py-3 sm:py-2 px-3 text-sm sm:text-xs font-bold rounded-xl sm:rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                     mode === "login"
-                      ? "bg-blue-600 text-white shadow-md"
-                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8] hover:bg-white/50 dark:hover:bg-white/5"
                   }`}
                   role="tab"
                   aria-selected={mode === "login"}
                   aria-controls="form-login"
                 >
+                  <Lock className="w-3.5 h-3.5 sm:hidden" />
                   {t.signIn}
                 </button>
                 <button
                   onClick={() => setMode("signup")}
-                  className={`flex-1 py-2.5 sm:py-2 text-sm sm:text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`flex-1 py-3 sm:py-2 px-3 text-sm sm:text-xs font-bold rounded-xl sm:rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
                     mode === "signup"
-                      ? "bg-blue-600 text-white shadow-md"
-                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8]"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8] hover:bg-white/50 dark:hover:bg-white/5"
                   }`}
                   role="tab"
                   aria-selected={mode === "signup"}
                   aria-controls="form-signup"
                 >
+                  <Sparkles className="w-3.5 h-3.5 sm:hidden" />
                   {t.signUp}
                 </button>
               </div>
