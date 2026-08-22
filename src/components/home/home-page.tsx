@@ -83,8 +83,9 @@ const messages: Record<Lang, Record<string, string>> = {
     terms: "CGU",
     privateInfo: "Vos informations restent privées",
     // Footer
-    footerRights: "© 2026 Séjoura — Une solution Refontiq. Tous droits réservés. Zéro frais d'installation.",
-    footerContact: "Abidjan, Côte d'Ivoire • Contact : +225 00 00 00 00 00",
+    footerRights: "© 2026 Séjoura by Refontiq.",
+    footerContact: "Abidjan, Côte d'Ivoire",
+    footerPowered: "Une solution",
     // Modal
     closeModal: "Fermer & Revenir au portail",
     // Validation
@@ -153,8 +154,9 @@ const messages: Record<Lang, Record<string, string>> = {
     acceptTerms: "I accept the",
     terms: "Terms",
     privateInfo: "Your information stays private",
-    footerRights: "© 2026 Séjoura — A Refontiq solution. All rights reserved. Zero setup fees.",
-    footerContact: "Abidjan, Côte d'Ivoire • Contact: +225 00 00 00 00 00",
+    footerRights: "© 2026 Séjoura by Refontiq.",
+    footerContact: "Abidjan, Côte d'Ivoire",
+    footerPowered: "A solution by",
     closeModal: "Close & Return to portal",
     emailInvalid: "Invalid email address.",
     passwordShort: "Password must be at least 6 characters.",
@@ -1577,8 +1579,19 @@ export function HomePage() {
       )}
 
       {/* Footer */}
-      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-1 text-xs text-white/75 space-y-1 px-4">
-        <p>{t.footerRights}</p>
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-2 text-xs text-white/60 space-y-1 px-4">
+        <div className="flex items-center gap-1.5">
+          <span>{t.footerPowered}</span>
+          <a
+            href="https://refontiq.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-white/90 hover:text-white transition-colors underline underline-offset-2 decoration-white/30 hover:decoration-white/60"
+          >
+            Refontiq
+          </a>
+        </div>
+        <p className="text-white/40">{t.footerRights} {t.footerContact}</p>
       </footer>
 
       {/* Modal */}
