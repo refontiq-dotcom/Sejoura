@@ -6,6 +6,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyPin } from "@/lib/pin";
 import { getDeviceName, getRequestOrigin, getRpId, normalizeTransports } from "@/lib/webauthn";
+import { pinRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * POST /api/employee-biometric/register
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
     }
     if (action !== "options" && action !== "verify") {
       return NextResponse.json({ error: "Action invalide." }, { status: 400 });
+    }
+
+    // ── Rate limiting (brute-force PIN) ──────────────────────────────────────
+    const rlKey = getRateLimitKey(request, userId);
+    const rl = pinRateLimiter.check(rlKey);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
     }
 
     const admin = createAdminClient();

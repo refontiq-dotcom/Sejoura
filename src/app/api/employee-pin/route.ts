@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashPin, verifyPin } from "@/lib/pin";
 import { signInEmployeeServerSide } from "@/lib/employee-auth";
+import { pinRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * POST /api/employee-pin
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
     }
     if (action !== "set" && action !== "verify") {
       return NextResponse.json({ error: "Action invalide." }, { status: 400 });
+    }
+
+    // ── Rate limiting (brute-force PIN) ──────────────────────────────────────
+    const rlKey = getRateLimitKey(request, userId);
+    const rl = pinRateLimiter.check(rlKey);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
     }
 
     const admin = createAdminClient();
