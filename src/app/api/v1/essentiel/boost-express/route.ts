@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -14,6 +15,24 @@ const EXPRESS_BOOST_OPTIONS: Record<number, number> = {
   7:  10_000,
   14: 18_000,
 };
+
+async function verifyAdminAuth(request: Request, tenantId: string) {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "Non authentifié.", status: 401 } as const;
+
+  const admin = createAdminClient();
+  const { data: userData } = await admin
+    .from("users")
+    .select("id, tenant_id, role")
+    .eq("auth_user_id", session.user.id)
+    .maybeSingle();
+
+  if (!userData || userData.role !== "admin_residence" || userData.tenant_id !== tenantId) {
+    return { error: "Accès non autorisé.", status: 403 } as const;
+  }
+  return { admin } as const;
+}
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +50,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    const auth = await verifyAdminAuth(request, tenantId);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const admin = auth.admin;
+
     if (!EXPRESS_BOOST_OPTIONS[durationDays]) {
       return NextResponse.json(
         {
@@ -41,8 +67,6 @@ export async function POST(request: Request) {
     }
 
     const priceFcfa = EXPRESS_BOOST_OPTIONS[durationDays];
-
-    const admin = createAdminClient();
 
     // ─── 1. Vérification du plan ─────────────────────────────────────────────
     const { data: subscription } = await admin
@@ -164,7 +188,12 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const admin = createAdminClient();
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    const auth = await verifyAdminAuth(request, tenantId);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const admin = auth.admin;
 
     // Vérification plan
     const { data: subscription } = await admin

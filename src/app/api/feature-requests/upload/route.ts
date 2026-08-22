@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
@@ -13,6 +14,13 @@ const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/g
  */
 export async function POST(req: Request) {
   try {
+    // ── Auth : utilisateur connecté requis ────────────────────────────────────
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 

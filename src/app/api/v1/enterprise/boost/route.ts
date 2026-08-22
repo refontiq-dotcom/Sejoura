@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -9,6 +10,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+    }
+
     const body = await request.json();
     const tenantId = typeof body?.tenantId === "string" ? body.tenantId : "";
     const accommodationId =
@@ -23,6 +31,17 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
+
+    // Vérifier que l'appelant est admin du tenant
+    const { data: userData } = await admin
+      .from("users")
+      .select("id, tenant_id, role")
+      .eq("auth_user_id", session.user.id)
+      .maybeSingle();
+
+    if (!userData || userData.role !== "admin_residence" || userData.tenant_id !== tenantId) {
+      return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
+    }
 
     // Vérification plan côté API (double-sécurité avec le trigger SQL)
     const { data: subscription } = await admin
