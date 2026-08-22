@@ -27,7 +27,6 @@ import {
   BarChart3,
   CreditCard,
   Server,
-  Palette,
   MessageCircle,
   DoorOpen,
   Sparkles,
@@ -197,6 +196,7 @@ export function HomePage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionName>(null);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "signup" | null>(null);
 
   // Hydration-safe detection du montage côté client (SSR)
   const mounted = useSyncExternalStore(
@@ -270,7 +270,7 @@ export function HomePage() {
 
   // Lock body scroll when modal or mobile menu is open
   useEffect(() => {
-    if (activeSection || mobileMenuOpen) {
+    if (activeSection || mobileMenuOpen || authModalMode) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -278,7 +278,7 @@ export function HomePage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [activeSection, mobileMenuOpen]);
+  }, [activeSection, mobileMenuOpen, authModalMode]);
 
   // Prefill email if "remember me" was checked previously
   useEffect(() => {
@@ -659,14 +659,6 @@ export function HomePage() {
                   : "Allows your site or another app to connect directly to Séjoura.",
             },
             {
-              icon: Palette,
-              title: lang === "fr" ? "Marque blanche" : "White label",
-              desc:
-                lang === "fr"
-                  ? "Personnalisez l'application avec votre logo et vos couleurs pour vos équipes et vos clients."
-                  : "Customize the app with your logo and colors for your teams and clients.",
-            },
-            {
               icon: CreditCard,
               title: lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment",
               desc:
@@ -761,7 +753,7 @@ export function HomePage() {
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Marque blanche, API & notifications WhatsApp" : "White label, API & WhatsApp notifications"}
+                {lang === "fr" ? "API & notifications WhatsApp" : "API & WhatsApp notifications"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
@@ -804,8 +796,8 @@ export function HomePage() {
               q: lang === "fr" ? "Différence entre les offres ?" : "Difference between the plans?",
               a:
                 lang === "fr"
-                  ? "Le plan Essentiel (15 000 FCFA/mois) convient jusqu'à 1 établissement avec 1 admin et 1 réceptionniste. Le plan Entreprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage automatique, la vitrine Trouvetou, le paiement en ligne Wave, la marque blanche, l'accès API et un support dédié 24/7."
-                  : "The Essentiel plan (15,000 XOF/month) suits up to 1 establishment with 1 admin and 1 receptionist. The Entreprise plan (55,000 XOF/month) adds unlimited establishments, automatic cleaning, the Trouvetou showcase, Wave online payment, white label, API access and dedicated 24/7 support.",
+                  ? "Le plan Essentiel (15 000 FCFA/mois) convient jusqu'à 1 établissement avec 1 admin et 1 réceptionniste. Le plan Entreprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage automatique, la vitrine Trouvetou, le paiement en ligne Wave, l'accès API et un support dédié 24/7."
+                  : "The Essentiel plan (15,000 XOF/month) suits up to 1 establishment with 1 admin and 1 receptionist. The Entreprise plan (55,000 XOF/month) adds unlimited establishments, automatic cleaning, the Trouvetou showcase, Wave online payment, API access and dedicated 24/7 support.",
             },
             {
               q: lang === "fr" ? "Comment mes clients paient-ils ?" : "How do my clients pay?",
@@ -838,13 +830,6 @@ export function HomePage() {
                 lang === "fr"
                   ? "Quelques minutes. Une première réservation peut être créée en moins de 2 minutes, sans formation nécessaire."
                   : "A few minutes. A first reservation can be created in under 2 minutes, no training needed.",
-            },
-            {
-              q: lang === "fr" ? "C'est quoi la « Marque blanche » ?" : "What is \"White label\"?",
-              a:
-                lang === "fr"
-                  ? "C'est une option qui permet à votre établissement d'utiliser Séjoura sous votre propre nom et logo, sans que vos clients voient le nom « Séjoura »."
-                  : "An option that lets your establishment use Séjoura under your own name and logo.",
             },
             {
               q: lang === "fr" ? "C'est quoi une « API » ?" : "What is an \"API\"?",
@@ -1064,8 +1049,8 @@ export function HomePage() {
             </div>
           </div>
 
-          {/* Right side — Floating auth card */}
-          <div className="relative w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-5 sm:p-5 flex flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-100px)] overflow-y-auto">
+          {/* Right side — Floating auth card (desktop) */}
+          <div className="relative hidden md:flex w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-5 sm:p-5 flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-100px)] overflow-y-auto">
             {/* Tab switcher */}
             <div>
               <div
@@ -1442,8 +1427,155 @@ export function HomePage() {
               </p>
             </div>
           </div>
+
+          {/* Mobile CTA buttons — below carousel on mobile only */}
+          <div className="md:hidden w-full flex flex-col items-center gap-3 mt-2">
+            <button
+              onClick={() => { setMode("login"); setAuthModalMode("login"); }}
+              className="w-full max-w-xs py-3.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              {t.signIn}
+            </button>
+            <button
+              onClick={() => { setMode("signup"); setAuthModalMode("signup"); }}
+              className="w-full max-w-xs py-3.5 px-6 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/25 shadow-lg backdrop-blur-md text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              {t.signUp}
+            </button>
+            <p className="text-[10px] text-white/50 font-medium">{t.noCardRequired}</p>
+          </div>
         </div>
       </main>
+
+      {/* Mobile auth modal */}
+      {authModalMode && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          onClick={() => setAuthModalMode(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#1a1a1a] w-full sm:max-w-[400px] sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 dark:border-[#333333] max-h-[92vh] overflow-y-auto animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div />
+                <button
+                  onClick={() => setAuthModalMode(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#2e2e2e] transition-colors"
+                  aria-label="Fermer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex bg-slate-100 dark:bg-[#262626] p-1.5 rounded-2xl mb-5 border border-slate-200 dark:border-[#333333]" role="tablist">
+                <button onClick={() => setAuthModalMode("login")} className={`flex-1 py-3 px-3 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${authModalMode === "login" ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30" : "text-slate-500 dark:text-[#a0a0a0]"}`} role="tab" aria-selected={authModalMode === "login"}>
+                  <Lock className="w-3.5 h-3.5" />{t.signIn}
+                </button>
+                <button onClick={() => setAuthModalMode("signup")} className={`flex-1 py-3 px-3 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${authModalMode === "signup" ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30" : "text-slate-500 dark:text-[#a0a0a0]"}`} role="tab" aria-selected={authModalMode === "signup"}>
+                  <Sparkles className="w-3.5 h-3.5" />{t.signUp}
+                </button>
+              </div>
+              {authModalMode === "login" && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">{t.managerSpace}</h2>
+                  <form onSubmit={handleLogin} className="space-y-2.5 mt-2" noValidate>
+                    <div>
+                      <label htmlFor="m-login-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
+                      <input id="m-login-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="m-login-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
+                      <div className="relative">
+                        <input id="m-login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] pt-1 pb-1">
+                      <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer">
+                        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3.5 h-3.5 cursor-pointer" />
+                        {t.rememberMe}
+                      </label>
+                      <Link href="/auth/forgot-password" className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors">{t.forgotPassword}</Link>
+                    </div>
+                    <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                      {loading ? (<><Loader2 className="w-4 h-4 animate-spin" />{t.signing}</>) : t.loginBtn}
+                    </button>
+                  </form>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-[#404040]" /></div>
+                    <div className="relative flex justify-center"><span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">{t.or}</span></div>
+                  </div>
+                  <button type="button" onClick={handleGoogleAuth} disabled={loading} className="w-full py-3.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (<svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>)}
+                    {t.signInWith}
+                  </button>
+                </div>
+              )}
+              {authModalMode === "signup" && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">{t.createAccount}</h2>
+                  <form onSubmit={handleSignUp} className="space-y-2 mt-2" noValidate>
+                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0]">
+                      {lang === "fr" ? "Étape 1 sur 2 — créez votre compte, puis configurez votre établissement." : "Step 1 of 2 — create your account, then set up your establishment."}
+                    </p>
+                    <div>
+                      <label htmlFor="m-signup-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
+                      <input id="m-signup-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="m-signup-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
+                      <div className="relative">
+                        <input id="m-signup-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>}
+                      <PasswordStrength password={password} />
+                    </div>
+                    <div>
+                      <label htmlFor="m-signup-confirm" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.confirmPassword}</label>
+                      <input id="m-signup-confirm" name="confirmPassword" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.confirmPassword && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
+                    </div>
+                    <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
+                      <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]" />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0]">
+                        {t.acceptTerms}{" "}<Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{t.terms}</Link>
+                      </span>
+                    </label>
+                    <button type="submit" disabled={loading} className="w-full mt-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                      {loading ? (<><Loader2 className="w-4 h-4 animate-spin" />{t.creating}</>) : t.signUpBtn}
+                    </button>
+                    <p className="text-center text-[10px] text-slate-500 dark:text-[#a0a0a0] font-medium">{t.noCardRequired}</p>
+                  </form>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-[#404040]" /></div>
+                    <div className="relative flex justify-center"><span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">{t.or}</span></div>
+                  </div>
+                  <button type="button" onClick={handleGoogleAuth} disabled={loading} className="w-full py-3.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (<svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>)}
+                    {t.signUpWith}
+                  </button>
+                </div>
+              )}
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-[#333333] text-center">
+                <p className="text-[10px] text-slate-500 dark:text-[#a0a0a0] font-bold">
+                  <Lock className="w-3 h-3 text-slate-300 dark:text-[#666666] inline mr-1" />{t.privateInfo}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="relative z-20 w-full flex flex-col items-center justify-center py-2 text-xs text-white/75 space-y-2 px-4">
