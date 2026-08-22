@@ -886,7 +886,7 @@ export function HomePage() {
   ];
 
   return (
-    <div className="relative h-screen w-full overflow-y-auto flex flex-col justify-between py-3 px-4 sm:px-6 md:px-12 text-white">
+    <div className="relative h-screen w-full overflow-y-auto flex flex-col justify-between py-2 px-4 sm:px-6 md:px-12 text-white">
       {/* Full-screen panoramic background with dark overlay */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
         <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
@@ -1034,13 +1034,13 @@ export function HomePage() {
       {/* Main content */}
       <main
         id="main-content"
-        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3"
+        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-1 sm:py-3"
       >
-        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-5 lg:gap-10 min-h-[400px] lg:min-h-[500px]">
+        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-4 lg:gap-10 min-h-0 lg:min-h-[500px]">
           {/* Left side — Hero title + dynamic carousel */}
           <div className="relative lg:flex-1 flex flex-col justify-center text-white">
-            <div className="flex flex-col gap-6 sm:gap-8 max-w-xl">
-              <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
+            <div className="flex flex-col gap-4 sm:gap-8 max-w-xl">
+              <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
                 {t.heroTitle}
               </h1>
 
@@ -1428,17 +1428,17 @@ export function HomePage() {
           </div>
 
           {/* Mobile CTA buttons — below carousel on mobile only */}
-          <div className="md:hidden w-full flex flex-col items-center gap-3 mt-2">
+          <div className="md:hidden w-full flex flex-col items-center gap-2 mt-1">
             <button
               onClick={() => { setMode("login"); setAuthModalMode("login"); }}
-              className="w-full max-w-xs py-3.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm transition-all flex items-center justify-center gap-2"
+              className="w-full max-w-xs py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm transition-all flex items-center justify-center gap-2"
             >
               <Lock className="w-4 h-4" />
               {t.signIn}
             </button>
             <button
               onClick={() => { setMode("signup"); setAuthModalMode("signup"); }}
-              className="w-full max-w-xs py-3.5 px-6 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/25 shadow-lg backdrop-blur-md text-sm transition-all flex items-center justify-center gap-2"
+              className="w-full max-w-xs py-2.5 px-6 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/25 shadow-lg backdrop-blur-md text-sm transition-all flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
               {t.signUp}
@@ -1577,7 +1577,7 @@ export function HomePage() {
       )}
 
       {/* Footer */}
-      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-2 text-xs text-white/75 space-y-2 px-4">
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-1 text-xs text-white/75 space-y-1 px-4">
         <p>{t.footerRights}</p>
       </footer>
 
