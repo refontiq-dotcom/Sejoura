@@ -539,65 +539,57 @@ export function HomePage() {
     Fonctionnalités: (
       <div className="space-y-3">
         <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
-          {lang === "fr" ? "Le quotidien simplifié" : "Simplified daily life"}
+          {lang === "fr" ? "Ce qui rend Séjoura unique" : "What makes Séjoura unique"}
         </h4>
         <ul className="space-y-3 text-sm">
           {[
             {
               icon: Calendar,
-              title: lang === "fr" ? "Réservations" : "Reservations",
+              title: lang === "fr" ? "Tarification dynamique" : "Dynamic pricing",
               desc:
                 lang === "fr"
-                  ? "Enregistrez chaque réservation et voyez en un coup d'œil qui arrive, qui part, et quelles chambres sont libres."
-                  : "Record each reservation and see at a glance who arrives, who leaves, and which rooms are available.",
+                  ? "Prix ajustés automatiquement selon la saison, les week-ends, les jours fériés et le taux d'occupation. Maximisez vos revenus sans effort."
+                  : "Prices automatically adjusted based on season, weekends, holidays and occupancy rate. Maximize your revenue effortlessly.",
             },
             {
-              icon: DoorOpen,
-              title: lang === "fr" ? "Check-in / Check-out" : "Check-in / Check-out",
+              icon: Sparkles,
+              title: lang === "fr" ? "Suggestions IA" : "AI suggestions",
               desc:
                 lang === "fr"
-                  ? "Accueillez vos clients à l'arrivée, enregistrez leur pièce d'identité et finalisez le départ en quelques secondes."
-                  : "Welcome your clients on arrival, record their ID and complete the departure in a few seconds.",
-            },
-            {
-              icon: Wallet,
-              title: lang === "fr" ? "Facturation automatique" : "Automatic invoicing",
-              desc:
-                lang === "fr"
-                  ? "Créez une facture en un clic. Elle est prête à envoyer au client, sans calcul à la main."
-                  : "Create an invoice in one click. Ready to send to the client, no manual calculation.",
-            },
-            {
-              icon: CreditCard,
-              title: lang === "fr" ? "Suivi des paiements" : "Payment tracking",
-              desc:
-                lang === "fr"
-                  ? "Enregistrez si le client a payé en espèces ou par Mobile Money (Orange, MTN, Moov, Wave) — tout est noté et retrouvable facilement."
-                  : "Record whether the client paid in cash or via Mobile Money — everything is noted and easily searchable.",
-            },
-            {
-              icon: Wallet,
-              title: lang === "fr" ? "Suivi de la caisse" : "Cash tracking",
-              desc:
-                lang === "fr"
-                  ? "Voyez chaque jour combien d'argent est entré et sorti de votre établissement, sans tenir un cahier à part."
-                  : "See each day how much money entered and left your establishment.",
-            },
-            {
-              icon: Users,
-              title: lang === "fr" ? "Gestion des équipes" : "Team management",
-              desc:
-                lang === "fr"
-                  ? "Créez des comptes pour vos réceptionnistes et ménagères : chacun se connecte avec un code personnel."
-                  : "Create accounts for your receptionists and cleaners: each one signs in with a personal PIN.",
+                  ? "Un moteur intelligent analyse vos données et vous suggère des actions concrètes : tâches de ménage en retard, chambres à publier, baisse d'occupation à anticiper."
+                  : "An intelligent engine analyzes your data and suggests concrete actions: overdue cleaning, rooms to publish, occupancy drops to anticipate.",
             },
             {
               icon: BarChart3,
-              title: lang === "fr" ? "Rapports simples" : "Simple reports",
+              title: lang === "fr" ? "Détection d'anomalies" : "Anomaly detection",
               desc:
                 lang === "fr"
-                  ? "Voyez en un coup d'œil combien vous avez gagné ce mois-ci — pas de tableau compliqué à lire."
-                  : "See at a glance how much you earned this month — no complicated spreadsheets.",
+                  ? "Séjoura détecte automatiquement les surpaiements, sous-paiements, paiements en double et écarts de prix — vous êtes alerté avant qu'il ne soit trop tard."
+                  : "Séjoura automatically detects overpayments, underpayments, duplicate payments and price discrepancies — you're alerted before it's too late.",
+            },
+            {
+              icon: Sparkles,
+              title: lang === "fr" ? "Ménage automatique" : "Automatic cleaning",
+              desc:
+                lang === "fr"
+                  ? "Le départ d'un client crée la tâche de nettoyage dans un pool partagé. La première ménagère disponible la prend. Alerte automatique après 1h30."
+                  : "A client checkout creates the cleaning task in a shared pool. The first available cleaner picks it up. Automatic alert after 1h30.",
+            },
+            {
+              icon: CreditCard,
+              title: lang === "fr" ? "Espace client mobile" : "Mobile client portal",
+              desc:
+                lang === "fr"
+                  ? "Chaque client reçoit une page séjour privée sur son téléphone : infos du séjour, demandes de services et suivi du paiement."
+                  : "Each client receives a private stay page on their phone: stay info, service requests and payment tracking.",
+            },
+            {
+              icon: Wallet,
+              title: lang === "fr" ? "Caisse & Shift en temps réel" : "Real-time cash & shift",
+              desc:
+                lang === "fr"
+                  ? "Suivez chaque mouvement de caisse en temps réel : encaissements, décaissements, journal complet avec horodatage."
+                  : "Track every cash movement in real time: receipts, disbursements, complete timestamped journal.",
             },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3">
@@ -613,58 +605,65 @@ export function HomePage() {
         </ul>
         <p className="text-xs text-slate-500 dark:text-[#a0a0a0] border-t border-slate-200 dark:border-[#404040] pt-3">
           {lang === "fr"
-            ? "Ménage automatique et vitrine Trouvetou : inclus avec le plan Entreprise."
-            : "Automatic cleaning and the Trouvetou showcase: included with the Entreprise plan."}
+            ? "Toutes ces fonctionnalités sont incluses dans chaque plan, dès l'essai gratuit."
+            : "All these features are included in every plan, from the free trial."}
         </p>
       </div>
     ),
     Modules: (
       <div className="space-y-3">
         <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
-          {lang === "fr" ? "Fonctions avancées (Plan Entreprise)" : "Advanced features (Entreprise Plan)"}
+          {lang === "fr" ? "Les modules du dashboard" : "Dashboard modules"}
         </h4>
         <ul className="space-y-3 text-sm">
           {[
             {
-              icon: Building2,
-              title:
-                lang === "fr" ? "Établissements illimités" : "Unlimited establishments",
+              icon: Calendar,
+              title: lang === "fr" ? "Réservations & calendrier" : "Reservations & calendar",
               desc:
                 lang === "fr"
-                  ? "Gérez plusieurs résidences ou hôtels : les chiffres de tous vos établissements se retrouvent sur un seul écran."
-                  : "Manage several residences or hotels: all your establishments' figures appear on one screen.",
+                  ? "Créez, modifiez et suivez toutes vos réservations. Anti double-booking, demandes de prolongation et statuts en temps réel."
+                  : "Create, modify and track all your reservations. Anti double-booking, extension requests and real-time statuses.",
             },
             {
-              icon: Sparkles,
-              title: lang === "fr" ? "Module Ménage automatique" : "Automatic cleaning",
+              icon: Building2,
+              title: lang === "fr" ? "Chambres & types" : "Rooms & types",
               desc:
                 lang === "fr"
-                  ? "Le départ d'un client crée automatiquement la tâche de nettoyage, partagée entre vos ménagères jusqu'à la remise en service de la chambre."
-                  : "A client checkout automatically creates the cleaning task, shared among your cleaners until the room is ready again.",
+                  ? "Gérez vos types de chambres, grilles tarifaires, photos et disponibilités. Suivi du statut de chaque chambre."
+                  : "Manage your room types, pricing grids, photos and availability. Track the status of every room.",
+            },
+            {
+              icon: Wallet,
+              title: lang === "fr" ? "Comptabilité & factures PDF" : "Accounting & PDF invoices",
+              desc:
+                lang === "fr"
+                  ? "Dépenses, rapports mensuels, factures et reçus PDF générés en un clic. Journal d'audit complet."
+                  : "Expenses, monthly reports, invoices and PDF receipts generated in one click. Complete audit trail.",
+            },
+            {
+              icon: Users,
+              title: lang === "fr" ? "Employés & auth par PIN" : "Employees & PIN auth",
+              desc:
+                lang === "fr"
+                  ? "Créez des comptes réceptionnistes et ménagères. Chacun se connecte avec un code PIN — pas besoin de compte email."
+                  : "Create receptionist and cleaner accounts. Each one signs in with a PIN — no email account needed.",
             },
             {
               icon: Store,
-              title: lang === "fr" ? "Vitrine Trouvetou" : "Trouvetou showcase",
+              title: lang === "fr" ? "Trouvetou — mise en ligne" : "Trouvetou — listing",
               desc:
                 lang === "fr"
-                  ? "Publiez vos logements sur Trouvetou et recevez les demandes de réservation directement sur WhatsApp."
-                  : "Publish your units on Trouvetou and receive booking requests directly on WhatsApp.",
+                  ? "Publiez vos chambres sur la vitrine Trouvetou avec photos, prix et disponibilités. Les réservations arrivent sur WhatsApp."
+                  : "List your rooms on the Trouvetou showcase with photos, prices and availability. Bookings arrive on WhatsApp.",
             },
             {
               icon: Server,
-              title: "Accès API",
+              title: lang === "fr" ? "API & intégrations" : "API & integrations",
               desc:
                 lang === "fr"
-                  ? "Permet à votre site ou à une autre application de se connecter directement à Séjoura."
-                  : "Allows your site or another app to connect directly to Séjoura.",
-            },
-            {
-              icon: CreditCard,
-              title: lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment",
-              desc:
-                lang === "fr"
-                  ? "Réglez votre abonnement en ligne par Wave depuis votre téléphone, sans carte bancaire."
-                  : "Pay your subscription online by Wave from your phone, no credit card required.",
+                  ? "Endpoints REST pour connecter votre site web ou vos applications tierces. Disponibilités, réservations et annulations."
+                  : "REST endpoints to connect your website or third-party apps. Availability, bookings and cancellations.",
             },
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3">
