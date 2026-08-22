@@ -66,6 +66,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Refuser la création de session pour les réservations terminées
+    if (
+      booking.status === "cancelled" ||
+      booking.status === "no_show" ||
+      booking.status === "checked_out"
+    ) {
+      return NextResponse.json(
+        { error: "Cette réservation est terminée. L'espace client n'est plus disponible." },
+        { status: 410 }
+      );
+    }
+
     // Réutiliser une session active existante : le lien déjà partagé reste valide
     // (sa date d'expiration est resynchronisée par le trigger côté base lors
     // des prolongations de séjour).
@@ -85,12 +97,6 @@ export async function POST(request: Request) {
       const expiresAt = new Date(
         `${booking.check_out_date}T${booking.check_out_time || "11:00"}`
       ).toISOString();
-      const isActive =
-        booking.status === "cancelled" ||
-        booking.status === "no_show" ||
-        booking.status === "checked_out"
-          ? false
-          : true;
 
       const { data: inserted, error: insertErr } = await admin
         .from("client_sessions")
@@ -100,7 +106,7 @@ export async function POST(request: Request) {
           client_id: booking.client_id,
           access_token: token,
           expires_at: expiresAt,
-          is_active: isActive,
+          is_active: true,
         })
         .select("id, access_token")
         .single();

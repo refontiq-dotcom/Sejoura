@@ -59,10 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setMounted(true);
     const storedTheme = localStorage.getItem("sejoura-theme") as Theme | null;
     const storedColor = localStorage.getItem("sejoura-primary-color");
-    // Persistance : on lit d'abord la clé demandée "theme_color", puis l'ancienne clé pour rétro-compatibilité
-    const storedThemeColor =
-      localStorage.getItem("theme_color") ||
-      localStorage.getItem("sejoura-theme-color");
+    const storedThemeColor = localStorage.getItem("theme_color");
 
     if (storedTheme) {
       setThemeState(storedTheme);
@@ -104,7 +101,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (colorOrId) {
         setThemeColorState(colorOrId);
         localStorage.setItem("theme_color", colorOrId);
-        localStorage.setItem("sejoura-theme-color", colorOrId);
       }
     }
 
@@ -164,7 +160,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         root.style.setProperty("--primary-color", dynamicPrimary);
         root.style.setProperty("--primary-light", dynamicLight);
         localStorage.setItem("theme_color", themeColor);
-        localStorage.setItem("sejoura-theme-color", themeColor);
       } else {
         root.style.removeProperty("--sidebar-bg");
         root.style.removeProperty("--main-bg");
@@ -193,10 +188,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeColorState(color);
     if (color) {
       localStorage.setItem("theme_color", color);
-      localStorage.setItem("sejoura-theme-color", color);
     } else {
       localStorage.removeItem("theme_color");
-      localStorage.removeItem("sejoura-theme-color");
     }
   };
 

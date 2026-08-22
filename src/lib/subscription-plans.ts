@@ -4,8 +4,6 @@ export type SubscriptionTier = "essentiel" | "entreprise" | "free";
 export const WAVE_PAY_LINKS: Record<string, string> = {
   essentiel: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000",
   entreprise: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000",
-  standard: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000",
-  enterprise: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000",
 };
 
 export function getWavePayLink(plan?: string | null): string {
@@ -14,7 +12,7 @@ export function getWavePayLink(plan?: string | null): string {
 
 export function normalizePlan(plan?: string | null): SubscriptionTier {
   const normalized = (plan || "").toLowerCase();
-  if (normalized === "essentiel" || normalized === "essential" || normalized === "standard") return "essentiel";
+  if (normalized === "essentiel" || normalized === "essential" || normalized === "standard" || normalized === "pro") return "essentiel";
   if (normalized === "entreprise" || normalized === "enterprise") return "entreprise";
   return "free";
 }

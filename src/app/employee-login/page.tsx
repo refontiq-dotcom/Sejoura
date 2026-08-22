@@ -217,13 +217,13 @@ function EmployeeLoginContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [step, handlePhoneKey, handlePhoneSubmit]);
 
-  // ── Connexion via les identifiants internes (PIN ou biométrie) ──────────────
-  const signInWithPayload = useCallback(
-    async (data: { loginEmail: string; internalPassword: string }) => {
+  // ── Connexion via les tokens de session retournés par le serveur ───────────
+  const signInWithSession = useCallback(
+    async (session: { access_token: string; refresh_token: string }) => {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: data.loginEmail,
-        password: data.internalPassword,
+      const { error } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
       });
       return !error;
     },
@@ -246,9 +246,11 @@ function EmployeeLoginContent() {
           return { success: false, error: data.error || "Code secret incorrect." };
         }
 
-        const signedIn = await signInWithPayload(data);
-        if (!signedIn) {
-          return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+        if (data.session) {
+          const signedIn = await signInWithSession(data.session);
+          if (!signedIn) {
+            return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+          }
         }
 
         setLastRole(data.role || profile.role);
@@ -258,7 +260,7 @@ function EmployeeLoginContent() {
         return { success: false, error: "Erreur serveur. Réessayez." };
       }
     },
-    [profile, signInWithPayload]
+    [profile, signInWithSession]
   );
 
   // ── Définition du PIN (première connexion) ──────────────────────────────────
@@ -277,9 +279,11 @@ function EmployeeLoginContent() {
           return { success: false, error: data.error || "Erreur lors de la définition du code." };
         }
 
-        const signedIn = await signInWithPayload(data);
-        if (!signedIn) {
-          return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+        if (data.session) {
+          const signedIn = await signInWithSession(data.session);
+          if (!signedIn) {
+            return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+          }
         }
 
         setLastRole(data.role || profile.role);
@@ -289,21 +293,23 @@ function EmployeeLoginContent() {
         return { success: false, error: "Erreur serveur. Réessayez." };
       }
     },
-    [profile, signInWithPayload]
+    [profile, signInWithSession]
   );
 
   // ── Authentification biométrique (Face ID / Empreinte) ──────────────────────
   const handleBiometricComplete = useCallback(
     async (payload: BiometricAuthPayload): Promise<PinSubmitResult> => {
-      const signedIn = await signInWithPayload(payload);
-      if (!signedIn) {
-        return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+      if (payload.session) {
+        const signedIn = await signInWithSession(payload.session);
+        if (!signedIn) {
+          return { success: false, error: "Erreur d'authentification. Contactez votre responsable." };
+        }
       }
       setLastRole(payload.role);
       toast.success(`Bienvenue, ${payload.fullName} !`);
       return { success: true };
     },
-    [signInWithPayload]
+    [signInWithSession]
   );
 
   // ── Redirection après authentification réussie ──────────────────────────────

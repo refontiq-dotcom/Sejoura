@@ -83,8 +83,8 @@ export async function GET(request: Request) {
       .select("room_id")
       .in("room_id", allRoomIds)
       .in("status", ["confirmed", "checked_in"])
-      .lte("check_in", now)
-      .gte("check_out", now);
+      .lte("check_in_date", now)
+      .gte("check_out_date", now);
     for (const b of activeBookings ?? []) {
       occupiedRoomIds.add(b.room_id);
     }

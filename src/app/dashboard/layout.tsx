@@ -48,16 +48,6 @@ export default function DashboardLayout({
     return true;
   });
 
-  useEffect(() => {
-    function handleResize() {
-      if (window.innerWidth < 1024) {
-        setSidebarCollapsed(true);
-      }
-    }
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
   const [headerHidden, setHeaderHidden] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -87,14 +77,11 @@ export default function DashboardLayout({
     return () => clearInterval(id);
   }, []);
 
+  // Gérer la sidebar responsive : plier en mobile, déplier en desktop.
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setSidebarCollapsed(true);
-      } else {
-        setSidebarCollapsed(false);
-      }
-    };
+    function handleResize() {
+      setSidebarCollapsed(window.innerWidth < 1024);
+    }
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -293,7 +280,6 @@ export default function DashboardLayout({
               setThemeColor(tenantData.theme_color);
               if (typeof window !== "undefined") {
                 localStorage.setItem("theme_color", tenantData.theme_color);
-                localStorage.setItem("sejoura-theme-color", tenantData.theme_color);
               }
             } else {
               setThemeColor(null);

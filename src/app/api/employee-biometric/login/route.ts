@@ -4,16 +4,14 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getRequestOrigin, getRpId, normalizeTransports, type EmployeeAuthPayload } from "@/lib/webauthn";
+import { getRequestOrigin, getRpId, normalizeTransports } from "@/lib/webauthn";
+import { signInEmployeeServerSide } from "@/lib/employee-auth";
 
 /**
  * POST /api/employee-biometric/login
  *
  * Authentifie un employé via une clé biométrique (Face ID / Empreinte) WebAuthn.
- *
- * Body JSON :
- *   { action: "options", userId }          → génère les options d'authentification
- *   { action: "verify",  userId, response }→ vérifie l'assertion et renvoie les identifiants de session
+ * ⚠️  Ne retourne JAMAIS le internalPassword — l'auth serveur retourne les tokens de session.
  */
 export async function POST(request: Request) {
   try {
@@ -159,19 +157,19 @@ export async function POST(request: Request) {
       .update({ last_login_at: new Date().toISOString() })
       .eq("id", userId);
 
-    const loginEmail = user.email || `${user.phone?.replace(/[^0-9]/g, "")}@employe.sejoura.com`;
-    const internalPassword = `sejoura_emp_${userId.replace(/-/g, "").slice(0, 16)}`;
+    // ── Authentification serveur (ne jamais exposer le mot de passe) ────────
+    const sessionResult = await signInEmployeeServerSide(userId, user.email, user.phone);
+    if (!sessionResult) {
+      return NextResponse.json({ error: "Erreur d'authentification." }, { status: 500 });
+    }
 
-    const payload: EmployeeAuthPayload = {
+    return NextResponse.json({
       success: true,
-      internalPassword,
-      loginEmail,
+      session: sessionResult.session,
       role: user.role,
       fullName: user.full_name,
       userId,
-    };
-
-    return NextResponse.json(payload);
+    });
   } catch (err) {
     console.error("Erreur API employee-biometric (login):", err);
     return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });

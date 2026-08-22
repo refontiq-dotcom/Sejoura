@@ -23,10 +23,10 @@ export async function GET(request: Request) {
 
     const admin = createAdminClient();
 
-    // Récupérer tous les utilisateurs actifs (employés) — filtrage côté app pour flexibilité
+    // Récupérer les utilisateurs — ne pas sélectionner pin_code (donnée sensible)
     const { data: allUsers, error } = await admin
       .from("users")
-      .select("id, tenant_id, full_name, phone, role, is_active, first_login, pin_code")
+      .select("id, tenant_id, full_name, phone, role, is_active, first_login")
       .neq("role", "super_admin");
 
     if (error || !allUsers) {
@@ -65,13 +65,16 @@ export async function GET(request: Request) {
       if (tenant?.company_name) companyName = tenant.company_name;
     }
 
+    // hasPinCode est déduit de first_login (false = PIN configuré)
+    const hasPinCode = !(matchedUser.first_login ?? true);
+
     return NextResponse.json({
       found: true,
       userId: matchedUser.id,
       fullName: matchedUser.full_name,
       role: matchedUser.role,
       firstLogin: matchedUser.first_login ?? true,
-      hasPinCode: matchedUser.pin_code !== null,
+      hasPinCode,
       primaryColor,
       companyName,
     });

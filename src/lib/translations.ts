@@ -246,7 +246,7 @@ export const translations = {
     cleaning: {
       title: "Suivi ménage",
       subtitleStandard: "Module de gestion du ménage automatique",
-      proRequiredTitle: "Module Pro requis",
+      proRequiredTitle: "Module Entreprise requis",
       proRequiredCopy: "Le module de ménage automatique avec pool de tâches partagé est disponible à partir du plan Entreprise.",
       poolSummary: "Pool de tâches partagé — {count} tâche(s)",
       upgrade: "Mettre à niveau",
@@ -809,7 +809,7 @@ export const translations = {
       subtitle: "Manage your residences and availability",
       summary: "{count} residence(s)",
       planLimitTitle: "Plan limit reached",
-      planLimitCopy: "Upgrade to Pro for unlimited residences.",
+      planLimitCopy: "Upgrade to Entreprise for unlimited residences.",
       addResidence: "Add a residence",
       noResidenceTitle: "No residences",
       noResidenceCopy: "Start by adding your first residence",
@@ -844,7 +844,7 @@ export const translations = {
     cleaning: {
       title: "Cleaning",
       subtitleStandard: "Automatic cleaning task management module",
-      proRequiredTitle: "Pro module required",
+      proRequiredTitle: "Entreprise module required",
       proRequiredCopy: "The automatic cleaning pool module is available starting with the Entreprise plan.",
       poolSummary: "Shared task pool — {count} task(s)",
       upgrade: "Upgrade",

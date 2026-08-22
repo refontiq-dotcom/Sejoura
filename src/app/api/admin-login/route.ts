@@ -127,10 +127,12 @@ export async function POST(req: Request) {
     recordAttempt(ip, true);
 
     // ── Deep-link : retour vers la section demandée (ex. /admin/ideas) ─────
+    // Avant : next.startsWith(ADMIN_LOGIN_ROUTE) && next.startsWith("/admin/")
+    //         always true car ADMIN_LOGIN_ROUTE = "/admin" → condition redondante.
     let redirectTo = ADMIN_HUB_ROUTE;
     const url = new URL(req.url);
     const next = url.searchParams.get("next");
-    if (next && next.startsWith(ADMIN_LOGIN_ROUTE) && next.startsWith("/admin/")) {
+    if (next && next.startsWith("/admin/") && next !== ADMIN_LOGIN_ROUTE) {
       redirectTo = next;
     }
 

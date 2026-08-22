@@ -45,12 +45,3 @@ export function getDeviceName(request: Request): string {
   return "Appareil";
 }
 
-/** Payload d'authentification renvoyé par les routes PIN et biométrie */
-export interface EmployeeAuthPayload {
-  success: boolean;
-  internalPassword: string;
-  loginEmail: string;
-  role: string;
-  fullName: string;
-  userId: string;
-}

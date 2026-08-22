@@ -8,13 +8,14 @@
  * Appelée par les opérateurs (Wave, Orange Money, MTN...)
  * après confirmation du paiement d'un abonnement Séjoura.
  *
- * ⚠️  MÉTHODE ACTUELLE INCHANGÉE :
- * La validation manuelle via /api/subscription/notify-payment reste active.
- * Cette route est additionnelle et ne la remplace pas.
+ * ⚠️  Sécurité : la signature Wave est vérifiée. Pour les autres
+ * providers, un header x-webhook-secret est requis si WEBHOOK_SECRET
+ * est configuré.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { processSubscriptionPaymentWebhook } from "@/lib/payments/subscription-payment";
+import { verifyWaveSignature } from "@/lib/wave";
 
 // Mappage des statuts par opérateur
 const STATUS_MAP: Record<string, Record<string, string>> = {
@@ -48,13 +49,47 @@ const STATUS_MAP: Record<string, Record<string, string>> = {
 
 export async function POST(req: NextRequest) {
   try {
-    // Identifier le provider via le header ou query param
     const provider =
       req.headers.get("x-payment-provider") ??
       req.nextUrl.searchParams.get("provider") ??
       "unknown";
 
-    const rawBody = await req.json();
+    const rawBody = await req.text();
+
+    // ── Vérification de la signature ──────────────────────────────────────────
+    if (provider === "wave") {
+      const waveSignature = req.headers.get("wave-signature");
+      const waveSecret = process.env.WAVE_WEBHOOK_SECRET;
+
+      if (!waveSecret) {
+        console.error("[SubWebhook] WAVE_WEBHOOK_SECRET non configuré");
+        return NextResponse.json({ error: "Configuration manquante" }, { status: 500 });
+      }
+
+      if (!waveSignature) {
+        console.error("[SubWebhook] Signature Wave manquante");
+        return NextResponse.json({ error: "Signature manquante" }, { status: 401 });
+      }
+
+      const isValid = verifyWaveSignature(rawBody, waveSignature, waveSecret);
+      if (!isValid) {
+        console.error("[SubWebhook] Signature Wave invalide");
+        return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
+      }
+    } else {
+      // Pour les autres providers : secret partagé obligatoire si configuré
+      const webhookSecret = process.env.WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const providedSecret = req.headers.get("x-webhook-secret");
+        if (providedSecret !== webhookSecret) {
+          return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+        }
+      }
+    }
+
+    // Parser le payload après vérification de signature
+    const rawBodyForParse = rawBody;
+    const body = JSON.parse(rawBodyForParse);
 
     // Extraire le transaction ID selon le provider
     let transactionId: string | null = null;
@@ -62,24 +97,24 @@ export async function POST(req: NextRequest) {
 
     switch (provider) {
       case "wave":
-        transactionId = rawBody.id ?? rawBody.client_reference;
-        providerStatus = rawBody.checkout_status;
+        transactionId = body.id ?? body.client_reference;
+        providerStatus = body.checkout_status;
         break;
       case "orange_money":
-        transactionId = rawBody.notifToken ?? rawBody.payToken;
-        providerStatus = rawBody.status;
+        transactionId = body.notifToken ?? body.payToken;
+        providerStatus = body.status;
         break;
-        case "mtn":
-        transactionId = rawBody.financialTransactionId ?? rawBody.externalId;
-        providerStatus = rawBody.status;
+      case "mtn":
+        transactionId = body.financialTransactionId ?? body.externalId;
+        providerStatus = body.status;
         break;
       case "moov_africa":
-        transactionId = rawBody.transaction_id;
-        providerStatus = rawBody.status;
+        transactionId = body.transaction_id;
+        providerStatus = body.status;
         break;
       case "pi_spi":
-        transactionId = rawBody.transaction_id;
-        providerStatus = rawBody.status;
+        transactionId = body.transaction_id;
+        providerStatus = body.status;
         break;
       default:
         return NextResponse.json({ error: "Provider inconnu" }, { status: 400 });
@@ -92,11 +127,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Normaliser le statut
     const normalizedStatus =
       STATUS_MAP[provider]?.[providerStatus] ?? providerStatus;
 
-    // Traiter le paiement
     const result = await processSubscriptionPaymentWebhook(
       provider,
       transactionId,
@@ -113,5 +146,4 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Les webhooks ne doivent pas être mis en cache
 export const dynamic = "force-dynamic";

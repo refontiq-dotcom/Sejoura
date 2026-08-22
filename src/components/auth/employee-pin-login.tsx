@@ -45,8 +45,7 @@ export interface PinSubmitResult {
 
 export interface BiometricAuthPayload {
   success: boolean;
-  internalPassword: string;
-  loginEmail: string;
+  session?: { access_token: string; refresh_token: string };
   role: string;
   fullName: string;
   userId: string;

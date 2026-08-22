@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hashPin, verifyPin } from "@/lib/pin";
+import { signInEmployeeServerSide } from "@/lib/employee-auth";
 
 /**
  * POST /api/employee-pin
@@ -8,6 +9,9 @@ import { hashPin, verifyPin } from "@/lib/pin";
  * Body JSON :
  *   { action: "set",    userId: string, pin: string }  — Définit le code PIN (première connexion)
  *   { action: "verify", userId: string, pin: string }  — Vérifie le code PIN (reconnexion)
+ *
+ * ⚠️  Ne retourne JAMAIS le internalPassword. L'authentification Supabase
+ * est effectuée côté serveur et seuls les tokens de session sont renvoyés.
  */
 export async function POST(request: Request) {
   try {
@@ -44,7 +48,6 @@ export async function POST(request: Request) {
     }
 
     const loginEmail = user.email || `${user.phone?.replace(/[^0-9]/g, "")}@employe.sejoura.com`;
-    // Mot de passe interne stable (dérivé de l'userId, ne dépend pas du PIN)
     const internalPassword = `sejoura_emp_${userId.replace(/-/g, "").slice(0, 16)}`;
 
     // ── ACTION : SET (Première connexion) ──────────────────────────────────────
@@ -90,13 +93,7 @@ export async function POST(request: Request) {
         await admin.auth.admin.updateUserById(authUserId, { password: internalPassword });
       }
 
-      // Le trigger handle_new_user (on_auth_user_created) insère automatiquement
-      // un profil dans public.users à la création du compte Auth. Comme l'employé
-      // possède déjà un profil (créé par l'employeur, auth_user_id NULL), ce
-      // trigger crée un DOUBLON qui provoque ensuite une violation de contrainte
-      // UNIQUE sur auth_user_id lors de la mise à jour ci-dessous (erreur 500
-      // « Erreur lors de la sauvegarde du PIN »). On supprime donc les éventuels
-      // doublons avant de lier le profil d'origine (idempotent si aucun doublon).
+      // Nettoyage des doublons potentiels (trigger handle_new_user)
       const { error: cleanupError } = await admin
         .from("users")
         .delete()
@@ -125,10 +122,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Erreur lors de la sauvegarde du PIN." }, { status: 500 });
       }
 
+      // ── Authentification serveur (ne jamais exposer le mot de passe) ──────
+      const sessionResult = await signInEmployeeServerSide(userId, loginEmail, user.phone);
+      if (!sessionResult) {
+        return NextResponse.json({ error: "Erreur d'authentification." }, { status: 500 });
+      }
+
       return NextResponse.json({
         success: true,
-        internalPassword,
-        loginEmail,
+        session: sessionResult.session,
         fullName: user.full_name,
         role: user.role,
       });
@@ -153,10 +155,15 @@ export async function POST(request: Request) {
         .update({ last_login_at: new Date().toISOString() })
         .eq("id", userId);
 
+      // ── Authentification serveur (ne jamais exposer le mot de passe) ──────
+      const sessionResult = await signInEmployeeServerSide(userId, loginEmail, user.phone);
+      if (!sessionResult) {
+        return NextResponse.json({ error: "Erreur d'authentification." }, { status: 500 });
+      }
+
       return NextResponse.json({
         success: true,
-        internalPassword,
-        loginEmail,
+        session: sessionResult.session,
         fullName: user.full_name,
         role: user.role,
       });
