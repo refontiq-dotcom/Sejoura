@@ -571,12 +571,14 @@ CREATE TABLE notifications (
   link            TEXT,                    -- Lien vers la page concernée
   is_read         BOOLEAN NOT NULL DEFAULT FALSE,
   read_at         TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  recipient_role  TEXT DEFAULT NULL        -- NULL = tous les rôles ; 'admin_residence', 'receptionniste', etc.
 );
 
 CREATE INDEX idx_notifications_tenant ON notifications(tenant_id);
 CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_unread ON notifications(tenant_id, is_read) WHERE (is_read = FALSE);
+CREATE INDEX idx_notifications_recipient_role ON notifications(recipient_role) WHERE (recipient_role IS NOT NULL);
 
 -- ----------------------------------------------------------------------------
 -- 15. TABLE: client_sessions (Sessions temporaires pour les clients)
@@ -1248,6 +1250,7 @@ CREATE POLICY "notifications_select_own" ON notifications
     AND (user_id IS NULL OR user_id = (
       SELECT id FROM users WHERE auth_user_id = auth.uid()
     ))
+    AND (recipient_role IS NULL OR recipient_role = get_current_user_role())
   );
 
 CREATE POLICY "notifications_select_super_admin" ON notifications
@@ -1849,14 +1852,15 @@ BEGIN
   RETURNING * INTO v_request;
 
   -- Notification pour le gérant de l'établissement
-  INSERT INTO notifications (tenant_id, user_id, title, message, type, link)
+  INSERT INTO notifications (tenant_id, user_id, title, message, type, link, recipient_role)
   VALUES (
     v_tenant_id,
     NULL,
     'Abonnement activé',
     'Votre abonnement a été validé par l''administrateur. Merci pour votre paiement.',
     'success',
-    '/dashboard/subscription'
+    '/dashboard/subscription',
+    'admin_residence'
   );
 
   RETURN v_request;
@@ -2028,20 +2032,21 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- partir des événements métier (réservations, arrivées/départs, ménage, factures)
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION create_system_notification(
-  p_tenant_id UUID,
-  p_user_id   UUID,
-  p_title     TEXT,
-  p_message   TEXT,
-  p_type      TEXT,
-  p_link      TEXT
+  p_tenant_id      UUID,
+  p_user_id        UUID,
+  p_title          TEXT,
+  p_message        TEXT,
+  p_type           TEXT,
+  p_link           TEXT,
+  p_recipient_role TEXT DEFAULT NULL
 ) RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO notifications (tenant_id, user_id, title, message, type, link)
-  VALUES (p_tenant_id, p_user_id, p_title, p_message, p_type, p_link);
+  INSERT INTO notifications (tenant_id, user_id, title, message, type, link, recipient_role)
+  VALUES (p_tenant_id, p_user_id, p_title, p_message, p_type, p_link, p_recipient_role);
 EXCEPTION
   WHEN OTHERS THEN
     NULL;

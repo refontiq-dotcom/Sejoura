@@ -140,6 +140,7 @@ export async function POST(request: Request) {
     message: `${companyName} a déclaré un paiement Wave pour la formule ${getPlanLabel(plan)} (${amount} FCFA) depuis le numéro ${phone}. Validez l'abonnement.`,
     type: "warning",
     link: "/admin/sejour",
+    recipient_role: "admin_residence",
   });
 
   // 4. Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais

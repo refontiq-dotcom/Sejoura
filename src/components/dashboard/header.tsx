@@ -195,6 +195,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const [ideaCategory, setIdeaCategory] = useState<FeatureRequestCategory>("new_feature");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [tenantId, setTenantId] = useState<string>("");
+  const [notifLoading, setNotifLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
@@ -206,13 +208,14 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
   const loadNotifications = useCallback(async () => {
     try {
+      setNotifLoading(true);
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
       const { data: userData } = await supabase
         .from("users")
-        .select("tenant_id")
+        .select("tenant_id, role")
         .eq("auth_user_id", session.user.id)
         .maybeSingle();
 
@@ -223,6 +226,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         .from("notifications")
         .select("*")
         .eq("tenant_id", userData.tenant_id)
+        .or(`recipient_role.is.null,recipient_role.eq.${userData.role || ""}`)
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -240,6 +244,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       setNotifications(formatted);
     } catch {
       // Erreur silencieuse
+    } finally {
+      setNotifLoading(false);
     }
   }, []);
 
@@ -314,11 +320,15 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     if (notif.link) {
       setNotifOpen(false);
       router.push(notif.link);
+    } else {
+      // Just mark as read, don't close dropdown
+      setNotifOpen(false);
     }
   }
 
   async function handleMarkAllRead() {
-    if (!tenantId || unreadCount === 0) return;
+    if (!tenantId || unreadCount === 0 || markingAll) return;
+    setMarkingAll(true);
     try {
       const supabase = createClient();
       const { error } = await supabase
@@ -336,6 +346,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       toast.success(t.markAllReadSuccess);
     } catch {
       toast.error("Une erreur est survenue.");
+    } finally {
+      setMarkingAll(false);
     }
   }
 
@@ -359,6 +371,41 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     success: "bg-green-500",
     error: "bg-red-500",
   };
+
+  // Group notifications by date
+  function groupNotifications(items: NotificationItem[]) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const groups: { label: string; items: NotificationItem[] }[] = [];
+    let currentGroup = { label: "", items: [] as NotificationItem[] };
+
+    for (const notif of items) {
+      const notifDate = new Date(notif.time);
+      notifDate.setHours(0, 0, 0, 0);
+
+      let label = "";
+      if (notifDate.getTime() === today.getTime()) {
+        label = lang === "fr" ? "Aujourd'hui" : "Today";
+      } else if (notifDate.getTime() === yesterday.getTime()) {
+        label = lang === "fr" ? "Hier" : "Yesterday";
+      } else {
+        label = lang === "fr" ? "Plus tôt" : "Earlier";
+      }
+
+      if (label !== currentGroup.label) {
+        if (currentGroup.items.length > 0) groups.push(currentGroup);
+        currentGroup = { label, items: [] };
+      }
+      currentGroup.items.push(notif);
+    }
+    if (currentGroup.items.length > 0) groups.push(currentGroup);
+    return groups;
+  }
+
+  const groupedNotifications = groupNotifications(notifications);
 
   return (
     <>
@@ -465,7 +512,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
+              <div className="absolute right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-72 max-w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
                 <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
                   <h3 className="font-semibold text-sm text-[var(--foreground)]">{t.notifications}</h3>
                   {unreadCount > 0 && (
@@ -475,12 +522,21 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                   )}
                 </div>
                 <div className="max-h-80 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                  {notifLoading ? (
+                    <div className="p-6 text-center">
+                      <div className="w-5 h-5 border-2 border-[var(--primary-color)] border-t-transparent rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : notifications.length === 0 ? (
                     <div className="p-6 text-center text-[var(--muted-foreground)] text-xs">
                       {t.noNotifications}
                     </div>
                   ) : (
-                    notifications.map((notif) => (
+                    groupedNotifications.map((group) => (
+                      <div key={group.label}>
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider bg-[var(--muted)]/50">
+                          {group.label}
+                        </div>
+                        {group.items.map((notif) => (
                       <div
                         key={notif.id}
                         onClick={() => handleNotifClick(notif)}
@@ -516,6 +572,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                             <span className="w-2 h-2 rounded-full bg-blue-500 mt-1 flex-shrink-0" />
                           )}
                         </div>
+                      </div>
+                    ))}
                       </div>
                     ))
                   )}
