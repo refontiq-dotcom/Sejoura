@@ -5,38 +5,20 @@
  *
  * Route : POST /api/v1/cron/subscription-renewal
  *
- * Déclenché automatiquement chaque jour à 8h00 (UTC) pour tenter
- * le renouvellement automatique des abonnements qui expirent dans 3 jours.
+ * Déclenché automatiquement chaque jour à 8h00 (UTC) :
+ * - Alerte les abonnements expirant dans 3 jours (Telegram)
+ * - Soft-lock les abonnements expirés (is_soft_locked = true)
+ * - Notifie le Super Admin via Telegram
  *
- * Pour activer via Vercel Cron (vercel.json) :
- * {
- *   "crons": [{
- *     "path": "/api/v1/cron/subscription-renewal",
- *     "schedule": "0 8 * * *"
- *   }]
- * }
- *
- * Ou via pg_cron Supabase (appel HTTP) :
- * SELECT cron.schedule(
- *   'auto-renew-subscriptions',
- *   '0 8 * * *',
- *   $$SELECT net.http_post(
- *     'https://sejoura-lemon.vercel.app/api/v1/cron/subscription-renewal',
- *     '{}',
- *     headers := '{"x-cron-secret": "VOTRE_SECRET"}'::jsonb
- *   )$$
- * );
- *
- * ⚠️  MÉTHODE ACTUELLE INCHANGÉE :
- * Cette route est un NO-OP tant que les opérateurs ne sont pas configurés.
- * Elle ne touche à rien et n'a aucun effet de bord.
+ * Quand les opérateurs seront connectés, on ajoutera l'initiation
+ * de paiement automatique dans ce même flux.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { triggerAutoRenewalCron } from "@/lib/payments/subscription-payment";
+import { runSubscriptionRenewalCron } from "@/lib/payments/subscription-renewal";
 
 export async function POST(req: NextRequest) {
-  // Sécurité : vérifier le secret cron (à configurer en variable d'environnement)
+  // Sécurité : vérifier le secret cron
   const cronSecret = req.headers.get("x-cron-secret");
   const expectedSecret = process.env.CRON_SECRET;
 
@@ -46,13 +28,13 @@ export async function POST(req: NextRequest) {
 
   try {
     console.log("[SubCron] Démarrage du cron d'auto-renouvellement des abonnements...");
-    await triggerAutoRenewalCron();
-    console.log("[SubCron] Cron terminé.");
+    const result = await runSubscriptionRenewalCron();
+    console.log("[SubCron] Cron terminé.", result);
 
     return NextResponse.json({
       success: true,
-      message: "Cron d'auto-renouvellement exécuté (stubs actifs — aucun paiement initié).",
-      timestamp: new Date().toISOString(),
+      message: `Cron exécuté : ${result.expiringAlerts} alertes, ${result.expiredLocked} abonnements verrouillés.`,
+      ...result,
     });
   } catch (error) {
     console.error("[SubCron] Erreur:", error);
@@ -60,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Également accessible en GET pour les tests manuels depuis le navigateur
+// Également accessible en GET pour les tests manuels
 export async function GET(req: NextRequest) {
   return POST(req);
 }

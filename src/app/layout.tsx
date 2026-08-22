@@ -29,8 +29,26 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Séjoura by Refontiq — Gestion d'établissements",
-  description: "Application SaaS de gestion d'établissements et de chambres",
+  title: {
+    default: "Séjoura — Gestion d'établissements et d'hébergement",
+    template: "%s | Séjoura",
+  },
+  description:
+    "Séjoura est la plateforme SaaS complète pour gérer votre établissement d'hébergement : réservations, chambres, facturation, personnel, et listing sur Trouvetou. Simple, rapide, pensé pour l'Afrique.",
+  keywords: [
+    "gestion hôtel",
+    "gestion chambre",
+    "réservation hôtel",
+    "SaaS hébergement",
+    "logiciel hôtel Afrique",
+    "gestion établissement",
+    "facturation hôtel",
+    "Trouvetou",
+    "Séjoura",
+  ],
+  authors: [{ name: "Refontiq", url: "https://refontiq.com" }],
+  creator: "Refontiq",
+  publisher: "Refontiq",
   applicationName: "Séjoura",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -42,6 +60,41 @@ export const metadata: Metadata = {
       url: "/icons/apple-touch-icon.png",
       sizes: "180x180",
       type: "image/png",
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "fr_CI",
+    url: "https://sejoura.com",
+    siteName: "Séjoura",
+    title: "Séjoura — Gestion d'établissements et d'hébergement",
+    description:
+      "La plateforme SaaS complète pour gérer votre établissement d'hébergement : réservations, chambres, facturation, personnel, et listing sur Trouvetou.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Séjoura — Gestion d'établissements",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Séjoura — Gestion d'établissements",
+    description:
+      "La plateforme SaaS complète pour gérer votre établissement d'hébergement.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
   appleWebApp: {

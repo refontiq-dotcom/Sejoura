@@ -403,6 +403,65 @@ html {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Transition de page — apparition douce du contenu principal */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Skeleton shimmer — effet de brillance sur les placeholders */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-active) 25%,
+    var(--surface-hover) 50%,
+    var(--surface-active) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Apparition staggerée des éléments (cartes, listes) */
+@keyframes staggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-stagger-in {
+  animation: staggerIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Hover lift — soulèvement discret au survol des cartes */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 /* Animation d'apparition des dropdowns (fade-in + zoom-in 95%, 150 ms) */
 @keyframes dropdownIn {
   from {
