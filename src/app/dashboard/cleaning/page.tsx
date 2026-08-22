@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { canAccessPlanFeature } from "@/lib/utils";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import { CleaningSkeleton } from "@/components/ui/skeletons";
 import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
 import { useCleaningActions } from "@/hooks/use-cleaning-actions";
 import { useLanguage } from "@/hooks/use-language";
@@ -434,11 +435,7 @@ export default function CleaningPage() {
   }, [filteredTasks, now, lang]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
-      </div>
-    );
+    return <CleaningSkeleton />;
   }
 
   const hasCleaningAccess = canAccessPlanFeature(plan, "cleaningModule");

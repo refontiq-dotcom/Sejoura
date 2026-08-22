@@ -23,6 +23,7 @@ import {
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import { BookingsSkeleton } from "@/components/ui/skeletons";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -1449,11 +1450,7 @@ export default function BookingsPage() {
   }, [filterStatus, searchQuery, startDate, endDate]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
-      </div>
-    );
+    return <BookingsSkeleton />;
   }
 
   return (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { EmployeesSkeleton } from "@/components/ui/skeletons";
 import { getRoleLabel, getPlanLimits, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
 import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -391,11 +392,7 @@ export default function EmployeesPage() {
   }
 
   if (loading && employees.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
-      </div>
-    );
+    return <EmployeesSkeleton />;
   }
 
   return (
