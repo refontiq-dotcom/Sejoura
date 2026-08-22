@@ -3,51 +3,42 @@
  * SEJOURA — AUDIT LOGGING
  * ============================================================================
  *
- * Enregistre les actions importantes pour la securite et la traҫabilite.
- * Chaque action est loggee avec : qui, quoi, quand, d'ou.
+ * Enregistre les actions importantes pour la securite et la traabilit.
+ * Compatible avec la table audit_logs existante dans Supabase.
+ *
+ * Schema existant:
+ *   id, tenant_id, user_id, action, entity_type, entity_id,
+ *   old_values, new_values, ip_address, user_agent, created_at
  *
  * Usage:
  *   await auditLog({
+ *     tenantId: session.tenantId,
  *     userId: session.user.id,
-     action: "booking.created",
-     entityType: "booking",
-     entityId: bookingId,
- *     metadata: { guest_name: "..." },
+ *     action: "booking.created",
+ *     entityType: "booking",
+ *     entityId: bookingId,
+ *     newValues: { guest_name: "...", room: "101" },
  *     request,
  *   });
- *
- * TABLE REQUISE (a creer via migration SQL):
- * CREATE TABLE audit_logs (
- *   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
- *   user_id UUID REFERENCES auth.users(id),
- *   action TEXT NOT NULL,
- *   entity_type TEXT,
- *   entity_id TEXT,
- *   metadata JSONB DEFAULT '{}',
- *   ip_address TEXT,
- *   user_agent TEXT,
- *   created_at TIMESTAMPTZ DEFAULT now()
- * );
- *
- * CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
- * CREATE INDEX idx_audit_logs_action ON audit_logs(action);
- * CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
- * CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface AuditLogEntry {
+  /** UUID du tenant (etablissement) */
+  tenantId?: string;
   /** UUID de l'utilisateur authentifie */
   userId?: string;
   /** Action effectuee (ex: "booking.created", "employee.deleted") */
   action: string;
   /** Type d'entite concernee (ex: "booking", "employee", "subscription") */
-  entityType?: string;
+  entityType: string;
   /** ID de l'entite concernee */
   entityId?: string;
-  /** Metadonnees additionnelles (JSON serializable) */
-  metadata?: Record<string, unknown>;
+  /** Valeurs avant modification (pour les updates) */
+  oldValues?: Record<string, unknown>;
+  /** Valeurs apres modification (pour les creates/updates) */
+  newValues?: Record<string, unknown>;
   /** Objet Request Next.js (pour extraire IP et User-Agent) */
   request?: Request;
 }
@@ -93,10 +84,6 @@ export const AuditActions = {
   SETTINGS_UPDATED: "settings.updated",
   LOGO_UPLOADED: "settings.logo_uploaded",
   THEME_CHANGED: "settings.theme_changed",
-
-  // Data
-  DATA_EXPORTED: "data.exported",
-  DATA_DELETED: "data.deleted",
 } as const;
 
 /**
@@ -128,17 +115,18 @@ export async function auditLog(entry: AuditLogEntry): Promise<void> {
     const admin = createAdminClient();
 
     const { error } = await admin.from("audit_logs").insert({
+      tenant_id: entry.tenantId || null,
       user_id: entry.userId || null,
       action: entry.action,
-      entity_type: entry.entityType || null,
+      entity_type: entry.entityType,
       entity_id: entry.entityId || null,
-      metadata: entry.metadata || {},
+      old_values: entry.oldValues || null,
+      new_values: entry.newValues || null,
       ip_address: getClientIp(entry.request),
       user_agent: getUserAgent(entry.request),
     });
 
     if (error) {
-      // Ne pas casser l'app si le logging echoue
       console.error("[AuditLog] Failed to write:", error.message);
     }
   } catch {
@@ -147,18 +135,20 @@ export async function auditLog(entry: AuditLogEntry): Promise<void> {
 }
 
 /**
- * Recupere les logs d'audit pour un utilisateur donne.
+ * Recupere les logs d'audit pour un tenant donne.
  */
-export async function getUserAuditLogs(
-  userId: string,
+export async function getTenantAuditLogs(
+  tenantId: string,
   limit = 50
 ): Promise<
   Array<{
     id: string;
+    user_id: string | null;
     action: string;
-    entity_type: string | null;
+    entity_type: string;
     entity_id: string | null;
-    metadata: Record<string, unknown>;
+    old_values: Record<string, unknown> | null;
+    new_values: Record<string, unknown> | null;
     ip_address: string | null;
     created_at: string;
   }>
@@ -167,8 +157,8 @@ export async function getUserAuditLogs(
 
   const { data, error } = await admin
     .from("audit_logs")
-    .select("id, action, entity_type, entity_id, metadata, ip_address, created_at")
-    .eq("user_id", userId)
+    .select("id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, created_at")
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -182,9 +172,10 @@ export async function getUserAuditLogs(
 export async function getRecentAuditLogs(limit = 100): Promise<
   Array<{
     id: string;
+    tenant_id: string | null;
     user_id: string | null;
     action: string;
-    entity_type: string | null;
+    entity_type: string;
     entity_id: string | null;
     ip_address: string | null;
     created_at: string;
@@ -195,7 +186,7 @@ export async function getRecentAuditLogs(limit = 100): Promise<
 
   const { data, error } = await admin
     .from("audit_logs")
-    .select("id, user_id, action, entity_type, entity_id, ip_address, created_at")
+    .select("id, tenant_id, user_id, action, entity_type, entity_id, ip_address, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
 
