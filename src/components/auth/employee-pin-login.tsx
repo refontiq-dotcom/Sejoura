@@ -36,6 +36,7 @@ export interface EmployeePinLoginEmployee {
   role: string;
   companyName?: string | null;
   primaryColor?: string;
+  hasBiometric?: boolean;
 }
 
 export interface PinSubmitResult {
@@ -328,14 +329,9 @@ export default function EmployeePinLogin({
       if (cancelled) return;
       setIsBiometricSupported(supported);
       if (supported && mode === "verify") {
-        try {
-          const res = await fetch(`/api/employee-biometric?userId=${employee.userId}`);
-          const data = (await res.json()) as { registered?: boolean };
-          if (cancelled) return;
-          setBiometricRegistered(Boolean(data.registered));
-        } catch {
-          // Mode PIN par défaut
-        }
+        // Utiliser le statut déjà récupéré par employee-verify
+        // (évite un appel réseau supplémentaire vers /api/employee-biometric)
+        setBiometricRegistered(Boolean(employee.hasBiometric));
       }
     }
     void init();

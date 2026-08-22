@@ -22,6 +22,7 @@ interface EmployeeProfile {
   firstLogin: boolean;
   primaryColor?: string;
   companyName?: string;
+  hasBiometric?: boolean;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -176,6 +177,7 @@ function EmployeeLoginContent() {
         firstLogin: data.firstLogin,
         primaryColor: data.primaryColor,
         companyName: data.companyName,
+        hasBiometric: data.hasBiometric,
       });
 
       if (data.firstLogin || !data.hasPinCode) {
@@ -343,6 +345,7 @@ function EmployeeLoginContent() {
           role: profile.role,
           companyName: profile.companyName,
           primaryColor: profile.primaryColor,
+          hasBiometric: profile.hasBiometric,
         }}
         mode={step === "set-pin" ? "set" : "verify"}
         accentColor={currentAccent}

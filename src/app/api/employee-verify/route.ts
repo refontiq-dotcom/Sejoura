@@ -68,6 +68,16 @@ export async function GET(request: Request) {
     // hasPinCode est déduit de first_login (false = PIN configuré)
     const hasPinCode = !(matchedUser.first_login ?? true);
 
+    // Vérifier si l'employé a des clés biométriques enregistrées
+    let hasBiometric = false;
+    if (hasPinCode) {
+      const { data: passkeys } = await admin
+        .from("user_passkeys")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", matchedUser.id);
+      hasBiometric = (passkeys?.length ?? 0) > 0;
+    }
+
     return NextResponse.json({
       found: true,
       userId: matchedUser.id,
@@ -75,6 +85,7 @@ export async function GET(request: Request) {
       role: matchedUser.role,
       firstLogin: matchedUser.first_login ?? true,
       hasPinCode,
+      hasBiometric,
       primaryColor,
       companyName,
     });
