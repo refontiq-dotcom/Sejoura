@@ -1,17 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- Invert colors: white bg becomes dark, dark text becomes white -->
+    <filter id="invertLogo">
+      <feColorMatrix type="matrix"
+        values="-1 0 0 0 1
+                 0 -1 0 0 1
+                 0 0 -1 0 1
+                 0 0 0 1 0"/>
+    </filter>
+  </defs>
   <rect width="512" height="512" fill="#0C1C33"/>
-  <g transform="translate(256,256)">
-    <!-- Séjoura wordmark in white -->
-    <text
-      x="0" y="12"
-      text-anchor="middle"
-      font-family="'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      font-weight="600"
-      font-size="72"
-      fill="white"
-      letter-spacing="-1"
-    >séjoura</text>
-    <!-- Gold dot on the a -->
-    <circle cx="118" cy="-10" r="4" fill="#C2944E"/>
-  </g>
+  <image
+    href="/logo-sejoura.png"
+    x="0" y="0"
+    width="512" height="512"
+    preserveAspectRatio="xMidYMid meet"
+    filter="url(#invertLogo)"
+  />
 </svg>
