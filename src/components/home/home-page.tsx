@@ -1491,6 +1491,30 @@ export function HomePage() {
                       )}
                       {t.signUpWith}
                     </button>
+
+                    {/* Magic Link button - desktop signup */}
+                    {!magicLinkSent ? (
+                      <button
+                        type="button"
+                        onClick={handleMagicLink}
+                        disabled={magicLinkLoading}
+                        className="w-full py-3 rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-xs"
+                      >
+                        {magicLinkLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Mail className="w-4 h-4" />
+                        )}
+                        {magicLinkLoading
+                          ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
+                          : t.magicLink}
+                      </button>
+                    ) : (
+                      <div className="w-full py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium flex items-center justify-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        {t.magicLinkSent}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
