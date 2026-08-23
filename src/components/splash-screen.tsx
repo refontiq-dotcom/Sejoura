@@ -25,20 +25,18 @@ export function SplashScreen() {
       }`}
       aria-hidden="true"
     >
-      {/* Subtle radial glow behind logo */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-64 h-64 rounded-full bg-white/5 blur-3xl" />
       </div>
 
-      {/* Logo — invert removes white bg, mix-blend-screen makes it transparent on navy */}
       <div className="relative animate-splash-logo-in select-none">
         <Image
           src="/logo-sejoura.png"
           alt="Séjoura"
           width={220}
           height={70}
-          className="object-contain invert mix-blend-screen"
-          style={{ filter: "invert(1) brightness(2)" }}
+          className="object-contain"
+          style={{ filter: "invert(1) brightness(2)", mixBlendMode: "screen" }}
           priority
         />
       </div>
