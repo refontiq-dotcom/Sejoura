@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2 } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -191,6 +191,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [ideaModalOpen, setIdeaModalOpen] = useState(false);
   const [ideaCategory, setIdeaCategory] = useState<FeatureRequestCategory>("new_feature");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -200,6 +201,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const planLabel = getPlanLabel(plan || "free");
   // Le plan d'abonnement et les liens Paramètres/Abonnement ne concernent que
   // l'administrateur (gérant) — jamais les employés (réceptionnistes, ménagères).
@@ -280,6 +282,9 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       }
       if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
         setHelpOpen(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -435,8 +440,45 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3 md:gap-3.5 flex-shrink-0">
-          <div className="relative">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3.5 flex-shrink-0">
+          {/* Menu trois points — visible uniquement sur mobile, contient Search + Help + Theme */}
+          <div className="relative sm:hidden" ref={moreMenuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
+              aria-label="Plus d'actions"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-1.5 w-48 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden z-50 animate-dropdown-in p-1.5">
+                <button
+                  onClick={() => { setMenuOpen(false); setSearchOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  <Search className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                  {t.searchPlaceholder}
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); setHelpOpen(true); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                  {t.helpTitle}
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); toggleTheme(); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  {theme === "light" ? <Moon className="w-3.5 h-3.5 text-[var(--muted-foreground)]" /> : <Sun className="w-3.5 h-3.5 text-yellow-400" />}
+                  {t.themeToggle}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Search — visible uniquement sur sm+ */}
+          <div className="relative hidden sm:block">
           <button
             onClick={() => setSearchOpen(true)}
             className="flex items-center justify-center lg:justify-start gap-2 px-2.5 lg:px-3 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 text-[var(--muted-foreground)] transition-all shadow-xs w-9 lg:w-56"
@@ -452,7 +494,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
           {isAdminRole && <ResidenceSwitcher />}
 
-          <div className="relative" ref={helpRef}>
+          {/* Help — visible uniquement sur sm+ */}
+          <div className="relative hidden sm:block" ref={helpRef}>
             <button
               onClick={() => setHelpOpen(!helpOpen)}
               className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
@@ -485,9 +528,10 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
             )}
           </div>
 
+          {/* Theme toggle — visible uniquement sur sm+ */}
           <button
             onClick={toggleTheme}
-            className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
+            className="hidden sm:flex w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
             aria-label={t.themeToggle}
           >
             {theme === "light" ? (

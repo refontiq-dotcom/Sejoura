@@ -668,12 +668,12 @@ function PeriodSelector({
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-      <div className="inline-flex items-center gap-0.5 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800 overflow-x-auto">
+      <div className="flex items-center gap-0.5 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800 overflow-x-auto shrink-0">
         {PERIOD_PRESETS.map((p) => (
           <button
             key={p.key}
             onClick={() => onPreset(p.key)}
-            className={`px-2 py-1 sm:px-2.5 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
+            className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-md text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               preset === p.key
                 ? "bg-white text-zinc-900"
                 : "text-zinc-400 hover:text-zinc-200"
