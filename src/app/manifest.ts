@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Séjoura",
     description:
       "Application SaaS de gestion d'établissements et de chambres meublées",
-    start_url: "/?v=2",
+    start_url: "/?v=3",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
@@ -18,6 +18,12 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "fr",
     icons: [
       {
+        src: "/icons/icon-maskable.svg",
+        sizes: "512x512",
+        type: "image/svg+xml",
+        purpose: "maskable",
+      },
+      {
         src: "/icons/icon-192x192.png",
         sizes: "192x192",
         type: "image/png",
@@ -26,12 +32,6 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/icon-512x512.png",
         sizes: "512x512",
         type: "image/png",
-      },
-      {
-        src: "/icons/icon-maskable-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
       },
     ],
   };
