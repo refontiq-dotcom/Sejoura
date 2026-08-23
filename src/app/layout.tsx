@@ -9,6 +9,7 @@ import { AccommodationProvider } from "@/hooks/use-accommodation";
 import { InlineScript } from "@/components/inline-script";
 import { ThemeToaster } from "@/components/providers/theme-toaster";
 import { PwaRegister } from "@/components/pwa-register";
+import { SplashScreen } from "@/components/splash-screen";
 import { OfflineBanner } from "@/components/offline-banner";
 
 const geistSans = Geist({
@@ -129,6 +130,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-background text-foreground theme-transition">
+        <SplashScreen />
         <ThemeProvider>
           <LanguageProvider initialLang={initialLang}>
             <AccommodationProvider>

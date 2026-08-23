@@ -1,20 +1,3 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <!-- Invert colors: white bg becomes dark, dark text becomes white -->
-    <filter id="invertLogo">
-      <feColorMatrix type="matrix"
-        values="-1 0 0 0 1
-                 0 -1 0 0 1
-                 0 0 -1 0 1
-                 0 0 0 1 0"/>
-    </filter>
-  </defs>
   <rect width="512" height="512" fill="#0C1C33"/>
-  <image
-    href="/logo-sejoura.png"
-    x="0" y="0"
-    width="512" height="512"
-    preserveAspectRatio="xMidYMid meet"
-    filter="url(#invertLogo)"
-  />
 </svg>
