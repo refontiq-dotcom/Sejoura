@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -766,6 +766,7 @@ export default function DashboardPage() {
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
+  const loadRetriesRef = useRef(0);
   const [overstayCount, setOverstayCount] = useState(0);
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
@@ -791,6 +792,12 @@ export default function DashboardPage() {
           .maybeSingle();
 
         if (userError || !userData?.tenant_id) {
+          // Retry automatique après rechargement post-onboarding
+          if (!isSilent && loadRetriesRef.current < 3) {
+            loadRetriesRef.current += 1;
+            setTimeout(() => loadDashboardData(false, date), 1500);
+            return;
+          }
           setError(true);
           if (!isSilent) setLoading(false);
           return;
@@ -1052,6 +1059,12 @@ export default function DashboardPage() {
         const trend = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
         setTrendPercentage(trend);
       } catch (err) {
+        // Retry automatique après rechargement post-onboarding
+        if (!isSilent && loadRetriesRef.current < 3) {
+          loadRetriesRef.current += 1;
+          setTimeout(() => loadDashboardData(false, date), 1500);
+          return;
+        }
         setError(true);
         const normalizedError = normalizeUnknownError(err);
         console.error(normalizedError, err);
@@ -1173,7 +1186,7 @@ export default function DashboardPage() {
         </div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t.error.title}</h2>
         <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">{t.error.copy}</p>
-        <Button onClick={() => loadDashboardData(false, selectedDate)} className="gap-2">
+        <Button onClick={() => { loadRetriesRef.current = 0; loadDashboardData(false, selectedDate); }} className="gap-2">
           <RefreshCw className="w-4 h-4" /> {t.error.retry}
         </Button>
       </div>
