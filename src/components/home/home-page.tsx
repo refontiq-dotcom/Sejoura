@@ -1156,9 +1156,9 @@ export function HomePage() {
                       </label>
                       <input
                         id="login-email"
-                        name="email"
+                        name="login-email"
                         type="email"
-                        autoComplete="email"
+                        autoComplete="off"
                         required
                         value={email}
                         onChange={(e) => {
@@ -1284,28 +1284,28 @@ export function HomePage() {
                     {t.signInWith}
                   </button>
 
-                  {/* Magic Link button */}
+                  {/* Magic Link — subtle text link */}
                   {!magicLinkSent ? (
                     <button
                       type="button"
                       onClick={handleMagicLink}
                       disabled={magicLinkLoading}
-                      className="w-full py-3 rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-xs"
+                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
                     >
                       {magicLinkLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-3.5 h-3.5" />
                       )}
                       {magicLinkLoading
                         ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
                         : t.magicLink}
                     </button>
                   ) : (
-                    <div className="w-full py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium flex items-center justify-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
+                    <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
                       {t.magicLinkSent}
-                    </div>
+                    </p>
                   )}
                 </div>
               )}
@@ -1331,9 +1331,9 @@ export function HomePage() {
                       </label>
                       <input
                         id="signup-email"
-                        name="email"
+                        name="signup-email"
                         type="email"
-                        autoComplete="email"
+                        autoComplete="off"
                         required
                         value={email}
                         onChange={(e) => {
@@ -1460,8 +1460,8 @@ export function HomePage() {
                     </p>
                   </form>
 
-                  {/* Divider + Google sign-up, masqués sur écrans courts pour éviter le scroll */}
-                  <div className="[@media(max-height:760px)]:hidden">
+                  {/* Divider + Google sign-up + Magic Link */}
+                  <div>
                     <div className="relative my-3">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
@@ -1492,28 +1492,28 @@ export function HomePage() {
                       {t.signUpWith}
                     </button>
 
-                    {/* Magic Link button - desktop signup */}
+                    {/* Magic Link — subtle text link */}
                     {!magicLinkSent ? (
                       <button
                         type="button"
                         onClick={handleMagicLink}
                         disabled={magicLinkLoading}
-                        className="w-full py-3 rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-xs"
+                        className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
                       >
                         {magicLinkLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          <Mail className="w-4 h-4" />
+                          <Mail className="w-3.5 h-3.5" />
                         )}
                         {magicLinkLoading
                           ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
                           : t.magicLink}
                       </button>
                     ) : (
-                      <div className="w-full py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium flex items-center justify-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
+                      <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5" />
                         {t.magicLinkSent}
-                      </div>
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1617,28 +1617,28 @@ export function HomePage() {
                     {t.signInWith}
                   </button>
 
-                  {/* Magic Link button - mobile login */}
+                  {/* Magic Link — subtle text link */}
                   {!magicLinkSent ? (
                     <button
                       type="button"
                       onClick={handleMagicLink}
                       disabled={magicLinkLoading}
-                      className="w-full py-3 rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-xs"
+                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
                     >
                       {magicLinkLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-3.5 h-3.5" />
                       )}
                       {magicLinkLoading
                         ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
                         : t.magicLink}
                     </button>
                   ) : (
-                    <div className="w-full py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium flex items-center justify-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
+                    <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
                       {t.magicLinkSent}
-                    </div>
+                    </p>
                   )}
                 </div>
               )}
@@ -1690,28 +1690,28 @@ export function HomePage() {
                     {t.signUpWith}
                   </button>
 
-                  {/* Magic Link button for signup */}
+                  {/* Magic Link — subtle text link */}
                   {!magicLinkSent ? (
                     <button
                       type="button"
                       onClick={handleMagicLink}
                       disabled={magicLinkLoading}
-                      className="w-full py-3 rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-xs"
+                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
                     >
                       {magicLinkLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Mail className="w-4 h-4" />
+                        <Mail className="w-3.5 h-3.5" />
                       )}
                       {magicLinkLoading
                         ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
                         : t.magicLink}
                     </button>
                   ) : (
-                    <div className="w-full py-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-xs font-medium flex items-center justify-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
+                    <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" />
                       {t.magicLinkSent}
-                    </div>
+                    </p>
                   )}
                 </div>
               )}
