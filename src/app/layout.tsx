@@ -52,7 +52,6 @@ export const metadata: Metadata = {
   creator: "Refontiq",
   publisher: "Refontiq",
   applicationName: "Séjoura",
-  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
