@@ -183,7 +183,7 @@ export default function DashboardLayout({
             id: "",
             auth_user_id: session.user.id,
             role: (metadataRole || (isEmployeeEmail ? "receptionniste" : "admin_residence")) as User["role"],
-            full_name: session.user.user_metadata?.full_name || session.user.email || "Utilisateur",
+            full_name: session.user.user_metadata?.full_name || "",
             phone: "",
             email: session.user.email || "",
             password_hash: null,
