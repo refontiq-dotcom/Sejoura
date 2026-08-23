@@ -668,12 +668,12 @@ function PeriodSelector({
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-      <div className="inline-flex items-center gap-0.5 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800">
+      <div className="inline-flex items-center gap-0.5 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800 overflow-x-auto">
         {PERIOD_PRESETS.map((p) => (
           <button
             key={p.key}
             onClick={() => onPreset(p.key)}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
+            className={`px-2 py-1 sm:px-2.5 rounded-md text-[11px] font-medium transition-all whitespace-nowrap ${
               preset === p.key
                 ? "bg-white text-zinc-900"
                 : "text-zinc-400 hover:text-zinc-200"
@@ -1427,18 +1427,20 @@ export default function AccountingPage() {
     <div className="space-y-3 animate-fade-in relative">
       {!hasAccess && (
         <Card className="p-4 border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
-              <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Module comptabilité avancée</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Réservé à la formule Entreprise : dépenses, charges, recettes, factures, journal d&apos;audit et suivi client.
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Module comptabilité avancée</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Ce module est réservé à la formule Entreprise : dépenses, charges, recettes, factures, journal d&apos;audit et suivi client.
-              </p>
-            </div>
-            <Button size="sm" onClick={() => router.push("/dashboard/subscription")}>
-              <Sparkles className="w-4 h-4" /> Débloquer avec le plan Entreprise
+            <Button size="sm" onClick={() => router.push("/dashboard/subscription")} className="w-full sm:w-auto justify-center">
+              <Sparkles className="w-4 h-4" /> Débloquer avec Entreprise
             </Button>
           </div>
         </Card>
