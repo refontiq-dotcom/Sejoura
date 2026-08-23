@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 export function SplashScreen() {
   const [visible, setVisible] = useState(true);
@@ -29,12 +30,17 @@ export function SplashScreen() {
         <div className="w-64 h-64 rounded-full bg-white/5 blur-3xl" />
       </div>
 
-      {/* Text logo — no image, no white box */}
+      {/* Logo — invert removes white bg, mix-blend-screen makes it transparent on navy */}
       <div className="relative animate-splash-logo-in select-none">
-        <span className="text-white text-5xl font-semibold tracking-tight">
-          séjoura
-        </span>
-        <span className="absolute -top-1 right-[18px] w-1.5 h-1.5 rounded-full bg-[#C2944E]" />
+        <Image
+          src="/logo-sejoura.png"
+          alt="Séjoura"
+          width={220}
+          height={70}
+          className="object-contain invert mix-blend-screen"
+          style={{ filter: "invert(1) brightness(2)" }}
+          priority
+        />
       </div>
     </div>
   );
