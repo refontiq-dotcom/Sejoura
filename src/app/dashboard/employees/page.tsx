@@ -413,12 +413,12 @@ export default function EmployeesPage() {
       </div>
 
       {/* Limites du plan */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Admins</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">{adminCount} / {formatLimit(limits.maxAdmins)}</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">Admins</p>
+              <p className="text-base sm:text-xl font-bold text-slate-900 dark:text-white">{adminCount} / {formatLimit(limits.maxAdmins)}</p>
             </div>
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
@@ -426,8 +426,8 @@ export default function EmployeesPage() {
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Réceptionnistes</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">{recepCount} / {formatLimit(limits.maxReceptionnists)}</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">Réceptionnistes</p>
+              <p className="text-base sm:text-xl font-bold text-slate-900 dark:text-white">{recepCount} / {formatLimit(limits.maxReceptionnists)}</p>
             </div>
             <Users className="w-5 h-5 text-[var(--primary-color,#0C1C33)]" />
           </div>
@@ -435,8 +435,8 @@ export default function EmployeesPage() {
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">Ménagères</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-white">
+              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">Ménagères</p>
+              <p className="text-base sm:text-xl font-bold text-slate-900 dark:text-white">
                 {menagereCount}
                 {limits.hasCleaningModule ? ` / ${formatLimit(limits.maxReceptionnists)}` : ""}
               </p>
@@ -505,7 +505,100 @@ export default function EmployeesPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Cartes mobiles */}
+          <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700/50">
+            {filteredEmployees.map((emp) => {
+              const assignedAcc = accommodations.find((a) => a.id === emp.accommodation_id);
+              const tempAss = tempAssignments[emp.id];
+              const currentActiveAcc = tempAss ? accommodations.find((a) => a.id === tempAss.accommodation_id) : assignedAcc;
+              return (
+                <div key={emp.id} className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                        {getInitials(emp.full_name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{emp.full_name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <Badge variant={emp.role === "admin_residence" ? "info" : emp.role === "menagere" ? "theme" : "default"}>
+                            {getRoleLabel(emp.role)}
+                          </Badge>
+                          {emp.is_active ? (
+                            <Badge variant="success"><CheckCircle2 className="w-3 h-3" /> Actif</Badge>
+                          ) : (
+                            <Badge variant="error"><Ban className="w-3 h-3" /> Révoqué</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger aria-label={`Actions pour ${emp.full_name}`} className="h-10 w-10">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Affectation</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => openReassign(emp)} className="text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                          <ArrowLeftRight className="w-4 h-4" /> Changer d&apos;établissement
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openHistory(emp)}>
+                          <History className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Historique des affectations
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Accès</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            const origin = typeof window !== "undefined" ? window.location.origin : "";
+                            const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(emp.phone)}`;
+                            setInviteData({ full_name: emp.full_name, phone: emp.phone, role: emp.role, link: generatedLink });
+                            setInviteModalOpen(true);
+                          }}
+                          className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                        >
+                          <Share2 className="w-4 h-4" /> Partager le lien d&apos;accès
+                        </DropdownMenuItem>
+                        {emp.role !== "admin_residence" && (
+                          <>
+                            <DropdownMenuItem onSelect={() => handleToggleActive(emp)} className={emp.is_active ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" : "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"}>
+                              {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                              {emp.is_active ? "Révoquer l&apos;accès" : "Réactiver l&apos;accès"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => setDeleteTarget(emp)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
+                              <Trash2 className="w-4 h-4" /> Supprimer l&apos;employé
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div className="mt-2 ml-13 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{currentActiveAcc ? currentActiveAcc.name : "Tous les établissements"}</span>
+                    </div>
+                    {tempAss && tempAss.end_date && (
+                      <Badge variant="warning" className="text-[10px] gap-1 px-1.5 py-0.5">
+                        <CalendarDays className="w-3 h-3" />
+                        Temporaire jusqu&apos;au {formatDate(tempAss.end_date)}
+                      </Badge>
+                    )}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{emp.phone}</span>
+                    </div>
+                    {emp.email && (
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{emp.email}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tableau desktop */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
