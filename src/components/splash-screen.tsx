@@ -1,16 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
 export function SplashScreen() {
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    // Start fade-out after 1.2s
     const fadeTimer = setTimeout(() => setFading(true), 1200);
-    // Remove from DOM after animation completes
     const removeTimer = setTimeout(() => setVisible(false), 2000);
     return () => {
       clearTimeout(fadeTimer);
@@ -32,16 +29,12 @@ export function SplashScreen() {
         <div className="w-64 h-64 rounded-full bg-white/5 blur-3xl" />
       </div>
 
-      {/* Logo with entrance animation */}
-      <div className="relative animate-splash-logo-in">
-        <Image
-          src="/logo-sejoura.png"
-          alt="Séjoura"
-          width={220}
-          height={70}
-          className="object-contain brightness-0 invert"
-          priority
-        />
+      {/* Text logo — no image, no white box */}
+      <div className="relative animate-splash-logo-in select-none">
+        <span className="text-white text-5xl font-semibold tracking-tight">
+          séjoura
+        </span>
+        <span className="absolute -top-1 right-[18px] w-1.5 h-1.5 rounded-full bg-[#C2944E]" />
       </div>
     </div>
   );
