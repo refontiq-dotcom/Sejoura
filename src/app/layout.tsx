@@ -10,6 +10,7 @@ import { InlineScript } from "@/components/inline-script";
 import { ThemeToaster } from "@/components/providers/theme-toaster";
 import { PwaRegister } from "@/components/pwa-register";
 import { OfflineBanner } from "@/components/offline-banner";
+import { SplashScreen } from "@/components/splash-screen";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -140,6 +141,7 @@ export default async function RootLayout({
             </AccommodationProvider>
           </LanguageProvider>
         </ThemeProvider>
+        <SplashScreen />
         <PwaRegister />
         <OfflineBanner />
       </body>
