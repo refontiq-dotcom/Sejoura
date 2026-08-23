@@ -1,11 +1,10 @@
-const CACHE_VERSION = "sejoura-v3";
+const CACHE_VERSION = "sejoura-v4";
 const APP_SHELL = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 
 const PRECACHE_URLS = [
   "/",
-  "/manifest.webmanifest",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
   "/icons/icon-maskable-512x512.png",
@@ -180,7 +179,7 @@ function isStaticUrl(url) {
     (url.origin === self.location.origin &&
       (url.pathname.startsWith("/_next/static/") ||
         url.pathname.startsWith("/icons/") ||
-        url.pathname === "/manifest.webmanifest"))
+        false /* manifest not cached — served by manifest.ts */))
   );
 }
 
