@@ -373,7 +373,11 @@ export function HomePage() {
   async function handleMagicLink() {
     const emailToUse = magicLinkEmail.trim() || email;
     if (!isValidEmail(emailToUse)) {
-      toast.error(t.emailInvalid);
+      toast.error(
+        lang === "fr"
+          ? "Veuillez entrer votre email pour recevoir le lien."
+          : "Please enter your email to receive the link."
+      );
       return;
     }
     setMagicLinkLoading(true);
@@ -386,21 +390,33 @@ export function HomePage() {
         },
       });
       if (error) {
-        const message = (error.message || "").toLowerCase();
-        if (message.includes("rate limit") || message.includes("over")) {
+        console.error("Magic Link error:", error);
+        const msg = (error.message || "").toLowerCase();
+        if (msg.includes("rate limit") || msg.includes("over")) {
           toast.error(
             lang === "fr"
               ? "Trop de tentatives. Réessayez dans quelques minutes."
               : "Too many attempts. Try again in a few minutes."
           );
+        } else if (msg.includes("not enabled") || msg.includes("provider")) {
+          toast.error(
+            lang === "fr"
+              ? "La connexion par email n'est pas encore activée. Utilisez Google ou votre mot de passe."
+              : "Email login is not enabled yet. Use Google or your password."
+          );
         } else {
-          toast.error(t.generalError);
+          toast.error(
+            lang === "fr"
+              ? `Erreur : ${error.message || "inconnue"}`
+              : `Error: ${error.message || "unknown"}`
+          );
         }
       } else {
         setMagicLinkSent(true);
         toast.success(t.magicLinkSent);
       }
-    } catch {
+    } catch (err) {
+      console.error("Magic Link catch:", err);
       toast.error(t.generalError);
     } finally {
       setMagicLinkLoading(false);
