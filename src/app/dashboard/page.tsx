@@ -1787,12 +1787,12 @@ export default function DashboardPage() {
 
       {!isReceptionniste && !canAccessPlanFeature(plan, "advancedAccounting") && (
         <Card className="p-4 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t.enterpriseFeaturesAvailable}</p>
               <p className="text-sm text-amber-700 dark:text-amber-300">{t.advancedAccountingReserved}</p>
             </div>
-            <Button variant="primary" onClick={() => router.push("/dashboard/subscription")}>{t.switchToEnterprise}</Button>
+            <Button variant="primary" onClick={() => router.push("/dashboard/subscription")} className="whitespace-nowrap shrink-0 w-full sm:w-auto justify-center text-xs sm:text-sm">{t.switchToEnterprise}</Button>
           </div>
         </Card>
       )}
