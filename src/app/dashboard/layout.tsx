@@ -444,6 +444,8 @@ export default function DashboardLayout({
   function handleOnboardingComplete() {
     setNeedsOnboarding(false);
     toast.success("Bienvenue ! Votre espace est prêt.");
+    // Recharger pour que layout + page rechargent les données du nouvel espace
+    // (tenant, abonnement, établissement créés par service_role).
     window.location.reload();
   }
 

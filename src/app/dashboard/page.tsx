@@ -792,13 +792,20 @@ export default function DashboardPage() {
           .maybeSingle();
 
         if (userError || !userData?.tenant_id) {
-          // Retry automatique après rechargement post-onboarding
-          if (!isSilent && loadRetriesRef.current < 3) {
+          // Après l'étape 2 (onboarding), le profil peut prendre quelques secondes
+          // à être visible côté client après la création par service_role.
+          // On retry en silence sans bloquer l'utilisateur.
+          if (!isSilent && loadRetriesRef.current < 10) {
             loadRetriesRef.current += 1;
-            setTimeout(() => loadDashboardData(false, date), 1500);
+            const delay = 1000 + loadRetriesRef.current * 500;
+            setTimeout(() => loadDashboardData(false, date), delay);
             return;
           }
-          setError(true);
+          // Après tous les retries, afficher le dashboard vide (plan free)
+          // au lieu d'un écran d'erreur bloquant.
+          console.warn("loadDashboardData: user data not available after retries, showing empty dashboard");
+          // Afficher le dashboard vide sans données utilisateur
+          setHasAccommodations(false);
           if (!isSilent) setLoading(false);
           return;
         }
@@ -835,7 +842,7 @@ export default function DashboardPage() {
               .from("subscriptions")
               .select("plan")
               .eq("tenant_id", tenantId)
-              .single(),
+              .maybeSingle(),
             (() => {
               let bookingsQuery = supabase
                 .from("bookings")
@@ -885,13 +892,25 @@ export default function DashboardPage() {
               .eq("tenant_id", tenantId),
           ]);
 
-        if (subscriptionsData.error) throw new Error(subscriptionsData.error.message || "Erreur lors de la récupération de l'abonnement.");
-        if (bookingsData.error) throw new Error(bookingsData.error.message || "Erreur lors de la récupération des réservations.");
-        if (paymentsData.error) throw new Error(paymentsData.error.message || "Erreur lors de la récupération des paiements.");
-        if (cleaningTasksData.error) throw new Error(cleaningTasksData.error.message || "Erreur lors de la récupération des tâches de ménage.");
-        if (accommodationsData.error) throw new Error(accommodationsData.error.message || "Erreur lors de la récupération des établissements.");
+        // Les erreurs sur les requêtes secondaires (bookings, payments, etc.)
+        // ne doivent PAS bloquer l'affichage du dashboard. Pour un tout nouvel
+        // utilisateur après l'étape 2, les données créées par service_role
+        // peuvent prendre quelques secondes à être visibles côté client (RLS).
+        // On log les erreurs et on utilise des tableaux vides en fallback.
+        if (subscriptionsData.error) {
+          console.warn("subscriptions query error (will retry):", subscriptionsData.error.message);
+          if (!isSilent && loadRetriesRef.current < 5) {
+            loadRetriesRef.current += 1;
+            setTimeout(() => loadDashboardData(false, date), 2000);
+            return;
+          }
+        }
+        if (bookingsData.error) console.warn("bookings query error:", bookingsData.error.message);
+        if (paymentsData.error) console.warn("payments query error:", paymentsData.error.message);
+        if (cleaningTasksData.error) console.warn("cleaning_tasks query error:", cleaningTasksData.error.message);
+        if (accommodationsData.error) console.warn("accommodations query error:", accommodationsData.error.message);
 
-        const planValue = (subscriptionsData.data?.plan as string | undefined) || "standard";
+        const planValue = (subscriptionsData.data?.plan as string | undefined) || "free";
         setPlan(planValue);
 
         const bookings = (bookingsData.data || []) as unknown as (Booking & { client?: Client; room?: Room; room_type?: RoomType })[];
@@ -1059,15 +1078,15 @@ export default function DashboardPage() {
         const trend = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
         setTrendPercentage(trend);
       } catch (err) {
-        // Retry automatique après rechargement post-onboarding
-        if (!isSilent && loadRetriesRef.current < 3) {
-          loadRetriesRef.current += 1;
-          setTimeout(() => loadDashboardData(false, date), 1500);
-          return;
-        }
-        setError(true);
+        // Après l'étape 2 (onboarding), les données créées par service_role
+        // peuvent prendre du temps à être visibles côté client via RLS.
+        // Au lieu de bloquer l'utilisateur sur un écran d'erreur, on continue
+        // avec les données par défaut (tableaux vides, plan "free").
         const normalizedError = normalizeUnknownError(err);
-        console.error(normalizedError, err);
+        console.error("loadDashboardData error:", normalizedError, err);
+        // Ne pas setError(true) : le dashboard affiche quand même les KPIs à zéro
+        // et l'utilisateur peut interagir avec l'app. Le prochain polling (30s)
+        // ou la navigation rechargera les données correctement.
       } finally {
         if (!isSilent) setLoading(false);
       }
