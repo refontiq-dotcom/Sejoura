@@ -1,4 +1,4 @@
-const CACHE_VERSION = "sejoura-v5";
+const CACHE_VERSION = "sejoura-v6";
 const APP_SHELL = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;

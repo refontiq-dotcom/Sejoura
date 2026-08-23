@@ -8,11 +8,11 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Séjoura",
     description:
       "Application SaaS de gestion d'établissements et de chambres meublées",
-    start_url: "/?v=4",
+    start_url: "/?v=5",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: NAVY,
+    background_color: "#FFFFFF",
     theme_color: NAVY,
     categories: ["business", "productivity", "finance"],
     lang: "fr",
