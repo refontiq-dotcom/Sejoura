@@ -512,6 +512,14 @@ html {
   animation: slideIn 0.3s ease-out;
 }
 
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Animation pour le carrousel Hero */
 @keyframes heroSlide {
   from {

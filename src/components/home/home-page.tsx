@@ -197,6 +197,8 @@ export function HomePage() {
 
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileAuthOpen, setMobileAuthOpen] = useState(false);
+  const [mobileAuthMode, setMobileAuthMode] = useState<"login" | "signup">("login");
   const [activeSection, setActiveSection] = useState<SectionName>(null);
   const [authModalMode, setAuthModalMode] = useState<"login" | "signup" | null>(null);
 
