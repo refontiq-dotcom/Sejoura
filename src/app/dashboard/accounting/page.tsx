@@ -1446,7 +1446,7 @@ export default function AccountingPage() {
         </Card>
       )}
 
-      <div className={!hasAccess ? "opacity-60 pointer-events-none" : ""}>
+      <div className={!hasAccess ? "opacity-70" : ""}>
         {/* En-tête */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
