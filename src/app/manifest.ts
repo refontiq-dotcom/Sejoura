@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Séjoura",
     description:
       "Application SaaS de gestion d'établissements et de chambres meublées",
-    start_url: "/?v=3",
+    start_url: "/?v=4",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
@@ -18,9 +18,9 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "fr",
     icons: [
       {
-        src: "/icons/icon-maskable.svg",
+        src: "/icons/icon-maskable.png",
         sizes: "512x512",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "maskable",
       },
       {
