@@ -1446,7 +1446,7 @@ export default function AccountingPage() {
 
       <div className={!hasAccess ? "opacity-60 pointer-events-none" : ""}>
         {/* En-tête */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Comptabilité</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -1533,8 +1533,8 @@ export default function AccountingPage() {
           </div>
 
           {/* Répartition par mode de paiement */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold">Modes de paiement</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-5 lg:gap-x-6 p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 font-bold w-full sm:w-auto">Modes de paiement</span>
             {[
               { method: "cash", label: "Espèces", icon: Banknote },
               { method: "mobile_money", label: "Mobile Money", icon: Smartphone, aggregate: true },
@@ -1543,7 +1543,7 @@ export default function AccountingPage() {
             ].map(({ method, label, icon: Icon, aggregate }) => {
               if (aggregate) {
                 return (
-                  <div key={method} className="relative group flex items-center gap-2 cursor-help bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <div key={method} className="relative group flex items-center gap-1.5 sm:gap-2 cursor-help bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5 sm:px-3 rounded-xl border border-slate-100 dark:border-slate-800">
                     <Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{label}</span>
                     <span className="text-xs font-extrabold text-slate-900 dark:text-white tabular-nums">{mobileMoneyTotal > 0 ? fmt(mobileMoneyTotal) : "—"}</span>
@@ -1711,9 +1711,9 @@ export default function AccountingPage() {
         {/* ============ RECETTES ============ */}
         {activeTab === "revenue" && (
           <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col lg:flex-row gap-2 lg:items-center bg-zinc-900/70">
-              <div className="flex gap-2 flex-wrap items-center">
-                <div className="relative">
+            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900/70">
+              <div className="flex gap-2 flex-wrap items-center flex-1">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                   <input
                     type="text"
@@ -1748,12 +1748,12 @@ export default function AccountingPage() {
                   <ArrowLeftRight className="w-3.5 h-3.5" /> Caisse du jour
                 </Button>
               </div>
-              <div className="lg:ml-auto flex gap-2">
+              <div className="sm:ml-auto flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
-                  <FileText className="w-4 h-4" /> Rapport Financier PDF
+                  <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Rapport Financier PDF</span><span className="sm:hidden">PDF</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredPayments.length === 0}>
-                  <Download className="w-4 h-4" /> Exporter CSV
+                  <Download className="w-4 h-4" /> CSV
                 </Button>
               </div>
             </div>
@@ -1897,9 +1897,9 @@ export default function AccountingPage() {
             )}
 
             <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col lg:flex-row gap-2 lg:items-center bg-zinc-900/70">
-              <div className="flex gap-2 flex-wrap items-center">
-                <div className="relative">
+            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900/70">
+              <div className="flex gap-2 flex-wrap items-center flex-1">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                   <input
                     type="text"
@@ -1925,12 +1925,12 @@ export default function AccountingPage() {
                   <Plus className="w-3.5 h-3.5" /> Ajouter
                 </Button>
               </div>
-              <div className="lg:ml-auto flex gap-2">
+              <div className="sm:ml-auto flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
-                  <FileText className="w-4 h-4" /> Rapport Financier PDF
+                  <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Rapport Financier PDF</span><span className="sm:hidden">PDF</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredExpenses.length === 0}>
-                  <Download className="w-4 h-4" /> Exporter CSV
+                  <Download className="w-4 h-4" /> CSV
                 </Button>
               </div>
             </div>
