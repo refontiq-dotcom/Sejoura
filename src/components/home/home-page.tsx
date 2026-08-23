@@ -321,20 +321,19 @@ export function HomePage() {
     setLoading(true);
     try {
       const supabase = createClient();
+      // Use redirect flow (not popup) — works in PWA and on mobile
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          queryParams: {
+            // Force redirect flow (no popup)
+            prompt: "consent",
+          },
         },
       });
       if (error) {
-        const code = (error as { code?: string }).code || "";
         const message = (error.message || "").toLowerCase();
-
-        // L'utilisateur a fermé la popup / annulé : ce n'est pas une erreur à afficher.
-        if (code === "access_denied" || message.includes("closed by user") || message.includes("popup") || message.includes("annul")) {
-          return;
-        }
         if (
           message.includes("provider") ||
           message.includes("not enabled") ||
@@ -351,9 +350,9 @@ export function HomePage() {
           toast.error(t.generalError);
         }
       }
+      // Note: setLoading(false) not needed — the page redirects
     } catch {
       toast.error(t.generalError);
-    } finally {
       setLoading(false);
     }
   }
