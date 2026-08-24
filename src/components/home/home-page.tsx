@@ -388,7 +388,7 @@ export function HomePage() {
       const { error } = await supabase.auth.signInWithOtp({
         email: emailToUse,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          // emailRedirectTo removed — Supabase uses the Site URL configured in dashboard
         },
       });
       if (error) {
