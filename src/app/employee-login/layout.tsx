@@ -3,7 +3,10 @@ import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
   title: "Séjoura Staff — Portail Employés",
   description: "Portail de connexion pour les employés Séjoura",
-  manifest: "/manifest-staff.webmanifest",
+  // Le manifest PWA principal (src/app/manifest.ts) s'applique à toutes les
+  // routes. L'ancien manifest staff (scope "/employee-login") interceptait
+  // l'installation PWA et forçait start_url="/employee-login", empêchant
+  // la page officielle Séjoura de s'afficher au démarrage.
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
