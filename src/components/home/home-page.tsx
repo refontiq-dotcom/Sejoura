@@ -369,8 +369,10 @@ export function HomePage() {
   const [magicLinkEmail, setMagicLinkEmail] = useState("");
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
+  const [magicLinkOpen, setMagicLinkOpen] = useState(false);
 
-  async function handleMagicLink() {
+  async function handleMagicLink(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     const emailToUse = magicLinkEmail.trim() || email;
     if (!isValidEmail(emailToUse)) {
       toast.error(
@@ -1300,23 +1302,41 @@ export function HomePage() {
                     {t.signInWith}
                   </button>
 
-                  {/* Magic Link — subtle text link */}
+                  {/* Magic Link — inline email form */}
                   {!magicLinkSent ? (
-                    <button
-                      type="button"
-                      onClick={handleMagicLink}
-                      disabled={magicLinkLoading}
-                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {magicLinkLoading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
+                    !magicLinkOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setMagicLinkOpen(true)}
+                        className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
+                      >
                         <Mail className="w-3.5 h-3.5" />
-                      )}
-                      {magicLinkLoading
-                        ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
-                        : t.magicLink}
-                    </button>
+                        {t.magicLink}
+                      </button>
+                    ) : (
+                      <form onSubmit={handleMagicLink} className="flex gap-2">
+                        <input
+                          type="email"
+                          value={magicLinkEmail}
+                          onChange={(e) => setMagicLinkEmail(e.target.value)}
+                          placeholder={lang === "fr" ? "Votre email" : "Your email"}
+                          autoFocus
+                          className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-[11px] outline-none focus:border-blue-500 transition-all"
+                        />
+                        <button
+                          type="submit"
+                          disabled={magicLinkLoading}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-medium disabled:opacity-50 transition-all flex items-center gap-1"
+                        >
+                          {magicLinkLoading ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Mail className="w-3 h-3" />
+                          )}
+                          {lang === "fr" ? "Envoyer" : "Send"}
+                        </button>
+                      </form>
+                    )
                   ) : (
                     <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5" />
@@ -1508,23 +1528,41 @@ export function HomePage() {
                       {t.signUpWith}
                     </button>
 
-                    {/* Magic Link — subtle text link */}
+                    {/* Magic Link — inline email form */}
                     {!magicLinkSent ? (
-                      <button
-                        type="button"
-                        onClick={handleMagicLink}
-                        disabled={magicLinkLoading}
-                        className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        {magicLinkLoading ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
+                      !magicLinkOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => setMagicLinkOpen(true)}
+                          className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
+                        >
                           <Mail className="w-3.5 h-3.5" />
-                        )}
-                        {magicLinkLoading
-                          ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
-                          : t.magicLink}
-                      </button>
+                          {t.magicLink}
+                        </button>
+                      ) : (
+                        <form onSubmit={handleMagicLink} className="flex gap-2">
+                          <input
+                            type="email"
+                            value={magicLinkEmail}
+                            onChange={(e) => setMagicLinkEmail(e.target.value)}
+                            placeholder={lang === "fr" ? "Votre email" : "Your email"}
+                            autoFocus
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-[11px] outline-none focus:border-blue-500 transition-all"
+                          />
+                          <button
+                            type="submit"
+                            disabled={magicLinkLoading}
+                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-medium disabled:opacity-50 transition-all flex items-center gap-1"
+                          >
+                            {magicLinkLoading ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Mail className="w-3 h-3" />
+                            )}
+                            {lang === "fr" ? "Envoyer" : "Send"}
+                          </button>
+                        </form>
+                      )
                     ) : (
                       <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
                         <CheckCircle className="w-3.5 h-3.5" />
@@ -1633,23 +1671,41 @@ export function HomePage() {
                     {t.signInWith}
                   </button>
 
-                  {/* Magic Link — subtle text link */}
+                  {/* Magic Link — inline email form */}
                   {!magicLinkSent ? (
-                    <button
-                      type="button"
-                      onClick={handleMagicLink}
-                      disabled={magicLinkLoading}
-                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {magicLinkLoading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
+                    !magicLinkOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setMagicLinkOpen(true)}
+                        className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
+                      >
                         <Mail className="w-3.5 h-3.5" />
-                      )}
-                      {magicLinkLoading
-                        ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
-                        : t.magicLink}
-                    </button>
+                        {t.magicLink}
+                      </button>
+                    ) : (
+                      <form onSubmit={handleMagicLink} className="flex gap-2">
+                        <input
+                          type="email"
+                          value={magicLinkEmail}
+                          onChange={(e) => setMagicLinkEmail(e.target.value)}
+                          placeholder={lang === "fr" ? "Votre email" : "Your email"}
+                          autoFocus
+                          className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-[11px] outline-none focus:border-blue-500 transition-all"
+                        />
+                        <button
+                          type="submit"
+                          disabled={magicLinkLoading}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-medium disabled:opacity-50 transition-all flex items-center gap-1"
+                        >
+                          {magicLinkLoading ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Mail className="w-3 h-3" />
+                          )}
+                          {lang === "fr" ? "Envoyer" : "Send"}
+                        </button>
+                      </form>
+                    )
                   ) : (
                     <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5" />
@@ -1706,23 +1762,41 @@ export function HomePage() {
                     {t.signUpWith}
                   </button>
 
-                  {/* Magic Link — subtle text link */}
+                  {/* Magic Link — inline email form */}
                   {!magicLinkSent ? (
-                    <button
-                      type="button"
-                      onClick={handleMagicLink}
-                      disabled={magicLinkLoading}
-                      className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {magicLinkLoading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
+                    !magicLinkOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setMagicLinkOpen(true)}
+                        className="w-full py-2 text-[11px] text-slate-500 dark:text-[#8a8a8a] hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors flex items-center justify-center gap-1.5"
+                      >
                         <Mail className="w-3.5 h-3.5" />
-                      )}
-                      {magicLinkLoading
-                        ? (lang === "fr" ? "Envoi en cours..." : "Sending...")
-                        : t.magicLink}
-                    </button>
+                        {t.magicLink}
+                      </button>
+                    ) : (
+                      <form onSubmit={handleMagicLink} className="flex gap-2">
+                        <input
+                          type="email"
+                          value={magicLinkEmail}
+                          onChange={(e) => setMagicLinkEmail(e.target.value)}
+                          placeholder={lang === "fr" ? "Votre email" : "Your email"}
+                          autoFocus
+                          className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-[#404040] bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-[11px] outline-none focus:border-blue-500 transition-all"
+                        />
+                        <button
+                          type="submit"
+                          disabled={magicLinkLoading}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-medium disabled:opacity-50 transition-all flex items-center gap-1"
+                        >
+                          {magicLinkLoading ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Mail className="w-3 h-3" />
+                          )}
+                          {lang === "fr" ? "Envoyer" : "Send"}
+                        </button>
+                      </form>
+                    )
                   ) : (
                     <p className="w-full py-2 text-[11px] text-green-600 dark:text-green-400 font-medium flex items-center justify-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5" />
