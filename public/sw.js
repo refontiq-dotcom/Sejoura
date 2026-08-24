@@ -5,6 +5,7 @@ const DATA_CACHE = `${CACHE_VERSION}-data`;
 
 const PRECACHE_URLS = [
   "/",
+  "/employee-login",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
   "/icons/icon-maskable-512x512.png",
