@@ -449,47 +449,47 @@ function EmployeeLoginContent() {
         </div>
       </main>
 
-      {/* ── Clavier numérique virtuel (style Wave) ── */}
-      <div className="relative z-10 w-full max-w-md mx-auto px-4 pt-1 pb-2 shrink-0">
-        <div className="grid grid-cols-3 gap-2">
+      {/* ── Clavier numérique virtuel (identique à l'étape PIN) ── */}
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-6 pt-2 shrink-0">
+        <div className="grid grid-cols-3 gap-2.5">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
             <button
               key={digit}
               onClick={() => handlePhoneKey(digit)}
               disabled={loading}
-              className="h-13 rounded-2xl text-xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+              className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
               aria-label={`Chiffre ${digit}`}
             >
               {digit}
             </button>
           ))}
 
-          {/* Ligne 4 — gauche : espace vide */}
-          <div className="h-13" />
+          {/* Ligne 4 — gauche : espace vide (identique hauteur au PIN) */}
+          <div className="h-16" />
 
           <button
             onClick={() => handlePhoneKey("0")}
             disabled={loading}
-            className="h-13 rounded-2xl text-xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+            className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
             aria-label="Chiffre 0"
           >
             0
           </button>
 
-          {/* Droite — effacer */}
+          {/* Droite — effacer (identique style au PIN) */}
           <button
             onClick={() => handlePhoneKey("⌫")}
             disabled={loading}
-            className="h-13 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
+            className="h-16 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
             aria-label="Effacer"
           >
-            <Delete className="w-5 h-5" />
+            <Delete className="w-6 h-6" />
           </button>
         </div>
       </div>
 
       {/* ── Bouton Suivant (fixé en bas, style Wave) ── */}
-      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-4 pt-1 shrink-0">
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-4 pt-0 shrink-0">
         <button
           onClick={handlePhoneSubmit}
           disabled={loading || phone.length < 8}
