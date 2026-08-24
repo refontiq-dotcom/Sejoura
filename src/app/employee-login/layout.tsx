@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {
   title: "Séjoura Staff — Portail Employés",
   description: "Portail de connexion pour les employés Séjoura",
-  manifest: "/employee-login/manifest.webmanifest",
+  manifest: "/manifest-staff.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
