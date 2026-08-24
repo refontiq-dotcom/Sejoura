@@ -515,7 +515,7 @@ export default function EmployeePinLogin({
       </header>
 
       {/* ── Zone centrale ── */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-end px-4 w-full max-w-md mx-auto">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full max-w-md mx-auto">
         {/* Avatar */}
         <div
           className="w-16 h-16 rounded-3xl flex items-center justify-center text-white text-xl font-extrabold shadow-lg"
