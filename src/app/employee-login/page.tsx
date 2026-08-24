@@ -371,7 +371,7 @@ function EmployeeLoginContent() {
 
   return (
     <div
-      className="min-h-screen w-full overflow-hidden relative flex flex-col font-sans select-none transition-colors duration-300"
+      className="h-screen w-full overflow-hidden relative flex flex-col font-sans select-none transition-colors duration-300"
       style={{
         background: isDark
           ? "linear-gradient(180deg, #0B1120 0%, #090D16 100%)"

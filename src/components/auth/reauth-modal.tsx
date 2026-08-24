@@ -241,7 +241,7 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col font-sans select-none overflow-hidden transition-colors duration-300"
+      className="fixed inset-0 z-[9999] h-screen flex flex-col font-sans select-none overflow-hidden transition-colors duration-300"
       style={{
         background: isDark
           ? "linear-gradient(180deg, #0B1120 0%, #090D16 100%)"
