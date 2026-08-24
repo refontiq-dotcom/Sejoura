@@ -201,15 +201,8 @@ export default function DashboardLayout({
           // L'onboarding ne doit s'afficher QUE pour les véritables administrateurs
           // créateurs d'espace : la décision fiable vient du serveur (service_role).
           const serverNeedsOnboarding = await fetchOnboardingStatus();
-          // Croiser avec le localStorage : si l'utilisateur a explicitement
-          // fermé le modal, on respecte sa décision jusqu'à la prochaine session.
-          let dismissed = false;
-          try {
-            dismissed = localStorage.getItem(`sejoura-onboarding-dismissed-${session.user.id}`) === "1";
-          } catch {
-            // Non bloquant
-          }
-          setNeedsOnboarding(serverNeedsOnboarding && !dismissed);
+          // L'étape 2 est obligatoire — on ne respecte plus le refus précédent.
+          setNeedsOnboarding(serverNeedsOnboarding);
           setLoading(false);
           return;
         }
@@ -345,13 +338,8 @@ export default function DashboardLayout({
         // la présence d'un établissement est vérifiée côté serveur (service_role)
         // pour ne jamais renvoyer un compte déjà configuré vers l'onboarding.
         const serverNeedsOnboarding = await fetchOnboardingStatus();
-        let dismissed = false;
-        try {
-          dismissed = localStorage.getItem(`sejoura-onboarding-dismissed-${session.user.id}`) === "1";
-        } catch {
-          // Non bloquant
-        }
-        setNeedsOnboarding(serverNeedsOnboarding && !dismissed);
+        // L'étape 2 est obligatoire — pas de bypass via localStorage.
+        setNeedsOnboarding(serverNeedsOnboarding);
 
         setLoading(false);
       } catch (err) {
@@ -449,21 +437,8 @@ export default function DashboardLayout({
     window.location.reload();
   }
 
-  // L'utilisateur peut fermer l'étape 2 et continuer plus tard : on lève le
-  // blocage. Le tableau de bord gère lui-même l'état "aucun établissement".
-  function handleOnboardingDismiss() {
-    setNeedsOnboarding(false);
-    // Persister le refus dans localStorage pour ne pas re-bloquer l'utilisateur
-    // lors des navigations futures ( tant que le profil n'est pas créé côté serveur,
-    // le prochain fetchOnboardingStatus() retouvera "true" ).
-    if (authUserId) {
-      try {
-        localStorage.setItem(`sejoura-onboarding-dismissed-${authUserId}`, "1");
-      } catch {
-        // Non bloquant
-      }
-    }
-  }
+  // L'étape 2 est obligatoire — aucune fermeture possible sans compléter.
+  // La seule issue est la déconnexion.
 
   if (loading) {
     return (
@@ -573,18 +548,7 @@ export default function DashboardLayout({
           email={user?.email || ""}
           fullName={user?.full_name || ""}
           userRole={user?.role}
-          onComplete={() => {
-            // Réinitialiser le flag de refus quand l'onboarding est complété
-            if (authUserId) {
-              try {
-                localStorage.removeItem(`sejoura-onboarding-dismissed-${authUserId}`);
-              } catch {
-                // Non bloquant
-              }
-            }
-            handleOnboardingComplete();
-          }}
-          onClose={handleOnboardingDismiss}
+          onComplete={handleOnboardingComplete}
         />
       )}
     </div>

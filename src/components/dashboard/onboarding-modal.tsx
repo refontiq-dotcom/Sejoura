@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { Building2, MapPin, Home, Loader2, User, Phone, Globe2, Check, X, LogOut } from "lucide-react";
+import { Building2, MapPin, Home, Loader2, User, Phone, Globe2, Check, LogOut } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { createClient } from "@/lib/supabase/client";
@@ -17,10 +17,9 @@ interface OnboardingModalProps {
   fullName: string;
   userRole?: string;
   onComplete: () => void;
-  onClose?: () => void;
 }
 
-export function OnboardingModal({ userId, email, fullName, userRole, onComplete, onClose }: OnboardingModalProps) {
+export function OnboardingModal({ userId, email, fullName, userRole, onComplete }: OnboardingModalProps) {
   const { lang } = useLanguage();
   const t = translations[lang].onboarding;
   const router = useRouter();
@@ -171,16 +170,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-[-50%] left-[-10%] w-48 h-48 rounded-full bg-white blur-2xl animate-pulse" />
           </div>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t.close}
-              className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          {/* L'étape 2 est obligatoire — pas de bouton fermer */}
           <div className="inline-flex p-3 rounded-full bg-white/10 mb-3 backdrop-blur-md shadow-inner">
             <Home className="w-6 h-6 text-white" />
           </div>
@@ -359,18 +349,8 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
             )}
           </button>
 
-          {/* Sortie de l'étape 2 : on ne doit jamais être bloqué ici */}
-          <div className="pt-2 pb-1 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-700">
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
-              >
-                {t.skip}
-              </button>
-            )}
+          {/* L'étape 2 est obligatoire — seul le déconnexion est possible */}
+          <div className="pt-2 pb-1 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
             <button
               type="button"
               onClick={handleSignOut}
