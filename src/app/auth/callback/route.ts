@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
   const next = searchParams.get("next") ?? "/dashboard";
+  const googleSignup = searchParams.get("google_signup");
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
@@ -80,6 +81,9 @@ export async function GET(request: Request) {
 
       const redirectUrl = new URL(next, origin);
       redirectUrl.searchParams.set("oauth_success", "true");
+      if (googleSignup) {
+        redirectUrl.searchParams.set("google_signup", "true");
+      }
       return NextResponse.redirect(redirectUrl);
     }
 
