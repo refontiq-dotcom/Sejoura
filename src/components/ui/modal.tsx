@@ -67,10 +67,10 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ pointerEvents: "auto" }}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto overscroll-contain" style={{ pointerEvents: "auto" }}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" style={{ pointerEvents: "auto" }}
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" style={{ pointerEvents: "auto" }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -81,7 +81,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title || description || undefined}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] sm:rounded-lg rounded-t-2xl shadow-[var(--shadow-xl)] animate-modal-in max-h-[70vh] sm:max-h-[90vh] flex flex-col`} style={{ pointerEvents: "auto" }}
+        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] sm:rounded-lg rounded-t-2xl shadow-[var(--shadow-xl)] animate-modal-in max-h-[92vh] flex flex-col pb-[env(safe-area-inset-bottom)] sm:pb-0`} style={{ pointerEvents: "auto" }}
       >
         {/* Header */}
         {(title || description) && (
@@ -120,7 +120,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-3 sm:p-4 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
+        <div className="p-3 sm:p-4 overflow-y-auto flex-1 overscroll-contain" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
       </div>
     </div>
   );

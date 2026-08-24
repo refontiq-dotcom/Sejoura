@@ -159,12 +159,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
     "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto overscroll-contain">
       {/* Backdrop blur & dark overlay */}
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-x-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[75vh] sm:max-h-[92vh] overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-x-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0" style={{ WebkitOverflowScrolling: "touch" }}>
         {/* Beautiful organic header */}
         <div className="relative bg-[var(--primary-color,#0C1C33)] p-6 text-white text-center">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
