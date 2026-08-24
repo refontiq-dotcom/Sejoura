@@ -1471,7 +1471,7 @@ export function HomePage() {
           onClick={() => setAuthModalMode(null)}
         >
           <div
-            className="bg-white dark:bg-[#1a1a1a] w-full sm:max-w-[400px] sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 dark:border-[#333333] max-h-[92vh] overflow-y-auto animate-slide-up"
+            className="bg-white dark:bg-[#1a1a1a] w-full sm:max-w-[400px] sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 dark:border-[#333333] max-h-[85vh] sm:max-h-[92vh] overflow-y-auto animate-slide-up" style={{ WebkitOverflowScrolling: "touch" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-5">
@@ -1621,7 +1621,7 @@ export function HomePage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
-            className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#404040] text-slate-800 dark:text-[#e8e8e8] w-full max-w-3xl rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[85vh] overflow-y-auto animate-modal-in"
+            className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#404040] text-slate-800 dark:text-[#e8e8e8] w-full max-w-3xl rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[80vh] sm:max-h-[85vh] overflow-y-auto animate-modal-in" style={{ WebkitOverflowScrolling: "touch" }}
             onClick={(e) => e.stopPropagation()}
           >
             <button

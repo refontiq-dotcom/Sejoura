@@ -80,7 +80,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title || description || undefined}
-        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-xl)] animate-modal-in max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-xl)] animate-modal-in max-h-[85vh] sm:max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
         {(title || description) && (
@@ -119,7 +119,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-3 overflow-y-auto flex-1">{children}</div>
+        <div className="p-3 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
       </div>
     </div>
   );

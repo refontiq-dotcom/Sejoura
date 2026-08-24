@@ -164,7 +164,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
 
       {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-x-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[85vh] sm:max-h-[92vh] overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
         {/* Beautiful organic header */}
         <div className="relative bg-[var(--primary-color,#0C1C33)] p-6 text-white text-center">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
