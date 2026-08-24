@@ -5,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Delete, Moon, Sun } from "lucide-react";
+import { ChevronLeft, Delete, Loader2, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
+import { deriveUltraLightColor } from "@/lib/colors";
 import EmployeePinLogin, {
   type BiometricAuthPayload,
   type PinSubmitResult,
@@ -334,6 +335,7 @@ function EmployeeLoginContent() {
   }, []);
 
   const currentAccent = brandColor || themePrimaryColor || "#0C1C33";
+  const accentUltraLight = deriveUltraLightColor(currentAccent);
 
   // ── Étape 2 : PIN (composant dédié, plein écran) ────────────────────────────
   if ((step === "set-pin" || step === "verify-pin") && profile) {
@@ -359,118 +361,143 @@ function EmployeeLoginContent() {
     );
   }
 
-  // ── Étape 1 : Saisie Téléphone ──────────────────────────────────────────────
+  // ── Étape 1 : Saisie Téléphone (style Wave, plein écran) ──────────────────
+  const isDark = theme === "dark";
+  const accentOnDark = "#C2944E";
+
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[var(--background)] flex items-center justify-center p-3 relative font-sans select-none">
-      {/* Halo lumineux dynamique basé sur la couleur de marque */}
+    <div
+      className="min-h-screen w-full overflow-hidden relative flex flex-col font-sans select-none transition-colors duration-300"
+      style={{
+        background: isDark
+          ? "linear-gradient(180deg, #0B1120 0%, #090D16 100%)"
+          : `linear-gradient(180deg, ${accentUltraLight} 0%, #FFFFFF 100%)`,
+      }}
+    >
+      {/* Halo lumineux Wave */}
       <div
-        className="absolute w-[500px] h-[500px] rounded-full blur-[140px] opacity-25 pointer-events-none transition-all duration-700"
-        style={{ backgroundColor: currentAccent }}
+        className="absolute top-[-120px] left-1/2 -translate-x-1/2 w-[560px] h-[360px] rounded-full blur-[130px] opacity-30 pointer-events-none"
+        style={{ backgroundColor: isDark ? accentOnDark : currentAccent }}
       />
 
-      {/* Card principale ultra-compacte sans scroll */}
-      <div className="relative z-10 w-full max-w-[380px] bg-white dark:bg-slate-900/90 dark:backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 p-5 flex flex-col items-center justify-between text-slate-900 dark:text-white transition-all duration-300 max-h-[95vh]">
+      {/* ── Barre supérieure ── */}
+      <header className="relative z-10 w-full max-w-md mx-auto flex items-center justify-between h-14 px-4">
+        <div className="w-9" />
 
-        {/* Top bar avec logo et toggle thème */}
-        <div className="w-full flex items-center justify-between h-9 mb-2">
-          <div className="w-8" />
+        <Image
+          src="/logo-sejoura.png"
+          alt="Séjoura"
+          width={140}
+          height={40}
+          className="object-contain h-8 w-auto dark:brightness-0 dark:invert"
+          priority
+        />
 
-          <div className="flex items-center justify-center">
-            <Image
-              src="/logo-sejoura.png"
-              alt="Séjoura"
-              width={140}
-              height={40}
-              className="object-contain h-9 w-auto dark:brightness-0 dark:invert"
-              priority
+        <button
+          onClick={toggleTheme}
+          className="p-2 -mr-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all"
+          aria-label={isDark ? "Activer le mode clair" : "Activer le mode sombre"}
+        >
+          {isDark ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4" />}
+        </button>
+      </header>
+
+      {/* ── Zone centrale ── */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-start pt-2 px-4 w-full max-w-md mx-auto">
+        {/* Titre */}
+        <h2 className="mt-3 text-lg font-bold text-slate-900 dark:text-white">
+          Portail Espace Employés
+        </h2>
+        <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 mt-1.5">
+          📱 Mobile
+        </span>
+
+        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
+          Saisissez votre numéro mobile enregistré
+        </p>
+
+        {/* Sélecteur pays + numéro affiché */}
+        <div className="mt-5 flex items-center gap-2">
+          <select
+            value={dialCode}
+            onChange={(e) => setDialCode(e.target.value)}
+            className="text-sm font-semibold px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm"
+          >
+            {countryCodes.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
+
+          <div className="flex items-center font-mono text-2xl font-bold tracking-widest text-slate-900 dark:text-white min-w-[180px]">
+            <span>{phone || "\u00A0"}</span>
+            <span
+              className="w-0.5 h-6 ml-0.5 animate-pulse rounded-full"
+              style={{ backgroundColor: isDark ? accentOnDark : currentAccent }}
             />
           </div>
+        </div>
 
-          <div className="w-8 flex justify-end">
-            <button onClick={toggleTheme} className="p-1.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={theme === "light" ? "Activer le mode sombre" : "Activer le mode clair"}>
-              {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
+        {/* Erreur */}
+        <div className="mt-3 h-5 flex items-center justify-center">
+          {phoneError && (
+            <p className="text-xs text-red-500 font-semibold animate-shake">{phoneError}</p>
+          )}
+        </div>
+      </main>
+
+      {/* ── Clavier numérique virtuel (style Wave, plein écran) ── */}
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-6 pt-2">
+        <div className="grid grid-cols-3 gap-2.5">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
+            <button
+              key={digit}
+              onClick={() => handlePhoneKey(digit)}
+              disabled={loading}
+              className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+              aria-label={`Chiffre ${digit}`}
+            >
+              {digit}
             </button>
-          </div>
-        </div>
+          ))}
 
-        {/* Étape 1 : Saisie Téléphone */}
-        <div className={`w-full flex flex-col items-center my-auto transition-all duration-200 ${transitioning ? "opacity-0 scale-95" : "opacity-100 scale-100"}`}>
-          <div className="w-full text-center space-y-3">
-            <div>
-              <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">
-                Portail Espace Employés
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Saisissez votre numéro mobile enregistré
-              </p>
-            </div>
+          {/* Ligne 4 — gauche : espace vide */}
+          <div className="h-16" />
 
-            {/* Saisie numéro compacte */}
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-inner">
-              <select
-                value={dialCode}
-                onChange={(e) => setDialCode(e.target.value)}
-                className="bg-white dark:bg-slate-700 text-xs font-bold px-2 py-1.5 rounded-xl text-slate-700 dark:text-slate-200 outline-none border border-slate-200 dark:border-slate-600 cursor-pointer"
-              >
-                {countryCodes.map((c) => (
-                  <option key={c.code} value={c.code}>{c.label}</option>
-                ))}
-              </select>
-
-              <div className="flex-1 flex items-center justify-start px-2 font-mono text-base font-bold text-slate-900 dark:text-white tracking-wider overflow-hidden">
-                {phone ? (
-                  <span>{phone}</span>
-                ) : (
-                  <span className="text-slate-400 font-normal text-xs">07 00 00 00 00</span>
-                )}
-                <span className="w-0.5 h-4 ml-0.5 animate-pulse rounded-full" style={{ backgroundColor: currentAccent }} />
-              </div>
-            </div>
-
-            {phoneError && (
-              <p className="text-xs text-red-500 font-medium animate-shake">
-                {phoneError}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Pavé Numérique Ultra-Compact et Proportionné */}
-        <div className="w-full space-y-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="grid grid-cols-3 gap-1.5 w-full">
-            {DIAL_KEYS.map((key, idx) => {
-              if (key === "") return <div key={idx} className="h-10" />;
-
-              const isDelete = key === "⌫";
-
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handlePhoneKey(key)}
-                  disabled={loading}
-                  className="h-10 rounded-xl font-bold text-sm bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 active:scale-95 transition-all flex items-center justify-center border border-slate-200/50 dark:border-slate-700/50"
-                  aria-label={isDelete ? "Effacer" : key}
-                >
-                  {isDelete ? <Delete className="w-4 h-4 text-slate-500" /> : key}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Bouton Suivant */}
           <button
-            onClick={handlePhoneSubmit}
-            disabled={loading || phone.length < 8}
-            className="w-full h-10 mt-1 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
-            style={{ backgroundColor: currentAccent }}
+            onClick={() => handlePhoneKey("0")}
+            disabled={loading}
+            className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+            aria-label="Chiffre 0"
           >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-            ) : (
-              "Suivant"
-            )}
+            0
+          </button>
+
+          {/* Droite — effacer */}
+          <button
+            onClick={() => handlePhoneKey("⌫")}
+            disabled={loading}
+            className="h-16 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
+            aria-label="Effacer"
+          >
+            <Delete className="w-6 h-6" />
           </button>
         </div>
+      </div>
+
+      {/* ── Bouton Suivant (fixé en bas, style Wave) ── */}
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-8">
+        <button
+          onClick={handlePhoneSubmit}
+          disabled={loading || phone.length < 8}
+          className="w-full h-14 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+          style={{ backgroundColor: isDark ? accentOnDark : currentAccent }}
+        >
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-white" />
+          ) : (
+            "Suivant"
+          )}
+        </button>
       </div>
     </div>
   );
