@@ -403,21 +403,21 @@ function EmployeeLoginContent() {
       </header>
 
       {/* ── Zone centrale ── */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-start pt-2 px-4 w-full max-w-md mx-auto">
+      <main className="relative z-10 flex flex-col items-center justify-start pt-1 px-4 w-full max-w-md mx-auto shrink-0">
         {/* Titre */}
-        <h2 className="mt-3 text-lg font-bold text-slate-900 dark:text-white">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white">
           Portail Espace Employés
         </h2>
-        <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 mt-1.5">
+        <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 mt-1">
           📱 Mobile
         </span>
 
-        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400 font-medium">
+        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
           Saisissez votre numéro mobile enregistré
         </p>
 
         {/* Sélecteur pays + numéro affiché */}
-        <div className="mt-5 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <select
             value={dialCode}
             onChange={(e) => setDialCode(e.target.value)}
@@ -438,22 +438,22 @@ function EmployeeLoginContent() {
         </div>
 
         {/* Erreur */}
-        <div className="mt-3 h-5 flex items-center justify-center">
+        <div className="mt-1 h-4 flex items-center justify-center">
           {phoneError && (
             <p className="text-xs text-red-500 font-semibold animate-shake">{phoneError}</p>
           )}
         </div>
       </main>
 
-      {/* ── Clavier numérique virtuel (style Wave, plein écran) ── */}
-      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-6 pt-2">
-        <div className="grid grid-cols-3 gap-2.5">
+      {/* ── Clavier numérique virtuel (style Wave) ── */}
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pt-1 pb-2 shrink-0">
+        <div className="grid grid-cols-3 gap-2">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
             <button
               key={digit}
               onClick={() => handlePhoneKey(digit)}
               disabled={loading}
-              className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+              className="h-13 rounded-2xl text-xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
               aria-label={`Chiffre ${digit}`}
             >
               {digit}
@@ -461,12 +461,12 @@ function EmployeeLoginContent() {
           ))}
 
           {/* Ligne 4 — gauche : espace vide */}
-          <div className="h-16" />
+          <div className="h-13" />
 
           <button
             onClick={() => handlePhoneKey("0")}
             disabled={loading}
-            className="h-16 rounded-2xl text-2xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
+            className="h-13 rounded-2xl text-xl font-semibold text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 disabled:opacity-50 transition-all"
             aria-label="Chiffre 0"
           >
             0
@@ -476,24 +476,24 @@ function EmployeeLoginContent() {
           <button
             onClick={() => handlePhoneKey("⌫")}
             disabled={loading}
-            className="h-16 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
+            className="h-13 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
             aria-label="Effacer"
           >
-            <Delete className="w-6 h-6" />
+            <Delete className="w-5 h-5" />
           </button>
         </div>
       </div>
 
       {/* ── Bouton Suivant (fixé en bas, style Wave) ── */}
-      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-8">
+      <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-4 pt-1 shrink-0">
         <button
           onClick={handlePhoneSubmit}
           disabled={loading || phone.length < 8}
-          className="w-full h-14 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+          className="w-full h-12 rounded-2xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
           style={{ backgroundColor: isDark ? accentOnDark : currentAccent }}
         >
           {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-white" />
+            <Loader2 className="w-4 h-4 animate-spin text-white" />
           ) : (
             "Suivant"
           )}
