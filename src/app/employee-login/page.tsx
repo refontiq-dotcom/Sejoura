@@ -407,7 +407,7 @@ function EmployeeLoginContent() {
       </header>
 
       {/* ── Zone centrale ── */}
-      <main className="relative z-10 flex flex-col items-center justify-start pt-1 px-4 w-full max-w-md mx-auto shrink-0">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 w-full max-w-md mx-auto shrink-0">
         {/* Titre */}
         <h2 className="text-base font-bold text-slate-900 dark:text-white">
           Portail Espace Employés
