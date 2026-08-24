@@ -385,7 +385,7 @@ function EmployeeLoginContent() {
       />
 
       {/* ── Barre supérieure ── */}
-      <header className="relative z-10 w-full max-w-md mx-auto flex items-center justify-between h-14 px-4">
+      <header className="relative z-10 w-full max-w-md mx-auto flex items-center justify-between h-11 px-4">
         <div className="w-9" />
 
         <Image
@@ -409,7 +409,7 @@ function EmployeeLoginContent() {
       {/* ── Zone centrale ── */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-end px-4 pb-2 w-full max-w-md mx-auto shrink-0">
         {/* Titre */}
-        <h2 className="text-base font-bold text-slate-900 dark:text-white">
+        <h2 className="text-base font-bold text-slate-900 dark:text-white -mt-1">
           Portail Espace Employés
         </h2>
         <span className="inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 mt-1">

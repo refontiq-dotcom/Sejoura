@@ -255,7 +255,7 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
       />
 
       {/* Header */}
-      <header className="relative z-10 w-full max-w-md mx-auto flex items-center justify-between h-14 px-4">
+      <header className="relative z-10 w-full max-w-md mx-auto flex items-center justify-between h-11 px-4">
         <div className="w-9" />
         <Image
           src="/logo-sejoura.png"
