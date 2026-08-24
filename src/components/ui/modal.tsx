@@ -67,7 +67,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
@@ -80,7 +80,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title || description || undefined}
-        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-xl)] animate-modal-in max-h-[85vh] sm:max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] sm:rounded-lg rounded-t-2xl shadow-[var(--shadow-xl)] animate-modal-in max-h-[70vh] sm:max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
         {(title || description) && (
@@ -119,7 +119,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="p-3 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
+        <div className="p-3 sm:p-4 overflow-y-auto flex-1" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
       </div>
     </div>
   );
