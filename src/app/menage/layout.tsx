@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, Sparkles, LogOut, Moon, Sun, UserCircle2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { LOGIN_ROUTE } from "@/lib/routes";
+import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 
 export default function MenageLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,6 +17,12 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
   const [tenantLogo, setTenantLogo] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [showProfile, setShowProfile] = useState(false);
+  const [needsReauth, setNeedsReauth] = useState(false);
+
+  // Vérifier si l'employé a vérifié son identité dans cette session
+  useEffect(() => {
+    setNeedsReauth(!isEmpVerified());
+  }, []);
 
   useEffect(() => {
     async function checkAuth() {
@@ -141,6 +148,10 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       </header>
 
       <main className="p-4 pb-28">{children}</main>
+
+      {needsReauth && (
+        <ReauthModal onVerified={() => setNeedsReauth(false)} />
+      )}
 
       {/* Bottom nav mobile — barre flottante ergonomique */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-4">

@@ -317,6 +317,10 @@ function EmployeeLoginContent() {
 
   // ── Redirection après authentification réussie ──────────────────────────────
   const handleFinish = useCallback(() => {
+    // Marquer la session comme vérifiée pour le garde de reconnexion
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("sejoura-emp-verified", "1");
+    }
     window.setTimeout(() => {
       router.push(lastRole === "menagere" ? "/menage" : "/dashboard");
     }, 400);

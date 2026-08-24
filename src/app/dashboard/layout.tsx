@@ -17,6 +17,7 @@ import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { getActiveAssignmentId } from "@/lib/assignments";
+import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 import type { User, Accommodation } from "@/types/database";
 
 const ACTIVE_ACCOMMODATION_STORAGE_KEY = "sejoura-active-accommodation";
@@ -51,6 +52,7 @@ export default function DashboardLayout({
   const [headerHidden, setHeaderHidden] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [needsReauth, setNeedsReauth] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   // Heure locale du navigateur pour le greeting (évite le décalage UTC côté serveur)
@@ -75,6 +77,11 @@ export default function DashboardLayout({
   useEffect(() => {
     const id = setInterval(() => setLocalHour(new Date().getHours()), 5 * 60_000);
     return () => clearInterval(id);
+  }, []);
+
+  // Vérifier si l'employé a vérifié son identité dans cette session
+  useEffect(() => {
+    setNeedsReauth(!isEmpVerified());
   }, []);
 
   // Gérer la sidebar responsive : plier en mobile, déplier en desktop.
@@ -550,6 +557,10 @@ export default function DashboardLayout({
           userRole={user?.role}
           onComplete={handleOnboardingComplete}
         />
+      )}
+
+      {needsReauth && (
+        <ReauthModal onVerified={() => setNeedsReauth(false)} />
       )}
     </div>
   );
