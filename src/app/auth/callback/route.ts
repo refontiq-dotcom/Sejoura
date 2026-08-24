@@ -77,7 +77,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}?error=get_user_failed`);
       }
 
-      await ensureUserProfile(supabase, user);
+      await ensureUserProfile(supabase, user, { googleSignup: googleSignup === "true" });
 
       const redirectUrl = new URL(next, origin);
       redirectUrl.searchParams.set("oauth_success", "true");
@@ -102,11 +102,12 @@ export async function GET(request: Request) {
  */
 async function ensureUserProfile(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
+  opts: { googleSignup?: boolean } = {}
 ) {
   const { data: existingProfile } = await supabase
     .from("users")
-    .select("id")
+    .select("id, role, tenant_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -131,6 +132,30 @@ async function ensureUserProfile(
 
     if (insertError) {
       console.error("[auth/callback] Failed to create user profile:", insertError.message);
+    }
+    return;
+  }
+
+  // Google OAuth ne transmet aucun rôle dans les métadonnées : le trigger
+  // on_auth_user_created crée donc un profil avec le rôle par défaut 'client'
+  // lors d'une inscription Google (Étape 1). Sans correction, l'API
+  // /api/auth/onboarding-status considère le compte comme non-éligible à
+  // l'étape 2 (onboarding) et le modal de configuration ne s'affiche jamais.
+  // Comme le paramètre google_signup=true n'est posé que par le formulaire
+  // d'inscription de la page d'accueil, on promeut alors le profil au rôle
+  // admin_residence pour déclencher l'étape 2.
+  if (
+    opts.googleSignup &&
+    existingProfile.role === "client" &&
+    !existingProfile.tenant_id
+  ) {
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ role: "admin_residence" })
+      .eq("id", existingProfile.id);
+
+    if (updateError) {
+      console.error("[auth/callback] Failed to promote profile to admin_residence:", updateError.message);
     }
   }
 }
