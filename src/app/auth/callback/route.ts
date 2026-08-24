@@ -2,119 +2,131 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 /**
- * Callback OAuth (Google, etc.)
+ * Callback OAuth + Magic Link
  *
- * After Google redirects the user back, Supabase exchange the code for a session.
- * If the user is new (first Google sign-in), we create their profile in the
- * public `users` table so the dashboard can load properly.
- *
- * Flow:
- * 1. Google redirects to /auth/callback?code=...&next=/dashboard
- * 2. Supabase exchanges the code for a session (sets cookies)
- * 3. We check if a profile exists in `users` table
- * 4. If not, create it with role `admin_residence`
- * 5. Redirect to the destination
+ * Handles two flows:
+ * 1. OAuth (Google): ?code=xxx&next=/dashboard
+ * 2. Magic Link: ?token_hash=xxx&type=magiclink&next=/dashboard
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") ?? "/dashboard";
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 
-  // Handle OAuth errors (user denied access, etc.)
+  // Handle OAuth errors
   if (error) {
-    console.error(
-      "[auth/callback] OAuth error:",
-      error,
-      errorDescription
-    );
+    console.error("[auth/callback] OAuth error:", error, errorDescription);
     return NextResponse.redirect(
       `${origin}?error=${encodeURIComponent(errorDescription ?? error)}`
     );
   }
 
-  if (!code) {
-    console.error("[auth/callback] No code in URL");
-    return NextResponse.redirect(`${origin}?error=no_code`);
-  }
-
   try {
     const supabase = await createClient();
 
-    // Exchange the code for a session (sets auth cookies)
-    const { error: exchangeError } =
-      await supabase.auth.exchangeCodeForSession(code);
-
-    if (exchangeError) {
-      console.error(
-        "[auth/callback] Code exchange failed:",
-        exchangeError.message
-      );
-      return NextResponse.redirect(
-        `${origin}?error=${encodeURIComponent(exchangeError.message)}`
-      );
-    }
-
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error("[auth/callback] Failed to get user:", userError?.message);
-      return NextResponse.redirect(`${origin}?error=get_user_failed`);
-    }
-
-    // Check if a profile already exists in the `users` table
-    const { data: existingProfile } = await supabase
-      .from("users")
-      .select("id, role")
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    if (!existingProfile) {
-      // First time Google sign-in: create the user profile
-      const fullName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        user.email?.split("@")[0] ||
-        "Utilisateur";
-      const avatarUrl =
-        user.user_metadata?.avatar_url ||
-        user.user_metadata?.picture ||
-        null;
-
-      const { error: insertError } = await supabase.from("users").insert({
-        auth_user_id: user.id,
-        email: user.email,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        role: "admin_residence",
+    // ── Flow 1: Magic Link (token_hash) ──────────────────────────────
+    if (tokenHash && type) {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: type as "magiclink" | "signup",
       });
 
-      if (insertError) {
-        // If the insert fails (e.g. duplicate key from a race condition),
-        // log but don't block the login — the profile might already exist
-        console.error(
-          "[auth/callback] Failed to create user profile:",
-          insertError.message
+      if (verifyError) {
+        console.error("[auth/callback] Magic Link verify failed:", verifyError.message);
+        return NextResponse.redirect(
+          `${origin}?error=${encodeURIComponent(verifyError.message)}`
         );
       }
+
+      // Get the authenticated user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("[auth/callback] Failed to get user after magic link:", userError?.message);
+        return NextResponse.redirect(`${origin}?error=get_user_failed`);
+      }
+
+      // Create profile if first login
+      await ensureUserProfile(supabase, user);
+
+      const redirectUrl = new URL(next, origin);
+      redirectUrl.searchParams.set("magic_success", "true");
+      return NextResponse.redirect(redirectUrl);
     }
 
-    // Build redirect URL
-    const redirectUrl = new URL(next, origin);
+    // ── Flow 2: OAuth (code exchange) ────────────────────────────────
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    // Add a flag to indicate successful OAuth (for toast notification)
-    redirectUrl.searchParams.set("oauth_success", "true");
+      if (exchangeError) {
+        console.error("[auth/callback] Code exchange failed:", exchangeError.message);
+        return NextResponse.redirect(
+          `${origin}?error=${encodeURIComponent(exchangeError.message)}`
+        );
+      }
 
-    return NextResponse.redirect(redirectUrl);
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("[auth/callback] Failed to get user:", userError?.message);
+        return NextResponse.redirect(`${origin}?error=get_user_failed`);
+      }
+
+      await ensureUserProfile(supabase, user);
+
+      const redirectUrl = new URL(next, origin);
+      redirectUrl.searchParams.set("oauth_success", "true");
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // No code and no token_hash
+    console.error("[auth/callback] No code or token_hash in URL");
+    return NextResponse.redirect(`${origin}?error=no_code`);
   } catch (err) {
     console.error("[auth/callback] Unexpected error:", err);
-    return NextResponse.redirect(
-      `${origin}?error=${encodeURIComponent("callback_failed")}`
-    );
+    return NextResponse.redirect(`${origin}?error=callback_failed`);
+  }
+}
+
+/**
+ * Create user profile in public.users if it doesn't exist.
+ * Works for both Google OAuth and Magic Link sign-ins.
+ */
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const { data: existingProfile } = await supabase
+    .from("users")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    const fullName =
+      (user.user_metadata?.full_name as string) ||
+      (user.user_metadata?.name as string) ||
+      user.email?.split("@")[0] ||
+      "Utilisateur";
+    const avatarUrl =
+      (user.user_metadata?.avatar_url as string) ||
+      (user.user_metadata?.picture as string) ||
+      null;
+
+    const { error: insertError } = await supabase.from("users").insert({
+      auth_user_id: user.id,
+      email: user.email,
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      role: "admin_residence",
+    });
+
+    if (insertError) {
+      console.error("[auth/callback] Failed to create user profile:", insertError.message);
+    }
   }
 }
