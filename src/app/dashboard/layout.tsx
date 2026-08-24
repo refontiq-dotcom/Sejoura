@@ -79,10 +79,9 @@ export default function DashboardLayout({
     return () => clearInterval(id);
   }, []);
 
-  // Vérifier si l'employé a vérifié son identité dans cette session
-  useEffect(() => {
-    setNeedsReauth(!isEmpVerified());
-  }, []);
+  // La vérification reauth (PIN) est gérée dans checkAuth() : seuls les
+  // employés (réceptionnistes) y sont soumis. Les admins utilisent email+
+  // mot de passe et n'ont pas de code secret.
 
   // Gérer la sidebar responsive : plier en mobile, déplier en desktop.
   useEffect(() => {
@@ -262,6 +261,14 @@ export default function DashboardLayout({
 
         setUser(userData as unknown as User);
         setAuthUserId(session.user.id);
+
+        // La vérification reauth (PIN) ne concerne QUE les employés
+        // (réceptionnistes). Les admins et super_admins utilisent email+
+        // mot de passe — ils n'ont pas de code secret.
+        const isEmployee = userData.role === "receptionniste" || userData.role === "menagere";
+        if (isEmployee) {
+          setNeedsReauth(!isEmpVerified());
+        }
 
         if (userData.tenant_id) {
           const { data: tenantData } = await supabase
