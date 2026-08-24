@@ -67,10 +67,10 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4" style={{ pointerEvents: "auto" }}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" style={{ pointerEvents: "auto" }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -80,7 +80,8 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title || description || undefined}
-        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] sm:rounded-lg rounded-t-2xl shadow-[var(--shadow-xl)] animate-modal-in max-h-[70vh] sm:max-h-[90vh] flex flex-col`}
+        onClick={(e) => e.stopPropagation()}
+        className={`relative w-full ${sizeClasses[size]} bg-[var(--surface-elevated)] border border-[var(--border)] sm:rounded-lg rounded-t-2xl shadow-[var(--shadow-xl)] animate-modal-in max-h-[70vh] sm:max-h-[90vh] flex flex-col`} style={{ pointerEvents: "auto" }}
       >
         {/* Header */}
         {(title || description) && (
