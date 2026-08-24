@@ -542,7 +542,16 @@ export default function EmployeePinLogin({
         </p>
 
         {/* Puces de confirmation */}
-        <div className={`mt-5 flex items-center gap-3 ${shaking ? "animate-shake" : ""}`}>
+        <div
+          className={`mt-5 flex items-center gap-3 ${shaking ? "animate-shake" : ""}`}
+          role="status"
+          aria-live="polite"
+          aria-label={
+            activePin.length === 0
+              ? "Aucun chiffre saisi"
+              : `${activePin.length} sur ${PIN_LENGTH} chiffres saisis`
+          }
+        >
           {Array.from({ length: PIN_LENGTH }).map((_, i) => {
             const filled = i < activePin.length;
             return (
@@ -563,7 +572,7 @@ export default function EmployeePinLogin({
         {/* Erreur PIN */}
         <div className="mt-3 h-5 flex items-center justify-center">
           {pinError && (
-            <p className="text-xs text-red-500 font-semibold animate-shake">{pinError}</p>
+            <p role="alert" className="text-xs text-red-500 font-semibold animate-shake">{pinError}</p>
           )}
         </div>
 
@@ -632,7 +641,25 @@ export default function EmployeePinLogin({
 
       {/* ── Clavier numérique virtuel (mobile < 768px, style Wave) ── */}
       {isMobile && (
-        <div className="relative z-10 w-full max-w-md mx-auto px-4 pb-6 pt-2">
+        <div className="relative z-10 w-full max-w-md mx-auto px-4 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+          {/* Accès biométrique placé hors du clavier : l'effacement reste
+              toujours disponible pour corriger une saisie. */}
+          {canUseBiometrics && !biometricPromptVisible && (
+            <button
+              onClick={() => attemptBiometricLoginRef.current()}
+              disabled={isAuthenticating || submitting}
+              className="mb-3 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white active:scale-95 disabled:opacity-60 transition-all shadow-lg"
+              style={{ backgroundColor: isDark ? accentOnDark : accent }}
+              aria-label="Se connecter avec Face ID ou empreinte"
+            >
+              {isAuthenticating ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <FingerprintPattern className="w-5 h-5" />
+              )}
+              {isAuthenticating ? "Reconnaissance en cours…" : "Face ID / Empreinte"}
+            </button>
+          )}
           <div className="grid grid-cols-3 gap-2.5">
             {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
               <button
@@ -669,38 +696,22 @@ export default function EmployeePinLogin({
               0
             </button>
 
-            {/* Droite — biométrie si disponible, sinon effacer */}
-            {canUseBiometrics ? (
-              <button
-                onClick={() => attemptBiometricLoginRef.current()}
-                disabled={isAuthenticating || submitting}
-                className="h-16 rounded-2xl flex items-center justify-center text-white active:scale-95 disabled:opacity-60 transition-all shadow-md"
-                style={{ backgroundColor: isDark ? accentOnDark : accent }}
-                aria-label="Se connecter avec Face ID ou empreinte"
-              >
-                {isAuthenticating ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <FingerprintPattern className="w-7 h-7" />
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={pressBackspace}
-                disabled={submitting || isAuthenticating}
-                className="h-16 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
-                aria-label="Effacer"
-              >
-                <Delete className="w-6 h-6" />
-              </button>
-            )}
+            {/* Droite — effacement (toujours disponible pour corriger une saisie) */}
+            <button
+              onClick={pressBackspace}
+              disabled={submitting || isAuthenticating}
+              className="h-16 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 bg-transparent active:bg-slate-100 dark:active:bg-slate-800 active:scale-95 disabled:opacity-50 transition-all"
+              aria-label="Effacer"
+            >
+              <Delete className="w-6 h-6" />
+            </button>
           </div>
         </div>
       )}
 
       {/* ── Modal d'enrôlement biométrique ── */}
       {showEnrollPrompt && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div
             className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
             onClick={declineEnrollment}

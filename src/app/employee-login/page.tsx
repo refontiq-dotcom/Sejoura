@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { ChevronLeft, Delete, Loader2, Moon, Sun } from "lucide-react";
+import { CornerDownLeft, Delete, Loader2, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { deriveUltraLightColor } from "@/lib/colors";
 import EmployeePinLogin, {
@@ -56,11 +56,25 @@ export default function EmployeeLoginPage() {
   );
 }
 
+// ─── Détection mobile (affichage conditionnel de l'indice clavier) ────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 function EmployeeLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, toggleTheme, setPrimaryColor, primaryColor: themePrimaryColor } = useTheme();
+  const isMobile = useIsMobile();
 
   // État machine
   const [step, setStep] = useState<Step>("phone");
@@ -425,6 +439,7 @@ function EmployeeLoginContent() {
           <select
             value={dialCode}
             onChange={(e) => setDialCode(e.target.value)}
+            aria-label="Indicatif du pays"
             className="text-sm font-semibold px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none border border-slate-200 dark:border-slate-700 cursor-pointer shadow-sm"
           >
             {countryCodes.map((c) => (
@@ -432,7 +447,13 @@ function EmployeeLoginContent() {
             ))}
           </select>
 
-          <div className="flex items-center font-mono text-2xl font-bold tracking-widest text-slate-900 dark:text-white min-w-[180px]">
+          <div
+            role="textbox"
+            aria-label="Numéro de téléphone"
+            aria-readonly="true"
+            aria-live="polite"
+            className="flex items-center font-mono text-2xl font-bold tracking-widest text-slate-900 dark:text-white min-w-[180px]"
+          >
             <span>{phone || "\u00A0"}</span>
             <span
               className="w-0.5 h-6 ml-0.5 animate-pulse rounded-full"
@@ -444,7 +465,7 @@ function EmployeeLoginContent() {
         {/* Erreur */}
         <div className="mt-1 h-4 flex items-center justify-center">
           {phoneError && (
-            <p className="text-xs text-red-500 font-semibold animate-shake">{phoneError}</p>
+            <p role="alert" className="text-xs text-red-500 font-semibold animate-shake">{phoneError}</p>
           )}
         </div>
       </main>
@@ -485,6 +506,14 @@ function EmployeeLoginContent() {
           >
             <Delete className="w-6 h-6" />
           </button>
+
+          {/* Indice clavier physique (desktop) */}
+          {!isMobile && (
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 pt-1">
+              <CornerDownLeft className="w-3.5 h-3.5" />
+              <span>Tapez votre numéro directement sur le clavier</span>
+            </div>
+          )}
         </div>
       </div>
 
