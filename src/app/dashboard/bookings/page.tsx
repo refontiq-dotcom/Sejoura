@@ -57,6 +57,8 @@ import {
   History,
   ArrowRight,
   Info,
+  Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -116,6 +118,16 @@ export default function BookingsPage() {
   const [checkoutForm, setCheckoutForm] = useState({
     amount: "",
     payment_method: "",
+    mobile_money_operator: "",
+  });
+
+  // Paiement partiel en cours de séjour (enregistré par la réceptionniste)
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentBooking, setPaymentBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    payment_method: "cash",
     mobile_money_operator: "",
   });
 
@@ -1280,23 +1292,86 @@ export default function BookingsPage() {
 
   // Check-out sans encaisser le solde (le client réglera plus tard) :
   // conserve la traçabilité en laissant un solde "partial".
-  async function handleCheckoutSkip() {
-    const b = checkoutBooking;
-    if (!b) return;
+    async function handleCheckoutSkip() {
+    if (!checkoutBooking) return;
     setCheckoutSaving(true);
     try {
-      const ok = await doCheckout(b.id);
-      if (!ok) return;
-      toast.success("Check-out confirmé (sans encaissement) ✓");
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("bookings")
+        .update({ payment_status: "partial", updated_at: new Date().toISOString() })
+        .eq("id", checkoutBooking.id);
+      if (error) throw error;
+      setInvoicesMap((prev) => {
+        const inv = { ...prev[checkoutBooking.id] };
+        if (inv) inv.status = "sent";
+        return { ...prev, [checkoutBooking.id]: inv };
+      });
+      toast.info("Solde en attente — le réglera plus tard.");
       setCheckoutModalOpen(false);
       setCheckoutBooking(null);
-      await runOverstayCheck();
       loadBookings(tenantId);
     } catch (err) {
-      toast.error("Une erreur est survenue lors du check-out.");
-      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la mise à jour.");
     } finally {
       setCheckoutSaving(false);
+    }
+  }
+
+  // ── Enregistrer un paiement partiel en cours de séjour ────────────────────
+  function openPaymentModal(booking: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    const remaining = Math.max(0, (booking.total_amount || 0) - (booking.amount_paid || 0));
+    setPaymentBooking(booking);
+    setPaymentForm({
+      amount: remaining > 0 ? String(remaining) : "",
+      payment_method: "cash",
+      mobile_money_operator: "",
+    });
+    setPaymentModalOpen(true);
+  }
+
+  async function handleRecordPayment() {
+    if (!paymentBooking) return;
+    const amount = Math.round(Number(paymentForm.amount));
+    if (!amount || amount <= 0) {
+      toast.error("Le montant doit être supérieur à 0.");
+      return;
+    }
+    const remaining = Math.max(0, (paymentBooking.total_amount || 0) - (paymentBooking.amount_paid || 0));
+    if (amount > remaining) {
+      toast.error(`Le montant ne peut pas dépasser le solde restant (${fmt(remaining)}).`);
+      return;
+    }
+    if (!paymentForm.payment_method) {
+      toast.error("Veuillez sélectionner un moyen de paiement.");
+      return;
+    }
+    setPaymentSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("payments").insert({
+        tenant_id: paymentBooking.tenant_id,
+        booking_id: paymentBooking.id,
+        accommodation_id: paymentBooking.room?.accommodation_id || paymentBooking.accommodation_id,
+        amount,
+        payment_method: paymentForm.payment_method,
+        mobile_money_operator: paymentForm.payment_method === "mobile_money" ? paymentForm.mobile_money_operator || null : null,
+        payment_date: new Date().toISOString(),
+        received_by: userId,
+        operation_type: "booking",
+        notes: `Paiement partiel en cours de séjour — reste dû`,
+      });
+      if (error) throw error;
+      // Le trigger DB update_booking_payment_status recalcule automatiquement
+      // amount_paid et payment_status (source de vérité : somme des paiements).
+      toast.success(`Paiement de ${fmt(amount)} enregistré ✓`);
+      setPaymentModalOpen(false);
+      setPaymentBooking(null);
+      loadBookings(tenantId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du paiement.");
+    } finally {
+      setPaymentSaving(false);
     }
   }
 
@@ -1808,6 +1883,14 @@ export default function BookingsPage() {
                                 )}
                               </>
                             )}
+                            {b.payment_status !== "paid" && (b.total_amount || 0) > (b.amount_paid || 0) && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => openPaymentModal(b)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                                  <Wallet className="w-4 h-4" /> Enregistrer un paiement
+                                </DropdownMenuItem>
+                              </>
+                            )}
                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
                               <>
                                 <DropdownMenuSeparator />
@@ -2007,6 +2090,14 @@ export default function BookingsPage() {
                                     <Receipt className="w-4 h-4" /> Générer la facture PDF
                                   </DropdownMenuItem>
                                 )}
+                              </>
+                            )}
+                             {b.payment_status !== "paid" && (b.total_amount || 0) > (b.amount_paid || 0) && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => openPaymentModal(b)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20">
+                                  <Wallet className="w-4 h-4" /> Enregistrer un paiement
+                                </DropdownMenuItem>
                               </>
                             )}
                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
@@ -3106,6 +3197,77 @@ export default function BookingsPage() {
             </div>
           </div>
         </Modal>
+
+      {/* ============ MODAL PAIEMENT PARTIEL ============ */}
+      <Modal
+        open={!!paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        title="Enregistrer un paiement"
+        description={paymentBooking ? `${paymentBooking.client?.full_name || "Client"} · Ch. ${paymentBooking.room?.room_number || "—"} · Solde restant : ${fmt(Math.max(0, (paymentBooking.total_amount || 0) - (paymentBooking.amount_paid || 0)))}` : ""}
+      >
+        <div className="space-y-3">
+          {paymentBooking && (
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p>
+                  Total séjour : <strong>{fmt(paymentBooking.total_amount)}</strong>
+                  {" · "}Déjà payé : <strong>{fmt(paymentBooking.amount_paid)}</strong>
+                </p>
+                <p className="mt-1 font-semibold">
+                  Solde restant dû : <strong>{fmt(Math.max(0, (paymentBooking.total_amount || 0) - (paymentBooking.amount_paid || 0)))}</strong>
+                </p>
+              </div>
+            </div>
+          )}
+          <Input
+            label="Montant reçu (FCFA)"
+            type="number"
+            value={paymentForm.amount}
+            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+            placeholder={paymentBooking ? String(Math.max(0, (paymentBooking.total_amount || 0) - (paymentBooking.amount_paid || 0))) : ""}
+          />
+          <div>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Moyen de paiement</label>
+            <select
+              value={paymentForm.payment_method}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+            >
+              <option value="cash">Espèces</option>
+              <option value="mobile_money">Mobile Money</option>
+              <option value="bank">Virement bancaire</option>
+              <option value="wave">Wave</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+          {paymentForm.payment_method === "mobile_money" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Opérateur</label>
+              <select
+                value={paymentForm.mobile_money_operator}
+                onChange={(e) => setPaymentForm({ ...paymentForm, mobile_money_operator: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="">Sélectionner</option>
+                <option value="orange_money">Orange Money</option>
+                <option value="mtn_money">MTN Money</option>
+                <option value="moov_money">Moov Money</option>
+                <option value="wave">Wave</option>
+                <option value="other">Autre</option>
+              </select>
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setPaymentModalOpen(false)}>
+              Annuler
+            </Button>
+            <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={handleRecordPayment} loading={paymentSaving}>
+              <CheckCircle2 className="w-4 h-4 mr-1.5" /> Enregistrer le paiement
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
