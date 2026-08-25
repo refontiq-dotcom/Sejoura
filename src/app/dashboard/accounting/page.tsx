@@ -747,6 +747,7 @@ export default function AccountingPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [payments, setPayments] = useState<EnrichedPayment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [accommodations, setAccommodations] = useState<{ id: string; name: string }[]>([]);
@@ -2428,7 +2429,7 @@ export default function AccountingPage() {
             ) : (
               <div className="space-y-2">
                 {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
+                  <div key={log.id} onClick={() => setSelectedLog(log)} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors">
                     <div className="w-8 h-8 rounded-md bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
                       <ScrollText className="w-4 h-4 text-[var(--foreground-muted)]" />
                     </div>
@@ -2438,6 +2439,7 @@ export default function AccountingPage() {
                         {log.entity_type} {log.entity_id ? `#${log.entity_id.substring(0, 8)}` : ""} • {usersById[log.user_id || ""] || "Système"} • {formatDate(log.created_at)}
                       </p>
                     </div>
+                    <Eye className="w-3.5 h-3.5 text-[var(--foreground-muted)] mt-1 flex-shrink-0" />
                   </div>
                 ))}
               </div>
@@ -2962,6 +2964,74 @@ export default function AccountingPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ============ MODAL DETAIL JOURNAL D'AUDIT ============ */}
+      <Modal
+        open={!!selectedLog}
+        onClose={() => setSelectedLog(null)}
+        title="Détail de l'action"
+        size="lg"
+      >
+        {selectedLog && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
+                <ScrollText className="w-5 h-5 text-[var(--foreground-muted)]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)] capitalize">{selectedLog.action.replace(/_/g, " ")}</p>
+                <p className="text-[11px] text-[var(--foreground-subtle)]">{formatDate(selectedLog.created_at)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-[12px]">
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Entité</p>
+                <p className="text-[var(--foreground)]">{selectedLog.entity_type}{selectedLog.entity_id ? ` #${selectedLog.entity_id.substring(0, 8)}` : ""}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Utilisateur</p>
+                <p className="text-[var(--foreground)]">{usersById[selectedLog.user_id || ""] || "Système"}</p>
+              </div>
+            </div>
+
+            {selectedLog.ip_address && (
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50 text-[12px]">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Adresse IP</p>
+                <p className="text-[var(--foreground)] font-mono text-[11px]">{selectedLog.ip_address}</p>
+              </div>
+            )}
+
+            {(selectedLog.old_values || selectedLog.new_values) && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-2">Valeurs modifiées</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedLog.old_values && Object.keys(selectedLog.old_values).length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500 mb-1.5">Avant</p>
+                      <pre className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap font-mono leading-relaxed">
+                        {JSON.stringify(selectedLog.old_values, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {selectedLog.new_values && Object.keys(selectedLog.new_values).length > 0 && (
+                    <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1.5">Après</p>
+                      <pre className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap font-mono leading-relaxed">
+                        {JSON.stringify(selectedLog.new_values, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" size="sm" onClick={() => setSelectedLog(null)}>Fermer</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
