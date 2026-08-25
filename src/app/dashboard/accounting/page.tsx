@@ -769,6 +769,7 @@ export default function AccountingPage() {
   const [expenseCategory, setExpenseCategory] = useState("all");
   const [expenseSearch, setExpenseSearch] = useState("");
   const [invoiceStatus, setInvoiceStatus] = useState("all");
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
   // Tri
@@ -1074,8 +1075,18 @@ export default function AccountingPage() {
   const filteredInvoices = useMemo(() => {
     return invoices
       .filter((inv) => inRange(inv.created_at, startDate, endDate))
-      .filter((inv) => (invoiceStatus === "all" ? true : inv.status === invoiceStatus));
-  }, [invoices, startDate, endDate, invoiceStatus]);
+      .filter((inv) => (invoiceStatus === "all" ? true : inv.status === invoiceStatus))
+    .filter((inv) => {
+      if (!invoiceSearch) return true;
+      const q = invoiceSearch.toLowerCase();
+      return (
+        inv.invoice_number?.toLowerCase().includes(q) ||
+        inv.booking?.client_name?.toLowerCase().includes(q) ||
+        inv.booking?.booking_code?.toLowerCase().includes(q) ||
+        inv.status?.toLowerCase().includes(q)
+      );
+    });
+  }, [invoices, startDate, endDate, invoiceStatus, invoiceSearch]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch) return clients;
@@ -2177,18 +2188,30 @@ export default function AccountingPage() {
         {activeTab === "invoices" && (
           <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
             <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row gap-2 sm:items-center bg-[var(--surface-sunken)]">
-              <select
-                value={invoiceStatus}
-                onChange={(e) => setInvoiceStatus(e.target.value)}
-                className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
-              >
-                <option value="all">Tous les statuts</option>
-                {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2 flex-wrap items-center flex-1">
+                <div className="relative w-full sm:w-auto">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher (n° facture, client, réservation)"
+                    value={invoiceSearch}
+                    onChange={(e) => setInvoiceSearch(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--border-strong)] w-full sm:w-56"
+                  />
+                </div>
+                <select
+                  value={invoiceStatus}
+                  onChange={(e) => setInvoiceStatus(e.target.value)}
+                  className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
+                >
+                  <option value="all">Tous les statuts</option>
+                  {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="sm:ml-auto">
                 <Button variant="outline" size="sm" onClick={exportInvoicesCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredInvoices.length === 0}>
                   <Download className="w-4 h-4" /> Exporter CSV
