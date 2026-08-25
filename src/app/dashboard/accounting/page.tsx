@@ -24,6 +24,71 @@ import Link from "next/link";
 import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
+
+// ── Libellés lisibles pour les champs d'audit ──
+const AUDIT_FIELD_LABELS: Record<string, string> = {
+  check_out_date: "Date de départ",
+  check_out_time: "Heure de départ",
+  negotiated_price: "Prix négocié",
+  total_amount: "Montant total",
+  payment_status: "Statut du paiement",
+  status: "Statut",
+  room_number: "Numéro de chambre",
+  client_name: "Nom du client",
+  booking_code: "Code réservation",
+  start_date: "Date de début",
+  end_date: "Date de fin",
+  base_price: "Prix de base",
+  amount: "Montant",
+  category: "Catégorie",
+  description: "Description",
+  expense_date: "Date de la dépense",
+  accommodation_id: "Établissement",
+  full_name: "Nom complet",
+  email: "E-mail",
+  phone: "Téléphone",
+  role: "Rôle",
+  plan: "Formule",
+  room_type: "Type de chambre",
+  capacity: "Capacité",
+  surface_m2: "Surface (m²)",
+  amenities: "Commodités",
+  featured_images: "Photos",
+  is_listed_on_trouvetou: "Publié sur Trouvetou",
+  method: "Méthode de paiement",
+  operator: "Opérateur",
+  paid_at: "Date de paiement",
+  notes: "Notes",
+};
+
+/** Transforme une clé snake_case en libellé lisible */
+function auditFieldLabel(key: string): string {
+  return AUDIT_FIELD_LABELS[key] ?? key.replace(/_/g, " ");
+}
+
+/** Formate une valeur brute pour l'affichage */
+function auditFieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
+  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (typeof value === "number") {
+    // Détecter les montants (> 100 souvent en FCFA)
+    if (["negotiated_price", "total_amount", "amount", "base_price"].includes(key)) {
+      return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
+    }
+    return String(value);
+  }
+  const s = String(value);
+  // Détecter les dates ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(s) && s.length <= 10) {
+    try { return new Date(s).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }); } catch {}
+  }
+  // Détecter les heures (HH:MM:SS)
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    return s.replace(":00", "").replace(/^0/, "") + " h";
+  }
+  return s;
+}
 import { Send, XCircle } from "lucide-react";
 import {
   LineChart,
@@ -3005,25 +3070,45 @@ export default function AccountingPage() {
 
             {(selectedLog.old_values || selectedLog.new_values) && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-2">Valeurs modifiées</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {selectedLog.old_values && Object.keys(selectedLog.old_values).length > 0 && (
-                    <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500 mb-1.5">Avant</p>
-                      <pre className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap font-mono leading-relaxed">
-                        {JSON.stringify(selectedLog.old_values, null, 2)}
-                      </pre>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-2">Détails de la modification</p>
+                {(() => {
+                  const allKeys = [
+                    ...new Set([
+                      ...(selectedLog.old_values ? Object.keys(selectedLog.old_values) : []),
+                      ...(selectedLog.new_values ? Object.keys(selectedLog.new_values) : []),
+                    ]),
+                  ];
+                  if (allKeys.length === 0) return null;
+                  return (
+                    <div className="rounded-lg border border-[var(--border)]/50 overflow-hidden">
+                      <div className="grid grid-cols-[1fr_auto] text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] bg-[var(--surface-sunken)]">
+                        <span className="px-3 py-1.5">Champ</span>
+                        <span className="px-3 py-1.5 flex gap-6">
+                          <span className="w-28 text-right">Avant</span>
+                          <span className="w-28 text-right">Après</span>
+                        </span>
+                      </div>
+                      {allKeys.map((key) => {
+                        const oldVal = selectedLog.old_values?.[key];
+                        const newVal = selectedLog.new_values?.[key];
+                        const changed = JSON.stringify(oldVal) !== JSON.stringify(newVal);
+                        return (
+                          <div key={key} className={`grid grid-cols-[1fr_auto] border-t border-[var(--border)]/30 text-[12px] ${changed ? "bg-[var(--surface-hover)]" : ""}`}>
+                            <span className="px-3 py-2 text-[var(--foreground)] font-medium">{auditFieldLabel(key)}</span>
+                            <span className="px-3 py-2 flex gap-6">
+                              <span className={`w-28 text-right ${oldVal !== undefined ? "text-[var(--foreground-muted)] line-through" : "text-[var(--foreground-muted)]"}`}>
+                                {auditFieldValue(key, oldVal)}
+                              </span>
+                              <span className="w-28 text-right text-[var(--foreground)] font-medium">
+                                {auditFieldValue(key, newVal)}
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                  {selectedLog.new_values && Object.keys(selectedLog.new_values).length > 0 && (
-                    <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 mb-1.5">Après</p>
-                      <pre className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap font-mono leading-relaxed">
-                        {JSON.stringify(selectedLog.new_values, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             )}
 
