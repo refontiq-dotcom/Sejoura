@@ -25,6 +25,127 @@ import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
 
+
+// ── Actions d'audit : emojis + labels FR + couleurs + catégories ──
+const AUDIT_ACTIONS: Record<string, { label: string; emoji: string; color: string; bg: string; category: string }> = {
+  "booking.created":        { label: "Réservation créée",            emoji: "📅", color: "text-blue-600",     bg: "bg-blue-50 dark:bg-blue-950/30",     category: "reservation" },
+  "booking.checked_in":     { label: "Check-in effectué",            emoji: "✅", color: "text-emerald-600",  bg: "bg-emerald-50 dark:bg-emerald-950/30", category: "reservation" },
+  "booking.checked_out":    { label: "Check-out effectué",           emoji: "🏁", color: "text-amber-600",    bg: "bg-amber-50 dark:bg-amber-950/30",   category: "reservation" },
+  "booking.cancelled":      { label: "Réservation annulée",          emoji: "❌", color: "text-red-600",      bg: "bg-red-50 dark:bg-red-950/30",       category: "reservation" },
+  "booking.payment_recorded": { label: "Paiement enregistré",        emoji: "💰", color: "text-emerald-600",  bg: "bg-emerald-50 dark:bg-emerald-950/30", category: "paiement" },
+  "price_change":           { label: "Prix modifié",                 emoji: "📊", color: "text-purple-600",   bg: "bg-purple-50 dark:bg-purple-950/30",  category: "paiement" },
+  "overstay_detected":      { label: "Séjour prolongé détecté",      emoji: "⏰", color: "text-orange-600",   bg: "bg-orange-50 dark:bg-orange-950/30",  category: "systeme" },
+  "auto_checkout":          { label: "Check-out automatique",        emoji: "⚡", color: "text-orange-600",   bg: "bg-orange-50 dark:bg-orange-950/30",  category: "systeme" },
+  "invoice_generated":      { label: "Facture générée",              emoji: "📄", color: "text-indigo-600",   bg: "bg-indigo-50 dark:bg-indigo-950/30",  category: "facturation" },
+  "invoice_sent":           { label: "Facture envoyée",              emoji: "📩", color: "text-blue-600",     bg: "bg-blue-50 dark:bg-blue-950/30",     category: "facturation" },
+  "invoice_paid":           { label: "Facture payée",                emoji: "✅", color: "text-emerald-600",  bg: "bg-emerald-50 dark:bg-emerald-950/30", category: "facturation" },
+  "invoice_cancelled":      { label: "Facture annulée",              emoji: "❌", color: "text-red-600",      bg: "bg-red-50 dark:bg-red-950/30",       category: "facturation" },
+  "expense.created":        { label: "Dépense enregistrée",          emoji: "🧾", color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
+  "expense.updated":        { label: "Dépense modifiée",             emoji: "✏️",  color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
+  "auth.login":             { label: "Connexion",                    emoji: "🔑", color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "auth" },
+  "auth.logout":            { label: "Déconnexion",                  emoji: "🔒", color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "auth" },
+  "employee.created":       { label: "Employé ajouté",               emoji: "👤", color: "text-cyan-600",     bg: "bg-cyan-50 dark:bg-cyan-950/30",     category: "personnel" },
+  "employee.updated":       { label: "Employé modifié",              emoji: "✏️",  color: "text-cyan-600",     bg: "bg-cyan-50 dark:bg-cyan-950/30",     category: "personnel" },
+  "employee.deleted":       { label: "Employé supprimé",             emoji: "🚫", color: "text-red-600",      bg: "bg-red-50 dark:bg-red-950/30",       category: "personnel" },
+  "employee.role_changed":  { label: "Rôle modifié",                 emoji: "👑", color: "text-cyan-600",     bg: "bg-cyan-50 dark:bg-cyan-950/30",     category: "personnel" },
+  "room.status_changed":    { label: "Statut chambre modifié",       emoji: "🏠", color: "text-violet-600",   bg: "bg-violet-50 dark:bg-violet-950/30", category: "chambre" },
+  "room.created":           { label: "Chambre créée",                emoji: "🏠", color: "text-violet-600",   bg: "bg-violet-50 dark:bg-violet-950/30", category: "chambre" },
+  "subscription.activated": { label: "Abonnement activé",            emoji: "📈", color: "text-emerald-600",  bg: "bg-emerald-50 dark:bg-emerald-950/30", category: "abonnement" },
+  "subscription.expired":   { label: "Abonnement expiré",            emoji: "⏳", color: "text-red-600",      bg: "bg-red-50 dark:bg-red-950/30",       category: "abonnement" },
+  "subscription.plan_changed": { label: "Formule changée",           emoji: "🔄", color: "text-purple-600",   bg: "bg-purple-50 dark:bg-purple-950/30",  category: "abonnement" },
+  "settings.updated":       { label: "Paramètres modifiés",          emoji: "⚙️",  color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "parametres" },
+  "settings.logo_uploaded": { label: "Logo mis à jour",              emoji: "🖼️",  color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "parametres" },
+};
+
+const AUDIT_CATEGORIES: Record<string, { label: string; emoji: string }> = {
+  reservation: { label: "Réservations",        emoji: "📅" },
+  paiement:    { label: "Paiements",           emoji: "💰" },
+  facturation: { label: "Facturation",         emoji: "📄" },
+  depense:     { label: "Dépenses",            emoji: "🧾" },
+  systeme:     { label: "Système",             emoji: "⚙️" },
+  auth:        { label: "Authentification",    emoji: "🔑" },
+  personnel:   { label: "Personnel",           emoji: "👤" },
+  chambre:     { label: "Chambres",            emoji: "🏠" },
+  abonnement:  { label: "Abonnement",          emoji: "📈" },
+  parametres:  { label: "Paramètres",          emoji: "⚙️" },
+};
+
+function getAuditActionInfo(action: string) {
+  if (AUDIT_ACTIONS[action]) return AUDIT_ACTIONS[action];
+  const guess = action.replace(/[._]/g, " ");
+  return { label: guess.charAt(0).toUpperCase() + guess.slice(1), emoji: "📝", color: "text-[var(--foreground-muted)]", bg: "bg-[var(--surface-sunken)]", category: "systeme" };
+}
+
+function buildAuditSummary(log: AuditLog, users: Record<string, string>): string {
+  const who = users[log.user_id || ""] || "Le système";
+  const vals = log.new_values || log.old_values || {};
+
+  switch (log.action) {
+    case "booking.checked_in":
+      return who + " a effectué le check-in" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "") + (vals.client_name ? " pour " + vals.client_name : "");
+    case "booking.checked_out":
+      return who + " a effectué le check-out" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
+    case "booking.cancelled":
+      return who + " a annulé la réservation" + (vals.client_name ? " de " + vals.client_name : "");
+    case "booking.created":
+      return who + " a créé une réservation" + (vals.client_name ? " pour " + vals.client_name : "") + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
+    case "price_change": {
+      const old = log.old_values?.negotiated_price;
+      const nw = log.new_values?.negotiated_price;
+      if (old != null && nw != null) {
+        const diff = Number(nw) - Number(old);
+        const sign = diff > 0 ? "+" : "";
+        return who + " a modifié le prix : " + new Intl.NumberFormat("fr-FR").format(Number(old)) + " → " + new Intl.NumberFormat("fr-FR").format(Number(nw)) + " FCFA (" + sign + new Intl.NumberFormat("fr-FR").format(diff) + " FCFA)";
+      }
+      return who + " a modifié le prix";
+    }
+    case "overstay_detected":
+      return "Dépassement de séjour détecté automatiquement" + (vals.client_name ? " pour " + vals.client_name : "");
+    case "auto_checkout":
+      return "Check-out automatique effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
+    case "invoice_generated":
+      return who + " a généré " + (vals.invoice_number ? "la facture " + vals.invoice_number : "une facture") + (vals.total_amount ? " — " + new Intl.NumberFormat("fr-FR").format(Number(vals.total_amount)) + " FCFA" : "");
+    case "expense.created":
+      return who + " a enregistré une dépense" + (vals.amount ? " de " + new Intl.NumberFormat("fr-FR").format(Number(vals.amount)) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
+    case "expense.updated":
+      return who + " a modifié une dépense" + (vals.description ? " : " + vals.description : "");
+    case "auth.login":
+      return who + " s'est connecté(e)";
+    case "auth.logout":
+      return who + " s'est déconnecté(e)";
+    case "employee.created":
+      return who + " a ajouté l'employé" + (vals.full_name ? " " + vals.full_name : "");
+    case "employee.deleted":
+      return who + " a supprimé l'employé" + (vals.full_name ? " " + vals.full_name : "");
+    case "subscription.activated":
+      return "Abonnement " + (vals.plan || "") + " activé";
+    case "subscription.expired":
+      return "L'abonnement a expiré";
+    case "subscription.plan_changed":
+      return "Formule changée" + (vals.plan ? " vers " + vals.plan : "");
+    default:
+      return who + " a effectué une action sur " + log.entity_type;
+  }
+}
+
+function groupAuditLogsByDate(logs: AuditLog[]): { group: string; items: AuditLog[] }[] {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+  const groups: Record<string, AuditLog[]> = {};
+  const order: string[] = [];
+  for (const log of logs) {
+    const d = log.created_at.slice(0, 10);
+    let key: string;
+    if (d === today) key = "Aujourd'hui";
+    else if (d === yesterday) key = "Hier";
+    else key = new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(log);
+  }
+  return order.map((g) => ({ group: g, items: groups[g] }));
+}
+
 // ── Libellés lisibles pour les champs d'audit ──
 const AUDIT_FIELD_LABELS: Record<string, string> = {
   check_out_date: "Date de départ",
@@ -2477,42 +2598,79 @@ export default function AccountingPage() {
           </div>
         )}
 
-        {/* ============ JOURNAL D'AUDIT ============ */}
-        {activeTab === "audit" && (
-          <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-[var(--foreground)] flex items-center gap-2">
-                <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d&apos;audit
-              </h2>
-              <span className="text-[11px] text-[var(--foreground-subtle)]">{auditLogs.length} entrées</span>
-            </div>
-            {auditLogs.length === 0 ? (
-              <div className="text-center py-8">
-                <ScrollText className="w-10 h-10 text-[var(--foreground-muted)] mx-auto mb-3" />
-                <p className="text-sm text-[var(--foreground-subtle)]">Aucune action enregistrée</p>
+                {/* ============ JOURNAL D'AUDIT ============ */}
+        {activeTab === "audit" && (() => {
+          const [auditFilter, setAuditFilter] = useState<string | null>(null);
+          const filteredLogs = auditFilter
+            ? auditLogs.filter((l) => getAuditActionInfo(l.action).category === auditFilter)
+            : auditLogs;
+          const grouped = groupAuditLogsByDate(filteredLogs);
+          const presentCategories = [...new Set(auditLogs.map((l) => getAuditActionInfo(l.action).category))];
+          return (
+            <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-[13px] font-semibold text-[var(--foreground)] flex items-center gap-2">
+                  <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d'audit
+                </h2>
+                <span className="text-[11px] text-[var(--foreground-subtle)]">{filteredLogs.length} / {auditLogs.length} entrées</span>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {auditLogs.map((log) => (
-                  <div key={log.id} onClick={() => setSelectedLog(log)} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50 cursor-pointer hover:bg-[var(--surface-hover)] transition-colors">
-                    <div className="w-8 h-8 rounded-md bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
-                      <ScrollText className="w-4 h-4 text-[var(--foreground-muted)]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-[var(--foreground)] capitalize">{log.action.replace(/_/g, " ")}</p>
-                      <p className="text-[11px] text-[var(--foreground-subtle)]">
-                        {log.entity_type} {log.entity_id ? `#${log.entity_id.substring(0, 8)}` : ""} • {usersById[log.user_id || ""] || "Système"} • {formatDate(log.created_at)}
-                      </p>
-                    </div>
-                    <Eye className="w-3.5 h-3.5 text-[var(--foreground-muted)] mt-1 flex-shrink-0" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* ============ CLIENTS (CRM) ============ */}
+              {presentCategories.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  <button onClick={() => setAuditFilter(null)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${!auditFilter ? "bg-[var(--foreground)] text-[var(--surface)] border-[var(--foreground)]" : "bg-[var(--surface-sunken)] text-[var(--foreground-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"}`}>
+                    Tous
+                  </button>
+                  {presentCategories.map((cat) => {
+                    const catInfo = AUDIT_CATEGORIES[cat] || { label: cat, emoji: "" };
+                    const active = auditFilter === cat;
+                    return (
+                      <button key={cat} onClick={() => setAuditFilter(active ? null : cat)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${active ? "bg-[var(--foreground)] text-[var(--surface)] border-[var(--foreground)]" : "bg-[var(--surface-sunken)] text-[var(--foreground-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"}`}>
+                        {catInfo.emoji} {catInfo.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {filteredLogs.length === 0 ? (
+                <div className="text-center py-8">
+                  <ScrollText className="w-10 h-10 text-[var(--foreground-muted)] mx-auto mb-3" />
+                  <p className="text-sm text-[var(--foreground-subtle)]">{auditFilter ? "Aucune action dans cette catégorie" : "Aucune action enregistrée"}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {grouped.map((g) => (
+                    <div key={g.group}>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1.5 px-1">{g.group}</p>
+                      <div className="space-y-1.5">
+                        {g.items.map((log) => {
+                          const info = getAuditActionInfo(log.action);
+                          const summary = buildAuditSummary(log, usersById);
+                          const time = new Date(log.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                          return (
+                            <div key={log.id} onClick={() => setSelectedLog(log)} className={`flex items-start gap-3 p-3 rounded-lg ${info.bg} border border-[var(--border)]/40 cursor-pointer hover:brightness-95 transition-all`}>
+                              <span className="text-xl mt-0.5 flex-shrink-0">{info.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <span className={`text-[11px] font-semibold ${info.color}`}>{info.label}</span>
+                                  <span className="text-[10px] text-[var(--foreground-muted)]">{time}</span>
+                                </div>
+                                <p className="text-[11px] text-[var(--foreground-subtle)] leading-relaxed line-clamp-2">{summary}</p>
+                              </div>
+                              <Eye className="w-3.5 h-3.5 text-[var(--foreground-muted)] mt-1 flex-shrink-0 opacity-40" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+{/* ============ CLIENTS (CRM) ============ */}
         {activeTab === "clients" && (
           <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
             <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row gap-2 sm:items-center bg-[var(--surface-sunken)]">
@@ -3031,22 +3189,27 @@ export default function AccountingPage() {
         </div>
       </Modal>
 
-      {/* ============ MODAL DETAIL JOURNAL D'AUDIT ============ */}
+            {/* ============ MODAL DETAIL JOURNAL D'AUDIT ============ */}
       <Modal
         open={!!selectedLog}
         onClose={() => setSelectedLog(null)}
-        title="Détail de l'action"
+        title=""
         size="lg"
       >
-        {selectedLog && (
+        {selectedLog && (() => {
+          const info = getAuditActionInfo(selectedLog.action);
+          const summary = buildAuditSummary(selectedLog, usersById);
+          const time = new Date(selectedLog.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          return (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
-                <ScrollText className="w-5 h-5 text-[var(--foreground-muted)]" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--foreground)] capitalize">{selectedLog.action.replace(/_/g, " ")}</p>
-                <p className="text-[11px] text-[var(--foreground-subtle)]">{formatDate(selectedLog.created_at)}</p>
+            <div className={`${info.bg} rounded-xl p-4 border border-[var(--border)]/30`}>
+              <div className="flex items-start gap-3">
+                <span className="text-3xl">{info.emoji}</span>
+                <div className="flex-1">
+                  <p className={`text-sm font-bold ${info.color}`}>{info.label}</p>
+                  <p className="text-[12px] text-[var(--foreground)] mt-1 leading-relaxed">{summary}</p>
+                  <p className="text-[10px] text-[var(--foreground-muted)] mt-2">{formatDate(selectedLog.created_at)} à {time}</p>
+                </div>
               </div>
             </div>
 
@@ -3116,7 +3279,8 @@ export default function AccountingPage() {
               <Button variant="outline" size="sm" onClick={() => setSelectedLog(null)}>Fermer</Button>
             </div>
           </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );
