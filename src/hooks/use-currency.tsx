@@ -75,7 +75,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
-    }).format(converted || 0);
+    })
+      .format(converted || 0)
+      .replace(/[\u202F\u00A0]/g, " ");
 
     if (["$", "₦", "₵", "£", "€"].includes(symbol.trim())) {
       return `${symbol} ${formatted}`;
@@ -88,7 +90,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
-    }).format(amount || 0);
+    })
+      .format(amount || 0)
+      .replace(/[\u202F\u00A0]/g, " ");
 
     if (["$", "₦", "₵", "£", "€"].includes(symbol.trim())) {
       return `${symbol} ${formatted}`;

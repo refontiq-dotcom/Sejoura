@@ -303,7 +303,9 @@ function formatFCFA(amount: number): string {
   return new Intl.NumberFormat("fr", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount) + " FCFA";
+  })
+    .format(amount)
+    .replace(/[\u202F\u00A0]/g, " ") + " FCFA";
 }
 
 // ─── Labels ─────────────────────────────────────────────────────────────────

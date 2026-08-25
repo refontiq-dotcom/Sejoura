@@ -153,7 +153,9 @@ export function formatPrice(amountInXof: number, targetCode: string): string {
   const formatted = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(converted || 0);
+  })
+    .format(converted || 0)
+    .replace(/[\u202F\u00A0]/g, " ");
 
   if (["$", "₦", "₵", "£", "€"].includes(symbol.trim())) {
     return `${symbol} ${formatted}`;
@@ -182,7 +184,9 @@ export async function formatPriceDynamic(amountInXof: number, targetCode: string
   const formatted = new Intl.NumberFormat("fr-FR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(converted || 0);
+  })
+    .format(converted || 0)
+    .replace(/[\u202F\u00A0]/g, " ");
 
   if (["$", "₦", "₵", "£", "€"].includes(symbol.trim())) {
     return `${symbol} ${formatted}`;

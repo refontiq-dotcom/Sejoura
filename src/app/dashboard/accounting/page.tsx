@@ -79,6 +79,7 @@ function getAuditActionInfo(action: string) {
 function buildAuditSummary(log: AuditLog, users: Record<string, string>): string {
   const who = users[log.user_id || ""] || "Le système";
   const vals = log.new_values || log.old_values || {};
+  const fmtNum = (n: unknown) => new Intl.NumberFormat("fr-FR").format(Number(n)).replace(/[\u202F\u00A0]/g, " ");
 
   switch (log.action) {
     case "booking.checked_in":
@@ -95,7 +96,7 @@ function buildAuditSummary(log: AuditLog, users: Record<string, string>): string
       if (old != null && nw != null) {
         const diff = Number(nw) - Number(old);
         const sign = diff > 0 ? "+" : "";
-        return who + " a modifié le prix : " + new Intl.NumberFormat("fr-FR").format(Number(old)) + " → " + new Intl.NumberFormat("fr-FR").format(Number(nw)) + " FCFA (" + sign + new Intl.NumberFormat("fr-FR").format(diff) + " FCFA)";
+        return who + " a modifié le prix : " + fmtNum(old) + " → " + fmtNum(nw) + " FCFA (" + sign + fmtNum(diff) + " FCFA)";
       }
       return who + " a modifié le prix";
     }
@@ -104,9 +105,9 @@ function buildAuditSummary(log: AuditLog, users: Record<string, string>): string
     case "auto_checkout":
       return "Check-out automatique effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
     case "invoice_generated":
-      return who + " a généré " + (vals.invoice_number ? "la facture " + vals.invoice_number : "une facture") + (vals.total_amount ? " — " + new Intl.NumberFormat("fr-FR").format(Number(vals.total_amount)) + " FCFA" : "");
+      return who + " a généré " + (vals.invoice_number ? "la facture " + vals.invoice_number : "une facture") + (vals.total_amount ? " — " + fmtNum(vals.total_amount) + " FCFA" : "");
     case "expense.created":
-      return who + " a enregistré une dépense" + (vals.amount ? " de " + new Intl.NumberFormat("fr-FR").format(Number(vals.amount)) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
+      return who + " a enregistré une dépense" + (vals.amount ? " de " + fmtNum(vals.amount) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
     case "expense.updated":
       return who + " a modifié une dépense" + (vals.description ? " : " + vals.description : "");
     case "auth.login":
@@ -224,7 +225,7 @@ function auditFieldValue(key: string, value: unknown): string {
   if (typeof value === "boolean") return value ? "Oui" : "Non";
   if (typeof value === "number") {
     if (["negotiated_price", "total_amount", "amount", "base_price", "amount_paid"].includes(key)) {
-      return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
+      return new Intl.NumberFormat("fr-FR").format(value).replace(/[\u202F\u00A0]/g, " ") + " FCFA";
     }
     return String(value);
   }

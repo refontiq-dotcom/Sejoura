@@ -68,7 +68,9 @@ export function formatFCFA(amount: number): string {
 export function formatNumber(amount: number, lang: Lang = "fr"): string {
   return new Intl.NumberFormat(lang, {
     maximumFractionDigits: 0,
-  }).format(amount || 0);
+  })
+    .format(amount || 0)
+    .replace(/[\u202F\u00A0]/g, " ");
 }
 
 /**

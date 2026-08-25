@@ -104,7 +104,9 @@ function toLocalDateStr(value: string): string {
 function formatAmountOnly(amountInXof: number, currencyCode: string, lang: Lang = "fr"): string {
   const converted = convertXofTo(amountInXof, currencyCode);
   const decimals = getCurrencyDecimals(currencyCode);
-  return new Intl.NumberFormat(lang, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(converted || 0);
+  return new Intl.NumberFormat(lang, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    .format(converted || 0)
+    .replace(/[\u202F\u00A0]/g, " ");
 }
 
 interface RoomStatusData {
