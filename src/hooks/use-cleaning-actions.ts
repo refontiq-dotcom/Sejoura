@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export function useCleaningActions(
-  tenantId: string,
+  userId: string,
   callbacks: {
     onClaimDone?: () => void;
     onCompleteDone?: () => void;
@@ -18,6 +18,7 @@ export function useCleaningActions(
       const supabase = createClient();
       const { data, error } = await supabase.rpc("claim_cleaning_task", {
         p_task_id: taskId,
+        p_user_id: userId,
       });
       if (error) {
         toast.error("Erreur : " + error.message);
@@ -43,6 +44,7 @@ export function useCleaningActions(
       const supabase = createClient();
       const { error } = await supabase.rpc("complete_cleaning_task", {
         p_task_id: taskId,
+        p_user_id: userId,
       });
       if (error) {
         toast.error("Erreur : " + error.message);

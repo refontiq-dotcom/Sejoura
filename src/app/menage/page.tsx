@@ -49,7 +49,7 @@ export default function MenagePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  const { actionTaskId, claim, complete } = useCleaningActions(tenantId, {
+  const { actionTaskId, claim, complete } = useCleaningActions(userId, {
     onClaimDone: () => {
       setFilter("mine");
       loadData();

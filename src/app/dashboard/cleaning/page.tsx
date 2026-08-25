@@ -117,7 +117,7 @@ export default function CleaningPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  const { actionTaskId, claim, complete, reopen } = useCleaningActions(tenantId, {
+  const { actionTaskId, claim, complete, reopen } = useCleaningActions(userId, {
     onClaimDone: loadData,
     onCompleteDone: loadData,
     onReopenDone: loadData,
