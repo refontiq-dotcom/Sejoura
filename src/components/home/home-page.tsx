@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
 import { useTheme } from "@/components/providers/theme-provider";
 import { PasswordStrength } from "@/components/auth/password-strength";
+import { lockBodyScroll } from "@/components/ui/modal";
 import { HeroCarousel, type HeroSlide } from "@/components/home/hero-carousel";
 import { toast } from "sonner";
 import {
@@ -284,15 +285,11 @@ export function HomePage() {
   }, [activeSection]);
 
   // Lock body scroll when modal or mobile menu is open
+  // (verrou comptabilisé partagé : ne libère le scroll que lorsque le dernier
+  // overlay se ferme, et compose avec les <Modal> du reste de l'app)
   useEffect(() => {
-    if (activeSection || mobileMenuOpen || authModalMode) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (!(activeSection || mobileMenuOpen || authModalMode)) return;
+    return lockBodyScroll();
   }, [activeSection, mobileMenuOpen, authModalMode]);
 
   // Prefill email if "remember me" was checked previously

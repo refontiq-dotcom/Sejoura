@@ -20,13 +20,30 @@ const sizeClasses = {
   xl: "max-w-4xl",
 };
 
-// Pile globale des modals actuellement ouvertes. Elle permet de :
-//   1. ne fermer que la modal la plus haute sur Escape (et pas toutes les
-//      modals empilées d'un coup — ex. Facture → Envoyer la facture) ;
-//   2. ne rendre le scroll au body que lorsque la DERNIÈRE modal se ferme
-//      (avant, fermer une modal enfant réactivait le scroll derrière la
-//      modal parent encore ouverte).
+// Pile globale des modals actuellement ouvertes. Elle permet de ne fermer que
+// la modal la plus haute sur Escape (et pas toutes les modals empilées d'un
+// coup — ex. Facture → Envoyer la facture).
 const openModalStack: symbol[] = [];
+
+// ── Scroll-lock partagé et comptabilisé ──
+// Plusieurs overlays peuvent coexister (modals empilées, modals de la page
+// d'accueil…). On ne rend le scroll au body que lorsque le DERNIER verrou est
+// relâché ; sinon, fermer un overlay enfant réactivait le scroll derrière un
+// overlay parent encore ouvert.
+const openScrollLocks: symbol[] = [];
+
+export function lockBodyScroll(): () => void {
+  const token = Symbol("body-scroll-lock");
+  openScrollLocks.push(token);
+  document.body.style.overflow = "hidden";
+  return () => {
+    const index = openScrollLocks.indexOf(token);
+    if (index !== -1) openScrollLocks.splice(index, 1);
+    if (openScrollLocks.length === 0) {
+      document.body.style.overflow = "";
+    }
+  };
+}
 
 export function Modal({
   open,
@@ -56,7 +73,7 @@ export function Modal({
     previouslyFocused.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
 
     // Place le focus dans la dialog (le conteneur a tabIndex={-1}).
     const focusTimer = window.setTimeout(() => {
@@ -65,14 +82,10 @@ export function Modal({
 
     return () => {
       window.clearTimeout(focusTimer);
+      releaseScroll();
       const index = openModalStack.indexOf(token);
       if (index !== -1) openModalStack.splice(index, 1);
       stackToken.current = null;
-
-      // Ne libère le scroll que si plus aucune modal n'est ouverte.
-      if (openModalStack.length === 0) {
-        document.body.style.overflow = "";
-      }
 
       // Restaure le focus sur l'élément qui a ouvert la modal.
       previouslyFocused.current?.focus?.();
