@@ -900,20 +900,20 @@ function PeriodSelector({
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-1.5 bg-[var(--surface-sunken)] border border-[var(--border)] rounded-lg px-3 py-1.5">
+      <div className="flex items-center gap-1.5">
         <Calendar className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
         <input
           type="date"
           value={startDate}
           onChange={(e) => onChange(e.target.value, endDate)}
-          className="text-xs bg-transparent border-none focus:ring-0 text-[var(--foreground-muted)] outline-none [color-scheme:dark]"
+          className="text-[11px] px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]"
         />
-        <span className="text-xs text-[var(--foreground-muted)]">→</span>
+        <span className="text-[11px] text-[var(--foreground-muted)]">→</span>
         <input
           type="date"
           value={endDate}
           onChange={(e) => onChange(startDate, e.target.value)}
-          className="text-xs bg-transparent border-none focus:ring-0 text-[var(--foreground-muted)] outline-none [color-scheme:dark]"
+          className="text-[11px] px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]"
         />
       </div>
     </div>
