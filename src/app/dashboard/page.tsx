@@ -1262,6 +1262,14 @@ export default function DashboardPage() {
         )}
 
         <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
+          {!isToday && (
+            <button
+              onClick={() => handleDateChange(toLocalISODate(new Date()))}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
+            >
+              {"Aujourd'hui"}
+            </button>
+          )}
           <button
             onClick={() => shiftDate(-1)}
             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
@@ -1282,14 +1290,6 @@ export default function DashboardPage() {
           >
             <ChevronRight className="w-4 h-4" />
           </button>
-          {!isToday && (
-            <button
-              onClick={() => handleDateChange(toLocalISODate(new Date()))}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
-            >
-              {"Aujourd'hui"}
-            </button>
-          )}
         </div>
       </div>
 
