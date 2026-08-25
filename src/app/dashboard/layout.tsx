@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
-import { Loader2 } from "lucide-react";
+import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
@@ -456,8 +456,22 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--main-bg,var(--background))]">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
+      <div className="min-h-screen flex bg-[var(--main-bg,var(--background))]">
+        <div className="hidden lg:flex w-60 shrink-0 flex-col gap-4 p-4 border-r border-[var(--card-border,var(--border))]">
+          <Skeleton className="h-10 w-36" />
+          <div className="space-y-3 mt-2">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 p-3 md:p-4 space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <DashboardSkeletons />
+        </div>
       </div>
     );
   }

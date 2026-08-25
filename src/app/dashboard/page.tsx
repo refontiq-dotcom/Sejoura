@@ -767,6 +767,7 @@ export default function DashboardPage() {
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
   const loadRetriesRef = useRef(0);
+  const dashboardLoadedRef = useRef(false);
   const [overstayCount, setOverstayCount] = useState(0);
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
@@ -847,9 +848,24 @@ export default function DashboardPage() {
               let bookingsQuery = supabase
                 .from("bookings")
                 .select(`
-                  *,
-                  client:clients(*),
-                  room:rooms(*, room_type:room_types(*), accommodation:accommodations(name))
+                  id,
+                  booking_code,
+                  check_in_date,
+                  check_in_time,
+                  check_out_date,
+                  check_out_time,
+                  payment_status,
+                  payment_method,
+                  total_amount,
+                  amount_paid,
+                  status,
+                  nights_count,
+                  number_of_guests,
+                  special_requests,
+                  is_overstay,
+                  accommodation_id,
+                  client:clients(full_name, phone, email, nationality, id_number),
+                  room:rooms(room_number, room_type:room_types(name), accommodation:accommodations(name))
                 `)
                 .eq("tenant_id", tenantId)
                 .in("status", ["confirmed", "checked_in", "checked_out", "cancelled"])
@@ -1096,9 +1112,14 @@ export default function DashboardPage() {
     let cancelled = false;
     let inFlight = false;
 
-    // setTimeout(0) : évite un setState synchrone dans le corps de l'effet (eslint)
+    // Premier chargement : skeleton complet. Changements suivants (date,
+    // résidence active, langue) : rechargement silencieux — le contenu déjà
+    // affiché reste visible et se met à jour sans faire "disparaître" la page.
     const initialLoad = setTimeout(() => {
-      if (!cancelled) loadDashboardData(false, selectedDate);
+      if (!cancelled) {
+        loadDashboardData(!dashboardLoadedRef.current, selectedDate);
+        dashboardLoadedRef.current = true;
+      }
     }, 0);
 
     // Polling silencieux toutes les 30 s, sans chevauchement de requêtes
