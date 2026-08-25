@@ -313,10 +313,11 @@ export default function EmployeesPage() {
 
       // Si c'est une réaffectation permanente (pas de end_date) → mettre à jour aussi accommodation_id sur users
       if (!isTemporary) {
-        await supabase
+        const { error: updateError } = await supabase
           .from("users")
           .update({ accommodation_id: reassignForm.accommodation_id })
           .eq("id", reassignTarget.id);
+        if (updateError) throw updateError;
       }
 
       // Insérer dans employee_assignments pour l'historique
