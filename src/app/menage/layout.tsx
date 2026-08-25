@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Sparkles, LogOut, Moon, Sun, UserCircle2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
-import { LOGIN_ROUTE } from "@/lib/routes";
+import { EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 
 export default function MenageLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +29,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       try {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { router.push(LOGIN_ROUTE); return; }
+        if (!session) { router.push(EMPLOYEE_LOGIN_ROUTE); return; }
 
         const { data: userData } = await supabase
           .from("users")
@@ -38,7 +38,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
           .single();
 
         if (!userData || userData.role !== "menagere") {
-          router.push(LOGIN_ROUTE);
+          router.push(EMPLOYEE_LOGIN_ROUTE);
           return;
         }
 
@@ -65,7 +65,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
 
         setLoading(false);
       } catch {
-        router.push(LOGIN_ROUTE);
+        router.push(EMPLOYEE_LOGIN_ROUTE);
       }
     }
     checkAuth();
@@ -75,9 +75,9 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      router.push(LOGIN_ROUTE);
+      router.push(EMPLOYEE_LOGIN_ROUTE);
     } catch {
-      router.push(LOGIN_ROUTE);
+      router.push(EMPLOYEE_LOGIN_ROUTE);
     }
   }
 
