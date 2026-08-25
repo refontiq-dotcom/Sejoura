@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect, useId, useRef } from "react";
+import { ReactNode, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -60,6 +61,14 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const stackToken = useRef<symbol | null>(null);
+  // Portail vers document.body : sans lui, un ancêtre avec transform/filter
+  // (ex. l'animation .animate-page-enter du layout dashboard) devient le
+  // référentiel des éléments position: fixed — la modal n'occupe plus tout le
+  // viewport et se retrouve rognée en haut et en bas.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   // ── Scroll-lock + pile d'ouverture + focus ──
   useEffect(() => {
@@ -143,9 +152,9 @@ export function Modal({
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [open, onClose, onConfirm]);
 
-  if (!open) return null;
+  if (!open || !portalTarget) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto overscroll-contain" style={{ pointerEvents: "auto" }}>
       {/* Backdrop */}
       <div
@@ -205,6 +214,7 @@ export function Modal({
         {/* Content */}
         <div className="p-3 sm:p-4 overflow-y-auto flex-1 overscroll-contain" style={{ WebkitOverflowScrolling: "touch" }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    portalTarget
   );
 }
