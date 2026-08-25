@@ -193,7 +193,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   booking_code: "Code réservation",
   nights: "Nuits",
   stayCount: "Séjours",
-  totalSpent: "CA total",
+  totalSpent: "CA généré",
   paid: "Montant payé",
   balance: "Solde",
   score: "Score",
@@ -973,6 +973,7 @@ export default function AccountingPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [accommodations, setAccommodations] = useState<{ id: string; name: string }[]>([]);
   const [clients, setClients] = useState<ClientWithStats[]>([]);
+  const [totalClientCount, setTotalClientCount] = useState(0);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
 
   const [tenantId, setTenantId] = useState("");
@@ -1189,6 +1190,10 @@ export default function AccountingPage() {
       if (bkAll) setBookings(bkAll as unknown as Booking[]);
 
       // Clients pour le CRM
+      const { count: clientCount } = await supabase
+        .from("clients")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tid);
       const { data: clData } = await supabase
         .from("clients")
         .select(`
@@ -1202,19 +1207,17 @@ export default function AccountingPage() {
       if (clData) {
         const stats: ClientWithStats[] = (clData as ClientWithBookingsRow[]).map((c) => {
           const bks = (c.bookings || []) as Booking[];
-          const nights = bks.reduce((s, b) => s + (b.nights_count || 0), 0);
-          const totalSpent = bks.reduce((s, b) => s + (b.total_amount || 0), 0);
-          const paid = bks.reduce((s, b) => s + (b.amount_paid || 0), 0);
-          const balance = bks.reduce(
-            (s, b) =>
-              s +
-              (b.status === "confirmed" || b.status === "checked_in" ? (b.total_amount || 0) - (b.amount_paid || 0) : 0),
-            0
-          );
+          // Seules les réservations effectivement réalisées comptent (pas les annulations / no-show)
+          const validBks = bks.filter((b) => b.status !== "cancelled" && b.status !== "no_show");
+          const nights = validBks.reduce((s, b) => s + (b.nights_count || 0), 0);
+          const totalSpent = validBks.reduce((s, b) => s + (b.total_amount || 0), 0);
+          const paid = validBks.reduce((s, b) => s + (b.amount_paid || 0), 0);
+          // Solde dû : compté même après le check-out (le client peut partir sans avoir tout payé)
+          const balance = validBks.reduce((s, b) => s + (b.total_amount || 0) - (b.amount_paid || 0), 0);
           return {
             ...c,
             bookings: bks,
-            stayCount: bks.length,
+            stayCount: validBks.length,
             nights,
             totalSpent,
             paid,
@@ -1239,6 +1242,7 @@ export default function AccountingPage() {
         });
 
         setClients(stats);
+        setTotalClientCount(clientCount ?? stats.length);
       }
     } catch (err) {
       toast.error("Impossible de charger les données. Veuillez réessayer.");
@@ -1346,12 +1350,17 @@ export default function AccountingPage() {
 
   // ============================================================================
   // ─ KPIs CRM ─
-  const crmTotalClients = clients.length;
+  const crmTotalClients = totalClientCount;
   const crmTotalRevenue = clients.reduce((s, c) => s + c.totalSpent, 0);
   const crmUnpaidClients = clients.filter((c) => c.balance > 0).length;
-  const crmUnpaidTotal = clients.reduce((s, c) => s + c.balance, 0);
+  // Solde dû total : on ne compte que les soldes positifs (les trop-perçus ne viennent pas
+  // réduire artificiellement le montant des impayés)
+  const crmUnpaidTotal = clients.filter((c) => c.balance > 0).reduce((s, c) => s + c.balance, 0);
   const crmLoyalClients = clients.filter((c) => c.stayCount >= 3).length;
-  const crmAvgScore = clients.length > 0 ? Math.round(clients.reduce((s, c) => s + (c.score || 0), 0) / clients.length) : 0;
+  // Score moyen : calculé uniquement sur les clients ayant réellement un score,
+  // sinon les clients non scorés tirent la moyenne vers zéro
+  const scoredClients = clients.filter((c) => c.score != null && c.score > 0);
+  const crmAvgScore = scoredClients.length > 0 ? Math.round(scoredClients.reduce((s, c) => s + (c.score || 0), 0) / scoredClients.length) : 0;
 
   // KPIs
   // ============================================================================
@@ -1722,7 +1731,7 @@ export default function AccountingPage() {
     if (filteredClients.length === 0) return;
     downloadCSV(
       `clients_${todayISO()}.csv`,
-      ["Nom", "Téléphone", "Email", "Nationalité", "Séjours", "Nuits", "CA total", "Encaissé", "Solde dû"],
+      ["Nom", "Téléphone", "Email", "Nationalité", "Séjours", "Nuits", "CA généré", "Encaissé", "Solde dû"],
       filteredClients.map((c) => [
         c.full_name,
         c.phone || "",
@@ -2774,21 +2783,21 @@ export default function AccountingPage() {
                 <p className="text-lg font-bold text-[var(--foreground)]">{crmTotalClients}</p>
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">CA total</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">CA généré</p>
                 <p className="text-lg font-bold text-emerald-600">{fmt(crmTotalRevenue)}</p>
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Impay\u00e9s</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Clients en impayé</p>
                 <p className={`text-lg font-bold ${crmUnpaidClients > 0 ? "text-red-600" : "text-emerald-600"}`}>{crmUnpaidClients}</p>
                 {crmUnpaidTotal > 0 && <p className="text-[10px] text-red-500">{fmt(crmUnpaidTotal)}</p>}
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Fid\u00e8les</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Fidèles</p>
                 <p className="text-lg font-bold text-purple-600">{crmLoyalClients}</p>
-                <p className="text-[10px] text-[var(--foreground-muted)]">\u2265 3 s\u00e9jours</p>
+                <p className="text-[10px] text-[var(--foreground-muted)]">≥ 3 séjours</p>
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Score moy.</p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Score moyen</p>
                 <p className="text-lg font-bold text-amber-600">{crmAvgScore}</p>
               </div>
             </div>
@@ -2852,7 +2861,7 @@ export default function AccountingPage() {
                         </p>
                       </div>
                       <div className="rounded-lg bg-[var(--surface-sunken)] border border-[var(--border-subtle)] py-1.5">
-                        <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-subtle)]">CA total</p>
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-subtle)]">CA généré</p>
                         <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 truncate">{fmt(c.totalSpent)}</p>
                       </div>
                       <div className="rounded-lg bg-[var(--surface-sunken)] border border-[var(--border-subtle)] py-1.5">
@@ -2901,7 +2910,7 @@ export default function AccountingPage() {
                       <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Score</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Contact</th>
                       <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Séjours</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">CA total</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">CA généré</th>
                       <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Encaissé</th>
                       <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Solde dû</th>
                       <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Actions</th>
