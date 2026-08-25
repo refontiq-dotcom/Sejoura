@@ -967,6 +967,8 @@ export default function AccountingPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [auditFilter, setAuditFilter] = useState<string | null>(null);
+  const [auditStartDate, setAuditStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); });
+  const [auditEndDate, setAuditEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [accommodations, setAccommodations] = useState<{ id: string; name: string }[]>([]);
@@ -1780,9 +1782,12 @@ export default function AccountingPage() {
   }
 
   // ── Données dérivées pour le journal d'audit ──
-  const filteredAuditLogs = auditFilter
-    ? auditLogs.filter((l) => getAuditActionInfo(l.action).category === auditFilter)
-    : auditLogs;
+  const filteredAuditLogs = auditLogs
+    .filter((l) => !auditFilter || getAuditActionInfo(l.action).category === auditFilter)
+    .filter((l) => {
+      const d = l.created_at.slice(0, 10);
+      return d >= auditStartDate && d <= auditEndDate;
+    });
   const groupedAuditLogs = groupAuditLogsByDate(filteredAuditLogs);
   const presentAuditCategories = [...new Set(auditLogs.map((l) => getAuditActionInfo(l.action).category))];
 
@@ -2677,6 +2682,17 @@ export default function AccountingPage() {
                   <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d'audit
                 </h2>
                 <span className="text-[11px] text-[var(--foreground-subtle)]">{filteredAuditLogs.length} / {auditLogs.length} entrées</span>
+              </div>
+
+              {/* Filtre par date */}
+              <div className="flex items-center gap-1.5 mb-3">
+                <Calendar className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+                <input type="date" value={auditStartDate} onChange={(e) => setAuditStartDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
+                <span className="text-[11px] text-[var(--foreground-muted)]">→</span>
+                <input type="date" value={auditEndDate} onChange={(e) => setAuditEndDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
+                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setDate(d.getDate() - 7); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">7j</button>
+                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setMonth(d.getMonth() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">30j</button>
+                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setFullYear(d.getFullYear() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">12m</button>
               </div>
 
               {presentAuditCategories.length > 1 && (
