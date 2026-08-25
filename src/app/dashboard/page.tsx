@@ -1140,20 +1140,41 @@ export default function DashboardPage() {
     };
   }, [loadDashboardData, selectedDate]);
 
-  // Temps réel : rechargement immédiat dès qu'une réservation change
-  // (création, modification, check-in/out, paiement — le trigger de paiement
-  // met aussi à jour bookings.payment_status, donc un seul canal suffit).
+  // Temps réel : rechargement immédiat dès qu'une donnée change.
+  // - bookings : création, check-in/out, paiement
+  // - cleaning_tasks : tâche marquée faite/en attente (compteurs ménage)
+  // - payments : paiement enregistré (revenus)
+  // - rooms : changement de statut d'une chambre
   useEffect(() => {
     if (!tenantId) return;
     const supabase = createClient();
+    const refresh = () => loadDashboardData(true, selectedDate);
+
+    // Canal unique avec 4 abonnements postgres_changes
     const channel = supabase
-      .channel("dashboard-bookings-realtime")
+      .channel("dashboard-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
-        () => loadDashboardData(true, selectedDate)
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cleaning_tasks", filter: `tenant_id=eq.${tenantId}` },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments", filter: `tenant_id=eq.${tenantId}` },
+        refresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "rooms" },
+        refresh,
       )
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
