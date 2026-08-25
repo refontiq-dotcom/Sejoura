@@ -580,20 +580,18 @@ function KpiCard({
   return (
     <div className={`p-4 rounded-2xl border-0 shadow-[var(--shadow-md)] transition-all hover:shadow-[var(--shadow-lg)] ${style.card}`}>
       <div className="flex items-start justify-between gap-2.5">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${style.iconBg}`}>
             <Icon className="w-5 h-5" />
           </div>
-          <div className="min-w-0">
-            <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none truncate">{value}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none">{value}</p>
             <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1 truncate">{label}</p>
           </div>
         </div>
-        {badge ? (
-          <Badge variant={style.badge}>{badge}</Badge>
-        ) : delta != null ? (
+        {delta != null && (
           <span
-            className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+            className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
               positive
                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                 : "bg-rose-500/15 text-rose-700 dark:text-rose-300"
@@ -603,11 +601,14 @@ function KpiCard({
             {positive ? "+" : ""}
             {delta.toFixed(1)}%
           </span>
-        ) : null}
+        )}
       </div>
-      {sub && (
-        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3 truncate">{sub}</p>
-      )}
+      <div className="flex items-center gap-2 mt-2">
+        {badge && <Badge variant={style.badge}>{badge}</Badge>}
+        {sub && (
+          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">{sub}</p>
+        )}
+      </div>
     </div>
   );
 }
