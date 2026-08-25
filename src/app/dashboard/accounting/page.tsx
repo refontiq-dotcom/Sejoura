@@ -23,7 +23,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
-import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier } from "@/types/database";
+import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
+import { Send, XCircle } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -84,6 +85,36 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
   paid: "Payée",
   partial: "Partielle",
   cancelled: "Annulée",
+};
+
+// Transitions de statut valides pour les factures
+// Seules ces transitions sont autorisées : on ne peut pas revenir en arrière
+// ni sauter d'état (ex: directement draft → paid sans passer par sent)
+const VALID_INVOICE_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
+  draft: ["sent", "cancelled"],      // Brouillon → envoyée ou annulée
+  sent: ["paid", "partial", "cancelled"], // Envoyée → payée, partielle ou annulée
+  partial: ["paid", "cancelled"],     // Partielle → payée ou annulée
+  paid: [],                            // Payée → état terminal
+  cancelled: [],                       // Annulée → état terminal
+};
+
+// Configuration des actions par statut
+const INVOICE_STATUS_ACTIONS: Record<InvoiceStatus, { status: InvoiceStatus; label: string; icon: string; color: string }[]> = {
+  draft: [
+    { status: "sent", label: "Marquer envoyée", icon: "send", color: "blue" },
+    { status: "cancelled", label: "Annuler", icon: "cancel", color: "red" },
+  ],
+  sent: [
+    { status: "paid", label: "Marquer payée", icon: "paid", color: "green" },
+    { status: "partial", label: "Paiement partiel", icon: "partial", color: "amber" },
+    { status: "cancelled", label: "Annuler", icon: "cancel", color: "red" },
+  ],
+  partial: [
+    { status: "paid", label: "Marquer payée", icon: "paid", color: "green" },
+    { status: "cancelled", label: "Annuler", icon: "cancel", color: "red" },
+  ],
+  paid: [],
+  cancelled: [],
 };
 
 const EXPENSE_CATEGORY_GROUPS: { group: string; items: { value: string; hint?: string }[] }[] = [
@@ -382,7 +413,7 @@ function CashFlowChart({
 
   if (data.length === 0) {
     return (
-      <div className="h-56 flex items-center justify-center text-sm text-zinc-500">
+      <div className="h-56 flex items-center justify-center text-sm text-[var(--foreground-subtle)]">
         Aucune donnée sur la période
       </div>
     );
@@ -401,8 +432,8 @@ function CashFlowChart({
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
         {gridLines.map((g, i) => (
           <g key={i}>
-            <line x1={padL} y1={g.y} x2={width - padR} y2={g.y} stroke="currentColor" strokeWidth="1" className="text-zinc-700" strokeDasharray="4 4" />
-            <text x={padL - 8} y={g.y + 4} textAnchor="end" className="text-[10px] fill-zinc-500">
+            <line x1={padL} y1={g.y} x2={width - padR} y2={g.y} stroke="currentColor" strokeWidth="1" className="text-[var(--foreground-muted)]" strokeDasharray="4 4" />
+            <text x={padL - 8} y={g.y + 4} textAnchor="end" className="text-[10px] fill-[var(--foreground-subtle)]">
               {fmt(g.value).replace(/[^\d\s.]/g, "").trim()}
             </text>
           </g>
@@ -425,16 +456,16 @@ function CashFlowChart({
               <rect x={padL + i * groupW} y={padT} width={groupW} height={innerH} fill="transparent" />
               <rect x={cx - barW - 2} y={yR} width={barW} height={Math.max(hR, 1)} rx="3" fill="#d4d4d8" opacity={opacity} />
               <rect x={cx + 2} y={yE} width={barW} height={Math.max(hE, 1)} rx="3" fill="#ef4444" opacity={opacity} />
-              <text x={cx} y={height - 8} textAnchor="middle" className="text-[10px] fill-zinc-500">
+              <text x={cx} y={height - 8} textAnchor="middle" className="text-[10px] fill-[var(--foreground-subtle)]">
                 {monthLabel(d.month)}
               </text>
               {hovered === i && (
                 <g>
                   <rect x={Math.min(cx - 56, width - 130)} y={padT - 2} width="118" height="46" rx="8" fill="#27272a" opacity="0.95" />
-                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 14} className="text-[10px] fill-zinc-100">
+                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 14} className="text-[10px] fill-[var(--foreground-inverse)]">
                     Recettes : {fmt(d.revenue)}
                   </text>
-                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 30} className="text-[10px] fill-zinc-100">
+                  <text x={Math.min(cx - 56, width - 130) + 10} y={padT + 30} className="text-[10px] fill-[var(--foreground-inverse)]">
                     Dépenses : {fmt(d.expenses)}
                   </text>
                 </g>
@@ -443,9 +474,9 @@ function CashFlowChart({
           );
         })}
       </svg>
-      <div className="flex items-center justify-center gap-5 text-xs text-zinc-500 mt-1">
+      <div className="flex items-center justify-center gap-5 text-xs text-[var(--foreground-subtle)] mt-1">
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-zinc-300" /> Recettes
+          <span className="w-3 h-3 rounded-sm bg-[var(--border-strong)]" /> Recettes
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-red-500" /> Dépenses
@@ -466,7 +497,7 @@ function CategoryBreakdown({
   const sorted = [...items].sort((a, b) => b.amount - a.amount).filter((i) => i.amount > 0);
   if (sorted.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-zinc-500">
+      <div className="py-10 text-center text-sm text-[var(--foreground-subtle)]">
         Aucune dépense sur la période
       </div>
     );
@@ -479,17 +510,17 @@ function CategoryBreakdown({
         return (
           <div key={it.category}>
             <div className="flex items-center justify-between mb-1">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-300">
-                <Icon className="w-3.5 h-3.5 text-zinc-500" />
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--foreground-muted)]">
+                <Icon className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
                 {getExpenseCategoryLabel(it.category)}
               </span>
               <span className="text-xs font-semibold text-white">
                 {fmt(it.amount)}
-                <span className="ml-2 text-[10px] font-normal text-zinc-500">{pct.toFixed(0)}%</span>
+                <span className="ml-2 text-[10px] font-normal text-[var(--foreground-subtle)]">{pct.toFixed(0)}%</span>
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
-              <div className="h-full rounded-full bg-zinc-200" style={{ width: `${pct}%` }} />
+            <div className="h-1.5 rounded-full bg-[var(--surface-muted)] overflow-hidden">
+              <div className="h-full rounded-full bg-[var(--border)]" style={{ width: `${pct}%` }} />
             </div>
           </div>
         );
@@ -515,7 +546,7 @@ function DailyCashFlowChart({
   const hasData = data.some((d) => d.entrées > 0 || d.sorties > 0);
   if (!hasData) {
     return (
-      <div className="h-72 flex items-center justify-center text-sm text-zinc-500">
+      <div className="h-72 flex items-center justify-center text-sm text-[var(--foreground-subtle)]">
         Aucune donnée sur la période
       </div>
     );
@@ -591,7 +622,7 @@ function CategoryPie({
 
   if (sorted.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-zinc-500">
+      <div className="py-10 text-center text-sm text-[var(--foreground-subtle)]">
         Aucune dépense sur la période
       </div>
     );
@@ -629,7 +660,7 @@ function CategoryPie({
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <p className="text-lg font-bold text-white">{fmt(total)}</p>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Total</p>
+          <p className="text-[10px] uppercase tracking-wide text-[var(--foreground-subtle)]">Total</p>
         </div>
       </div>
 
@@ -640,11 +671,11 @@ function CategoryPie({
           return (
             <div key={it.category} className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-              <span className="text-xs text-zinc-300 flex-1 truncate">
+              <span className="text-xs text-[var(--foreground-muted)] flex-1 truncate">
                 {getExpenseCategoryLabel(it.category)}
               </span>
               <span className="text-xs font-semibold text-white">{fmt(it.amount)}</span>
-              <span className="text-[10px] text-zinc-500 w-9 text-right">{pct.toFixed(0)}%</span>
+              <span className="text-[10px] text-[var(--foreground-subtle)] w-9 text-right">{pct.toFixed(0)}%</span>
             </div>
           );
         })}
@@ -668,35 +699,35 @@ function PeriodSelector({
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-      <div className="flex items-center gap-0.5 bg-zinc-900/80 p-1 rounded-lg border border-zinc-800 overflow-x-auto shrink-0">
+      <div className="flex items-center gap-0.5 bg-[var(--surface-sunken)] p-1 rounded-lg border border-[var(--border)] overflow-x-auto shrink-0">
         {PERIOD_PRESETS.map((p) => (
           <button
             key={p.key}
             onClick={() => onPreset(p.key)}
             className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-md text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               preset === p.key
-                ? "bg-white text-zinc-900"
-                : "text-zinc-400 hover:text-zinc-200"
+                ? "bg-white text-[var(--foreground)]"
+                : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
             }`}
           >
             {p.label}
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-1.5 bg-zinc-900/80 border border-zinc-800 rounded-lg px-3 py-1.5">
-        <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+      <div className="flex items-center gap-1.5 bg-[var(--surface-sunken)] border border-[var(--border)] rounded-lg px-3 py-1.5">
+        <Calendar className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
         <input
           type="date"
           value={startDate}
           onChange={(e) => onChange(e.target.value, endDate)}
-          className="text-xs bg-transparent border-none focus:ring-0 text-zinc-300 outline-none [color-scheme:dark]"
+          className="text-xs bg-transparent border-none focus:ring-0 text-[var(--foreground-muted)] outline-none [color-scheme:dark]"
         />
-        <span className="text-xs text-zinc-600">→</span>
+        <span className="text-xs text-[var(--foreground-muted)]">→</span>
         <input
           type="date"
           value={endDate}
           onChange={(e) => onChange(startDate, e.target.value)}
-          className="text-xs bg-transparent border-none focus:ring-0 text-zinc-300 outline-none [color-scheme:dark]"
+          className="text-xs bg-transparent border-none focus:ring-0 text-[var(--foreground-muted)] outline-none [color-scheme:dark]"
         />
       </div>
     </div>
@@ -765,6 +796,10 @@ export default function AccountingPage() {
     expense_date: todayISO(),
     accommodation_id: "",
   });
+
+  // Modal de changement de statut facture
+  const [invoiceStatusTarget, setInvoiceStatusTarget] = useState<{ invoice: Invoice; newStatus: InvoiceStatus } | null>(null);
+  const [updatingInvoiceStatus, setUpdatingInvoiceStatus] = useState(false);
 
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -1351,6 +1386,74 @@ export default function AccountingPage() {
     }
   }
 
+  // Changement intelligent de statut facture
+  function openInvoiceStatusChange(invoice: Invoice, newStatus: InvoiceStatus) {
+    // Vérifie que la transition est valide
+    const validTransitions = VALID_INVOICE_TRANSITIONS[invoice.status];
+    if (!validTransitions.includes(newStatus)) {
+      toast.error(`Transition invalide : ${invoice.status} → ${newStatus}`);
+      return;
+    }
+    setInvoiceStatusTarget({ invoice, newStatus });
+  }
+
+  async function confirmInvoiceStatusChange() {
+    if (!invoiceStatusTarget) return;
+    const { invoice, newStatus } = invoiceStatusTarget;
+    setUpdatingInvoiceStatus(true);
+    try {
+      const supabase = createClient();
+      const updateData: Record<string, unknown> = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Données supplémentaires selon le statut cible
+      if (newStatus === "sent") {
+        updateData.sent_at = new Date().toISOString();
+      } else if (newStatus === "cancelled") {
+        updateData.cancelled_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from("invoices")
+        .update(updateData)
+        .eq("id", invoice.id);
+
+      if (error) throw error;
+
+      // Met à jour le state local
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === invoice.id
+            ? { ...inv, ...updateData } as Invoice
+            : inv
+        )
+      );
+
+      toast.success(`Facture marquée comme « ${INVOICE_STATUS_LABELS[newStatus]} »`);
+      setInvoiceStatusTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors du changement de statut.");
+    } finally {
+      setUpdatingInvoiceStatus(false);
+    }
+  }
+
+  // Label de transition pour la confirmation
+  function getTransitionLabel(from: InvoiceStatus, to: InvoiceStatus): string {
+    const labels: Record<string, string> = {
+      "draft-sent": "Envoyer la facture",
+      "draft-cancelled": "Annuler la facture",
+      "sent-paid": "Marquer la facture comme payée",
+      "sent-partial": "Enregistrer un paiement partiel",
+      "sent-cancelled": "Annuler la facture envoyée",
+      "partial-paid": "Marquer la facture comme entièrement payée",
+      "partial-cancelled": "Annuler la facture",
+    };
+    return labels["`${from}-${to}`"] || `Changer le statut vers « ${INVOICE_STATUS_LABELS[to]} »`;
+  }
+
   function exportClientsCSV() {
     if (filteredClients.length === 0) return;
     downloadCSV(
@@ -1485,7 +1588,7 @@ export default function AccountingPage() {
                 setEndDate(r.end);
               }}
             />
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-[var(--foreground-subtle)]">
               {filteredPayments.length} paiements · {filteredExpenses.length} dépenses · {filteredInvoices.length} factures
             </p>
           </div>
@@ -1712,23 +1815,23 @@ export default function AccountingPage() {
 
         {/* ============ RECETTES ============ */}
         {activeTab === "revenue" && (
-          <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900/70">
+          <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
+            <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center gap-2 bg-[var(--surface-sunken)]">
               <div className="flex gap-2 flex-wrap items-center flex-1">
                 <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
                   <input
                     type="text"
                     placeholder="Rechercher (client, réf, réservation)"
                     value={revenueSearch}
                     onChange={(e) => setRevenueSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-full sm:w-56"
+                    className="pl-8 pr-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--border-strong)] w-full sm:w-56"
                   />
                 </div>
                 <select
                   value={revenueMethod}
                   onChange={(e) => setRevenueMethod(e.target.value)}
-                  className="px-2 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 focus:outline-none"
+                  className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
                 >
                   <option value="all">Tous les modes</option>
                   <option value="cash">Espèces</option>
@@ -1739,22 +1842,22 @@ export default function AccountingPage() {
                 <select
                   value={revenueType}
                   onChange={(e) => setRevenueType(e.target.value)}
-                  className="px-2 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 focus:outline-none"
+                  className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
                 >
                   <option value="all">Tous les types</option>
                   <option value="booking">Paiements réservation</option>
                   <option value="manual_in">Entrées de caisse</option>
                   <option value="manual_out">Sorties de caisse</option>
                 </select>
-                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/shift")} className="gap-1.5 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
+                <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/shift")} className="gap-1.5 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]">
                   <ArrowLeftRight className="w-3.5 h-3.5" /> Caisse du jour
                 </Button>
               </div>
               <div className="sm:ml-auto flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
+                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]">
                   <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Rapport Financier PDF</span><span className="sm:hidden">PDF</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredPayments.length === 0}>
+                <Button variant="outline" size="sm" onClick={exportRevenueCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredPayments.length === 0}>
                   <Download className="w-4 h-4" /> CSV
                 </Button>
               </div>
@@ -1762,16 +1865,16 @@ export default function AccountingPage() {
 
             {filteredPayments.length === 0 ? (
               <div className="p-12 text-center">
-                <TrendingUp className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500 mb-4">Aucune recette sur la période</p>
-                <Button size="sm" className="!bg-zinc-100 !text-zinc-900 hover:!bg-white" onClick={() => router.push("/dashboard/shift")}>
+                <TrendingUp className="w-12 h-12 text-[var(--foreground-muted)] mx-auto mb-4" />
+                <p className="text-sm text-[var(--foreground-subtle)] mb-4">Aucune recette sur la période</p>
+                <Button size="sm" className="!bg-[var(--surface-muted)] !text-[var(--foreground)] hover:!bg-white" onClick={() => router.push("/dashboard/shift")}>
                   <ArrowLeftRight className="w-4 h-4" /> Encaisser depuis la caisse
                 </Button>
               </div>
             ) : (
               <>
               {/* Cartes mobiles */}
-              <div className="md:hidden divide-y divide-zinc-800/60">
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
                 {filteredPayments.map((pay) => {
                   const isOut = pay.amount < 0;
                   return (
@@ -1779,20 +1882,20 @@ export default function AccountingPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {pay.booking?.booking_code && (
-                            <span className="font-mono text-[11px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                            <span className="font-mono text-[11px] bg-[var(--surface-muted)] text-[var(--foreground-muted)] px-1.5 py-0.5 rounded">
                               {pay.booking.booking_code}
                             </span>
                           )}
-                          <span className="text-[11px] text-zinc-500 whitespace-nowrap">{formatDate(pay.payment_date)}</span>
+                          <span className="text-[11px] text-[var(--foreground-subtle)] whitespace-nowrap">{formatDate(pay.payment_date)}</span>
                         </div>
-                        <p className="text-xs font-medium text-zinc-100 mt-1 truncate">
+                        <p className="text-xs font-medium text-[var(--foreground)] mt-1 truncate">
                           {pay.booking?.client_name || (pay.notes ? pay.notes : "Opération de caisse")}
                         </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <Badge variant={isOut ? "error" : "info"} className={isOut ? "!bg-red-500/15 !text-red-400" : "!bg-blue-500/15 !text-blue-400"}>
                             {paymentMethodDisplay(pay)}
                           </Badge>
-                          {pay.reference && <span className="text-[11px] text-zinc-500">{pay.reference}</span>}
+                          {pay.reference && <span className="text-[11px] text-[var(--foreground-subtle)]">{pay.reference}</span>}
                         </div>
                       </div>
                       <p className={`text-sm font-bold flex-shrink-0 ${isOut ? "text-red-400" : "text-emerald-400"}`}>
@@ -1802,8 +1905,8 @@ export default function AccountingPage() {
                     </div>
                   );
                 })}
-                <div className="p-3 flex items-center justify-between border-t border-zinc-800">
-                  <span className="text-xs font-semibold text-zinc-300">Total recettes nettes</span>
+                <div className="p-3 flex items-center justify-between border-t border-[var(--border)]">
+                  <span className="text-xs font-semibold text-[var(--foreground-muted)]">Total recettes nettes</span>
                   <span className="text-sm font-bold text-white">
                     {fmt(filteredPayments.reduce((s, p) => s + p.amount, 0))}
                   </span>
@@ -1813,22 +1916,22 @@ export default function AccountingPage() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
+                    <tr className="border-b border-[var(--border)]">
                       <th
                         aria-sort={revenueSort.key === "date" ? (revenueSort.direction === "asc" ? "ascending" : "descending") : "none"}
-                        className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
+                        className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider cursor-pointer"
                         onClick={() =>
                           setRevenueSort({ key: "date", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
                         }
                       >
                         Date {revenueSort.key === "date" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
                       </th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Client / Opération</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Méthode</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Référence</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Client / Opération</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Méthode</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Référence</th>
                       <th
                         aria-sort={revenueSort.key === "amount" ? (revenueSort.direction === "asc" ? "ascending" : "descending") : "none"}
-                        className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
+                        className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider cursor-pointer"
                         onClick={() =>
                           setRevenueSort({ key: "amount", direction: revenueSort.direction === "asc" ? "desc" : "asc" })
                         }
@@ -1837,20 +1940,20 @@ export default function AccountingPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {filteredPayments.map((pay) => {
                       const isOut = pay.amount < 0;
                       return (
-                        <tr key={pay.id} className="hover:bg-zinc-900/40">
-                          <td className="p-2.5 text-xs text-zinc-400 whitespace-nowrap">{formatDate(pay.payment_date)}</td>
+                        <tr key={pay.id} className="hover:bg-[var(--surface-hover)]">
+                          <td className="p-2.5 text-xs text-[var(--foreground-muted)] whitespace-nowrap">{formatDate(pay.payment_date)}</td>
                           <td className="p-2.5">
                             <div className="flex items-center gap-2">
                               {pay.booking?.booking_code && (
-                                <span className="font-mono text-[11px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-[11px] bg-[var(--surface-muted)] text-[var(--foreground-muted)] px-1.5 py-0.5 rounded">
                                   {pay.booking.booking_code}
                                 </span>
                               )}
-                              <span className="text-xs font-medium text-zinc-100">
+                              <span className="text-xs font-medium text-[var(--foreground)]">
                                 {pay.booking?.client_name || (pay.notes ? pay.notes : "Opération de caisse")}
                               </span>
                             </div>
@@ -1860,7 +1963,7 @@ export default function AccountingPage() {
                               {paymentMethodDisplay(pay)}
                             </Badge>
                           </td>
-                          <td className="p-2.5 text-xs text-zinc-400">{pay.reference || "—"}</td>
+                          <td className="p-2.5 text-xs text-[var(--foreground-muted)]">{pay.reference || "—"}</td>
                           <td className={`p-2.5 text-right text-xs font-bold ${isOut ? "text-red-400" : "text-emerald-400"}`}>
                             {isOut ? "-" : ""}
                             {fmt(Math.abs(pay.amount))}
@@ -1870,8 +1973,8 @@ export default function AccountingPage() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-zinc-800">
-                      <td colSpan={4} className="p-2.5 text-xs font-semibold text-zinc-300">
+                    <tr className="border-t border-[var(--border)]">
+                      <td colSpan={4} className="p-2.5 text-xs font-semibold text-[var(--foreground-muted)]">
                         Total recettes nettes
                       </td>
                       <td className="p-2.5 text-right text-sm font-bold text-white">
@@ -1890,31 +1993,31 @@ export default function AccountingPage() {
         {activeTab === "expenses" && (
           <div className="space-y-4">
             {categoryBreakdown.length > 0 && (
-              <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
-                <h2 className="text-[13px] font-semibold text-zinc-200 mb-3 flex items-center gap-2">
-                  <PieChartIcon className="w-4 h-4 text-zinc-500" /> Où va le budget (par catégorie)
+              <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
+                <h2 className="text-[13px] font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
+                  <PieChartIcon className="w-4 h-4 text-[var(--foreground-subtle)]" /> Où va le budget (par catégorie)
                 </h2>
                 <CategoryPie items={categoryBreakdown} fmt={fmt} />
               </div>
             )}
 
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900/70">
+            <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
+            <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center gap-2 bg-[var(--surface-sunken)]">
               <div className="flex gap-2 flex-wrap items-center flex-1">
                 <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
                   <input
                     type="text"
                     placeholder="Rechercher une dépense"
                     value={expenseSearch}
                     onChange={(e) => setExpenseSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 w-full sm:w-56"
+                    className="pl-8 pr-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--border-strong)] w-full sm:w-56"
                   />
                 </div>
                 <select
                   value={expenseCategory}
                   onChange={(e) => setExpenseCategory(e.target.value)}
-                  className="px-2 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 focus:outline-none"
+                  className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
                 >
                   <option value="all">Toutes les catégories</option>
                   {EXPENSE_CATEGORIES.map((cat) => (
@@ -1923,15 +2026,15 @@ export default function AccountingPage() {
                     </option>
                   ))}
                 </select>
-                <Button variant="outline" size="sm" onClick={openNewExpense} className="gap-1.5 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
+                <Button variant="outline" size="sm" onClick={openNewExpense} className="gap-1.5 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]">
                   <Plus className="w-3.5 h-3.5" /> Ajouter
                 </Button>
               </div>
               <div className="sm:ml-auto flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800">
+                <Button variant="outline" size="sm" onClick={handleExportPdf} loading={exportingPdf} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]">
                   <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Rapport Financier PDF</span><span className="sm:hidden">PDF</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredExpenses.length === 0}>
+                <Button variant="outline" size="sm" onClick={exportExpensesCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredExpenses.length === 0}>
                   <Download className="w-4 h-4" /> CSV
                 </Button>
               </div>
@@ -1939,44 +2042,44 @@ export default function AccountingPage() {
 
             {filteredExpenses.length === 0 ? (
               <div className="p-12 text-center">
-                <TrendingDown className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500 mb-4">Aucune dépense sur la période</p>
-                <Button className="!bg-zinc-100 !text-zinc-900 hover:!bg-white" onClick={openNewExpense}>
+                <TrendingDown className="w-12 h-12 text-[var(--foreground-muted)] mx-auto mb-4" />
+                <p className="text-sm text-[var(--foreground-subtle)] mb-4">Aucune dépense sur la période</p>
+                <Button className="!bg-[var(--surface-muted)] !text-[var(--foreground)] hover:!bg-white" onClick={openNewExpense}>
                   <Plus className="w-4 h-4" /> Enregistrer une dépense
                 </Button>
               </div>
             ) : (
               <>
               {/* Cartes mobiles */}
-              <div className="md:hidden divide-y divide-zinc-800/60">
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
                 {filteredExpenses.map((exp) => (
                   <div key={exp.id} className="p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-zinc-100 truncate">{exp.description}</p>
+                        <p className="text-xs font-medium text-[var(--foreground)] truncate">{exp.description}</p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <Badge variant="theme" className="!bg-zinc-800 !text-zinc-300">
+                          <Badge variant="theme" className="!bg-[var(--surface-muted)] !text-[var(--foreground-muted)]">
                             {getExpenseCategoryLabel(exp.category)}
                           </Badge>
-                          <span className="text-[11px] text-zinc-500">
+                          <span className="text-[11px] text-[var(--foreground-subtle)]">
                             {accommodations.find((a) => a.id === exp.accommodation_id)?.name || "—"}
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-500 mt-1">{formatDate(exp.expense_date)}</p>
+                        <p className="text-[11px] text-[var(--foreground-subtle)] mt-1">{formatDate(exp.expense_date)}</p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <span className="text-sm font-bold text-red-400">{fmt(exp.amount)}</span>
                         <button
                           onClick={() => openEditExpense(exp)}
                           title="Modifier"
-                          className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                          className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingExpense(exp)}
                           title="Supprimer"
-                          className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1984,8 +2087,8 @@ export default function AccountingPage() {
                     </div>
                   </div>
                 ))}
-                <div className="p-3 flex items-center justify-between border-t border-zinc-800">
-                  <span className="text-xs font-semibold text-zinc-300">Total dépenses</span>
+                <div className="p-3 flex items-center justify-between border-t border-[var(--border)]">
+                  <span className="text-xs font-semibold text-[var(--foreground-muted)]">Total dépenses</span>
                   <span className="text-sm font-bold text-red-400">
                     {fmt(filteredExpenses.reduce((s, e) => s + e.amount, 0))}
                   </span>
@@ -1995,54 +2098,54 @@ export default function AccountingPage() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Description</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Catégorie</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Établissement</th>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Description</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Catégorie</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Établissement</th>
                       <th
                         aria-sort={expenseSort.key === "date" ? (expenseSort.direction === "asc" ? "ascending" : "descending") : "none"}
-                        className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
+                        className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider cursor-pointer"
                         onClick={() => setExpenseSort({ key: "date", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
                       >
                         Date {expenseSort.key === "date" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
                       </th>
                       <th
                         aria-sort={expenseSort.key === "amount" ? (expenseSort.direction === "asc" ? "ascending" : "descending") : "none"}
-                        className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider cursor-pointer"
+                        className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider cursor-pointer"
                         onClick={() => setExpenseSort({ key: "amount", direction: expenseSort.direction === "asc" ? "desc" : "asc" })}
                       >
                         Montant {expenseSort.key === "amount" ? (expenseSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
                       </th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {filteredExpenses.map((exp) => (
-                      <tr key={exp.id} className="hover:bg-zinc-900/40 group">
-                        <td className="p-2.5 text-xs font-medium text-zinc-100">{exp.description}</td>
+                      <tr key={exp.id} className="hover:bg-[var(--surface-hover)] group">
+                        <td className="p-2.5 text-xs font-medium text-[var(--foreground)]">{exp.description}</td>
                         <td className="p-2.5">
-                          <Badge variant="theme" className="!bg-zinc-800 !text-zinc-300">
+                          <Badge variant="theme" className="!bg-[var(--surface-muted)] !text-[var(--foreground-muted)]">
                             {getExpenseCategoryLabel(exp.category)}
                           </Badge>
                         </td>
-                        <td className="p-2.5 text-xs text-zinc-400">
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">
                           {accommodations.find((a) => a.id === exp.accommodation_id)?.name || "—"}
                         </td>
-                        <td className="p-2.5 text-xs text-zinc-400 whitespace-nowrap">{formatDate(exp.expense_date)}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)] whitespace-nowrap">{formatDate(exp.expense_date)}</td>
                         <td className="p-2.5 text-right text-xs font-bold text-red-400">{fmt(exp.amount)}</td>
                         <td className="p-2.5">
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => openEditExpense(exp)}
                               title="Modifier"
-                              className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                              className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setDeletingExpense(exp)}
                               title="Supprimer"
-                              className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -2052,8 +2155,8 @@ export default function AccountingPage() {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-zinc-800">
-                      <td colSpan={4} className="p-2.5 text-xs font-semibold text-zinc-300">
+                    <tr className="border-t border-[var(--border)]">
+                      <td colSpan={4} className="p-2.5 text-xs font-semibold text-[var(--foreground-muted)]">
                         Total dépenses
                       </td>
                       <td className="p-2.5 text-right text-sm font-bold text-red-400">
@@ -2072,12 +2175,12 @@ export default function AccountingPage() {
 
         {/* ============ FACTURES ============ */}
         {activeTab === "invoices" && (
-          <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row gap-2 sm:items-center bg-zinc-900/70">
+          <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
+            <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row gap-2 sm:items-center bg-[var(--surface-sunken)]">
               <select
                 value={invoiceStatus}
                 onChange={(e) => setInvoiceStatus(e.target.value)}
-                className="px-2 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 focus:outline-none"
+                className="px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] focus:outline-none"
               >
                 <option value="all">Tous les statuts</option>
                 {Object.entries(INVOICE_STATUS_LABELS).map(([k, v]) => (
@@ -2087,7 +2190,7 @@ export default function AccountingPage() {
                 ))}
               </select>
               <div className="sm:ml-auto">
-                <Button variant="outline" size="sm" onClick={exportInvoicesCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredInvoices.length === 0}>
+                <Button variant="outline" size="sm" onClick={exportInvoicesCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredInvoices.length === 0}>
                   <Download className="w-4 h-4" /> Exporter CSV
                 </Button>
               </div>
@@ -2095,25 +2198,25 @@ export default function AccountingPage() {
 
             {filteredInvoices.length === 0 ? (
               <div className="p-12 text-center">
-                <Receipt className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500 mb-2">Aucune facture sur la période</p>
-                <p className="text-xs text-zinc-500">
+                <Receipt className="w-12 h-12 text-[var(--foreground-muted)] mx-auto mb-4" />
+                <p className="text-sm text-[var(--foreground-subtle)] mb-2">Aucune facture sur la période</p>
+                <p className="text-xs text-[var(--foreground-subtle)]">
                   Les factures sont générées depuis la page Réservations.
                 </p>
               </div>
             ) : (
               <>
               {/* Cartes mobiles */}
-              <div className="md:hidden divide-y divide-zinc-800/60">
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
                 {filteredInvoices.map((inv) => (
                   <div key={inv.id} className="p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-semibold text-zinc-100">{inv.invoice_number}</span>
-                          <span className="text-[11px] text-zinc-500 whitespace-nowrap">{formatDate(inv.created_at)}</span>
+                          <span className="text-xs font-semibold text-[var(--foreground)]">{inv.invoice_number}</span>
+                          <span className="text-[11px] text-[var(--foreground-subtle)] whitespace-nowrap">{formatDate(inv.created_at)}</span>
                         </div>
-                        <p className="text-xs text-zinc-400 mt-1 truncate">
+                        <p className="text-xs text-[var(--foreground-muted)] mt-1 truncate">
                           {inv.booking?.client_name || "—"}
                           {inv.booking?.booking_code ? ` · ${inv.booking.booking_code}` : ""}
                         </p>
@@ -2123,7 +2226,7 @@ export default function AccountingPage() {
                             inv.status === "paid"
                               ? "!bg-emerald-500/15 !text-emerald-400"
                               : inv.status === "sent"
-                                ? "!bg-zinc-800 !text-zinc-300"
+                                ? "!bg-[var(--surface-muted)] !text-[var(--foreground-muted)]"
                                 : inv.status === "draft"
                                   ? "!bg-blue-500/15 !text-blue-400"
                                   : inv.status === "partial"
@@ -2136,14 +2239,14 @@ export default function AccountingPage() {
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <div className="text-right mr-1">
-                          <p className="text-sm font-bold text-zinc-100">{fmt(inv.total_amount)}</p>
-                          <p className="text-[10px] text-zinc-500">TTC</p>
+                          <p className="text-sm font-bold text-[var(--foreground)]">{fmt(inv.total_amount)}</p>
+                          <p className="text-[10px] text-[var(--foreground-subtle)]">TTC</p>
                         </div>
                         {inv.pdf_url && (
                           <button
                             onClick={() => handleOpenInvoice(inv)}
                             title="Voir la facture PDF"
-                            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                            className="p-1.5 rounded-md text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -2157,9 +2260,31 @@ export default function AccountingPage() {
                             <Download className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        {/* Actions intelligentes par statut */}
+                        {INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
+                          <button
+                            key={action.status}
+                            onClick={() => openInvoiceStatusChange(inv, action.status)}
+                            title={action.label}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              action.color === "green"
+                                ? "text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                : action.color === "blue"
+                                ? "text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                                : action.color === "amber"
+                                ? "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                                : "text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                            }`}
+                          >
+                            {action.icon === "send" && <Send className="w-3.5 h-3.5" />}
+                            {action.icon === "paid" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                            {action.icon === "partial" && <AlertTriangle className="w-3.5 h-3.5" />}
+                            {action.icon === "cancel" && <XCircle className="w-3.5 h-3.5" />}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <p className="text-[11px] text-zinc-500 mt-1.5">
+                    <p className="text-[11px] text-[var(--foreground-subtle)] mt-1.5">
                       Sous-total {fmt(inv.amount)} · TVA {fmt(inv.tax_amount)}
                     </p>
                   </div>
@@ -2169,28 +2294,28 @@ export default function AccountingPage() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">N° Facture</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Date</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Client</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Réservation</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Sous-total</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">TVA</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Total TTC</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Statut</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">N° Facture</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Date</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Client</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Réservation</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Sous-total</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">TVA</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Total TTC</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Statut</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {filteredInvoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-zinc-900/40">
-                        <td className="p-2.5 text-xs font-medium text-zinc-100">{inv.invoice_number}</td>
-                        <td className="p-2.5 text-xs text-zinc-400 whitespace-nowrap">{formatDate(inv.created_at)}</td>
-                        <td className="p-2.5 text-xs text-zinc-400">{inv.booking?.client_name || "—"}</td>
-                        <td className="p-2.5 text-xs text-zinc-400">{inv.booking?.booking_code || "—"}</td>
-                        <td className="p-2.5 text-xs text-zinc-400">{fmt(inv.amount)}</td>
-                        <td className="p-2.5 text-xs text-zinc-400">{fmt(inv.tax_amount)}</td>
-                        <td className="p-2.5 text-right text-xs font-bold text-zinc-100">{fmt(inv.total_amount)}</td>
+                      <tr key={inv.id} className="hover:bg-[var(--surface-hover)]">
+                        <td className="p-2.5 text-xs font-medium text-[var(--foreground)]">{inv.invoice_number}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)] whitespace-nowrap">{formatDate(inv.created_at)}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">{inv.booking?.client_name || "—"}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">{inv.booking?.booking_code || "—"}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">{fmt(inv.amount)}</td>
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">{fmt(inv.tax_amount)}</td>
+                        <td className="p-2.5 text-right text-xs font-bold text-[var(--foreground)]">{fmt(inv.total_amount)}</td>
                         <td className="p-2.5">
                           <Badge
                             variant={inv.status === "paid" ? "success" : inv.status === "sent" ? "default" : inv.status === "draft" ? "info" : inv.status === "partial" ? "warning" : "error"}
@@ -2198,7 +2323,7 @@ export default function AccountingPage() {
                               inv.status === "paid"
                                 ? "!bg-emerald-500/15 !text-emerald-400"
                                 : inv.status === "sent"
-                                  ? "!bg-zinc-800 !text-zinc-300"
+                                  ? "!bg-[var(--surface-muted)] !text-[var(--foreground-muted)]"
                                   : inv.status === "draft"
                                     ? "!bg-blue-500/15 !text-blue-400"
                                     : inv.status === "partial"
@@ -2215,7 +2340,7 @@ export default function AccountingPage() {
                               <button
                                 onClick={() => handleOpenInvoice(inv)}
                                 title="Voir la facture PDF"
-                                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                                className="p-1.5 rounded-md text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -2229,6 +2354,28 @@ export default function AccountingPage() {
                                 <Download className="w-3.5 h-3.5" />
                               </button>
                             )}
+                            {/* Actions intelligentes par statut */}
+                            {INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
+                              <button
+                                key={action.status}
+                                onClick={() => openInvoiceStatusChange(inv, action.status)}
+                                title={action.label}
+                                className={`p-1.5 rounded-md transition-colors ${
+                                  action.color === "green"
+                                    ? "text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                    : action.color === "blue"
+                                    ? "text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                                    : action.color === "amber"
+                                    ? "text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
+                                    : "text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                }`}
+                              >
+                                {action.icon === "send" && <Send className="w-3.5 h-3.5" />}
+                                {action.icon === "paid" && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                {action.icon === "partial" && <AlertTriangle className="w-3.5 h-3.5" />}
+                                {action.icon === "cancel" && <XCircle className="w-3.5 h-3.5" />}
+                              </button>
+                            ))}
                           </div>
                         </td>
                       </tr>
@@ -2243,28 +2390,28 @@ export default function AccountingPage() {
 
         {/* ============ JOURNAL D'AUDIT ============ */}
         {activeTab === "audit" && (
-          <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 p-3.5">
+          <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-zinc-200 flex items-center gap-2">
-                <History className="w-4 h-4 text-zinc-500" /> Journal d&apos;audit
+              <h2 className="text-[13px] font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d&apos;audit
               </h2>
-              <span className="text-[11px] text-zinc-500">{auditLogs.length} entrées</span>
+              <span className="text-[11px] text-[var(--foreground-subtle)]">{auditLogs.length} entrées</span>
             </div>
             {auditLogs.length === 0 ? (
               <div className="text-center py-8">
-                <ScrollText className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-                <p className="text-sm text-zinc-500">Aucune action enregistrée</p>
+                <ScrollText className="w-10 h-10 text-[var(--foreground-muted)] mx-auto mb-3" />
+                <p className="text-sm text-[var(--foreground-subtle)]">Aucune action enregistrée</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/50">
-                    <div className="w-8 h-8 rounded-md bg-zinc-800 flex items-center justify-center flex-shrink-0">
-                      <ScrollText className="w-4 h-4 text-zinc-400" />
+                  <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
+                    <div className="w-8 h-8 rounded-md bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
+                      <ScrollText className="w-4 h-4 text-[var(--foreground-muted)]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-zinc-100 capitalize">{log.action.replace(/_/g, " ")}</p>
-                      <p className="text-[11px] text-zinc-500">
+                      <p className="text-xs font-medium text-[var(--foreground)] capitalize">{log.action.replace(/_/g, " ")}</p>
+                      <p className="text-[11px] text-[var(--foreground-subtle)]">
                         {log.entity_type} {log.entity_id ? `#${log.entity_id.substring(0, 8)}` : ""} • {usersById[log.user_id || ""] || "Système"} • {formatDate(log.created_at)}
                       </p>
                     </div>
@@ -2277,47 +2424,47 @@ export default function AccountingPage() {
 
         {/* ============ CLIENTS (CRM) ============ */}
         {activeTab === "clients" && (
-          <div className="rounded-xl bg-zinc-900/50 border border-zinc-800/80 overflow-hidden">
-            <div className="p-3 border-b border-zinc-800 flex flex-col sm:flex-row gap-2 sm:items-center bg-zinc-900/70">
+          <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] overflow-hidden">
+            <div className="p-3 border-b border-[var(--border)] flex flex-col sm:flex-row gap-2 sm:items-center bg-[var(--surface-sunken)]">
               <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
                 <input
                   type="text"
                   placeholder="Rechercher un client (nom, téléphone, email)"
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-xs text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] focus:outline-none focus:ring-1 focus:ring-[var(--border-strong)]"
                 />
               </div>
-              <Button variant="outline" size="sm" onClick={exportClientsCSV} className="gap-2 !border-zinc-700 !bg-zinc-800/60 !text-zinc-300 hover:!bg-zinc-800" disabled={filteredClients.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportClientsCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredClients.length === 0}>
                 <Download className="w-4 h-4" /> Exporter CSV
               </Button>
             </div>
 
             {filteredClients.length === 0 ? (
               <div className="p-12 text-center">
-                <Users className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500">Aucun client enregistré</p>
-                <p className="text-xs text-zinc-500 mt-1">Les clients apparaissent dès la première réservation</p>
+                <Users className="w-12 h-12 text-[var(--foreground-muted)] mx-auto mb-4" />
+                <p className="text-sm text-[var(--foreground-subtle)]">Aucun client enregistré</p>
+                <p className="text-xs text-[var(--foreground-subtle)] mt-1">Les clients apparaissent dès la première réservation</p>
               </div>
             ) : (
               <>
               {/* Cartes mobiles */}
-              <div className="md:hidden divide-y divide-zinc-800/60">
+              <div className="md:hidden divide-y divide-[var(--border-subtle)]">
                 {filteredClients.map((c) => (
                   <div
                     key={c.id}
                     onClick={() => setSelectedClient(c)}
-                    className="p-3 cursor-pointer active:bg-zinc-900/40"
+                    className="p-3 cursor-pointer active:bg-[var(--surface-hover)]"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs text-zinc-300 flex-shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-[var(--surface-muted)] flex items-center justify-center font-bold text-xs text-[var(--foreground-muted)] flex-shrink-0">
                           {c.full_name.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-zinc-100 truncate">{c.full_name}</p>
-                          <p className="text-[11px] text-zinc-500 truncate">
+                          <p className="text-sm font-medium text-[var(--foreground)] truncate">{c.full_name}</p>
+                          <p className="text-[11px] text-[var(--foreground-subtle)] truncate">
                             {c.nationality || ""} {c.nationality && c.id_type ? "•" : ""} {c.id_type || ""}
                           </p>
                         </div>
@@ -2325,23 +2472,23 @@ export default function AccountingPage() {
                       <ClientScoreBadge score={c.score} tier={c.tier} clientId={c.id} showValue={false} />
                     </div>
                     {c.phone && (
-                      <p className="text-[11px] text-zinc-500 mt-2 flex items-center gap-1">
+                      <p className="text-[11px] text-[var(--foreground-subtle)] mt-2 flex items-center gap-1">
                         <Phone className="w-3 h-3" /> {c.phone}
                       </p>
                     )}
                     <div className="grid grid-cols-3 gap-2 mt-2.5 text-center">
-                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">Séjours</p>
-                        <p className="text-xs font-semibold text-zinc-200 mt-0.5">
+                      <div className="rounded-lg bg-[var(--surface-sunken)] border border-[var(--border-subtle)] py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-subtle)]">Séjours</p>
+                        <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5">
                           {c.stayCount} · {c.nights} nuit{c.nights > 1 ? "s" : ""}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">CA total</p>
-                        <p className="text-xs font-semibold text-zinc-100 mt-0.5 truncate">{fmt(c.totalSpent)}</p>
+                      <div className="rounded-lg bg-[var(--surface-sunken)] border border-[var(--border-subtle)] py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-subtle)]">CA total</p>
+                        <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 truncate">{fmt(c.totalSpent)}</p>
                       </div>
-                      <div className="rounded-lg bg-zinc-900/60 border border-zinc-800/60 py-1.5">
-                        <p className="text-[10px] uppercase tracking-wider text-zinc-500">Solde</p>
+                      <div className="rounded-lg bg-[var(--surface-sunken)] border border-[var(--border-subtle)] py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-subtle)]">Solde</p>
                         {c.balance > 0 ? (
                           <p className="text-xs font-bold text-red-400 mt-0.5 truncate">{fmt(c.balance)}</p>
                         ) : (
@@ -2368,7 +2515,7 @@ export default function AccountingPage() {
                             e.stopPropagation();
                             setSelectedClient(c);
                           }}
-                          className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 hover:text-zinc-200"
+                          className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                         >
                           <Eye className="w-3.5 h-3.5" /> Dossier
                         </button>
@@ -2381,32 +2528,32 @@ export default function AccountingPage() {
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Client</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Score</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Contact</th>
-                      <th className="text-left p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Séjours</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">CA total</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Encaissé</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Solde dû</th>
-                      <th className="text-right p-2.5 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">Actions</th>
+                    <tr className="border-b border-[var(--border)]">
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Client</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Score</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Contact</th>
+                      <th className="text-left p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Séjours</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">CA total</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Encaissé</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Solde dû</th>
+                      <th className="text-right p-2.5 text-[11px] font-medium text-[var(--foreground-subtle)] uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800/60">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {filteredClients.map((c) => (
                       <tr
                         key={c.id}
                         onClick={() => setSelectedClient(c)}
-                        className="hover:bg-zinc-900/40 cursor-pointer"
+                        className="hover:bg-[var(--surface-hover)] cursor-pointer"
                       >
                         <td className="p-2.5">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-xs text-zinc-300 flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center font-bold text-xs text-[var(--foreground-muted)] flex-shrink-0">
                               {c.full_name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-xs font-medium text-zinc-100">{c.full_name}</p>
-                              <p className="text-[11px] text-zinc-500">
+                              <p className="text-xs font-medium text-[var(--foreground)]">{c.full_name}</p>
+                              <p className="text-[11px] text-[var(--foreground-subtle)]">
                                 {c.nationality || ""} {c.nationality && c.id_type ? "•" : ""} {c.id_type || ""}
                               </p>
                             </div>
@@ -2416,7 +2563,7 @@ export default function AccountingPage() {
                           <ClientScoreBadge score={c.score} tier={c.tier} clientId={c.id} showValue={false} />
                         </td>
                         <td className="p-2.5">
-                          <div className="text-xs text-zinc-400">
+                          <div className="text-xs text-[var(--foreground-muted)]">
                             {c.phone && (
                               <p className="flex items-center gap-1">
                                 <Phone className="w-3 h-3" /> {c.phone}
@@ -2425,10 +2572,10 @@ export default function AccountingPage() {
                             {c.email && <p className="truncate max-w-[180px]">{c.email}</p>}
                           </div>
                         </td>
-                        <td className="p-2.5 text-xs text-zinc-400">
+                        <td className="p-2.5 text-xs text-[var(--foreground-muted)]">
                           {c.stayCount} séjour{c.stayCount > 1 ? "s" : ""} · {c.nights} nuit{c.nights > 1 ? "s" : ""}
                         </td>
-                        <td className="p-2.5 text-right text-xs font-semibold text-zinc-100">{fmt(c.totalSpent)}</td>
+                        <td className="p-2.5 text-right text-xs font-semibold text-[var(--foreground)]">{fmt(c.totalSpent)}</td>
                         <td className="p-2.5 text-right text-xs text-emerald-400">{fmt(c.paid)}</td>
                         <td className="p-2.5 text-right">
                           {c.balance > 0 ? (
@@ -2459,7 +2606,7 @@ export default function AccountingPage() {
                                 setSelectedClient(c);
                               }}
                               title="Voir le dossier client"
-                              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                              className="p-1.5 rounded-md text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
@@ -2721,6 +2868,77 @@ export default function AccountingPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ============ MODAL CHANGEMENT DE STATUT FACTURE ============ */}
+      <Modal
+        open={!!invoiceStatusTarget}
+        onClose={() => setInvoiceStatusTarget(null)}
+        title={invoiceStatusTarget ? getTransitionLabel(invoiceStatusTarget.invoice.status, invoiceStatusTarget.newStatus) : ""}
+        description="Confirmez le changement de statut de cette facture"
+      >
+        <div className="space-y-3">
+          {invoiceStatusTarget && (
+            <div className={`p-3 rounded-xl border ${
+              invoiceStatusTarget.newStatus === "cancelled"
+                ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                : invoiceStatusTarget.newStatus === "paid"
+                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+            }`}>
+              <div className="flex items-center gap-3">
+                {invoiceStatusTarget.newStatus === "cancelled" && (
+                  <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                )}
+                {invoiceStatusTarget.newStatus === "paid" && (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                )}
+                {invoiceStatusTarget.newStatus === "sent" && (
+                  <Send className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                )}
+                {invoiceStatusTarget.newStatus === "partial" && (
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                )}
+                <div>
+                  <p className={`text-sm font-medium ${
+                    invoiceStatusTarget.newStatus === "cancelled"
+                      ? "text-red-700 dark:text-red-300"
+                      : invoiceStatusTarget.newStatus === "paid"
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : "text-blue-700 dark:text-blue-300"
+                  }`}>
+                    {invoiceStatusTarget.invoice.invoice_number}
+                  </p>
+                  <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                    {fmt(invoiceStatusTarget.invoice.total_amount)} TTC
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setInvoiceStatusTarget(null)}>
+              Annuler
+            </Button>
+            <Button
+              className={`flex-1 ${
+                invoiceStatusTarget?.newStatus === "cancelled"
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : invoiceStatusTarget?.newStatus === "paid"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : ""
+              }`}
+              onClick={confirmInvoiceStatusChange}
+              disabled={updatingInvoiceStatus}
+            >
+              {updatingInvoiceStatus ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Mise à jour...</>
+              ) : (
+                <>Confirmer</>
+              )}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
