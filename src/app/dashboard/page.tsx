@@ -1144,39 +1144,43 @@ export default function DashboardPage() {
   // - bookings : création, check-in/out, paiement
   // - cleaning_tasks : tâche marquée faite/en attente (compteurs ménage)
   // - payments : paiement enregistré (revenus)
-  // - rooms : changement de statut d'une chambre
+  // Les rooms n'ont pas de tenant_id → couvert par le polling 30s.
   useEffect(() => {
     if (!tenantId) return;
+    let cancelled = false;
     const supabase = createClient();
-    const refresh = () => loadDashboardData(true, selectedDate);
+    const refresh = () => {
+      if (!cancelled) loadDashboardData(true, selectedDate);
+    };
 
-    // Canal unique avec 4 abonnements postgres_changes
-    const channel = supabase
-      .channel("dashboard-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
-        refresh,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "cleaning_tasks", filter: `tenant_id=eq.${tenantId}` },
-        refresh,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "payments", filter: `tenant_id=eq.${tenantId}` },
-        refresh,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "rooms" },
-        refresh,
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel("dashboard-realtime")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
+          refresh,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cleaning_tasks", filter: `tenant_id=eq.${tenantId}` },
+          refresh,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "payments", filter: `tenant_id=eq.${tenantId}` },
+          refresh,
+        )
+        .subscribe();
+    } catch {
+      // Realtime est best-effort : un échec ne doit pas casser le dashboard
+      console.warn("Realtime channel subscription failed, falling back to polling only");
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [tenantId, selectedDate, loadDashboardData]);
 
