@@ -1117,7 +1117,7 @@ export default function DashboardPage() {
     // affiché reste visible et se met à jour sans faire "disparaître" la page.
     const initialLoad = setTimeout(() => {
       if (!cancelled) {
-        loadDashboardData(!dashboardLoadedRef.current, selectedDate);
+        loadDashboardData(dashboardLoadedRef.current, selectedDate);
         dashboardLoadedRef.current = true;
       }
     }, 0);
