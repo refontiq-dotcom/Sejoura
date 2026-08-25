@@ -934,6 +934,7 @@ export default function AccountingPage() {
   const [payments, setPayments] = useState<EnrichedPayment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [auditFilter, setAuditFilter] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [accommodations, setAccommodations] = useState<{ id: string; name: string }[]>([]);
@@ -1266,9 +1267,11 @@ export default function AccountingPage() {
     .filter((inv) => {
       if (!invoiceSearch) return true;
       const q = invoiceSearch.toLowerCase();
+
       return (
         inv.invoice_number?.toLowerCase().includes(q) ||
         inv.booking?.client_name?.toLowerCase().includes(q) ||
+
         inv.booking?.booking_code?.toLowerCase().includes(q) ||
         inv.status?.toLowerCase().includes(q)
       );
@@ -1714,6 +1717,13 @@ export default function AccountingPage() {
       </div>
     );
   }
+
+  // ── Données dérivées pour le journal d'audit ──
+  const filteredAuditLogs = auditFilter
+    ? auditLogs.filter((l) => getAuditActionInfo(l.action).category === auditFilter)
+    : auditLogs;
+  const groupedAuditLogs = groupAuditLogsByDate(filteredAuditLogs);
+  const presentAuditCategories = [...new Set(auditLogs.map((l) => getAuditActionInfo(l.action).category))];
 
   const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
     { key: "overview", label: "Vue d'ensemble", icon: Wallet },
@@ -2599,28 +2609,21 @@ export default function AccountingPage() {
         )}
 
                 {/* ============ JOURNAL D'AUDIT ============ */}
-        {activeTab === "audit" && (() => {
-          const [auditFilter, setAuditFilter] = useState<string | null>(null);
-          const filteredLogs = auditFilter
-            ? auditLogs.filter((l) => getAuditActionInfo(l.action).category === auditFilter)
-            : auditLogs;
-          const grouped = groupAuditLogsByDate(filteredLogs);
-          const presentCategories = [...new Set(auditLogs.map((l) => getAuditActionInfo(l.action).category))];
-          return (
+        {activeTab === "audit" && (
             <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[13px] font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d'audit
                 </h2>
-                <span className="text-[11px] text-[var(--foreground-subtle)]">{filteredLogs.length} / {auditLogs.length} entrées</span>
+                <span className="text-[11px] text-[var(--foreground-subtle)]">{filteredAuditLogs.length} / {auditLogs.length} entrées</span>
               </div>
 
-              {presentCategories.length > 1 && (
+              {presentAuditCategories.length > 1 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   <button onClick={() => setAuditFilter(null)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${!auditFilter ? "bg-[var(--foreground)] text-[var(--surface)] border-[var(--foreground)]" : "bg-[var(--surface-sunken)] text-[var(--foreground-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"}`}>
                     Tous
                   </button>
-                  {presentCategories.map((cat) => {
+                  {presentAuditCategories.map((cat) => {
                     const catInfo = AUDIT_CATEGORIES[cat] || { label: cat, emoji: "" };
                     const active = auditFilter === cat;
                     return (
@@ -2632,14 +2635,14 @@ export default function AccountingPage() {
                 </div>
               )}
 
-              {filteredLogs.length === 0 ? (
+              {filteredAuditLogs.length === 0 ? (
                 <div className="text-center py-8">
                   <ScrollText className="w-10 h-10 text-[var(--foreground-muted)] mx-auto mb-3" />
                   <p className="text-sm text-[var(--foreground-subtle)]">{auditFilter ? "Aucune action dans cette catégorie" : "Aucune action enregistrée"}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {grouped.map((g) => (
+                  {groupedAuditLogs.map((g) => (
                     <div key={g.group}>
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1.5 px-1">{g.group}</p>
                       <div className="space-y-1.5">
@@ -2667,8 +2670,7 @@ export default function AccountingPage() {
                 </div>
               )}
             </div>
-          );
-        })()}
+          )}
 
 {/* ============ CLIENTS (CRM) ============ */}
         {activeTab === "clients" && (
