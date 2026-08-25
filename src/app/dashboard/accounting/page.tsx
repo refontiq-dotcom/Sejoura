@@ -148,15 +148,12 @@ function groupAuditLogsByDate(logs: AuditLog[]): { group: string; items: AuditLo
 
 // ── Libellés lisibles pour les champs d'audit ──
 const AUDIT_FIELD_LABELS: Record<string, string> = {
-  check_out_date: "Date de départ",
-  check_out_time: "Heure de départ",
   negotiated_price: "Prix négocié",
   total_amount: "Montant total",
   payment_status: "Statut du paiement",
   status: "Statut",
   room_number: "Numéro de chambre",
   client_name: "Nom du client",
-  booking_code: "Code réservation",
   start_date: "Date de début",
   end_date: "Date de fin",
   base_price: "Prix de base",
@@ -164,7 +161,6 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   category: "Catégorie",
   description: "Description",
   expense_date: "Date de la dépense",
-  accommodation_id: "Établissement",
   full_name: "Nom complet",
   email: "E-mail",
   phone: "Téléphone",
@@ -180,6 +176,31 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   operator: "Opérateur",
   paid_at: "Date de paiement",
   notes: "Notes",
+  extended_by: "Extendu par",
+  nights_count: "Nombre de nuits",
+  check_in_date: "Date d'arrivée",
+  check_out_date: "Date de départ",
+  check_out_time: "Heure de départ",
+  amount_paid: "Montant payé",
+  booking_id: "Réservation",
+  client_id: "Client",
+  room_id: "Chambre",
+  accommodation_id: "Établissement",
+  user_id: "Utilisateur",
+  tenant_id: "Établissement",
+  invoice_number: "Numéro de facture",
+  pdf_url: "Lien PDF",
+  booking_code: "Code réservation",
+  nights: "Nuits",
+  stayCount: "Séjours",
+  totalSpent: "CA total",
+  paid: "Montant payé",
+  balance: "Solde",
+  score: "Score",
+  tier: "Niveau",
+  nationality: "Nationalité",
+  id_type: "Type de pièce",
+  id_number: "Numéro de pièce",
 };
 
 /** Transforme une clé snake_case en libellé lisible */
@@ -188,23 +209,34 @@ function auditFieldLabel(key: string): string {
 }
 
 /** Formate une valeur brute pour l'affichage */
+// Champs qui contiennent des UUIDs internes — on les cache
+const UUID_FIELDS = new Set([
+  "extended_by", "booking_id", "client_id", "room_id", "accommodation_id",
+  "user_id", "tenant_id", "entity_id",
+]);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Formate une valeur brute pour l'affichage */
 function auditFieldValue(key: string, value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (typeof value === "boolean") return value ? "Oui" : "Non";
   if (typeof value === "number") {
-    // Détecter les montants (> 100 souvent en FCFA)
-    if (["negotiated_price", "total_amount", "amount", "base_price"].includes(key)) {
+    if (["negotiated_price", "total_amount", "amount", "base_price", "amount_paid"].includes(key)) {
       return new Intl.NumberFormat("fr-FR").format(value) + " FCFA";
     }
     return String(value);
   }
   const s = String(value);
-  // Détecter les dates ISO
+  // Masquer les UUIDs
+  if (UUID_FIELDS.has(key) && UUID_RE.test(s)) return "—";
+  if (UUID_RE.test(s) && key.endsWith("_id")) return "—";
+  // Dates ISO
   if (/^\d{4}-\d{2}-\d{2}/.test(s) && s.length <= 10) {
-    try { return new Date(s).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }); } catch {}
+    try { return new Date(s + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }); } catch {}
   }
-  // Détecter les heures (HH:MM:SS)
+  // Heures HH:MM:SS
   if (/^\d{2}:\d{2}(:\d{2})?$/.test(s)) {
     return s.replace(":00", "").replace(/^0/, "") + " h";
   }
