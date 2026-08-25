@@ -274,8 +274,11 @@ export default function EmployeesPage() {
 
   function openReassign(emp: User) {
     setReassignTarget(emp);
+    // Pré-remplit avec l'affectation ACTIVE (temporaire ou permanente)
+    const active = tempAssignments[emp.id];
+    const currentAccId = active?.accommodation_id || emp.accommodation_id || "";
     setReassignForm({
-      accommodation_id: emp.accommodation_id || "",
+      accommodation_id: currentAccId,
       start_date: new Date().toISOString().split("T")[0],
       end_date: "",
       notes: "",
@@ -292,7 +295,10 @@ export default function EmployeesPage() {
       toast.error("La date de fin doit être postérieure à la date de début.");
       return;
     }
-    if (reassignForm.accommodation_id === reassignTarget.accommodation_id) {
+    // Valide contre l'affectation ACTIVE (pas juste le permanent)
+    const activeAssignment = tempAssignments[reassignTarget.id];
+    const currentActiveAccId = activeAssignment?.accommodation_id || reassignTarget.accommodation_id;
+    if (reassignForm.accommodation_id === currentActiveAccId) {
       toast.error(`${reassignTarget.full_name} est déjà affecté à cet établissement.`);
       return;
     }
@@ -797,6 +803,24 @@ export default function EmployeesPage() {
           description="Changer l'établissement de travail ou programmer un déplacement temporaire."
         >
           <div className="space-y-3">
+            {reassignTarget && (() => {
+              const active = tempAssignments[reassignTarget.id];
+              const currentAccId = active?.accommodation_id || reassignTarget.accommodation_id;
+              const currentAcc = accommodations.find((a) => a.id === currentAccId);
+              const isTemp = !!active?.end_date;
+              return currentAcc ? (
+                <div className={`p-3 rounded-xl border text-sm ${
+                  isTemp
+                    ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200"
+                    : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200"
+                }`}>
+                  <span className="font-semibold">📍 Affectation actuelle :</span> {currentAcc.name}{currentAcc.city ? `, ${currentAcc.city}` : ""}
+                  {isTemp && (
+                    <span className="ml-2 text-xs opacity-75">(temporaire jusqu'au {formatDate(active.end_date)})</span>
+                  )}
+                </div>
+              ) : null;
+            })()}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nouvel établissement de destination *</label>
               <select
