@@ -959,6 +959,8 @@ export default function AccountingPage() {
   const [invoiceStatus, setInvoiceStatus] = useState("all");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [clientFilter, setClientFilter] = useState<"all" | "unpaid" | "loyal" | "recent" | "vip">("all");
+  const [clientSort, setClientSort] = useState<{ key: "name" | "revenue" | "score" | "stays"; direction: "asc" | "desc" }>({ key: "score", direction: "desc" });
 
   // Tri
   const [expenseSort, setExpenseSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" }>({
@@ -1279,17 +1281,44 @@ export default function AccountingPage() {
   }, [invoices, startDate, endDate, invoiceStatus, invoiceSearch]);
 
   const filteredClients = useMemo(() => {
-    if (!clientSearch) return clients;
-    const q = clientSearch.toLowerCase();
-    return clients.filter(
-      (c) =>
+    let list = clients;
+    if (clientSearch) {
+      const q = clientSearch.toLowerCase();
+      list = list.filter((c) =>
         c.full_name.toLowerCase().includes(q) ||
         (c.phone || "").toLowerCase().includes(q) ||
         (c.email || "").toLowerCase().includes(q)
-    );
-  }, [clients, clientSearch]);
+      );
+    }
+    if (clientFilter === "unpaid") list = list.filter((c) => c.balance > 0);
+    else if (clientFilter === "loyal") list = list.filter((c) => c.stayCount >= 3);
+    else if (clientFilter === "recent") {
+      const d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      list = list.filter((c) => c.bookings.some((b) => b.check_in_date >= d));
+    }
+    else if (clientFilter === "vip") list = list.filter((c) => (c.score || 0) >= 80);
+    list = [...list].sort((a, b) => {
+      const d = clientSort.direction === "asc" ? 1 : -1;
+      switch (clientSort.key) {
+        case "name": return d * a.full_name.localeCompare(b.full_name);
+        case "revenue": return d * (a.totalSpent - b.totalSpent);
+        case "score": return d * ((a.score || 0) - (b.score || 0));
+        case "stays": return d * (a.stayCount - b.stayCount);
+        default: return 0;
+      }
+    });
+    return list;
+  }, [clients, clientSearch, clientFilter, clientSort]);
 
   // ============================================================================
+  // ─ KPIs CRM ─
+  const crmTotalClients = clients.length;
+  const crmTotalRevenue = clients.reduce((s, c) => s + c.totalSpent, 0);
+  const crmUnpaidClients = clients.filter((c) => c.balance > 0).length;
+  const crmUnpaidTotal = clients.reduce((s, c) => s + c.balance, 0);
+  const crmLoyalClients = clients.filter((c) => c.stayCount >= 3).length;
+  const crmAvgScore = clients.length > 0 ? Math.round(clients.reduce((s, c) => s + (c.score || 0), 0) / clients.length) : 0;
+
   // KPIs
   // ============================================================================
 
@@ -2689,6 +2718,47 @@ export default function AccountingPage() {
               <Button variant="outline" size="sm" onClick={exportClientsCSV} className="gap-2 !border-[var(--border)] !bg-[var(--surface-muted)] !text-[var(--foreground-muted)] hover:!bg-[var(--surface-muted)]" disabled={filteredClients.length === 0}>
                 <Download className="w-4 h-4" /> Exporter CSV
               </Button>
+            </div>
+            {/* KPIs CRM */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 border-b border-[var(--border)] bg-[var(--surface-sunken)]">
+              <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Clients</p>
+                <p className="text-lg font-bold text-[var(--foreground)]">{crmTotalClients}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">CA total</p>
+                <p className="text-lg font-bold text-emerald-600">{fmt(crmTotalRevenue)}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Impay\u00e9s</p>
+                <p className={`text-lg font-bold ${crmUnpaidClients > 0 ? "text-red-600" : "text-emerald-600"}`}>{crmUnpaidClients}</p>
+                {crmUnpaidTotal > 0 && <p className="text-[10px] text-red-500">{fmt(crmUnpaidTotal)}</p>}
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Fid\u00e8les</p>
+                <p className="text-lg font-bold text-purple-600">{crmLoyalClients}</p>
+                <p className="text-[10px] text-[var(--foreground-muted)]">\u2265 3 s\u00e9jours</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)] text-center">
+                <p className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)]">Score moy.</p>
+                <p className="text-lg font-bold text-amber-600">{crmAvgScore}</p>
+              </div>
+            </div>
+
+            {/* Filtres + tri */}
+            <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+              {([
+                ["all", "Tous"],
+                ["unpaid", "Impayés"],
+                ["loyal", "Fidèles"],
+                ["recent", "Récents 30j"],
+                ["vip", "VIP ≥80"],
+              ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setClientFilter(key)} className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${clientFilter === key ? "bg-[var(--foreground)] text-[var(--surface)] border-[var(--foreground)]" : "bg-[var(--surface-sunken)] text-[var(--foreground-muted)] border-[var(--border)] hover:bg-[var(--surface-hover)]"}`}>
+                  {label}
+                </button>
+              ))}
+              <span className="text-[10px] text-[var(--foreground-muted)] self-center ml-1">{filteredClients.length} client{filteredClients.length > 1 ? "s" : ""}</span>
             </div>
 
             {filteredClients.length === 0 ? (
