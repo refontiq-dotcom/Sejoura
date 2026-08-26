@@ -379,7 +379,8 @@ export type StayActivityType =
   | "stay_extension_requested"
   | "stay_extension_approved"
   | "stay_extension_rejected"
-  | "payment";
+  | "payment"
+  | "room_change";
 
 export interface StayActivity {
   id: string;

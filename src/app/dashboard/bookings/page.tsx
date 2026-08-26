@@ -150,6 +150,13 @@ export default function BookingsPage() {
   const [checkinRoomTypeId, setCheckinRoomTypeId] = useState<string>("");
   const [checkinRoomId, setCheckinRoomId] = useState<string>("");
   // Changement de chambre pendant le séjour
+  // Recherche intelligente de client
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [clientSearchLoading, setClientSearchLoading] = useState(false);
+  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [changeRoomOpen, setChangeRoomOpen] = useState(false);
   const [changeRoomBooking, setChangeRoomBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [changeRoomTypeId, setChangeRoomTypeId] = useState<string>("");
@@ -521,7 +528,7 @@ export default function BookingsPage() {
     }
   }
 
-   async function loadRoomsForAccommodation(accId: string) {
+   async function loadRoomsForAccommodation(accId: string): Promise<RoomType[]> {
      try {
        const supabase = createClient();
        const { data, error } = await supabase
@@ -539,11 +546,13 @@ export default function BookingsPage() {
            .map((r) => r.room_type)
            .filter((t, i, arr) => t && arr.findIndex((x) => x.id === t.id) === i);
          setRoomTypes(types);
+         return types;
        }
       } catch (err) {
         toast.error("Impossible de charger les chambres.");
         console.error(err);
       }
+      return [];
     }
 
     async function loadInvoices(tId: string) {
@@ -1068,6 +1077,68 @@ export default function BookingsPage() {
     }
   }
 
+  // ── RECHERCHE INTELLIGENTE DE CLIENT ─────────────────────────────────────
+  function searchClients(query: string) {
+    if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+    if (!query.trim() || query.trim().length < 2) {
+      setClientSearchResults([]);
+      setClientSearchOpen(false);
+      return;
+    }
+    setClientSearchLoading(true);
+    clientSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
+          .order("full_name")
+          .limit(8);
+        setClientSearchResults((data as Client[]) || []);
+        setClientSearchOpen(true);
+      } catch {
+        setClientSearchResults([]);
+      } finally {
+        setClientSearchLoading(false);
+      }
+    }, 300);
+  }
+
+  function selectClientFromSearch(client: Client) {
+    setFormData({
+      ...formData,
+      client_id: client.id,
+      newClientName: "",
+      newClientPhone: "",
+      newClientEmail: "",
+      newClientIdType: "",
+      newClientIdNumber: "",
+      newClientEmergencyContact: "",
+      newClientNationality: "",
+    });
+    setClientSearchQuery(client.full_name);
+    setClientSearchOpen(false);
+    setClientSearchResults([]);
+  }
+
+  function clearClientSelection() {
+    setFormData({
+      ...formData,
+      client_id: "",
+      newClientName: "",
+      newClientPhone: "",
+      newClientEmail: "",
+      newClientIdType: "",
+      newClientIdNumber: "",
+      newClientEmergencyContact: "",
+      newClientNationality: "",
+    });
+    setClientSearchQuery("");
+    setClientSearchOpen(false);
+  }
+
   // ── CHANGEMENT DE CHAMBRE PENDANT LE SÉJOUR ──────────────────────────────
   function openChangeRoomModal(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
     setChangeRoomBooking(b);
@@ -1129,6 +1200,19 @@ export default function BookingsPage() {
 
       // 3. Occuper la nouvelle chambre
       await supabase.from("rooms").update({ status: "occupied" }).eq("id", changeRoomId);
+
+      // 4. Enregistrer l'activité dans l'historique du séjour
+      const oldRoom = rooms.find((r) => r.id === oldRoomId);
+      const newRoomTarget = rooms.find((r) => r.id === changeRoomId);
+      await supabase.from("stay_activities").insert({
+        tenant_id: changeRoomBooking.tenant_id,
+        booking_id: changeRoomBooking.id,
+        client_id: changeRoomBooking.client_id,
+        activity_type: "room_change",
+        title: "Changement de chambre",
+        description: `${oldRoom?.room_number || "—"} → ${newRoomTarget?.room_number || "—"}${supplement > 0 ? ` — Supplément ${fmt(supplement)}` : ""}`,
+        created_by: userId,
+      });
 
       // 4. Enregistrer le paiement du supplément
       if (supplement > 0) {
@@ -2697,9 +2781,14 @@ export default function BookingsPage() {
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Établissement</label>
             <select
               value={formData.accommodation_id}
-              onChange={(e) => {
-                setFormData({ ...formData, accommodation_id: e.target.value, room_id: "" });
-                loadRoomsForAccommodation(e.target.value);
+              onChange={async (e) => {
+                const accId = e.target.value;
+                setFormData({ ...formData, accommodation_id: accId, room_type_id: "", room_id: "" });
+                const types = await loadRoomsForAccommodation(accId);
+                // Auto-select si un seul type de chambre
+                if (types.length === 1) {
+                  setFormData((prev) => ({ ...prev, accommodation_id: accId, room_type_id: types[0].id, room_id: "" }));
+                }
               }}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
@@ -2752,19 +2841,57 @@ export default function BookingsPage() {
             </select>
           </div>
 
-          {/* Client */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Client existant</label>
-            <select
-              value={formData.client_id}
-              onChange={(e) => setFormData({ ...formData, client_id: e.target.value, newClientName: "", newClientPhone: "" })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">— Ou créer un nouveau client ci-dessous —</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name} {c.phone ? `(${c.phone})` : ""}</option>
-              ))}
-            </select>
+          {/* Client — recherche intelligente */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Rechercher un client</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input
+                type="text"
+                value={clientSearchQuery}
+                onChange={(e) => {
+                  setClientSearchQuery(e.target.value);
+                  if (formData.client_id) clearClientSelection();
+                  searchClients(e.target.value);
+                }}
+                onFocus={() => { if (clientSearchResults.length > 0) setClientSearchOpen(true); }}
+                placeholder="Nom, téléphone ou email..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {clientSearchLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 animate-spin" />
+              )}
+              {formData.client_id && !clientSearchLoading && (
+                <button type="button" onClick={clearClientSelection} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {/* Résultats de recherche */}
+            {clientSearchOpen && clientSearchResults.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-60 overflow-auto">
+                {clientSearchResults.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => selectClientFromSearch(c)}
+                    className="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700 last:border-0"
+                  >
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{c.full_name}</p>
+                    <p className="text-xs text-zinc-500">
+                      {c.phone ? `📱 ${c.phone}` : ""}{c.phone && c.email ? " · " : ""}{c.email ? `✉️ ${c.email}` : ""}
+                    </p>
+                    {c.id_number && <p className="text-[10px] text-zinc-400 mt-0.5">CNI: {c.id_number}</p>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {clientSearchOpen && clientSearchQuery.length >= 2 && clientSearchResults.length === 0 && !clientSearchLoading && (
+              <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-4 text-center">
+                <p className="text-sm text-zinc-500">Aucun client trouvé</p>
+                <p className="text-xs text-zinc-400 mt-1">Remplissez les champs ci-dessous pour créer un nouveau client</p>
+              </div>
+            )}
           </div>
 
           {!formData.client_id && (

@@ -17,6 +17,7 @@ import {
   Plus,
   StickyNote,
   XCircle,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -55,6 +56,7 @@ const ACTIVITY_STYLE: Record<
   stay_extension_approved: { icon: CheckCircle2, color: "text-emerald-500", dot: "bg-emerald-500" },
   stay_extension_rejected: { icon: XCircle, color: "text-red-500", dot: "bg-red-500" },
   payment: { icon: CreditCard, color: "text-green-600", dot: "bg-green-600" },
+  room_change: { icon: ArrowLeftRight, color: "text-purple-500", dot: "bg-purple-500" },
   note: { icon: StickyNote, color: "text-rose-500", dot: "bg-rose-500" },
 };
 
