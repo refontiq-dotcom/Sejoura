@@ -20,6 +20,7 @@ import {
   getOverstayColor,
   isBookingOverdue,
   MOBILE_MONEY_OPERATORS,
+  formatAmount,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -144,6 +145,8 @@ export default function BookingsPage() {
     nationality: "",
     emergency_contact: "",
   });
+  const [checkinRoomTypeId, setCheckinRoomTypeId] = useState<string>("");
+  const [checkinRoomId, setCheckinRoomId] = useState<string>("");
 
   // Mode édition client dans le tiroir d'informations
   const [editingClientInDrawer, setEditingClientInDrawer] = useState(false);
@@ -965,6 +968,8 @@ export default function BookingsPage() {
       nationality: c?.nationality || "",
       emergency_contact: c?.emergency_contact || "",
     });
+    setCheckinRoomTypeId(b.room?.room_type_id || "");
+    setCheckinRoomId(b.room_id || "");
     setCheckinModalOpen(true);
   }
 
@@ -1025,6 +1030,20 @@ export default function BookingsPage() {
 
         if (clientErr) {
           toast.error("Erreur lors de la mise à jour des informations du client : " + clientErr.message);
+          setCheckinSaving(false);
+          return;
+        }
+      }
+
+      // Si la chambre a changé, mettre à jour la réservation
+      if (checkinRoomId && checkinRoomId !== checkinBooking.room_id) {
+        const { error: roomErr } = await supabase
+          .from("bookings")
+          .update({ room_id: checkinRoomId })
+          .eq("id", checkinBooking.id);
+
+        if (roomErr) {
+          toast.error("Erreur lors du changement de chambre : " + roomErr.message);
           setCheckinSaving(false);
           return;
         }
@@ -2941,24 +2960,54 @@ export default function BookingsPage() {
               <p className="mt-0.5">Vérifiez et complétez les informations d'identité du client (CNI/Passeport) avant de valider son entrée dans l'établissement.</p>
             </div>
           </div>
-          {/* Chambre assignée — information visible pour la remise de clé */}
-          {checkinBooking?.room && (
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center flex-shrink-0">
-                <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
-                  {checkinBooking.room.room_number}
-                </span>
+          {/* Sélection de la chambre assignée */}
+          <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-3">
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Chambre assignée</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de chambre</label>
+                <select
+                  value={checkinRoomTypeId}
+                  onChange={(e) => {
+                    setCheckinRoomTypeId(e.target.value);
+                    // Reset room selection when type changes
+                    const firstRoom = rooms.find((r) => r.room_type_id === e.target.value && r.status === "available");
+                    setCheckinRoomId(firstRoom?.id || "");
+                  }}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Sélectionner un type</option>
+                  {roomTypes.map((rt) => (
+                    <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price)}/nuit</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                  Chambre {checkinBooking.room.room_number}
-                </p>
-                <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                  {checkinBooking.room_type?.name || "Type inconnu"} · Arrivée {formatDate(checkinBooking.check_in_date)} → Départ {formatDate(checkinBooking.check_out_date)}
-                </p>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Chambre disponible</label>
+                <select
+                  value={checkinRoomId}
+                  onChange={(e) => setCheckinRoomId(e.target.value)}
+                  disabled={!checkinRoomTypeId}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                >
+                  <option value="">Sélectionner une chambre</option>
+                  {rooms
+                    .filter((r) => r.room_type_id === checkinRoomTypeId && r.status === "available")
+                    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Chambre {r.room_number}{r.floor ? ` (étage ${r.floor})` : ""}
+                      </option>
+                    ))}
+                </select>
               </div>
             </div>
-          )}
+            {checkinBooking?.room && checkinRoomId !== checkinBooking.room_id && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                ⚠️ Changement de chambre : {checkinBooking.room.room_number} → {rooms.find((r) => r.id === checkinRoomId)?.room_number || "—"}
+              </p>
+            )}
+          </div>
 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
