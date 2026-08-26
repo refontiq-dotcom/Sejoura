@@ -1186,12 +1186,52 @@ export default function AccountingPage() {
           });
         }
       }
-      setInvoices(
-        invData.map((i) => ({
+      const existingInvoiceBookingIds = new Set(invData.map((i) => i.booking_id));
+
+      // Inclure les réservations payées/partiellement payées sans facture générée
+      const { data: paidBookings } = await supabase
+        .from("bookings")
+        .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), created_at")
+        .eq("tenant_id", tid)
+        .in("payment_status", ["paid", "partial"])
+        .order("created_at", { ascending: false });
+
+      const virtualInvoices: EnrichedInvoice[] = [];
+      if (paidBookings) {
+        for (const bk of paidBookings) {
+          if (existingInvoiceBookingIds.has(bk.id)) continue;
+          const clientName = (bk as { client?: { full_name: string }[] | null }).client?.[0]?.full_name || "—";
+          virtualInvoices.push({
+            id: `virtual-${bk.id}`,
+            tenant_id: tid,
+            booking_id: bk.id,
+            invoice_number: `ATT-${bk.booking_code}`,
+            amount: bk.total_amount,
+            tax_amount: 0,
+            total_amount: bk.total_amount,
+            status: "draft" as InvoiceStatus,
+            pdf_url: null,
+            sent_at: null,
+            sent_to: null,
+            created_by: "",
+            created_at: bk.created_at,
+            updated_at: bk.created_at,
+            booking: {
+              booking_code: bk.booking_code,
+              accommodation_id: bk.accommodation_id,
+              client_name: clientName,
+            },
+          });
+        }
+      }
+
+      setInvoices([
+        ...invData.map((i) => ({
           ...i,
           booking: i.booking_id ? invBookingById[i.booking_id] : undefined,
-        }))
-      );
+        })),
+        ...virtualInvoices,
+      ]);
 
       // Réservations pour les créances
       const { data: bkAll } = await supabase
@@ -1716,10 +1756,24 @@ export default function AccountingPage() {
 
   async function handleOpenInvoice(inv: EnrichedInvoice) {
     try {
-      const response = await fetch(`/api/invoice/generate?bookingId=${encodeURIComponent(inv.booking_id)}`);
-      const result = await response.json();
-      if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
-      window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+      const isVirtual = inv.id.startsWith("virtual-");
+      const response = await fetch(`/api/invoice/generate`, {
+        method: isVirtual ? "POST" : "GET",
+        headers: isVirtual ? { "Content-Type": "application/json" } : undefined,
+        body: isVirtual ? JSON.stringify({ bookingId: inv.booking_id }) : undefined,
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/pdf")) {
+        const pdfBlob = await response.blob();
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        window.open(blobUrl, "_blank", "noopener,noreferrer");
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+      } else {
+        const result = await response.json();
+        if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
+        window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
     }
@@ -2627,8 +2681,8 @@ export default function AccountingPage() {
                             <Download className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        {/* Actions intelligentes par statut */}
-                        {INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
+                        {/* Actions intelligentes par statut (pas pour les factures virtuelles) */}
+                        {!inv.id.startsWith('virtual-') && INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
                           <button
                             key={action.status}
                             onClick={() => openInvoiceStatusChange(inv, action.status)}
@@ -2722,7 +2776,7 @@ export default function AccountingPage() {
                               </button>
                             )}
                             {/* Actions intelligentes par statut */}
-                            {INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
+                            {!inv.id.startsWith('virtual-') && INVOICE_STATUS_ACTIONS[inv.status]?.map((action) => (
                               <button
                                 key={action.status}
                                 onClick={() => openInvoiceStatusChange(inv, action.status)}

@@ -101,6 +101,28 @@ export async function POST(request: Request) {
 
     if (!invoice) return NextResponse.json({ error: "Impossible de préparer la facture." }, { status: 500 });
 
+    // ── Synchronisation après prolongation ───────────────────────────────────
+    // Si le total de la réservation a changé (prolongation, modification de
+    // tarif), on recalcule la facture pour refléter le montant réel du séjour.
+    const expectedAmount = booking.total_amount || 0;
+    if (invoice.amount !== expectedAmount && expectedAmount > 0) {
+      const taxAmount = invoice.tax_amount || 0;
+      await admin
+        .from("invoices")
+        .update({ amount: expectedAmount, total_amount: expectedAmount + taxAmount })
+        .eq("id", invoice.id);
+      invoice = { ...invoice, amount: expectedAmount, total_amount: expectedAmount + taxAmount };
+      // Le PDF existant est obsolète : on force sa régénération en supprimant
+      // le chemin du fichier stocké.
+      if (invoice.pdf_url && !isLegacyPublicUrl(invoice.pdf_url)) {
+        const oldPath = invoice.pdf_url;
+        invoice.pdf_url = null;
+        await admin.from("invoices").update({ pdf_url: null }).eq("id", invoice.id);
+        // Suppression silencieuse du fichier ancien (best-effort)
+        await admin.storage.from(INVOICE_BUCKET).remove([oldPath]).catch(() => {});
+      }
+    }
+
     let storedPdfPath = invoice.pdf_url;
     const hadPdf = Boolean(storedPdfPath);
     if (!storedPdfPath) {
@@ -128,23 +150,48 @@ export async function POST(request: Request) {
         invoice,
         extensions: (extensions ?? []) as unknown as BookingExtension[],
       });
-      const objectPath = `${user.tenant_id}/${bookingId}/${invoice.id}.pdf`;
-      const { error: uploadError } = await admin.storage.from(INVOICE_BUCKET).upload(objectPath, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: false,
-      });
-      if (uploadError && !/already exists/i.test(uploadError.message)) {
-        return NextResponse.json({ error: `Erreur lors de l'upload du PDF: ${uploadError.message}` }, { status: 500 });
-      }
 
-      const { error: updateError } = await admin.from("invoices").update({ pdf_url: objectPath }).eq("id", invoice.id);
-      if (updateError) return NextResponse.json({ error: `PDF créé mais non rattaché à la facture: ${updateError.message}` }, { status: 500 });
-      storedPdfPath = objectPath;
-      invoice = { ...invoice, pdf_url: objectPath };
+      // ── Sauvegarde en arrière-plan (best-effort) ─────────────────────────
+      // On enregistre le PDF dans le storage Supabase pour les téléchargements
+      // futurs, mais on ne bloque pas la réponse : le PDF est retourné
+      // directement au navigateur.
+      const objectPath = `${user.tenant_id}/${bookingId}/${invoice.id}.pdf`;
+      admin.storage.from(INVOICE_BUCKET).upload(objectPath, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      }).then(() =>
+        admin.from("invoices").update({ pdf_url: objectPath }).eq("id", invoice.id)
+      ).catch(() => {});
+
+      // ── Retour du PDF directement au navigateur ──────────────────────────
+      return new Response(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="facture-${invoice.invoice_number}.pdf"`,
+          "X-Invoice-Number": invoice.invoice_number,
+          "X-Already-Generated": String(hadPdf),
+        },
+      });
     }
 
+    // ── Cas "déjà généré" : on sert le fichier depuis le storage ──────────
     const accessUrl = await getInvoiceAccessUrl(admin, storedPdfPath);
-    return NextResponse.json({ invoice: { ...invoice, pdf_url: accessUrl }, alreadyGenerated: hadPdf });
+    if (accessUrl) {
+      const pdfRes = await fetch(accessUrl);
+      if (pdfRes.ok) {
+        const pdfBuf = new Uint8Array(await pdfRes.arrayBuffer());
+        return new Response(pdfBuf, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="facture-${invoice.invoice_number}.pdf"`,
+            "X-Invoice-Number": invoice.invoice_number,
+            "X-Already-Generated": "true",
+          },
+        });
+      }
+    }
+    // Fallback : si le fichier est introuvable dans le storage, on régénère
+    return NextResponse.json({ error: "Le fichier PDF est introuvable. Veuillez réessayer." }, { status: 404 });
   } catch (err) {
     console.error("generate_invoice error:", err);
     return NextResponse.json({ error: "Une erreur est survenue lors de la génération de la facture." }, { status: 500 });
@@ -168,6 +215,22 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: "Erreur lors de la récupération de la facture." }, { status: 500 });
     if (!invoice) return NextResponse.json({ invoice: null });
 
+    // Si le PDF existe dans le storage, le retourner directement en binaire
+    if (invoice.pdf_url && !isLegacyPublicUrl(invoice.pdf_url)) {
+      const { data: fileData, error: downloadError } = await admin.storage
+        .from(INVOICE_BUCKET)
+        .download(invoice.pdf_url);
+      if (!downloadError && fileData) {
+        const pdfBuf = new Uint8Array(await fileData.arrayBuffer());
+        return new Response(pdfBuf, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="facture-${invoice.invoice_number}.pdf"`,
+          },
+        });
+      }
+    }
+    // Fallback : retourner le signed URL en JSON
     const accessUrl = await getInvoiceAccessUrl(admin, invoice.pdf_url);
     return NextResponse.json({ invoice: { ...invoice, pdf_url: accessUrl } });
   } catch (err) {

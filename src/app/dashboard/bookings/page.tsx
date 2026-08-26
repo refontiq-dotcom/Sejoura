@@ -204,6 +204,8 @@ export default function BookingsPage() {
   const [invoicesMap, setInvoicesMap] = useState<Record<string, Invoice>>({});
   const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
   const [emailInput, setEmailInput] = useState("");
+  // Blob URL du PDF affiché dans la modal (évite les iframes cross-origin)
+  const invoicePdfBlobUrlRef = useRef<string | null>(null);
 
   // Génère (ou réutilise) l'accès client sécurisé d'une réservation.
   // Formule Entreprise uniquement — sinon, propose l'upgrade.
@@ -340,6 +342,16 @@ export default function BookingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, bookings]);
+
+  // Nettoyage du blob URL de la facture lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      if (invoicePdfBlobUrlRef.current) {
+        URL.revokeObjectURL(invoicePdfBlobUrlRef.current);
+        invoicePdfBlobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   async function loadInitData() {
     try {
@@ -552,21 +564,61 @@ export default function BookingsPage() {
           body: JSON.stringify({ bookingId: booking.id }),
         });
 
-        const result = await response.json();
+        // Le POST peut retourner le PDF binaire ou une erreur JSON.
+        const contentType = response.headers.get("content-type") || "";
 
         if (!response.ok) {
-          toast.error(result.error || "Erreur lors de la génération de la facture.", { id: loadingToast });
+          const result = await response.json().catch(() => ({}));
+          toast.error((result as { error?: string }).error || "Erreur lors de la génération de la facture.", { id: loadingToast });
           return;
         }
 
-        const invoice = result.invoice as Invoice;
-        setInvoicesMap((prev) => ({ ...prev, [booking.id]: invoice }));
-        setSelectedBookingForInvoice(booking);
-        setInvoiceModalOpen(true);
+        if (contentType.includes("application/pdf")) {
+          // Réponse binaire : le PDF est retourné directement.
+          const pdfBlob = await response.blob();
+          // Libérer l'ancien blob URL s'il existe
+          if (invoicePdfBlobUrlRef.current) {
+            URL.revokeObjectURL(invoicePdfBlobUrlRef.current);
+          }
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          invoicePdfBlobUrlRef.current = blobUrl;
 
-        if (result.alreadyGenerated) {
-          toast("Facture existante retrouvée.", { id: loadingToast, duration: 3000 });
+          const invoiceNumber = response.headers.get("x-invoice-number") || "";
+          const alreadyGenerated = response.headers.get("x-already-generated") === "true";
+          // Mettre à jour la map des factures avec les infos de base
+          setInvoicesMap((prev) => ({
+            ...prev,
+            [booking.id]: {
+              ...(prev[booking.id] || {}),
+              id: booking.id,
+              booking_id: booking.id,
+              tenant_id: booking.tenant_id,
+              invoice_number: invoiceNumber,
+              pdf_url: blobUrl,
+              total_amount: booking.total_amount || 0,
+              amount: booking.total_amount || 0,
+              tax_amount: 0,
+              status: "draft",
+              created_by: userId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as Invoice,
+          }));
+          setSelectedBookingForInvoice(booking);
+          setInvoiceModalOpen(true);
+
+          if (alreadyGenerated) {
+            toast("Facture existante retrouvée.", { id: loadingToast, duration: 3000 });
+          } else {
+            toast.success("Facture générée avec succès !", { id: loadingToast });
+          }
         } else {
+          // Fallback : réponse JSON (ancien comportement)
+          const result = await response.json();
+          const invoice = result.invoice as Invoice;
+          setInvoicesMap((prev) => ({ ...prev, [booking.id]: invoice }));
+          setSelectedBookingForInvoice(booking);
+          setInvoiceModalOpen(true);
           toast.success("Facture générée avec succès !", { id: loadingToast });
         }
       } catch (err) {
@@ -611,9 +663,20 @@ export default function BookingsPage() {
     async function handleDownloadInvoice(invoice: Invoice) {
       try {
         const response = await fetch(`/api/invoice/generate?bookingId=${encodeURIComponent(invoice.booking_id)}`);
-        const result = await response.json();
-        if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
-        window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+        const contentType = response.headers.get("content-type") || "";
+
+        if (contentType.includes("application/pdf")) {
+          const pdfBlob = await response.blob();
+          const blobUrl = URL.createObjectURL(pdfBlob);
+          window.open(blobUrl, "_blank", "noopener,noreferrer");
+          // Nettoyage différé
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        } else {
+          // Fallback JSON
+          const result = await response.json();
+          if (!response.ok || !result.invoice?.pdf_url) throw new Error(result.error || "Aucun PDF disponible pour cette facture.");
+          window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
+        }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
       }
