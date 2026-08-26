@@ -58,6 +58,7 @@ import {
   History,
   ArrowRight,
   ArrowLeftRight,
+  Zap,
   Info,
   Wallet,
   CheckCircle2,
@@ -1159,6 +1160,42 @@ export default function BookingsPage() {
     }
   }
 
+  // ── CHECK-IN EXPRESS (discrétion) ────────────────────────────────────────
+  async function handleExpressCheckin(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    // Vérifier que le client a un CNI renseigné (obligatoire pour le check-in)
+    if (!b.client?.id_number) {
+      toast.error("Le client n'a pas de pièce d'identité enregistrée. Faites un check-in normal d'abord.");
+      return;
+    }
+    setActioningId(b.id);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("check_in_booking", {
+        p_booking_id: b.id,
+        p_user_id: userId,
+        p_allow_early: false,
+        p_allow_late: false,
+      });
+      if (error) {
+        if (error.message.includes("CHECK_IN_TOO_EARLY")) {
+          toast.error("Check-in trop tôt. L'arrivée est prévue le " + formatDate(b.check_in_date) + ".");
+        } else if (error.message.includes("CHECK_IN_TOO_LATE")) {
+          toast.error("Check-in trop tard. Le séjour a déjà expiré.");
+        } else {
+          toast.error("Erreur check-in express : " + error.message);
+        }
+        return;
+      }
+      // Afficher la chambre pour programmer la carte
+      toast.success(`Check-in express effectué — Chambre ${b.room?.room_number || "—"} — Programmez la carte et remettez-la au client ✓`, { duration: 8000 });
+      await loadBookings(tenantId, accommodationFilterRef.current);
+    } catch {
+      toast.error("Erreur lors du check-in express.");
+    } finally {
+      setActioningId("");
+    }
+  }
+
   // Sauvegarde des modifications du client depuis le drawer latéral
   async function handleSaveDrawerClient() {
     if (!selectedClient) return;
@@ -2057,6 +2094,11 @@ export default function BookingsPage() {
                             {b.status === "checked_in" && (
                               <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
                                 <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                              </DropdownMenuItem>
+                            )}
+                            {b.status === "confirmed" && (
+                              <DropdownMenuItem onSelect={() => handleExpressCheckin(b)}>
+                                <Zap className="w-4 h-4 text-emerald-500" /> Check-in express (discrétion)
                               </DropdownMenuItem>
                             )}
                             {b.status === "checked_in" && (
