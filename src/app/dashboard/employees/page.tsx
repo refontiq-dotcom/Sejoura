@@ -360,7 +360,7 @@ export default function EmployeesPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("employee_assignments")
-        .select(`*, accommodation:accommodations(id, name, city)`)
+        .select("*")
         .eq("user_id", emp.id)
         .order("start_date", { ascending: false })
         .limit(20);
@@ -369,7 +369,14 @@ export default function EmployeesPage() {
         toast.error("Le chargement de l'historique a échoué.");
         return;
       }
-      if (data) setHistoryData(data as unknown as (EmployeeAssignment & { accommodation?: Accommodation })[]);
+      if (data) {
+        // Joindre les accommodations déjà chargées en mémoire
+        const enriched = data.map((row: EmployeeAssignment) => ({
+          ...row,
+          accommodation: accommodations.find((a) => a.id === row.accommodation_id) || null,
+        }));
+        setHistoryData(enriched as (EmployeeAssignment & { accommodation?: Accommodation })[]);
+      }
     } catch (err) {
       console.error("Exception chargement historique:", err);
       toast.error("Le chargement a échoué : historique.");
