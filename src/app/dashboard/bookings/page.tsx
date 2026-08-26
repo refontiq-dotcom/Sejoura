@@ -274,6 +274,7 @@ export default function BookingsPage() {
 
   const [formData, setFormData] = useState({
     accommodation_id: "",
+    room_type_id: "",
     room_id: "",
     client_id: "",
     newClientName: "",
@@ -706,6 +707,7 @@ export default function BookingsPage() {
   function openAddModal() {
     setFormData({
       accommodation_id: "",
+      room_type_id: "",
       room_id: "",
       client_id: "",
       newClientName: "",
@@ -2708,27 +2710,45 @@ export default function BookingsPage() {
             </select>
           </div>
 
+          {/* Type de chambre */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Chambre</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre</label>
             <select
-              value={formData.room_id}
+              value={formData.room_type_id}
               onChange={(e) => {
-                const room = rooms.find((r) => r.id === e.target.value);
-                const rt = roomTypes.find((t) => t.id === room?.room_type_id);
-                setFormData({ ...formData, room_id: e.target.value, negotiated_price: rt?.base_price.toString() || "" });
+                setFormData({ ...formData, room_type_id: e.target.value, room_id: "" });
               }}
               disabled={!formData.accommodation_id}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              <option value="">Sélectionner une chambre</option>
-              {rooms.map((r) => {
-                const rt = roomTypes.find((t) => t.id === r.room_type_id);
-                return (
+              <option value="">Sélectionner un type</option>
+              {roomTypes.map((rt) => (
+                <option key={rt.id} value={rt.id}>{rt.name} — {fmt(rt.base_price)}/nuit</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Numéro de chambre (filtré par type) */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Numéro de chambre</label>
+            <select
+              value={formData.room_id}
+              onChange={(e) => {
+                const rt = roomTypes.find((t) => t.id === formData.room_type_id);
+                setFormData({ ...formData, room_id: e.target.value, negotiated_price: rt?.base_price.toString() || "" });
+              }}
+              disabled={!formData.room_type_id}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              <option value="">{formData.room_type_id ? "Sélectionner une chambre" : "Choisir un type d'abord"}</option>
+              {rooms
+                .filter((r) => r.room_type_id === formData.room_type_id && r.status === "available")
+                .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+                .map((r) => (
                   <option key={r.id} value={r.id}>
-                    Ch. {r.room_number} — {rt?.name || ""} — {rt ? fmt(rt.base_price) : ""}
+                    Chambre {r.room_number}{r.floor ? ` (étage ${r.floor})` : ""}
                   </option>
-                );
-              })}
+                ))}
             </select>
           </div>
 
