@@ -1757,7 +1757,10 @@ export default function AccountingPage() {
   async function handleOpenInvoice(inv: EnrichedInvoice) {
     try {
       const isVirtual = inv.id.startsWith("virtual-");
-      const response = await fetch(`/api/invoice/generate`, {
+      const url = isVirtual
+        ? `/api/invoice/generate`
+        : `/api/invoice/generate?bookingId=${encodeURIComponent(inv.booking_id)}`;
+      const response = await fetch(url, {
         method: isVirtual ? "POST" : "GET",
         headers: isVirtual ? { "Content-Type": "application/json" } : undefined,
         body: isVirtual ? JSON.stringify({ bookingId: inv.booking_id }) : undefined,

@@ -1297,6 +1297,20 @@ export default function BookingsPage() {
 
   // Règle le solde restant au check-out : encaisse le reliquat (payments),
   // puis confirme le départ. Le trigger recalcule automatiquement le statut.
+  // Génération automatique de facture après check-out (best-effort, silencieux)
+  async function autoGenerateInvoice(bookingId: string) {
+    try {
+      await fetch("/api/invoice/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      loadInvoices(tenantId);
+    } catch {
+      // Silencieux : la facture pourra être générée manuellement
+    }
+  }
+
   async function handleCheckoutConfirm() {
     const b = checkoutBooking;
     if (!b) return;
@@ -1345,6 +1359,8 @@ export default function BookingsPage() {
       setCheckoutBooking(null);
       await runOverstayCheck();
       loadBookings(tenantId);
+      // Génération automatique de la facture (best-effort)
+      autoGenerateInvoice(b.id);
     } catch (err) {
       toast.error("Une erreur est survenue lors du check-out.");
       console.error(err);
@@ -1493,6 +1509,8 @@ export default function BookingsPage() {
        setConfirmAction(null);
        await runOverstayCheck();
        loadBookings(tenantId);
+       // Génération automatique de la facture au check-out (best-effort)
+       if (action === "check_out") autoGenerateInvoice(bookingId);
      } catch (err) {
        toast.error("Une erreur est survenue lors de l'action.");
        console.error(err);
