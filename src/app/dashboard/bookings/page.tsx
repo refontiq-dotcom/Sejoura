@@ -2951,9 +2951,6 @@ export default function BookingsPage() {
             </>
           )}
 
-          {/* Client — tous les champs suivants nécessitent une chambre disponible */}
-          {availabilityChecked && availableRooms.length > 0 && (
-          <>
           {/* Client — champ unifié avec autocomplete */}
           <div className="relative">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nom du client</label>
@@ -3121,8 +3118,6 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSave} loading={saving}>Créer la réservation</Button>
           </div>
-          </>
-          )}
         </div>
       </Modal>
 
