@@ -183,7 +183,7 @@ export default function SuperAdminPage() {
 
       setLastUpdated(new Date());
     } catch {
-      if (!silent) toast.error("Impossible de charger les données initiales.");
+      if (!silent) toast.error("Oups, les données n'ont pas pu se charger... Réessayez 🔄");
     } finally {
       if (!silent) setLoading(false);
     }
@@ -199,12 +199,12 @@ export default function SuperAdminPage() {
         p_request_id: validateTarget.id,
       });
       if (error) throw error;
-      toast.success("Abonnement activé. Le gérant a été notifié.", { id: toastId });
+      toast.success("Abonnement activé ! Le gérant a été notifié 🎉", { id: toastId });
       setValidateTarget(null);
       await loadData(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur lors de la validation.";
-      toast.error(`Erreur lors de la validation : ${msg}`, { id: toastId });
+      toast.error(`La validation a échoué : ${msg} 🔄`, { id: toastId });
     } finally {
       setActioningId(null);
     }
@@ -220,12 +220,12 @@ export default function SuperAdminPage() {
         p_request_id: rejectTarget.id,
       });
       if (error) throw error;
-      toast.success("Demande rejetée. Le gérant a été notifié.", { id: toastId });
+      toast.success("Demande rejetée. Le gérant a été notifié 📧", { id: toastId });
       setRejectTarget(null);
       await loadData(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur lors du rejet.";
-      toast.error(`Erreur lors du rejet : ${msg}`, { id: toastId });
+      toast.error(`Le rejet a échoué : ${msg} 🔄`, { id: toastId });
     } finally {
       setActioningId(null);
     }
@@ -243,13 +243,13 @@ export default function SuperAdminPage() {
         p_reason: reason,
       });
       if (error) throw error;
-      toast.success("Établissement suspendu (lecture seule).", { id: toastId });
+      toast.success("Établissement suspendu 🔒", { id: toastId });
       setSuspensionModal(null);
       setSuspendReason("");
       await loadData(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur lors de la suspension.";
-      toast.error(`Erreur lors de la suspension : ${msg}`, { id: toastId });
+      toast.error(`La suspension a échoué : ${msg} 🔄`, { id: toastId });
     } finally {
       setSuspending(false);
     }
@@ -261,11 +261,11 @@ export default function SuperAdminPage() {
       const supabase = createClient();
       const { error } = await supabase.rpc("reactivate_tenant", { p_tenant_id: tenantId });
       if (error) throw error;
-      toast.success("Établissement réactivé.", { id: toastId });
+      toast.success("Établissement réactivé ! 🟢", { id: toastId });
       await loadData(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur lors de la réactivation.";
-      toast.error(`Erreur lors de la réactivation : ${msg}`, { id: toastId });
+      toast.error(`La réactivation a échoué : ${msg} 🔄`, { id: toastId });
     }
   }
 

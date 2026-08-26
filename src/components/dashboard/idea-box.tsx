@@ -89,7 +89,7 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
     const selected = e.target.files?.[0] || null;
     if (!selected) return;
     if (!selected.type.startsWith("image/")) {
-      toast.error("Veuillez sélectionner une image.");
+      toast.error("Choisissez une image 📸");
       return;
     }
     setFile(selected);
@@ -127,11 +127,11 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     if (trimmedTitle.length < 3) {
-      toast.error("Le titre doit contenir au moins 3 caractères.");
+      toast.error("Le titre doit faire au moins 3 caractères 📝");
       return;
     }
     if (trimmedDescription.length < 10) {
-      toast.error("La description doit contenir au moins 10 caractères.");
+      toast.error("La description doit faire au moins 10 caractères 📝");
       return;
     }
 
@@ -140,7 +140,7 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error("Session expirée. Reconnectez-vous.");
+        toast.error("Session expirée. Reconnectez-vous 🔐");
         return;
       }
 
@@ -181,7 +181,7 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
         }).catch(() => {});
       }
 
-      toast.success("Merci ! Votre suggestion a été envoyée.");
+      toast.success("Merci ! Votre suggestion est envoyée 💌");
       onClose();
     } catch (err) {
       console.error(err);
@@ -355,7 +355,7 @@ export function IdeaBoxSection() {
       if (voteData) setVotedIds(new Set((voteData as { feature_request_id: string }[]).map((v) => v.feature_request_id)));
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de charger les suggestions.");
+      toast.error("Les suggestions sont introuvables 🤔");
     } finally {
       setLoading(false);
     }
@@ -380,11 +380,11 @@ export function IdeaBoxSection() {
 
   async function toggleVote(idea: FeatureRequest) {
     if (!myUserId) {
-      toast.error("Reconnectez-vous pour voter.");
+      toast.error("Reconnectez-vous pour voter 🔐");
       return;
     }
     if (idea.created_by === myUserId) {
-      toast.info("Vous ne pouvez pas voter pour votre propre suggestion.");
+      toast.info("Vous ne pouvez pas voter pour votre propre suggestion 😄");
       return;
     }
     setVotingId(idea.id);
@@ -409,7 +409,7 @@ export function IdeaBoxSection() {
           .insert({ feature_request_id: idea.id, user_id: myUserId });
         if (error) {
           if ((error as { code?: string }).code === "23505") {
-            toast.info("Vous avez déjà voté pour cette suggestion.");
+            toast.info("Vous avez déjà voté pour cette suggestion 🗳️");
             loadIdeas();
             return;
           }
@@ -420,7 +420,7 @@ export function IdeaBoxSection() {
       }
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de mettre à jour le vote.");
+      toast.error("Le vote n'a pas pu être enregistré 🗳️");
     } finally {
       setVotingId(null);
     }

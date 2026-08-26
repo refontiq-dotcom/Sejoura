@@ -25,12 +25,12 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error("Erreur get_client_stay:", error);
-      return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+      return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
     }
 
     return NextResponse.json(data);
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

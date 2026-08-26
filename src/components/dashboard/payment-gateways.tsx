@@ -415,7 +415,7 @@ export function PaymentGatewaysSection() {
     if (error) {
       toast.error("Erreur lors de l'enregistrement des clés API.");
     } else {
-      toast.success(`Clés ${provider} enregistrées avec succès.`);
+      toast.success(`Clés ${provider} enregistrées 🔑`);
       loadGateways();
     }
   };
@@ -430,7 +430,7 @@ export function PaymentGatewaysSection() {
       .eq("id", existing.id);
 
     if (error) {
-      toast.error("Erreur lors de la mise à jour.");
+      toast.error("La mise à jour a échoué... Réessayez 🔄");
     } else {
       toast.success(isActive ? `${provider} activé ✓` : `${provider} désactivé`);
       loadGateways();

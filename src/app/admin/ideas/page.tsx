@@ -88,7 +88,7 @@ export default function AdminIdeasPage() {
       setIdeas(enriched);
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de charger les suggestions.");
+      toast.error("Les suggestions sont introuvables 🤔");
     } finally {
       setLoading(false);
     }
@@ -125,10 +125,10 @@ export default function AdminIdeasPage() {
         .eq("id", idea.id);
       if (error) throw error;
       setIdeas((prev) => prev.map((i) => (i.id === idea.id ? { ...i, status } : i)));
-      toast.success(`Statut mis à jour : ${FEATURE_REQUEST_STATUSES[status].label}`);
+      toast.success(`Statut mis à jour : ${FEATURE_REQUEST_STATUSES[status].label} ✅`);
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de mettre à jour le statut.");
+      toast.error("Le statut n'a pas pu être mis à jour 🔄");
     } finally {
       setActioningId(null);
     }
@@ -148,7 +148,7 @@ export default function AdminIdeasPage() {
       toast.success(next ? "Suggestion masquée (cachée des clients)." : "Suggestion réaffichée.");
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de modifier la visibilité.");
+      toast.error("La visibilité n'a pas pu être modifiée 🔄");
     } finally {
       setActioningId(null);
     }

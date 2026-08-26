@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Erreur create_service_request:", error);
-      return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+      return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
     }
 
     if (!data?.ok) {
@@ -47,6 +47,6 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

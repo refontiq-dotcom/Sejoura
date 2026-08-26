@@ -182,7 +182,7 @@ export function StayTimeline({ bookingId, tenantId, clientId }: StayTimelineProp
   async function handleSubmitNote(e: React.FormEvent) {
     e.preventDefault();
     if (!description.trim()) {
-      toast.error("Décrivez le comportement à noter.");
+      toast.error("Décrivez le comportement à noter 📝");
       return;
     }
     setSaving(true);
@@ -199,11 +199,11 @@ export function StayTimeline({ bookingId, tenantId, clientId }: StayTimelineProp
     setSaving(false);
 
     if (error) {
-      toast.error(error.message || "Impossible d'enregistrer la note.");
+      toast.error(error.message || "L'action a échoué : enregistrer la note.");
       return;
     }
 
-    toast.success("Note comportement enregistrée.");
+    toast.success("Note enregistrée 📝");
     setDescription("");
     setFormOpen(false);
     await load();

@@ -153,11 +153,11 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
       }
 
       sessionStorage.setItem(STORAGE_KEY, "1");
-      toast.success("Vérifié !");
+      toast.success("Tout est bon ! ✅");
       onVerified();
     } catch {
       setSubmitting(false);
-      setPinError("Erreur serveur.");
+      setPinError("Erreur serveur 🖥️.");
     }
   }, [userId, pin, submitting, onVerified]);
 
@@ -216,7 +216,7 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
       }
 
       sessionStorage.setItem(STORAGE_KEY, "1");
-      toast.success("Vérifié !");
+      toast.success("Tout est bon ! ✅");
       onVerified();
     } catch {
       setSubmitting(false);

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     // Validation taille + type MIME
     if (file.size > MAX_SIZE_BYTES) {
       return NextResponse.json(
-        { error: "La photo dépasse la taille maximale de 5 Mo." },
+        { error: "La photo fait plus de 5 Mo. Réduisez-la 📸" },
         { status: 400 }
       );
     }

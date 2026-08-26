@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 
   if (reqError || !requestRow) {
     return NextResponse.json(
-      { error: "Impossible d'enregistrer la demande de paiement." },
+      { error: "L'action a échoué : enregistrer la demande de paiement." },
       { status: 500 }
     );
   }

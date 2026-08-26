@@ -40,8 +40,8 @@ const AUDIT_ACTIONS: Record<string, { label: string; emoji: string; color: strin
   "invoice_sent":           { label: "Facture envoyée",              emoji: "📩", color: "text-blue-600",     bg: "bg-blue-50 dark:bg-blue-950/30",     category: "facturation" },
   "invoice_paid":           { label: "Facture payée",                emoji: "✅", color: "text-emerald-600",  bg: "bg-emerald-50 dark:bg-emerald-950/30", category: "facturation" },
   "invoice_cancelled":      { label: "Facture annulée",              emoji: "❌", color: "text-red-600",      bg: "bg-red-50 dark:bg-red-950/30",       category: "facturation" },
-  "expense.created":        { label: "Dépense enregistrée",          emoji: "🧾", color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
-  "expense.updated":        { label: "Dépense modifiée",             emoji: "✏️",  color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
+  "expense.created":        { label: "Dépense enregistrée 💰",          emoji: "🧾", color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
+  "expense.updated":        { label: "Dépense modifiée ✏️",             emoji: "✏️",  color: "text-rose-600",     bg: "bg-rose-50 dark:bg-rose-950/30",     category: "depense" },
   "auth.login":             { label: "Connexion",                    emoji: "🔑", color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "auth" },
   "auth.logout":            { label: "Déconnexion",                  emoji: "🔒", color: "text-slate-600",    bg: "bg-slate-50 dark:bg-slate-950/30",   category: "auth" },
   "employee.created":       { label: "Employé ajouté",               emoji: "👤", color: "text-cyan-600",     bg: "bg-cyan-50 dark:bg-cyan-950/30",     category: "personnel" },
@@ -1300,7 +1300,7 @@ export default function AccountingPage() {
         setTotalClientCount(clientCount ?? stats.length);
       }
     } catch (err) {
-      toast.error("Impossible de charger les données. Veuillez réessayer.");
+      toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -1311,7 +1311,7 @@ export default function AccountingPage() {
   async function handleRefresh() {
     setRefreshing(true);
     await loadData();
-    toast.success("Données actualisées");
+    toast.success("Données mises à jour 🔄");
   }
 
   // ============================================================================
@@ -1627,11 +1627,11 @@ export default function AccountingPage() {
 
   async function handleSaveExpense() {
     if (!expenseForm.category) {
-      toast.error("Veuillez choisir une catégorie.");
+      toast.error("Choisissez une catégorie 📂");
       return;
     }
     if (!expenseForm.description.trim()) {
-      toast.error("Veuillez indiquer une description.");
+      toast.error("Ajoutez une description 📝");
       return;
     }
     const amount = parseInt(expenseForm.amount);
@@ -1640,7 +1640,7 @@ export default function AccountingPage() {
       return;
     }
     if (!expenseForm.expense_date) {
-      toast.error("Veuillez choisir une date.");
+      toast.error("Choisissez une date 📅");
       return;
     }
     setSavingExpense(true);
@@ -1658,16 +1658,16 @@ export default function AccountingPage() {
       if (editingExpense) {
         const { error } = await supabase.from("expenses").update(payload).eq("id", editingExpense.id);
         if (error) throw error;
-        toast.success("Dépense modifiée");
+        toast.success("Dépense modifiée ✏️");
       } else {
         const { error } = await supabase.from("expenses").insert(payload);
         if (error) throw error;
-        toast.success("Dépense enregistrée");
+        toast.success("Dépense enregistrée 💰");
       }
       setExpenseModalOpen(false);
       loadData();
     } catch (err) {
-      toast.error("Impossible d'enregistrer la dépense : " + ((err as Error)?.message || "erreur"));
+      toast.error("L'action a échoué : enregistrer la dépense : " + ((err as Error)?.message || "erreur"));
     } finally {
       setSavingExpense(false);
     }
@@ -1679,11 +1679,11 @@ export default function AccountingPage() {
       const supabase = createClient();
       const { error } = await supabase.from("expenses").delete().eq("id", deletingExpense.id);
       if (error) throw error;
-      toast.success("Dépense supprimée");
+      toast.success("Dépense supprimée 🗑️");
       setDeletingExpense(null);
       loadData();
     } catch (err) {
-      toast.error("Impossible de supprimer : " + ((err as Error)?.message || "erreur"));
+      toast.error("La suppression a échoué : " + ((err as Error)?.message || "erreur"));
     }
   }
 
@@ -1716,7 +1716,7 @@ export default function AccountingPage() {
         e.amount,
       ])
     );
-    toast.success("Export CSV réussi");
+    toast.success("Export CSV prêt ! 📊");
   }
 
   function exportRevenueCSV() {
@@ -1734,7 +1734,7 @@ export default function AccountingPage() {
         p.amount,
       ])
     );
-    toast.success("Export CSV réussi");
+    toast.success("Export CSV prêt ! 📊");
   }
 
   function exportInvoicesCSV() {
@@ -1753,7 +1753,7 @@ export default function AccountingPage() {
         INVOICE_STATUS_LABELS[inv.status] || inv.status,
       ])
     );
-    toast.success("Export CSV réussi");
+    toast.success("Export CSV prêt ! 📊");
   }
 
   async function handleOpenInvoice(inv: EnrichedInvoice) {
@@ -1780,7 +1780,7 @@ export default function AccountingPage() {
         window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
+      toast.error(err instanceof Error ? err.message : "L'action a échoué : ouvrir la facture.");
     }
   }
 
@@ -1789,7 +1789,7 @@ export default function AccountingPage() {
     // Vérifie que la transition est valide
     const validTransitions = VALID_INVOICE_TRANSITIONS[invoice.status];
     if (!validTransitions.includes(newStatus)) {
-      toast.error(`Transition invalide : ${invoice.status} → ${newStatus}`);
+      toast.error(`Transition impossible : ${invoice.status} → ${newStatus} 🚫`);
       return;
     }
     setInvoiceStatusTarget({ invoice, newStatus });
@@ -1829,7 +1829,7 @@ export default function AccountingPage() {
         )
       );
 
-      toast.success(`Facture marquée comme « ${INVOICE_STATUS_LABELS[newStatus]} »`);
+      toast.success(`Facture marquée « ${INVOICE_STATUS_LABELS[newStatus]} » 📄`);
       setInvoiceStatusTarget(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors du changement de statut.");
@@ -1869,7 +1869,7 @@ export default function AccountingPage() {
         c.balance,
       ])
     );
-    toast.success("Export CSV réussi");
+    toast.success("Export CSV prêt ! 📊");
   }
 
   async function handleExportPdf() {
@@ -1888,7 +1888,7 @@ export default function AccountingPage() {
       });
       if (!res.ok) {
         const errData = (await res.json().catch(() => null)) as { error?: string } | null;
-        toast.error(errData?.error || "Impossible de générer le rapport PDF.");
+        toast.error(errData?.error || "Le rapport PDF n'a pas pu être généré 📄");
         return;
       }
       const blob = await res.blob();
@@ -1900,10 +1900,10 @@ export default function AccountingPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success("Rapport financier PDF généré");
+      toast.success("Rapport PDF prêt ! 📄");
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de générer le rapport PDF.");
+      toast.error("Le rapport PDF n'a pas pu être généré 📄");
     } finally {
       setExportingPdf(false);
     }

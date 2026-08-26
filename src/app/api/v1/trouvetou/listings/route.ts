@@ -277,6 +277,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("GET /api/v1/trouvetou/listings error:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️" }, { status: 500 });
   }
 }

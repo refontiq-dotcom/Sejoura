@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     if (searchErr || !allUsers) {
       return NextResponse.json(
-        { error: "Impossible d'accéder aux données employés." },
+        { error: "L'action a échoué : accéder aux données employés." },
         { status: 500 }
       );
     }

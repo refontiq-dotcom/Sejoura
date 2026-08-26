@@ -323,7 +323,7 @@ export default function ShiftPage() {
       if (bkData) setBookings(bkData as unknown as Booking[]);
 
     } catch (err) {
-      toast.error("Impossible de charger les données du shift.");
+      toast.error("Les données du shift sont introuvables 🤔");
       console.error(err);
     } finally {
       setLoading(false);
@@ -362,7 +362,7 @@ export default function ShiftPage() {
   async function handleOpenShift() {
     const opening = Math.round(Number(openShiftForm.opening_cash)) || 0;
     if (opening < 0) {
-      toast.error("Le fond de caisse ne peut pas être négatif.");
+      toast.error("Le fond de caisse ne peut pas être négatif 💰");
       return;
     }
     setOpenShiftSaving(true);
@@ -375,14 +375,14 @@ export default function ShiftPage() {
         p_notes: openShiftForm.notes?.trim() || null,
       });
       if (error) {
-        toast.error("Erreur à l'ouverture du shift : " + error.message);
+        toast.error("Erreur lors de l'ouverture du shift : " + error.message);
         return;
       }
       toast.success("Shift ouvert — fond de caisse " + fmt(opening) + " ✓");
       setOpenShiftModalOpen(false);
       await loadData();
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setOpenShiftSaving(false);
     }
@@ -401,7 +401,7 @@ export default function ShiftPage() {
     if (!activeShift) return;
     const counted = Math.round(Number(closeShiftForm.counted_cash));
     if (Number.isNaN(counted) || counted < 0) {
-      toast.error("La caisse comptée doit être un montant valide.");
+      toast.error("Le montant de la caisse n'est pas valide 💰");
       return;
     }
     setCloseShiftSaving(true);
@@ -413,12 +413,12 @@ export default function ShiftPage() {
         p_notes: closeShiftForm.notes?.trim() || null,
       });
       if (error) {
-        toast.error("Erreur à la fermeture du shift : " + error.message);
+        toast.error("La fermeture du shift a échoué : " + error.message);
         return;
       }
       const diff = (data as Shift)?.difference ?? 0;
       if (diff === 0) {
-        toast.success("Shift fermé — caisse exacte ✓");
+        toast.success("Shift fermé — caisse exacte ✓ 💯");
       } else {
         toast.warning(`Shift fermé — écart de ${fmtSigned(diff, fmt)}`);
       }
@@ -426,7 +426,7 @@ export default function ShiftPage() {
       setActiveShift(null);
       await loadData();
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setCloseShiftSaving(false);
     }
@@ -439,7 +439,7 @@ export default function ShiftPage() {
       return;
     }
     if (!manualForm.notes.trim()) {
-      toast.error("Veuillez indiquer la raison de l'opération.");
+      toast.error("Indiquez la raison de l'opération.");
       return;
     }
     setManualSaving(true);
@@ -472,7 +472,7 @@ export default function ShiftPage() {
       setManualForm({ operation_type: "manual_in", amount: "", payment_method: "cash", mobile_money_operator: "", notes: "" });
       await loadData();
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setManualSaving(false);
     }

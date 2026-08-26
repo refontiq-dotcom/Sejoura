@@ -145,7 +145,7 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error("essentiel/boost-express update error:", updateError);
       return NextResponse.json(
-        { error: updateError.message || "Impossible d'activer le Boost Express" },
+        { error: updateError.message || "L'action a échoué : activer le Boost Express" },
         { status: 500 }
       );
     }

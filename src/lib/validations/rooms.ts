@@ -28,7 +28,7 @@ export const roomTypeSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["featured_images"],
-      message: "Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.",
+      message: "Ajoutez une photo pour activer Trouvetou 📸",
     });
   }
 });

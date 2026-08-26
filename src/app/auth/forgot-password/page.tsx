@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
         setSent(true);
       }
     } catch {
-      setError("Une erreur est survenue. Réessayez dans quelques instants.");
+      setError("Oups, un petit souci technique ! Réessayez 🤕 Réessayez dans quelques instants.");
     } finally {
       setLoading(false);
     }

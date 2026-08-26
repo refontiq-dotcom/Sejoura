@@ -425,12 +425,12 @@ export default function EmployeePinLogin({
       }
 
       setBiometricRegistered(true);
-      toast.success("Face ID / Empreinte activé pour cet appareil.");
+      toast.success("Face ID / Empreinte activé ! 🔓");
     } catch (err) {
       if (!isWebAuthnCancel(err)) {
         console.error("Erreur enrôlement biométrie:", err);
       }
-      toast.info("Configuration biométrique annulée.");
+      toast.info("Config biométrique annulée 🚫");
     } finally {
       setIsEnrollingBiometrics(false);
       onFinish?.();

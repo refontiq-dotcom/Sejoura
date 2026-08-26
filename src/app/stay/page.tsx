@@ -233,7 +233,7 @@ function StayPortal() {
       setRequest(null);
     } catch (err) {
       setRequest({ ...request, submitting: false, message: request.message });
-      window.alert(err instanceof Error ? err.message : "Une erreur est survenue.");
+      window.alert(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
     }
   };
 
@@ -279,7 +279,7 @@ function StayPortal() {
         loadStay();
       }, 3000);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Une erreur est survenue.");
+      window.alert(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setExtendSubmitting(false);
     }

@@ -188,7 +188,7 @@ export default function SettingsPage() {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Une erreur est survenue.";
+      const message = err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕";
       toast.error(message);
       console.error(err);
     } finally {
@@ -249,7 +249,7 @@ export default function SettingsPage() {
 
       if (error) {
         if (!opts.silent) {
-          toast.error(error.message || "Impossible d'enregistrer.");
+          toast.error(error.message || "L'action a échoué : enregistrer.");
         }
         return false;
       }
@@ -259,7 +259,7 @@ export default function SettingsPage() {
       return true;
     } catch (err) {
       if (!opts.silent) {
-        toast.error(err instanceof Error ? err.message : "Une erreur est survenue.");
+        toast.error(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
       }
       return false;
     } finally {
@@ -305,7 +305,7 @@ export default function SettingsPage() {
       return;
     }
     if (companyForm.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyForm.contact_email)) {
-      setFormError("Adresse email invalide.");
+      setFormError("L'adresse email n'est pas valide ✉️");
       return;
     }
     setFormError("");
@@ -331,7 +331,7 @@ export default function SettingsPage() {
       }
     })();
     if (unchanged) {
-      toast.success("Aucun changement à enregistrer.");
+      toast.success("Rien à modifier, tout est bon 👌");
       return;
     }
 
@@ -390,14 +390,14 @@ export default function SettingsPage() {
         .eq("auth_user_id", user?.auth_user_id || "");
 
       if (error) {
-        toast.error("Impossible de mettre à jour le compte.");
+        toast.error("La mise à jour du compte a échoué 🔄");
         return;
       }
 
       setUser({ ...user!, full_name: accountForm.full_name, phone: accountForm.phone, email: accountForm.email } as unknown as UserType);
-      toast.success("Informations du compte mises à jour");
+      toast.success("Profil mis à jour 👤");
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setSaving(false);
     }
@@ -405,24 +405,24 @@ export default function SettingsPage() {
 
   function handleSaveWhatsApp() {
     if (!whatsappForm.apiToken || !whatsappForm.phoneId || !whatsappForm.webhookVerifyToken) {
-      toast.error("Tous les champs sont requis.");
+      toast.error("Tous les champs sont requis 📋");
       return;
     }
     localStorage.setItem("sejoura-whatsapp-config", JSON.stringify(whatsappForm));
-    toast.success("Configuration WhatsApp sauvegardée localement");
+    toast.success("Config WhatsApp sauvegardée 💾");
   }
 
   async function handleSavePassword() {
     if (!passwordForm.currentPassword || passwordForm.currentPassword.length < 6) {
-      toast.error("Le mot de passe actuel est requis.");
+      toast.error("Entrez votre mot de passe actuel 🔐");
       return;
     }
     if (passwordForm.newPassword.length < 8) {
-      toast.error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+      toast.error("Le mot de passe doit faire au moins 8 caractères 🔐");
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("Les mots de passe ne correspondent pas.");
+      toast.error("Les mots de passe ne correspondent pas 🔐");
       return;
     }
     setSaving(true);
@@ -435,19 +435,19 @@ export default function SettingsPage() {
         password: passwordForm.currentPassword,
       });
       if (signInError) {
-        toast.error("Mot de passe actuel incorrect.");
+        toast.error("Mot de passe actuel incorrect 🔐");
         return;
       }
       // Modification du mot de passe
       const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
       if (error) {
-        toast.error("Impossible de modifier le mot de passe : " + error.message);
+        toast.error("Le mot de passe n'a pas pu être changé : " + error.message);
         return;
       }
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      toast.success("Mot de passe modifié avec succès ✓");
+      toast.success("Mot de passe changé 🔐");
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setSaving(false);
     }
@@ -498,7 +498,7 @@ export default function SettingsPage() {
           .update({ guest_info: info as unknown as Record<string, unknown> })
           .eq("id", activeAccommodation.id);
         if (error) {
-          toast.error(error.message || "Impossible d'enregistrer.");
+          toast.error(error.message || "L'action a échoué : enregistrer.");
           return false;
         }
         setPortalGuestInfo(info);
@@ -830,7 +830,7 @@ export default function SettingsPage() {
                       onClick={async () => {
                         await navigator.clipboard.writeText(employeeLink);
                         setCopiedPortalLink(true);
-                        toast.success("Lien copié ✓");
+                        toast.success("Lien copié dans le presse-papier 📋");
                         setTimeout(() => setCopiedPortalLink(false), 2000);
                       }}
                       disabled={copiedPortalLink}

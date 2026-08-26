@@ -101,7 +101,7 @@ export default function SuperAdminHubPage() {
 
       setLastUpdated(new Date());
     } catch {
-      if (!silent) toast.error("Impossible de charger les données initiales.");
+      if (!silent) toast.error("Oups, les données n'ont pas pu se charger... Réessayez 🔄");
     } finally {
       if (!silent) setLoading(false);
     }

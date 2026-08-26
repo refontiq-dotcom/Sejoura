@@ -179,6 +179,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, registered: true, deviceName });
   } catch (err) {
     console.error("Erreur API employee-biometric (register):", err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

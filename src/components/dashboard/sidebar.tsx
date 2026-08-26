@@ -89,7 +89,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
       const isEmployee = userRole === "receptionniste" || userRole === "menagere";
       window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
-      toast.error("Impossible de se déconnecter.");
+      toast.error("La déconnexion a échoué 🔄");
       setLoggingOut(false);
     }
   }

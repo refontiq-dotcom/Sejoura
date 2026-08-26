@@ -95,7 +95,7 @@ export default function ResidenceDetailPage() {
       setRoomTypes((typesResult.data || []) as unknown as RoomType[]);
       setRooms((roomsResult.data || []) as unknown as Room[]);
     } catch (err) {
-      toast.error("Impossible de charger les données.");
+      toast.error("Les données sont introuvables 🤔");
       console.error(err);
     } finally {
       if (!silent) setLoading(false);
@@ -170,9 +170,9 @@ export default function ResidenceDetailPage() {
         longitude: residenceForm.longitude ? parseFloat(residenceForm.longitude) : null,
       });
       setResidenceModalOpen(false);
-      toast.success("Établissement modifié");
+      toast.success("Établissement modifié ✏️");
     } catch (err) {
-      toast.error("Impossible d'enregistrer l'établissement.");
+      toast.error("L'action a échoué : enregistrer l'établissement.");
       console.error(err);
     } finally {
       setSaving(false);
@@ -185,11 +185,11 @@ export default function ResidenceDetailPage() {
       const supabase = createClient();
       const { error } = await supabase.from("accommodations").delete().eq("id", residence!.id);
       if (error) throw error;
-      toast.success("Établissement supprimé");
+      toast.success("Établissement supprimé 🗑️");
       router.push("/dashboard/residences");
       return true;
     } catch (err) {
-      toast.error("Impossible de supprimer l'établissement.");
+      toast.error("La suppression a échoué : établissement.");
       console.error(err);
       return false;
     } finally {
@@ -221,7 +221,7 @@ export default function ResidenceDetailPage() {
 
   async function saveRoom() {
     if (!roomForm.room_number || !roomForm.room_type_id) {
-      toast.error("Veuillez remplir tous les champs obligatoires.");
+      toast.error("Il manque des champs obligatoires ! Remplissez tout 📋");
       return;
     }
     setSaving(true);
@@ -253,7 +253,7 @@ export default function ResidenceDetailPage() {
         setRoomNumberError(errorMessage);
         toast.error(errorMessage);
       } else {
-        toast.error("Impossible d'enregistrer la chambre.");
+        toast.error("L'action a échoué : enregistrer la chambre.");
       }
       console.error(err);
     } finally {
@@ -268,10 +268,10 @@ export default function ResidenceDetailPage() {
       const { error } = await supabase.from("rooms").delete().eq("id", id);
       if (error) throw error;
       setRooms(rooms.filter((r) => r.id !== id));
-      toast.success("Chambre supprimée");
+      toast.success("Chambre supprimée 🗑️");
       return true;
     } catch (err) {
-      toast.error("Impossible de supprimer la chambre.");
+      toast.error("La chambre n'a pas pu être supprimée 🛏️");
       console.error(err);
       return false;
     } finally {
@@ -327,7 +327,7 @@ export default function ResidenceDetailPage() {
   async function uploadTypeImage(file: File) {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("La photo dépasse la taille maximale de 5 Mo.");
+      toast.error("La photo fait plus de 5 Mo. Réduisez-la 📸");
       return;
     }
     setUploadingImage(true);
@@ -335,7 +335,7 @@ export default function ResidenceDetailPage() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        toast.error("Session expirée. Reconnectez-vous.");
+        toast.error("Session expirée. Reconnectez-vous 🔐");
         return;
       }
       const formData = new FormData();
@@ -347,11 +347,11 @@ export default function ResidenceDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Impossible d'uploader la photo.");
+        toast.error(data.error || "L'action a échoué : uploader la photo.");
         return;
       }
       setTypeForm((prev) => ({ ...prev, featured_images: [...prev.featured_images, data.url] }));
-      toast.success("Photo ajoutée");
+      toast.success("Photo ajoutée avec succès 📸");
     } catch {
       toast.error("Erreur lors de l'upload de la photo.");
     } finally {
@@ -361,7 +361,7 @@ export default function ResidenceDetailPage() {
 
   function toggleTrouvetouListing() {
     if (!typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
-      toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
+      toast.error("Ajoutez une photo pour activer Trouvetou 📸");
       return;
     }
     setTypeForm((prev) => ({ ...prev, is_listed_on_trouvetou: !prev.is_listed_on_trouvetou }));
@@ -369,7 +369,7 @@ export default function ResidenceDetailPage() {
 
   async function saveType() {
     if (!typeForm.name || !typeForm.base_price) {
-      toast.error("Veuillez remplir tous les champs obligatoires.");
+      toast.error("Il manque des champs obligatoires ! Remplissez tout 📋");
       return;
     }
 
@@ -378,12 +378,12 @@ export default function ResidenceDetailPage() {
       (rt) => rt.name.trim().toLowerCase() === nameLower && rt.id !== editingType?.id
     );
     if (isDuplicate) {
-      toast.error("Un type de chambre avec ce nom existe déjà dans cette résidence.");
+      toast.error("Ce nom de type de chambre existe déjà dans cette résidence 🛏️");
       return;
     }
 
     if (typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
-      toast.error("Ajoutez au moins une photo pour activer la diffusion sur Trouvetou.");
+      toast.error("Ajoutez une photo pour activer Trouvetou 📸");
       return;
     }
     setSaving(true);
@@ -441,7 +441,7 @@ export default function ResidenceDetailPage() {
       loadData(true);
       toast.success(editingType ? "Type de chambre modifié" : "Type de chambre créé");
     } catch (err) {
-      toast.error("Impossible d'enregistrer le type de chambre.");
+      toast.error("L'action a échoué : enregistrer le type de chambre.");
       console.error(err);
     } finally {
       setSaving(false);
@@ -476,7 +476,7 @@ export default function ResidenceDetailPage() {
       }
     } catch (err) {
       console.error("syncTrouvetouForType error:", err);
-      toast.error("Erreur lors de la synchronisation Trouvetou.");
+      toast.error("La sync Trouvetou a échoué 🔄");
     }
   }
 
@@ -507,10 +507,10 @@ export default function ResidenceDetailPage() {
       const { error } = await supabase.from("room_types").delete().eq("id", id);
       if (error) throw error;
       setRoomTypes(roomTypes.filter((rt) => rt.id !== id));
-      toast.success("Type de chambre supprimé");
+      toast.success("Type de chambre supprimé 🗑️");
       return true;
     } catch (err) {
-      toast.error("Impossible de supprimer le type de chambre.");
+      toast.error("Le type de chambre n'a pas pu être supprimé 🛏️");
       console.error(err);
       return false;
     } finally {

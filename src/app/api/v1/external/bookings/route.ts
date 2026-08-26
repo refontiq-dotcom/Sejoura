@@ -352,7 +352,7 @@ export async function POST(request: Request) {
       if (!paymentResult.success) {
         await admin.from("bookings").delete().eq("id", booking.id);
         return NextResponse.json(
-          { error: `Impossible d'initier le paiement : ${paymentResult.error}` },
+          { error: `L'action a échoué : initier le paiement : ${paymentResult.error}` },
           { status: 502 }
         );
       }

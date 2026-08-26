@@ -183,6 +183,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Action non reconnue." }, { status: 400 });
   } catch (err) {
     console.error("Erreur API employee-pin:", err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

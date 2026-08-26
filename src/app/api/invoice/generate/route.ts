@@ -235,6 +235,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ invoice: { ...invoice, pdf_url: accessUrl } });
   } catch (err) {
     console.error("get invoice error:", err);
-    return NextResponse.json({ error: "Une erreur est survenue." }, { status: 500 });
+    return NextResponse.json({ error: "Oups, un petit souci technique ! Réessayez 🤕" }, { status: 500 });
   }
 }

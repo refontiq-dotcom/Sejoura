@@ -21,7 +21,7 @@ export function useCleaningActions(
         p_user_id: userId,
       });
       if (error) {
-        toast.error("Erreur : " + error.message);
+        toast.error("Oups : " + error.message);
         return;
       }
       if (!data) {
@@ -29,10 +29,10 @@ export function useCleaningActions(
         callbacks.onClaimDone?.();
         return;
       }
-      toast.success("Tâche prise en charge !");
+      toast.success("Tâche prise en charge ! 💪");
       callbacks.onClaimDone?.();
     } catch {
-      toast.error("Impossible de prendre la tâche.");
+      toast.error("La tâche n'a pas pu être prise 🔄");
     } finally {
       setActionTaskId(null);
     }
@@ -47,13 +47,13 @@ export function useCleaningActions(
         p_user_id: userId,
       });
       if (error) {
-        toast.error("Erreur : " + error.message);
+        toast.error("Oups : " + error.message);
         return;
       }
-      toast.success("Tâche terminée !");
+      toast.success("Tâche terminée ! 🎉");
       callbacks.onCompleteDone?.();
     } catch {
-      toast.error("Impossible de marquer la tâche comme terminée.");
+      toast.error("La tâche n'a pas pu être terminée 🔄");
     } finally {
       setActionTaskId(null);
     }
@@ -67,13 +67,13 @@ export function useCleaningActions(
         p_task_id: taskId,
       });
       if (error) {
-        toast.error("Erreur : " + error.message);
+        toast.error("Oups : " + error.message);
         return;
       }
-      toast.success("Tâche relancée dans le pool.");
+      toast.success("Tâche relancée dans le pool 🔄");
       callbacks.onReopenDone?.();
     } catch {
-      toast.error("Impossible de relancer la tâche.");
+      toast.error("La relance a échoué 🔄");
     } finally {
       setActionTaskId(null);
     }

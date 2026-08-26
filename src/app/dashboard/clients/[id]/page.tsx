@@ -140,7 +140,7 @@ export default function ClientProfilePage() {
 
         if (profileRes.error) {
           console.error("get_client_profile RPC error:", profileRes.error);
-          toast.error("Erreur lors du chargement du dossier client : " + (profileRes.error.message || "Erreur inconnue"));
+          toast.error("Le dossier client n'a pas pu charger : " + (profileRes.error.message || "Erreur inconnue"));
           setPayload(null);
         } else {
           const data = profileRes.data as ClientProfilePayload;
@@ -154,7 +154,7 @@ export default function ClientProfilePage() {
         setBookings((bookingsRes.data as unknown as BookingRow[] | null) || []);
       } catch (err) {
         console.error("client profile load failed", err);
-        toast.error("Impossible de charger le dossier client.");
+        toast.error("Le dossier client est introuvable 🤔");
       } finally {
         setLoading(false);
       }

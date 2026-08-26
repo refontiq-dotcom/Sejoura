@@ -225,7 +225,7 @@ export default function CleaningPage() {
       });
       setTomorrowCheckouts(counts);
     } catch (err) {
-      toast.error("Impossible de charger les données. Veuillez réessayer.");
+      toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");
       console.error(err);
     } finally {
       setLoading(false);

@@ -81,7 +81,7 @@ export default function SubscriptionPage() {
         .maybeSingle();
       setPendingRequest((reqData as { plan: string } | null) ?? null);
     } catch (err) {
-      toast.error("Impossible de charger les données. Veuillez réessayer.");
+      toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -129,14 +129,14 @@ export default function SubscriptionPage() {
         throw new Error(data?.error || "Impossible de soumettre la demande.");
       }
       if (data.alreadyPending) {
-        toast.info("Votre demande de validation est déjà en attente.");
+        toast.info("Votre demande est déjà en attente ⏳");
       } else {
         toast.success("Demande envoyée ! L'administrateur va vérifier votre paiement Wave.");
       }
       setPaymentStep(2);
       loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur de connexion.");
+      toast.error(err instanceof Error ? err.message : "Erreur de connexion 🌐.");
       console.error(err);
     } finally {
       setNotifying(false);

@@ -716,7 +716,7 @@ export default function BookingsPage() {
           toast.success("Facture générée avec succès !", { id: loadingToast });
         }
       } catch (err) {
-        toast.error("Une erreur est survenue.", { id: loadingToast });
+        toast.error("Oups, un petit souci technique ! Réessayez 🤕", { id: loadingToast });
         console.error(err);
       }
     }
@@ -772,7 +772,7 @@ export default function BookingsPage() {
           window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture 📄");
+        toast.error(err instanceof Error ? err.message : "L'action a échoué : ouvrir la facture 📄");
       }
     }
 
@@ -1019,7 +1019,7 @@ export default function BookingsPage() {
         toast.success("Ménage demandé ! Les ménagères sont prévenues 🧹");
       }
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setCleaningLoading(false);
     }
@@ -1478,7 +1478,7 @@ export default function BookingsPage() {
       await runOverstayCheck();
       loadBookings(tenantId);
       loadInvoices(tenantId);
-      toast.success("Réservation modifiée.");
+      toast.success("Réservation modifiée ✏️");
     } catch (err) {
       setEditError("Une erreur est survenue lors de la modification.");
       console.error(err);
@@ -1577,7 +1577,7 @@ export default function BookingsPage() {
       // invalide le PDF, qui sera régénéré au prochain clic).
       loadInvoices(tenantId);
     } catch (err) {
-      toast.error("Une erreur est survenue lors de la prolongation.");
+      toast.error("La prolongation a échoué 🔄");
       console.error(err);
     } finally {
       setSaving(false);
@@ -1694,7 +1694,7 @@ export default function BookingsPage() {
       // Génération automatique de la facture (best-effort)
       autoGenerateInvoice(b.id);
     } catch (err) {
-      toast.error("Une erreur est survenue lors du check-out.");
+      toast.error("Le check-out a échoué 🔄");
       console.error(err);
     } finally {
       setCheckoutSaving(false);

@@ -98,7 +98,7 @@ export default function ResidencesPage() {
         setRoomsCount(roomsMap);
       }
     } catch (err) {
-      toast.error("Impossible de charger les établissements.");
+      toast.error("Les établissements ne se chargent pas 🏨");
       console.error(err);
     } finally {
       if (!silent) setLoading(false);
@@ -207,9 +207,9 @@ export default function ResidencesPage() {
 
       setModalOpen(false);
       loadData(true);
-      toast.success(editingResidence ? "Établissement modifié" : "Établissement créé");
+      toast.success(editingResidence ? "Établissement modifié ✏️" : "Établissement créé");
     } catch (err) {
-      toast.error("Impossible d'enregistrer l'établissement.");
+      toast.error("L'action a échoué : enregistrer l'établissement.");
       console.error(err);
     } finally {
       setSaving(false);
@@ -223,12 +223,12 @@ export default function ResidencesPage() {
       const supabase = createClient();
       const { error } = await supabase.from("accommodations").delete().eq("id", id);
       if (error) throw error;
-      toast.success("Établissement supprimé avec succès.");
+      toast.success("Établissement supprimé 🗑️ 🗑️");
       setDeleteConfirmOpen(false);
       setDeletingId(null);
       loadData(true);
     } catch (err) {
-      toast.error("Impossible de supprimer l'établissement.");
+      toast.error("La suppression a échoué : établissement.");
       console.error(err);
     } finally {
       setSaving(false);

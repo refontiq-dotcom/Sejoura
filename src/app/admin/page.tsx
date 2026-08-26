@@ -107,14 +107,14 @@ function SuperAdminLoginContent() {
           return;
         }
 
-        toast.success("Bienvenue, Super Admin !");
+        toast.success("Bienvenue, Super Admin ! 👑");
         const target =
           typeof data.redirectTo === "string" && data.redirectTo.startsWith("/admin/")
             ? data.redirectTo
             : ADMIN_HUB_ROUTE;
         window.setTimeout(() => router.push(target), 350);
       } catch {
-        setError("Erreur de connexion. Réessayez.");
+        setError("Erreur de connexion 🌐. Réessayez.");
       } finally {
         setLoading(false);
       }

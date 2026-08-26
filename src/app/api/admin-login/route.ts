@@ -140,6 +140,6 @@ export async function POST(req: Request) {
   } catch (err) {
     recordAttempt(ip, false);
     console.error("admin-login:", err);
-    return NextResponse.json({ error: "Erreur serveur. Réessayez." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️. Réessayez." }, { status: 500 });
   }
 }

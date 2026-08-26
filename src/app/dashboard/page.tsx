@@ -1226,7 +1226,7 @@ export default function DashboardPage() {
       });
 
       if (rpcErr) {
-        toast.error("Impossible d'effectuer le check-out : " + rpcErr.message);
+        toast.error("L'action a échoué : effectuer le check-out : " + rpcErr.message);
         return false;
       }
 
@@ -1234,7 +1234,7 @@ export default function DashboardPage() {
       loadDashboardData(true, selectedDate);
       return true;
     } catch {
-      toast.error("Une erreur est survenue lors de l'action.");
+      toast.error("Oups, l'action a échoué : action.");
       return false;
     } finally {
       setActionLoading("");

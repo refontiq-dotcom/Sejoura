@@ -126,8 +126,8 @@ function EmployeeLoginContent() {
     const errorParam = searchParams.get("error");
     if (errorParam === "revoked") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPhoneError("Votre accès a été révoqué par votre employeur.");
-      toast.error("Votre accès a été révoqué par votre employeur.");
+      setPhoneError("Votre accès a été révoqué par votre employeur 🔒");
+      toast.error("Votre accès a été révoqué par votre employeur 🔒");
     }
 
     const phoneParam = searchParams.get("phone");
@@ -201,7 +201,7 @@ function EmployeeLoginContent() {
         goToStep("verify-pin");
       }
     } catch {
-      setPhoneError("Erreur de connexion. Réessayez.");
+      setPhoneError("Erreur de connexion 🌐. Réessayez.");
     } finally {
       setLoading(false);
     }
@@ -274,7 +274,7 @@ function EmployeeLoginContent() {
         toast.success(`Bienvenue, ${profile.fullName} !`);
         return { success: true };
       } catch {
-        return { success: false, error: "Erreur serveur. Réessayez." };
+        return { success: false, error: "Erreur serveur 🖥️. Réessayez." };
       }
     },
     [profile, signInWithSession]
@@ -307,7 +307,7 @@ function EmployeeLoginContent() {
         toast.success(`Bienvenue, ${profile.fullName} ! Code configuré avec succès.`);
         return { success: true };
       } catch {
-        return { success: false, error: "Erreur serveur. Réessayez." };
+        return { success: false, error: "Erreur serveur 🖥️. Réessayez." };
       }
     },
     [profile, signInWithSession]
@@ -349,7 +349,7 @@ function EmployeeLoginContent() {
 
   // ── Mot de passe oublié ─────────────────────────────────────────────────────
   const handleForgotPin = useCallback(() => {
-    toast.info("Contactez le responsable de votre établissement pour réinitialiser votre code.");
+    toast.info("Contactez votre responsable pour réinitialiser votre code 📞");
   }, []);
 
   const currentAccent = brandColor || themePrimaryColor || "#0C1C33";

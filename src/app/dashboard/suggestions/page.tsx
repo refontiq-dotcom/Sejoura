@@ -127,7 +127,7 @@ export default function SuggestionsPage() {
       setVotedIds(new Set((voteData || []).map((v) => v.feature_request_id as string)));
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de charger les suggestions.");
+      toast.error("Les suggestions sont introuvables 🤔");
     } finally {
       setLoading(false);
     }
@@ -154,11 +154,11 @@ export default function SuggestionsPage() {
   // ==========================================================================
   async function toggleVote(idea: EnrichedIdea) {
     if (!myUserId) {
-      toast.error("Reconnectez-vous pour voter.");
+      toast.error("Reconnectez-vous pour voter 🔐");
       return;
     }
     if (idea.created_by === myUserId) {
-      toast.info("Vous ne pouvez pas voter pour votre propre suggestion.");
+      toast.info("Vous ne pouvez pas voter pour votre propre suggestion 😄");
       return;
     }
     if (syncingVotes.has(idea.id)) return;
@@ -204,10 +204,10 @@ export default function SuggestionsPage() {
         prev.map((i) => (i.id === idea.id ? { ...i, upvotes: Math.max(0, i.upvotes - delta) } : i))
       );
       if ((err as { code?: string }).code === "23505") {
-        toast.info("Vous avez déjà voté pour cette suggestion.");
+        toast.info("Vous avez déjà voté pour cette suggestion 🗳️");
         loadData();
       } else {
-        toast.error("Impossible de mettre à jour le vote.");
+        toast.error("Le vote n'a pas pu être enregistré 🗳️");
       }
     } finally {
       setSyncingVotes((prev) => {
@@ -225,7 +225,7 @@ export default function SuggestionsPage() {
     const selected = e.target.files?.[0] || null;
     if (!selected) return;
     if (!selected.type.startsWith("image/")) {
-      toast.error("Veuillez sélectionner une image.");
+      toast.error("Choisissez une image 📸");
       return;
     }
     setFile(selected);
@@ -271,11 +271,11 @@ export default function SuggestionsPage() {
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     if (trimmedTitle.length < 3) {
-      toast.error("Le titre doit contenir au moins 3 caractères.");
+      toast.error("Le titre doit faire au moins 3 caractères 📝");
       return;
     }
     if (trimmedDescription.length < 10) {
-      toast.error("La description doit contenir au moins 10 caractères.");
+      toast.error("La description doit faire au moins 10 caractères 📝");
       return;
     }
 
@@ -284,7 +284,7 @@ export default function SuggestionsPage() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        toast.error("Session expirée. Reconnectez-vous.");
+        toast.error("Session expirée. Reconnectez-vous 🔐");
         return;
       }
 
@@ -325,7 +325,7 @@ export default function SuggestionsPage() {
         }).catch(() => {});
       }
 
-      toast.success("Merci ! Votre suggestion a été envoyée.");
+      toast.success("Merci ! Votre suggestion est envoyée 💌");
       resetForm();
       setActiveTab("community");
       loadData();

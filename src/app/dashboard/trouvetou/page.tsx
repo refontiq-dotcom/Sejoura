@@ -132,10 +132,10 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
         onSuccess();
         onClose();
       } else {
-        toast.error(data.error || "Impossible d'activer le Boost Express");
+        toast.error(data.error || "L'action a échoué : activer le Boost Express");
       }
     } catch {
-      toast.error("Erreur de connexion");
+      toast.error("Erreur de connexion 🌐");
     } finally {
       setLoading(false);
     }
@@ -387,7 +387,7 @@ export default function TrouvetouDashboardPage() {
       }
     } catch (err) {
       console.error(err);
-      setLoadError("Impossible de charger les données. Vérifiez votre connexion.");
+      setLoadError("Les données sont introuvables 🤔 Vérifiez votre connexion.");
     } finally {
       setLoading(false);
     }
@@ -398,7 +398,7 @@ export default function TrouvetouDashboardPage() {
     const newListed = !type.is_listed_on_trouvetou;
     try {
       if (newListed && type.featured_images.length === 0) {
-        toast.error("Ajoutez au moins une photo au type de chambre pour publier sur Trouvetou (section Établissements).");
+        toast.error("Ajoutez une photo au type de chambre pour publier sur Trouvetou 📸");
         return;
       }
       const res = await fetch("/api/v1/trouvetou/sync-type", {
@@ -427,7 +427,7 @@ export default function TrouvetouDashboardPage() {
         toast.error(data.error || "Erreur de mise à jour");
       }
     } catch {
-      toast.error("Erreur de connexion");
+      toast.error("Erreur de connexion 🌐");
     } finally {
       setSavingTypeId(null);
     }
@@ -436,7 +436,7 @@ export default function TrouvetouDashboardPage() {
   // ── Boost Permanent (ENTREPRISE) ────────────────────────────────────────────
   async function handleTogglePermanentBoost(acc: Accommodation) {
     if (!isEnterprisePlan) {
-      toast.error("Le Boost Permanent est réservé à la formule Entreprise");
+      toast.error("Le Boost Permanent est réservé à la formule Entreprise 💎");
       return;
     }
     setBoostSavingId(acc.id);
@@ -459,7 +459,7 @@ export default function TrouvetouDashboardPage() {
         toast.error(data.error || "Impossible de changer le statut Boost");
       }
     } catch {
-      toast.error("Erreur serveur");
+      toast.error("Erreur serveur 🖥️");
     } finally {
       setBoostSavingId(null);
     }

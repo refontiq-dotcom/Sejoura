@@ -91,6 +91,6 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error("Erreur API employee-verify:", err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

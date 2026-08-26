@@ -128,7 +128,7 @@ export default function EmployeesPage() {
         }
       }
     } catch (err) {
-      toast.error("Impossible de charger les données. Veuillez réessayer.");
+      toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -139,19 +139,19 @@ export default function EmployeesPage() {
     const name = formData.full_name.trim();
     const phone = normalizePhone(formData.phone.trim());
     if (!name || !phone) {
-      toast.error("Veuillez renseigner le nom et le numéro de téléphone.");
+      toast.error("Ajoutez un nom et un numéro de téléphone 📞");
       return;
     }
     if (!isValidPhone(formData.phone.trim())) {
-      toast.error("Numéro de téléphone invalide. Utilisez un format international ou local (ex : +225 07 00 00 00 00).");
+      toast.error("Numéro de téléphone invalide. Utilisez le format +225 07 00 00 00 00 📞");
       return;
     }
     if (formData.email && formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      toast.error("Adresse email invalide.");
+      toast.error("L'adresse email n'est pas valide ✉️");
       return;
     }
     if (!formData.accommodation_id) {
-      toast.error("Veuillez sélectionner l'établissement de rattachement de l'employé.");
+      toast.error("Sélectionnez l'établissement de rattachement de l'employé.");
       return;
     }
     // Détection de doublon de téléphone (même logique de correspondance que le login employé)
@@ -162,7 +162,7 @@ export default function EmployeesPage() {
       return empDigits === phoneDigits || empDigits.endsWith(phoneDigits) || phoneDigits.endsWith(empDigits);
     });
     if (duplicate) {
-      toast.error("Un employé est déjà enregistré avec ce numéro de téléphone.");
+      toast.error("Ce numéro de téléphone est déjà utilisé 📞");
       return;
     }
     setLoading(true);
@@ -195,7 +195,7 @@ export default function EmployeesPage() {
       setInviteModalOpen(true);
       loadData();
     } catch (err) {
-      toast.error("Impossible d'enregistrer les modifications.");
+      toast.error("L'action a échoué : enregistrer les modifications.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -208,7 +208,7 @@ export default function EmployeesPage() {
       setCopied(true);
       toast.success("Lien d'invitation copié dans le presse-papier !");
     } catch {
-      toast.error("Impossible de copier le lien. Sélectionnez-le manuellement.");
+      toast.error("Le copier a échoué. Sélectionnez-le manuellement 📋");
     }
     setTimeout(() => setCopied(false), 3000);
   }
@@ -232,7 +232,7 @@ export default function EmployeesPage() {
       toast.success(newStatus ? `Accès réactivé pour ${emp.full_name}` : `Accès révoqué pour ${emp.full_name}`);
       loadData();
     } catch (err) {
-      toast.error("Impossible de modifier le statut de l'employé.");
+      toast.error("Le statut n'a pas pu être modifié : employé.");
       console.error(err);
     }
   }
@@ -259,13 +259,13 @@ export default function EmployeesPage() {
           `Impossible de supprimer ${deleteTarget.full_name} (activité enregistrée). Son accès a été révoqué à la place.`
         );
       } else {
-        toast.success("Employé supprimé avec succès.");
+        toast.success("Employé supprimé 🗑️");
       }
 
       setDeleteTarget(null);
       loadData();
     } catch (err) {
-      toast.error("Impossible de supprimer.");
+      toast.error("La suppression a échoué 🗑️");
       console.error(err);
     } finally {
       setDeleteLoading(false);
@@ -288,11 +288,11 @@ export default function EmployeesPage() {
 
   async function handleReassign() {
     if (!reassignTarget || !reassignForm.accommodation_id) {
-      toast.error("Veuillez sélectionner un établissement de destination.");
+      toast.error("Choisissez un établissement de destination 🏨");
       return;
     }
     if (reassignForm.end_date && reassignForm.end_date < reassignForm.start_date) {
-      toast.error("La date de fin doit être postérieure à la date de début.");
+      toast.error("La date de fin doit être après le début 📅");
       return;
     }
     // Valide contre l'affectation ACTIVE (pas juste le permanent)
@@ -345,7 +345,7 @@ export default function EmployeesPage() {
       setReassignTarget(null);
       loadData();
     } catch (err) {
-      toast.error("Impossible d'effectuer la réaffectation.");
+      toast.error("L'action a échoué : effectuer la réaffectation.");
       console.error(err);
     } finally {
       setReassignLoading(false);
@@ -366,7 +366,7 @@ export default function EmployeesPage() {
         .limit(20);
       if (data) setHistoryData(data as unknown as (EmployeeAssignment & { accommodation?: Accommodation })[]);
     } catch {
-      toast.error("Impossible de charger l'historique.");
+      toast.error("Le chargement a échoué : historique.");
     }
   }
 

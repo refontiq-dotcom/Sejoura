@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
       if (challengeError) {
         console.error("Erreur API employee-biometric (challenge login):", challengeError.message);
-        return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+        return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
       }
 
       return NextResponse.json({ options });
@@ -172,6 +172,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("Erreur API employee-biometric (login):", err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur 🖥️." }, { status: 500 });
   }
 }

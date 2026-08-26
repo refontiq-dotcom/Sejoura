@@ -350,7 +350,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       toast.success(t.markAllReadSuccess);
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
     } finally {
       setMarkingAll(false);
     }

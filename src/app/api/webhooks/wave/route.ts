@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 
     if (paymentError) {
       return NextResponse.json(
-        { error: "Impossible d'enregistrer le paiement." },
+        { error: "L'action a échoué : enregistrer le paiement." },
         { status: 500 }
       );
     }
