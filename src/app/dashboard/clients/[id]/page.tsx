@@ -41,6 +41,7 @@ type BookingRow = {
   nights_count: number;
   total_amount: number;
   amount_paid: number;
+  room_id: string | null;
   room: { room_number: string }[] | null;
 };
 
@@ -124,7 +125,7 @@ export default function ClientProfilePage() {
           supabase
             .from("bookings")
             .select(
-              "id, booking_code, status, payment_status, check_in_date, check_out_date, nights_count, total_amount, amount_paid, room:rooms(room_number)"
+              "id, booking_code, status, payment_status, check_in_date, check_out_date, nights_count, total_amount, amount_paid, room_id, room:rooms!room_id(room_number)"
             )
             .eq("client_id", clientId)
             .order("check_in_date", { ascending: false })
@@ -277,6 +278,16 @@ export default function ClientProfilePage() {
           </div>
         </div>
 
+        {(() => {
+          const activeBooking = bookings.find((b) => b.status === "checked_in" || b.status === "confirmed");
+          const currentRoom = activeBooking?.room?.[0]?.room_number;
+          return currentRoom ? (
+            <p className="mt-3 text-[11px] text-zinc-400">
+              Chambre actuelle : <span className="font-medium text-slate-600 dark:text-slate-300">{currentRoom}</span>
+              {activeBooking ? ` · Séjour ${formatDate(activeBooking.check_in_date)} → ${formatDate(activeBooking.check_out_date)}` : ""}
+            </p>
+          ) : null;
+        })()}
         {client.id_type && (
           <p className="mt-3 text-[11px] text-zinc-400">
             Pièce d&apos;identité : {client.id_type}
