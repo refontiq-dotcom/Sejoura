@@ -67,6 +67,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
 import { ClientScoreBadge } from "@/components/client-score-badge";
+import PdfPreview from "@/components/pdf-preview";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
@@ -3656,10 +3657,9 @@ export default function BookingsPage() {
             <div className="space-y-3">
               {invoicesMap[selectedBookingForInvoice.id]?.pdf_url && (
                 <div className="aspect-[3/4] bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <iframe
-                    src={invoicesMap[selectedBookingForInvoice.id]?.pdf_url || ""}
-                    title={`Facture ${invoicesMap[selectedBookingForInvoice.id].invoice_number}`}
-                    className="w-full h-full"
+                  <PdfPreview
+                    url={invoicesMap[selectedBookingForInvoice.id]?.pdf_url || ""}
+                    className="w-full h-full p-2"
                   />
                 </div>
               )}
