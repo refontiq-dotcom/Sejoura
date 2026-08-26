@@ -601,15 +601,26 @@ export default function BookingsPage() {
           return;
         }
         // 2. Charger les réservations qui chevauchent les dates demandées
-        const { data: overlaps, error: bookingErr } = await supabase
+        //    Filtrer par tenant_id pour n'inclure que les réservations du locataire
+        //    courant — sans ce filtre, Supabase RLS peut bloquer la requête ou
+        //    retourner des résultats incohérents, provoquant "Aucune chambre dispo".
+        const bookingsQuery = supabase
           .from("bookings")
           .select("room_id")
           .eq("accommodation_id", accId)
           .in("status", ["confirmed", "checked_in"])
           .lt("check_in_date", checkOut)
           .gt("check_out_date", checkIn);
+        // Appliquer le filtre tenant_id uniquement si disponible (sinon RLS gère)
+        const bookingsWithTenant = tenantId
+          ? bookingsQuery.eq("tenant_id", tenantId)
+          : bookingsQuery;
+        const { data: overlaps, error: bookingErr } = await bookingsWithTenant;
         if (bookingErr) throw bookingErr;
-        const bookedRoomIds = new Set((overlaps || []).map((b) => b.room_id));
+        // Ignorer les réservations sans chambre assignée (room_id null)
+        const bookedRoomIds = new Set(
+          (overlaps || []).filter((b) => b.room_id != null).map((b) => b.room_id as string)
+        );
         // 3. Filtrer : seules les chambres sans réservation qui chevauchent sont libres.
         // On N'utilise PAS le statut de la chambre comme critère : une chambre
         // "occupied" dont le client part aujourd'hui est libre pour demain.
@@ -621,6 +632,7 @@ export default function BookingsPage() {
         setAvailabilityChecked(true);
       } catch (err) {
         console.error("Erreur vérification disponibilité:", err);
+        toast.error("Impossible de vérifier la disponibilité. Réessayez 🔄");
         setAvailableRooms([]);
         setAvailabilityChecked(true);
       } finally {
