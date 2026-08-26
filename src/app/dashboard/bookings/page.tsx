@@ -1162,14 +1162,28 @@ export default function BookingsPage() {
 
   // ── CHECK-IN EXPRESS (discrétion) ────────────────────────────────────────
   async function handleExpressCheckin(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
-    // Vérifier que le client a un CNI renseigné (obligatoire pour le check-in)
+    // Sécurité : le client doit avoir été vérifié physiquement au moins une fois
+    // (CNI enregistrée + au moins un séjour antérieur check-in ou check-out)
     if (!b.client?.id_number) {
-      toast.error("Le client n'a pas de pièce d'identité enregistrée. Faites un check-in normal d'abord.");
+      toast.error("Première visite du client — faites un check-in normal pour vérifier la CNI.");
       return;
     }
     setActioningId(b.id);
     try {
       const supabase = createClient();
+      // Vérifier qu'il y a au moins un séjour antérieur (hors réservation actuelle)
+      const { data: prevBookings, error: prevErr } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("client_id", b.client_id)
+        .neq("id", b.id)
+        .in("status", ["checked_in", "checked_out"])
+        .limit(1);
+      if (prevErr || !prevBookings || prevBookings.length === 0) {
+        toast.error("Le client n'a jamais séjourné dans l'établissement. Faites un check-in normal d'abord.");
+        setActioningId("");
+        return;
+      }
       const { error } = await supabase.rpc("check_in_booking", {
         p_booking_id: b.id,
         p_user_id: userId,
