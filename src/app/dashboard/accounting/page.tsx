@@ -927,6 +927,8 @@ function PeriodSelector({
             key={p.key}
             onClick={() => onPreset(p.key)}
             className={`px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-md text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+              p.key === "custom" ? "hidden sm:inline-flex" : ""
+            } ${
               preset === p.key
                 ? "bg-white text-[var(--foreground)]"
                 : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
