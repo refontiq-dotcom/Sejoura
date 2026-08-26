@@ -13,6 +13,8 @@ export interface FinancialReportData {
   start: string;
   end: string;
   currencyCode: string;
+  /** Résidence concernée (null = rapport consolidé multi-résidences). */
+  accommodationName?: string | null;
   revenueByMethod: { method: string; amount: number }[];
   mobileMoneyByOperator?: { operator: string; amount: number }[];
   totalRevenue: number;
@@ -107,19 +109,27 @@ export async function generateFinancialReportPdf(data: FinancialReportData): Pro
     .fontSize(24)
     .fillColor(accentGold)
     .font("Helvetica-Bold")
-    .text("RAPPORT FINANCIER", 370, 26, { align: "right" });
+    .text("RAPPORT FINANCIER", 370, 22, { align: "right" });
+
+  if (data.accommodationName) {
+    doc
+      .fontSize(11)
+      .fillColor("#FFFFFF")
+      .font("Helvetica-Bold")
+      .text(data.accommodationName, 370, 50, { align: "right" });
+  }
 
   doc
     .fontSize(10)
     .fillColor("#FFFFFF")
     .font("Helvetica")
-    .text(`Période: ${formatDate(start)} au ${formatDate(end)}`, 370, 56, { align: "right" });
+    .text(`Période: ${formatDate(start)} au ${formatDate(end)}`, 370, data.accommodationName ? 66 : 56, { align: "right" });
 
   doc
     .fontSize(8)
     .fillColor("#E2E8F0")
     .font("Helvetica")
-    .text(`Généré le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`, 370, 74, { align: "right" });
+    .text(`Généré le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`, 370, data.accommodationName ? 82 : 74, { align: "right" });
 
   // --- SYNTHÈSE ---
   let y = 145;

@@ -9,6 +9,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const start = typeof body.start === "string" ? body.start : "";
     const end = typeof body.end === "string" ? body.end : "";
+    // Périmètre optionnel : si une résidence est active côté interface, le
+    // rapport ne porte que sur elle au lieu de consolider tout le tenant.
+    const accommodationId =
+      typeof body.accommodationId === "string" && body.accommodationId.length > 0
+        ? body.accommodationId
+        : null;
 
     if (!start || !end) {
       return NextResponse.json(
@@ -43,24 +49,38 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const tid = userData.tenant_id;
 
-    const [paymentsRes, expensesRes, tenantRes] = await Promise.all([
-      admin
-        .from("payments")
-        .select("payment_date, amount, payment_method, mobile_money_operator, operation_type")
-        .eq("tenant_id", tid)
-        .gte("payment_date", `${start}T00:00:00`)
-        .lte("payment_date", `${end}T23:59:59.999Z`),
-      admin
-        .from("expenses")
-        .select("expense_date, amount, category")
-        .eq("tenant_id", tid)
-        .gte("expense_date", start)
-        .lte("expense_date", end),
+    let paymentsQuery = admin
+      .from("payments")
+      .select("payment_date, amount, payment_method, mobile_money_operator, operation_type")
+      .eq("tenant_id", tid)
+      .gte("payment_date", `${start}T00:00:00`)
+      .lte("payment_date", `${end}T23:59:59.999Z`);
+    if (accommodationId) paymentsQuery = paymentsQuery.eq("accommodation_id", accommodationId);
+
+    let expensesQuery = admin
+      .from("expenses")
+      .select("expense_date, amount, category")
+      .eq("tenant_id", tid)
+      .gte("expense_date", start)
+      .lte("expense_date", end);
+    if (accommodationId) expensesQuery = expensesQuery.eq("accommodation_id", accommodationId);
+
+    const [paymentsRes, expensesRes, tenantRes, accommodationRes] = await Promise.all([
+      paymentsQuery,
+      expensesQuery,
       admin
         .from("tenants")
         .select("company_name, address, city, contact_phone, logo_url, default_currency, default_currency_symbol")
         .eq("id", tid)
         .single(),
+      accommodationId
+        ? admin
+            .from("accommodations")
+            .select("name")
+            .eq("id", accommodationId)
+            .eq("tenant_id", tid)
+            .maybeSingle()
+        : Promise.resolve({ data: null as { name: string } | null }),
     ]);
 
     if (tenantRes.error || !tenantRes.data) {
@@ -69,6 +89,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const accommodationName =
+      (accommodationRes.data as { name: string } | null)?.name ?? null;
 
     const payments = (paymentsRes.data as Payment[] | null) || [];
     const expenses = (expensesRes.data as Expense[] | null) || [];
@@ -108,6 +131,7 @@ export async function POST(request: Request) {
       start,
       end,
       currencyCode,
+      accommodationName,
       revenueByMethod: Object.entries(revenueByMethodMap).map(([method, amount]) => ({ method, amount })),
       mobileMoneyByOperator: Object.entries(mobileMoneyByOperatorMap).map(([operator, amount]) => ({ operator, amount })),
       totalRevenue,
@@ -120,7 +144,12 @@ export async function POST(request: Request) {
       expenseCount: expenses.length,
     });
 
-    const fileName = `rapport-financier_${start}_${end}.pdf`;
+    // Nom de fichier suffixé par la résidence quand le rapport est ciblé.
+    const scopeSlug = accommodationName
+      ? "_" + accommodationName.toLowerCase().normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-+|-+$/g, "")
+      : "";
+
+    const fileName = `rapport-financier${scopeSlug}_${start}_${end}.pdf`;
 
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,

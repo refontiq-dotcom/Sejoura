@@ -409,7 +409,7 @@ function paymentMethodDisplay(p: { payment_method: string; mobile_money_operator
 }
 
 interface EnrichedInvoice extends Invoice {
-  booking?: { booking_code: string; client_name: string } | null;
+  booking?: { booking_code: string; client_name: string; accommodation_id?: string | null } | null;
 }
 
 interface ClientWithStats extends Client {
@@ -428,6 +428,7 @@ type BookingBriefRow = {
   booking_code: string;
   total_amount: number;
   payment_status: string;
+  accommodation_id: string;
   client: { full_name: string }[] | null;
   room: { room_number: string }[] | null;
 };
@@ -435,6 +436,7 @@ type BookingBriefRow = {
 type InvoiceBookingRow = {
   id: string;
   booking_code: string;
+  accommodation_id: string;
   client: { full_name: string }[] | null;
 };
 
@@ -1132,11 +1134,11 @@ export default function AccountingPage() {
       const payData = (pay.data as Payment[] | null) || [];
       const enrichedPayments: EnrichedPayment[] = payData.map((p) => ({ ...p }));
       const bookingIds = [...new Set(payData.filter((p) => p.booking_id).map((p) => p.booking_id as string))];
-      const bookingById: Record<string, { booking_code: string; total_amount: number; payment_status: string; client_name: string; room_number: string }> = {};
+      const bookingById: Record<string, { booking_code: string; total_amount: number; payment_status: string; accommodation_id: string; client_name: string; room_number: string }> = {};
       if (bookingIds.length > 0) {
         const { data: bk } = await supabase
           .from("bookings")
-          .select("id, booking_code, total_amount, payment_status, client:clients(full_name), room:rooms(room_number)")
+          .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), room:rooms(room_number)")
           .in("id", bookingIds);
         if (bk) {
           (bk as BookingBriefRow[]).forEach((b) => {
@@ -1144,6 +1146,7 @@ export default function AccountingPage() {
               booking_code: b.booking_code,
               total_amount: b.total_amount,
               payment_status: b.payment_status,
+              accommodation_id: b.accommodation_id,
               client_name: b.client?.[0]?.full_name || "—",
               room_number: b.room?.[0]?.room_number || "—",
             };
@@ -1151,8 +1154,15 @@ export default function AccountingPage() {
         }
       }
       enrichedPayments.forEach((p) => {
-        if (p.booking_id && bookingById[p.booking_id]) {
-          p.booking = bookingById[p.booking_id];
+        // Rattacher le paiement à sa résidence : colonne directe, sinon celle
+        // de la réservation liée (les paiements anciens peuvent avoir un
+        // accommodation_id null alors que leur réservation est rattachée).
+        const linked = p.booking_id ? bookingById[p.booking_id] : undefined;
+        if (!p.accommodation_id && linked?.accommodation_id) {
+          p.accommodation_id = linked.accommodation_id;
+        }
+        if (linked) {
+          p.booking = linked;
         }
       });
       setPayments(enrichedPayments);
@@ -1160,18 +1170,19 @@ export default function AccountingPage() {
       // Enrichir les factures avec les infos de réservation
       const invData = (inv.data as Invoice[] | null) || [];
       const invBookingIds = [...new Set(invData.map((i) => i.booking_id))];
-      const invBookingById: Record<string, { booking_code: string; client_name: string }> = {};
+      const invBookingById: Record<string, { booking_code: string; accommodation_id: string; client_name: string }> = {};
       if (invBookingIds.length > 0) {
         const { data: ibk } = await supabase
           .from("bookings")
-          .select("id, booking_code, client:clients(full_name)")
+          .select("id, booking_code, accommodation_id, client:clients(full_name)")
           .in("id", invBookingIds);
         if (ibk) {
           (ibk as InvoiceBookingRow[]).forEach((b) => {
-            invBookingById[b.id] = {
-              booking_code: b.booking_code,
-              client_name: b.client?.[0]?.full_name || "—",
-            };
+          invBookingById[b.id] = {
+            booking_code: b.booking_code,
+            accommodation_id: b.accommodation_id,
+            client_name: b.client?.[0]?.full_name || "—",
+          };
           });
         }
       }
@@ -1185,7 +1196,7 @@ export default function AccountingPage() {
       // Réservations pour les créances
       const { data: bkAll } = await supabase
         .from("bookings")
-        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date")
+        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date, accommodation_id")
         .eq("tenant_id", tid)
         .order("check_in_date", { ascending: false })
         .limit(300);
@@ -1200,7 +1211,7 @@ export default function AccountingPage() {
         .from("clients")
         .select(`
           *,
-          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count)
+          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count, accommodation_id)
         `)
         .eq("tenant_id", tid)
         .order("created_at", { ascending: false })
@@ -1262,11 +1273,52 @@ export default function AccountingPage() {
   }
 
   // ============================================================================
+  // Périmètre résidence (« all » = consolidé multi-résidences)
+  // ============================================================================
+
+  // Suit la résidence active du header. Tous les indicateurs ci-dessous sont
+  // ramenés à ce périmètre : recettes, dépenses, tendances, comparaisons,
+  // créances et CRM ne mélangent plus silencieusement plusieurs résidences.
+  const residenceScope = expAccFilter;
+
+  const scopedPayments = useMemo(
+    () =>
+      residenceScope === "all"
+        ? payments
+        : payments.filter((p) => p.accommodation_id === residenceScope),
+    [payments, residenceScope]
+  );
+
+  const scopedExpenses = useMemo(
+    () =>
+      residenceScope === "all"
+        ? expenses
+        : expenses.filter((e) => e.accommodation_id === residenceScope),
+    [expenses, residenceScope]
+  );
+
+  // Stats clients recalculées sur le périmètre : nuits, CA, encaissé et solde
+  // ne comptent que les séjours réalisés dans la résidence active.
+  const scopedClients = useMemo(() => {
+    if (residenceScope === "all") return clients;
+    return clients.map((c) => {
+      const validBks = c.bookings.filter(
+        (b) => b.status !== "cancelled" && b.status !== "no_show" && b.accommodation_id === residenceScope
+      );
+      const nights = validBks.reduce((s, b) => s + (b.nights_count || 0), 0);
+      const totalSpent = validBks.reduce((s, b) => s + (b.total_amount || 0), 0);
+      const paid = validBks.reduce((s, b) => s + (b.amount_paid || 0), 0);
+      const balance = validBks.reduce((s, b) => s + (b.total_amount || 0) - (b.amount_paid || 0), 0);
+      return { ...c, bookings: validBks, stayCount: validBks.length, nights, totalSpent, paid, balance } as ClientWithStats;
+    });
+  }, [clients, residenceScope]);
+
+  // ============================================================================
   // Données filtrées
   // ============================================================================
 
   const filteredExpenses = useMemo(() => {
-    return expenses
+    return scopedExpenses
       .filter((e) => inRange(e.expense_date, startDate, endDate))
       .filter((e) => (expenseCategory === "all" ? true : e.category === expenseCategory))
       .filter((e) => (expenseSearch ? e.description.toLowerCase().includes(expenseSearch.toLowerCase()) : true))
@@ -1275,10 +1327,10 @@ export default function AccountingPage() {
         const bVal = expenseSort.key === "date" ? b.expense_date : b.amount;
         return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * (expenseSort.direction === "asc" ? 1 : -1);
       });
-  }, [expenses, startDate, endDate, expenseCategory, expenseSearch, expenseSort]);
+  }, [scopedExpenses, startDate, endDate, expenseCategory, expenseSearch, expenseSort]);
 
   const filteredPayments = useMemo(() => {
-    return payments
+    return scopedPayments
       .filter((p) => inRange(p.payment_date, startDate, endDate))
       .filter((p) => {
         if (revenueMethod === "all") return true;
@@ -1300,11 +1352,12 @@ export default function AccountingPage() {
         const bVal = revenueSort.key === "date" ? b.payment_date : b.amount;
         return (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) * (revenueSort.direction === "asc" ? 1 : -1);
       });
-  }, [payments, startDate, endDate, revenueMethod, revenueType, revenueSearch, revenueSort]);
+  }, [scopedPayments, startDate, endDate, revenueMethod, revenueType, revenueSearch, revenueSort]);
 
   const filteredInvoices = useMemo(() => {
     return invoices
       .filter((inv) => inRange(inv.created_at, startDate, endDate))
+      .filter((inv) => (residenceScope === "all" ? true : inv.booking?.accommodation_id === residenceScope))
       .filter((inv) => (invoiceStatus === "all" ? true : inv.status === invoiceStatus))
     .filter((inv) => {
       if (!invoiceSearch) return true;
@@ -1318,10 +1371,10 @@ export default function AccountingPage() {
         inv.status?.toLowerCase().includes(q)
       );
     });
-  }, [invoices, startDate, endDate, invoiceStatus, invoiceSearch]);
+  }, [invoices, startDate, endDate, invoiceStatus, invoiceSearch, residenceScope]);
 
   const filteredClients = useMemo(() => {
-    let list = clients;
+    let list = scopedClients;
     if (clientSearch) {
       const q = clientSearch.toLowerCase();
       list = list.filter((c) =>
@@ -1348,20 +1401,20 @@ export default function AccountingPage() {
       }
     });
     return list;
-  }, [clients, clientSearch, clientFilter, clientSort]);
+  }, [scopedClients, clientSearch, clientFilter, clientSort]);
 
   // ============================================================================
   // ─ KPIs CRM ─
   const crmTotalClients = totalClientCount;
-  const crmTotalRevenue = clients.reduce((s, c) => s + c.totalSpent, 0);
-  const crmUnpaidClients = clients.filter((c) => c.balance > 0).length;
+  const crmTotalRevenue = scopedClients.reduce((s, c) => s + c.totalSpent, 0);
+  const crmUnpaidClients = scopedClients.filter((c) => c.balance > 0).length;
   // Solde dû total : on ne compte que les soldes positifs (les trop-perçus ne viennent pas
   // réduire artificiellement le montant des impayés)
-  const crmUnpaidTotal = clients.filter((c) => c.balance > 0).reduce((s, c) => s + c.balance, 0);
-  const crmLoyalClients = clients.filter((c) => c.stayCount >= 3).length;
+  const crmUnpaidTotal = scopedClients.filter((c) => c.balance > 0).reduce((s, c) => s + c.balance, 0);
+  const crmLoyalClients = scopedClients.filter((c) => c.stayCount >= 3).length;
   // Score moyen : calculé uniquement sur les clients ayant réellement un score,
   // sinon les clients non scorés tirent la moyenne vers zéro
-  const scoredClients = clients.filter((c) => c.score != null && c.score > 0);
+  const scoredClients = scopedClients.filter((c) => c.score != null && c.score > 0);
   const crmAvgScore = scoredClients.length > 0 ? Math.round(scoredClients.reduce((s, c) => s + (c.score || 0), 0) / scoredClients.length) : 0;
 
   // KPIs
@@ -1381,19 +1434,19 @@ export default function AccountingPage() {
   }, [startDate, endDate]);
 
   const prevRevenue = useMemo(
-    () => payments.filter((p) => p.amount > 0 && inRange(p.payment_date, prevRange.start, prevRange.end)).reduce((s, p) => s + p.amount, 0),
-    [payments, prevRange]
+    () => scopedPayments.filter((p) => p.amount > 0 && inRange(p.payment_date, prevRange.start, prevRange.end)).reduce((s, p) => s + p.amount, 0),
+    [scopedPayments, prevRange]
   );
   const prevExpenses = useMemo(
-    () => expenses.filter((e) => inRange(e.expense_date, prevRange.start, prevRange.end)).reduce((s, e) => s + e.amount, 0),
-    [expenses, prevRange]
+    () => scopedExpenses.filter((e) => inRange(e.expense_date, prevRange.start, prevRange.end)).reduce((s, e) => s + e.amount, 0),
+    [scopedExpenses, prevRange]
   );
   const prevOutflows = useMemo(
     () =>
       payments
         .filter((p) => p.amount < 0 && inRange(p.payment_date, prevRange.start, prevRange.end))
         .reduce((s, p) => s + Math.abs(p.amount), 0) + prevExpenses,
-    [payments, prevExpenses, prevRange]
+    [scopedPayments, prevExpenses, prevRange]
   );
 
   const revenueDelta = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : null;
@@ -1430,9 +1483,20 @@ export default function AccountingPage() {
   const receivable = useMemo(
     () =>
       bookings
+        .filter((b) => (residenceScope === "all" ? true : b.accommodation_id === residenceScope))
         .filter((b) => (b.status === "confirmed" || b.status === "checked_in") && (b.total_amount - b.amount_paid) > 0)
         .reduce((s, b) => s + (b.total_amount - b.amount_paid), 0),
-    [bookings]
+    [bookings, residenceScope]
+  );
+
+  // Nombre de réservations impayées sur le périmètre actif (affiché sous le KPI créances).
+  const unpaidBookingCount = useMemo(
+    () =>
+      bookings
+        .filter((b) => (residenceScope === "all" ? true : b.accommodation_id === residenceScope))
+        .filter((b) => (b.status === "confirmed" || b.status === "checked_in") && b.total_amount > b.amount_paid)
+        .length,
+    [bookings, residenceScope]
   );
 
   const monthlySeries = useMemo(() => {
@@ -1442,18 +1506,18 @@ export default function AccountingPage() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       series.push({ month: monthKey(isoDate(d)), revenue: 0, expenses: 0 });
     }
-    payments.forEach((p) => {
+    scopedPayments.forEach((p) => {
       const k = monthKey(p.payment_date);
       const s = series.find((x) => x.month === k);
       if (s) s.revenue += p.amount > 0 ? p.amount : 0;
     });
-    expenses.forEach((e) => {
+    scopedExpenses.forEach((e) => {
       const k = monthKey(e.expense_date);
       const s = series.find((x) => x.month === k);
       if (s) s.expenses += e.amount;
     });
     return series;
-  }, [payments, expenses]);
+  }, [scopedPayments, scopedExpenses]);
 
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1726,7 +1790,7 @@ export default function AccountingPage() {
       "partial-paid": "Marquer la facture comme entièrement payée",
       "partial-cancelled": "Annuler la facture",
     };
-    return labels["`${from}-${to}`"] || `Changer le statut vers « ${INVOICE_STATUS_LABELS[to]} »`;
+    return labels[`${from}-${to}`] || `Changer le statut vers « ${INVOICE_STATUS_LABELS[to]} »`;
   }
 
   function exportClientsCSV() {
@@ -1755,7 +1819,13 @@ export default function AccountingPage() {
       const res = await fetch("/api/accounting/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ start: startDate, end: endDate }),
+        // Périmètre résidence actif : le rapport PDF ne consolide plus
+        // silencieusement toutes les résidences.
+        body: JSON.stringify({
+          start: startDate,
+          end: endDate,
+          accommodationId: expAccFilter !== "all" ? expAccFilter : undefined,
+        }),
       });
       if (!res.ok) {
         const errData = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -1916,7 +1986,7 @@ export default function AccountingPage() {
               icon={AlertTriangle}
               label="Créances clients"
               value={fmt(receivable)}
-              sub={`${bookings.filter((b) => (b.status === "confirmed" || b.status === "checked_in") && b.total_amount > b.amount_paid).length} réservation(s) impayée(s)`}
+              sub={`${unpaidBookingCount} réservation(s) impayée(s)`}
               variant="amber"
               badge="Créances"
             />
