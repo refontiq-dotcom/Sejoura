@@ -587,44 +587,41 @@ export default function BookingsPage() {
       try {
         const supabase = createClient();
         // 1. Charger toutes les chambres de l'établissement qui ne sont pas en maintenance
+        //    RLS filtre automatiquement par tenant via la jointure accommodations.
         const { data: allRooms, error: roomErr } = await supabase
           .from("rooms")
           .select("*, room_type:room_types(*)")
           .eq("accommodation_id", accId)
-          .neq("status", "maintenance")
           .order("room_number");
-        if (roomErr) throw roomErr;
+        if (roomErr) {
+          console.error("Erreur chargement chambres:", roomErr);
+          throw roomErr;
+        }
         if (!allRooms || allRooms.length === 0) {
           setAvailableRooms([]);
           setAvailabilityChecked(true);
           setAvailabilityLoading(false);
           return;
         }
-        // 2. Charger les réservations qui chevauchent les dates demandées
-        //    Filtrer par tenant_id pour n'inclure que les réservations du locataire
-        //    courant — sans ce filtre, Supabase RLS peut bloquer la requête ou
-        //    retourner des résultats incohérents, provoquant "Aucune chambre dispo".
-        const bookingsQuery = supabase
+        // 2. Charger les réservations qui chevauchent les dates demandées.
+        //    RLS filtre par tenant_id automatiquement (bookings_select_*).
+        const { data: overlaps, error: bookingErr } = await supabase
           .from("bookings")
           .select("room_id")
           .eq("accommodation_id", accId)
           .in("status", ["confirmed", "checked_in"])
           .lt("check_in_date", checkOut)
           .gt("check_out_date", checkIn);
-        // Appliquer le filtre tenant_id uniquement si disponible (sinon RLS gère)
-        const bookingsWithTenant = tenantId
-          ? bookingsQuery.eq("tenant_id", tenantId)
-          : bookingsQuery;
-        const { data: overlaps, error: bookingErr } = await bookingsWithTenant;
-        if (bookingErr) throw bookingErr;
-        // Ignorer les réservations sans chambre assignée (room_id null)
+        if (bookingErr) {
+          console.error("Erreur chargement réservations:", bookingErr);
+          throw bookingErr;
+        }
         const bookedRoomIds = new Set(
           (overlaps || []).filter((b) => b.room_id != null).map((b) => b.room_id as string)
         );
         // 3. Filtrer : seules les chambres sans réservation qui chevauchent sont libres.
-        // On N'utilise PAS le statut de la chambre comme critère : une chambre
-        // "occupied" dont le client part aujourd'hui est libre pour demain.
-        // Le statut est un reflet de l'état actuel, pas de la disponibilité future.
+        //    On N'utilise PAS le statut de la chambre : une chambre "occupied"
+        //    dont le client part aujourd'hui est libre pour demain.
         const free = (allRooms as unknown as (Room & { room_type?: RoomType })[]).filter(
           (r) => !bookedRoomIds.has(r.id)
         );
@@ -632,7 +629,7 @@ export default function BookingsPage() {
         setAvailabilityChecked(true);
       } catch (err) {
         console.error("Erreur vérification disponibilité:", err);
-        toast.error("Impossible de vérifier la disponibilité. Réessayez 🔄");
+        toast.error("Erreur de disponibilité — vérifiez la console pour le détail 🔍");
         setAvailableRooms([]);
         setAvailabilityChecked(true);
       } finally {
