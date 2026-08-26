@@ -159,43 +159,45 @@ function ClientDrawer({
     <>
       {/* Overlay — hidden on mobile, visible on desktop */}
       <div
-        className="hidden lg:block fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
+        className="hidden lg:block fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
         onClick={onClose}
       />
 
       {/* Click-to-close zone (mobile only) */}
       <div
-        className="fixed inset-0 z-[45] lg:hidden"
+        className="fixed inset-0 z-[55] lg:hidden"
         onClick={onClose}
       />
 
       {/* Drawer — top sheet mobile, right drawer desktop */}
-      <div className="fixed inset-x-0 top-0 z-[50] w-full max-w-md h-[85vh] max-h-[85vh] rounded-b-2xl lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:top-auto lg:w-[420px] lg:h-full lg:max-h-none lg:rounded-none flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-b border-slate-200 dark:border-slate-700 lg:border-l lg:border-b-0 animate-slide-in-right">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-              {movement.clientName.charAt(0)}
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">{movement.clientName}</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{movement.bookingCode}</p>
-            </div>
+      <div className="fixed inset-x-0 top-0 z-[60] flex w-full max-w-md h-[85vh] max-h-[85vh] rounded-b-2xl lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:top-auto lg:w-[480px] lg:h-full lg:max-h-none lg:rounded-none transform transition-transform duration-300 ease-in-out">
+        <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 rounded-b-2xl lg:rounded-none border-b border-slate-200 dark:border-slate-700 lg:border-l lg:border-b-0 shadow-2xl flex flex-col">
+
+          {/* Drag handle (mobile top sheet) */}
+          <div className="flex justify-center pb-2 lg:hidden">
+            <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Drag handle (mobile top sheet) */}
-        <div className="flex justify-center pb-2 lg:hidden">
-          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-        </div>
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-[var(--primary-color,#0C1C33)] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+                {movement.clientName.charAt(0)}
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">{movement.clientName}</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{movement.bookingCode}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="flex-1 p-3 space-y-3">
           {/* Infos client */}
           <section>
               <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -351,6 +353,7 @@ function ClientDrawer({
             </Button>
           </div>
         )}
+        </div>
       </div>
     </>
   );
