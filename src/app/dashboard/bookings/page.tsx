@@ -2609,11 +2609,11 @@ export default function BookingsPage() {
           />
 
           {/* Panel latéral */}
-          <div className="fixed inset-x-0 bottom-0 z-[60] flex w-full max-w-md h-[85vh] max-h-[85vh] rounded-t-2xl lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:bottom-auto lg:w-[480px] lg:h-full lg:max-h-none lg:rounded-none transform transition-transform duration-300 ease-in-out">
-            <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 rounded-t-2xl lg:rounded-none border-t border-slate-200 dark:border-slate-700 lg:border-l lg:border-t-0 shadow-2xl flex flex-col">
+          <div className="fixed inset-x-0 top-0 z-[60] flex w-full max-w-md h-[85vh] max-h-[85vh] rounded-b-2xl lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:bottom-auto lg:top-auto lg:w-[480px] lg:h-full lg:max-h-none lg:rounded-none transform transition-transform duration-300 ease-in-out">
+            <div className="relative h-full w-full overflow-y-auto bg-white dark:bg-slate-800 rounded-b-2xl lg:rounded-none border-b border-slate-200 dark:border-slate-700 lg:border-l lg:border-b-0 shadow-2xl flex flex-col">
 
-              {/* Drag handle (mobile bottom sheet) */}
-              <div className="flex justify-center pt-2 lg:hidden">
+              {/* Drag handle (mobile top sheet) */}
+              <div className="flex justify-center pb-2 lg:hidden">
                 <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               </div>
 
