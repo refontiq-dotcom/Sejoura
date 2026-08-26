@@ -214,6 +214,10 @@ export default function BookingsPage() {
   // lui-même une valeur explicite ("all" ou une résidence précise).
   const { activeAccommodationId } = useAccommodation();
   const [accomFilter, setAccomFilter] = useState<string>("all");
+  // Chambres disponibles pour les dates sélectionnées
+  const [availableRooms, setAvailableRooms] = useState<(Room & { room_type?: RoomType })[]>([]);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const userPickedAccomRef = useRef(false);
   const loadBookingsRef = useRef(loadBookings);
   loadBookingsRef.current = loadBookings;
@@ -322,6 +326,20 @@ export default function BookingsPage() {
     if (tenantId) loadBookingsRef.current(tenantId, accommodationFilterRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccommodationId]);
+
+  // Auto-vérifier la disponibilité quand les dates ou l'établissement changent
+  useEffect(() => {
+    if (formData.accommodation_id && formData.check_in_date && formData.check_out_date) {
+      const nights = calculateNights(formData.check_in_date, formData.check_out_date);
+      if (nights > 0) {
+        checkAvailability(formData.accommodation_id, formData.check_in_date, formData.check_out_date);
+      }
+    } else {
+      setAvailableRooms([]);
+      setAvailabilityChecked(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.accommodation_id, formData.check_in_date, formData.check_out_date]);
 
   // Temps réel : rechargement immédiat dès qu'une réservation change
   // (création, modification, check-in/out, paiement). Le rechargement est
@@ -559,6 +577,55 @@ export default function BookingsPage() {
         console.error(err);
       }
       return [];
+    }
+
+    // Vérifie la disponibilité des chambres pour un établissement et des dates données
+    async function checkAvailability(accId: string, checkIn: string, checkOut: string) {
+      setAvailabilityLoading(true);
+      setAvailabilityChecked(false);
+      setAvailableRooms([]);
+      try {
+        const supabase = createClient();
+        // 1. Charger toutes les chambres de l'établissement qui ne sont pas en maintenance
+        const { data: allRooms, error: roomErr } = await supabase
+          .from("rooms")
+          .select("*, room_type:room_types(*)")
+          .eq("accommodation_id", accId)
+          .neq("status", "maintenance")
+          .order("room_number");
+        if (roomErr) throw roomErr;
+        if (!allRooms || allRooms.length === 0) {
+          setAvailableRooms([]);
+          setAvailabilityChecked(true);
+          setAvailabilityLoading(false);
+          return;
+        }
+        // 2. Charger les réservations qui chevauchent les dates demandées
+        const { data: overlaps, error: bookingErr } = await supabase
+          .from("bookings")
+          .select("room_id")
+          .eq("accommodation_id", accId)
+          .in("status", ["confirmed", "checked_in"])
+          .lt("check_in_date", checkOut)
+          .gt("check_out_date", checkIn);
+        if (bookingErr) throw bookingErr;
+        const bookedRoomIds = new Set((overlaps || []).map((b) => b.room_id));
+        // 3. Filtrer : seules les chambres sans réservation qui chevauchent sont libres.
+        // On N'utilise PAS le statut de la chambre comme critère : une chambre
+        // "occupied" dont le client part aujourd'hui est libre pour demain.
+        // Le statut est un reflet de l'état actuel, pas de la disponibilité future.
+        const free = (allRooms as unknown as (Room & { room_type?: RoomType })[]).filter(
+          (r) => !bookedRoomIds.has(r.id)
+        );
+        setAvailableRooms(free);
+        setAvailabilityChecked(true);
+      } catch (err) {
+        console.error("Erreur vérification disponibilité:", err);
+        setAvailableRooms([]);
+        setAvailabilityChecked(true);
+      } finally {
+        setAvailabilityLoading(false);
+      }
     }
 
     async function loadInvoices(tId: string) {
@@ -2783,6 +2850,17 @@ export default function BookingsPage() {
             </div>
           )}
 
+          {/* ═══ ÉTAPE 1 : Dates ═══ */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Date d'arrivée" type="date" value={formData.check_in_date} onChange={(e) => setFormData({ ...formData, check_in_date: e.target.value })} />
+            <Input label="Date de départ" type="date" value={formData.check_out_date} onChange={(e) => setFormData({ ...formData, check_out_date: e.target.value })} />
+          </div>
+
+          {formData.check_in_date && formData.check_out_date && calculateNights(formData.check_in_date, formData.check_out_date) <= 0 && (
+            <p className="text-sm text-red-600 dark:text-red-400">La date de départ doit être après la date d'arrivée.</p>
+          )}
+
+          {/* ═══ ÉTAPE 2 : Établissement ═══ */}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Établissement</label>
             <select
@@ -2791,7 +2869,6 @@ export default function BookingsPage() {
                 const accId = e.target.value;
                 setFormData({ ...formData, accommodation_id: accId, room_type_id: "", room_id: "" });
                 const types = await loadRoomsForAccommodation(accId);
-                // Auto-select si un seul type de chambre
                 if (types.length === 1) {
                   setFormData((prev) => ({ ...prev, accommodation_id: accId, room_type_id: types[0].id, room_id: "" }));
                 }
@@ -2805,47 +2882,72 @@ export default function BookingsPage() {
             </select>
           </div>
 
-          {/* Type de chambre */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre</label>
-            <select
-              value={formData.room_type_id}
-              onChange={(e) => {
-                setFormData({ ...formData, room_type_id: e.target.value, room_id: "" });
-              }}
-              disabled={!formData.accommodation_id}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              <option value="">Sélectionner un type</option>
-              {roomTypes.map((rt) => (
-                <option key={rt.id} value={rt.id}>{rt.name} — {fmt(rt.base_price)}/nuit</option>
-              ))}
-            </select>
-          </div>
+          {/* ═══ ÉTAPE 3 : Résultat disponibilité ═══ */}
+          {availabilityLoading && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-sm">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Vérification de la disponibilité...
+            </div>
+          )}
 
-          {/* Numéro de chambre (filtré par type) */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Numéro de chambre</label>
-            <select
-              value={formData.room_id}
-              onChange={(e) => {
-                const rt = roomTypes.find((t) => t.id === formData.room_type_id);
-                setFormData({ ...formData, room_id: e.target.value, negotiated_price: rt?.base_price.toString() || "" });
-              }}
-              disabled={!formData.room_type_id}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              <option value="">{formData.room_type_id ? "Sélectionner une chambre" : "Choisir un type d'abord"}</option>
-              {rooms
-                .filter((r) => r.room_type_id === formData.room_type_id && r.status === "available")
-                .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
-                .map((r) => (
-                  <option key={r.id} value={r.id}>
-                    Chambre {r.room_number}{r.floor ? ` (étage ${r.floor})` : ""}
-                  </option>
-                ))}
-            </select>
-          </div>
+          {availabilityChecked && !availabilityLoading && (
+            <div className={`p-4 rounded-xl text-sm ${availableRooms.length > 0 ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"}`}>
+              {availableRooms.length > 0 ? (
+                <>✅ <strong>{availableRooms.length}</strong> chambre(s) disponible(s) pour ces dates.</>
+              ) : (
+                <>❌ Aucune chambre disponible pour ces dates. Changez les dates ou l'établissement.</>
+              )}
+            </div>
+          )}
+
+          {/* ═══ ÉTAPE 4 : Chambre (uniquement si des chambres sont disponibles) ═══ */}
+          {availabilityChecked && availableRooms.length > 0 && (
+            <>
+              {/* Type de chambre */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de chambre</label>
+                <select
+                  value={formData.room_type_id}
+                  onChange={(e) => {
+                    setFormData({ ...formData, room_type_id: e.target.value, room_id: "" });
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Sélectionner un type</option>
+                  {Array.from(new Map(availableRooms.map((r) => [r.room_type_id, r.room_type])).values())
+                    .filter(Boolean)
+                    .map((rt) => (
+                      <option key={rt!.id} value={rt!.id}>{rt!.name} — {fmt(rt!.base_price)}/nuit</option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Numéro de chambre */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Numéro de chambre</label>
+                <select
+                  value={formData.room_id}
+                  onChange={(e) => {
+                    const selectedRoom = availableRooms.find((r) => r.id === e.target.value);
+                    const rt = roomTypes.find((t) => t.id === formData.room_type_id);
+                    setFormData({ ...formData, room_id: e.target.value, negotiated_price: rt?.base_price.toString() || selectedRoom?.room_type?.base_price.toString() || "" });
+                  }}
+                  disabled={!formData.room_type_id}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  <option value="">{formData.room_type_id ? "Sélectionner une chambre" : "Choisir un type d'abord"}</option>
+                  {availableRooms
+                    .filter((r) => !formData.room_type_id || r.room_type_id === formData.room_type_id)
+                    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Chambre {r.room_number}{r.floor ? ` (étage ${r.floor})` : ""} — {r.room_type?.name || ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Client — champ unifié avec autocomplete */}
           <div className="relative">
@@ -2937,12 +3039,7 @@ export default function BookingsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Date d'arrivée" type="date" value={formData.check_in_date} onChange={(e) => setFormData({ ...formData, check_in_date: e.target.value })} />
-            <Input label="Date de départ" type="date" value={formData.check_out_date} onChange={(e) => setFormData({ ...formData, check_out_date: e.target.value })} />
-          </div>
-
-          {formData.check_in_date && formData.check_out_date && (
+          {formData.check_in_date && formData.check_out_date && calculateNights(formData.check_in_date, formData.check_out_date) > 0 && (
             <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-sm text-indigo-700 dark:text-indigo-300">
               {calculateNights(formData.check_in_date, formData.check_out_date)} nuit(s) × {fmt(parseInt(formData.negotiated_price) || 0)} ={" "}
               <strong>{fmt((parseInt(formData.negotiated_price) || 0) * calculateNights(formData.check_in_date, formData.check_out_date))}</strong>
