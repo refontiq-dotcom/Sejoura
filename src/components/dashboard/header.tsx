@@ -217,7 +217,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
 
       const { data: userData } = await supabase
         .from("users")
-        .select("tenant_id, role")
+        .select("id, tenant_id, role")
         .eq("auth_user_id", session.user.id)
         .maybeSingle();
 
@@ -229,6 +229,9 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         .select("*")
         .eq("tenant_id", userData.tenant_id)
         .or(`recipient_role.is.null,recipient_role.eq.${userData.role || ""}`)
+        // Exclure les notifications générées par l'utilisateur connecté
+        // (ses propres actions : check-in, check-out, réservation, etc.)
+        .or(`user_id.is.null,user_id.neq.${userData.id}`)
         .order("created_at", { ascending: false })
         .limit(20);
 
