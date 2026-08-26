@@ -2596,9 +2596,15 @@ export default function BookingsPage() {
       {/* Drawer — Détails client (panneau latéral droit) */}
       {selectedClient && (
         <>
-          {/* Backdrop — no overlay on mobile bottom sheet, full on desktop */}
+          {/* Backdrop — hidden on mobile (bottom sheet needs no overlay), full on desktop */}
           <div
-            className="fixed inset-0 z-50 lg:bg-slate-900/50 lg:backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            className="hidden lg:block fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            onClick={() => setSelectedClient(null)}
+          />
+
+          {/* Click-to-close zone (mobile only) */}
+          <div
+            className="fixed inset-0 z-[55] lg:hidden"
             onClick={() => setSelectedClient(null)}
           />
 
