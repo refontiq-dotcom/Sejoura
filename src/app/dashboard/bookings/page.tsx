@@ -787,12 +787,14 @@ export default function BookingsPage() {
     }
 
   function openAddModal() {
-    // Si le réceptionniste n'a qu'une résidence, auto-charger les chambres
-    if (accommodations.length === 1) {
-      loadRoomsForAccommodation(accommodations[0].id);
+    const singleAccId = accommodations.length === 1 ? accommodations[0].id : "";
+    // Si une seule résidence, la pré-sélectionner pour que la vérification
+    // de disponibilité se déclenche automatiquement
+    if (singleAccId) {
+      loadRoomsForAccommodation(singleAccId);
     }
     setFormData({
-      accommodation_id: "",
+      accommodation_id: singleAccId,
       room_type_id: "",
       room_id: "",
       client_id: "",
@@ -2949,11 +2951,13 @@ export default function BookingsPage() {
             </>
           )}
 
+          {/* Client — tous les champs suivants nécessitent une chambre disponible */}
+          {availabilityChecked && availableRooms.length > 0 && (
+          <>
           {/* Client — champ unifié avec autocomplete */}
           <div className="relative">
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nom du client</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
               <input
                 type="text"
                 value={formData.newClientName}
@@ -2974,7 +2978,7 @@ export default function BookingsPage() {
                 }}
                 onBlur={() => setTimeout(() => setNameSuggestionsOpen(false), 200)}
                 placeholder="Tapez le nom du client..."
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-4 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               {nameSuggestionsLoading && (
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 animate-spin" />
@@ -3117,6 +3121,8 @@ export default function BookingsPage() {
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSave} loading={saving}>Créer la réservation</Button>
           </div>
+          </>
+          )}
         </div>
       </Modal>
 
