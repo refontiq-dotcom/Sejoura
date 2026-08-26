@@ -2404,7 +2404,6 @@ export default function BookingsPage() {
                             <ClientScoreBadge
                               score={clientProfiles[b.client.id]?.score}
                               tier={clientProfiles[b.client.id]?.tier}
-                              clientId={b.client.id}
                               showValue={false}
                               className="mt-0.5"
                             />
