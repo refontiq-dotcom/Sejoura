@@ -157,13 +157,20 @@ function ClientDrawer({
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — hidden on mobile, visible on desktop */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
+        className="hidden lg:block fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
       />
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md z-50 flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-l border-slate-200 dark:border-slate-700 animate-slide-in-right">
+
+      {/* Click-to-close zone (mobile only) */}
+      <div
+        className="fixed inset-0 z-[45] lg:hidden"
+        onClick={onClose}
+      />
+
+      {/* Drawer — top sheet mobile, right drawer desktop */}
+      <div className="fixed inset-x-0 top-0 z-[50] w-full max-w-md h-[85vh] max-h-[85vh] rounded-b-2xl lg:inset-y-0 lg:inset-x-auto lg:right-0 lg:top-auto lg:w-[420px] lg:h-full lg:max-h-none lg:rounded-none flex flex-col bg-white dark:bg-slate-800 shadow-2xl border-b border-slate-200 dark:border-slate-700 lg:border-l lg:border-b-0 animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
@@ -181,6 +188,11 @@ function ClientDrawer({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Drag handle (mobile top sheet) */}
+        <div className="flex justify-center pb-2 lg:hidden">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
