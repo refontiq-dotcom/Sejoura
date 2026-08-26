@@ -2596,9 +2596,9 @@ export default function BookingsPage() {
       {/* Drawer — Détails client (panneau latéral droit) */}
       {selectedClient && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — only above the bottom sheet on mobile, full on desktop */}
           <div
-            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
+            className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 ease-in-out bottom-[85vh] lg:bottom-0"
             onClick={() => setSelectedClient(null)}
           />
 
