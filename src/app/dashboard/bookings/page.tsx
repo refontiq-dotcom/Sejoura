@@ -150,12 +150,11 @@ export default function BookingsPage() {
   const [checkinRoomTypeId, setCheckinRoomTypeId] = useState<string>("");
   const [checkinRoomId, setCheckinRoomId] = useState<string>("");
   // Changement de chambre pendant le séjour
-  // Recherche intelligente de client
-  const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
-  const [clientSearchOpen, setClientSearchOpen] = useState(false);
-  const [clientSearchLoading, setClientSearchLoading] = useState(false);
-  const clientSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Autocomplete client dans le champ "Nom du nouveau client"
+  const [nameSuggestions, setNameSuggestions] = useState<Client[]>([]);
+  const [nameSuggestionsOpen, setNameSuggestionsOpen] = useState(false);
+  const [nameSuggestionsLoading, setNameSuggestionsLoading] = useState(false);
+  const nameSuggestionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [changeRoomOpen, setChangeRoomOpen] = useState(false);
   const [changeRoomBooking, setChangeRoomBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
@@ -1077,50 +1076,45 @@ export default function BookingsPage() {
     }
   }
 
-  // ── RECHERCHE INTELLIGENTE DE CLIENT ─────────────────────────────────────
-  function searchClients(query: string) {
-    if (clientSearchTimeoutRef.current) clearTimeout(clientSearchTimeoutRef.current);
+  // ── AUTOCOMPLETE CLIENT DANS LE CHAMP NOM ───────────────────────────────
+  // Recherche locale dans la liste des clients déjà chargés (pas de requête DB).
+  // Si le nom correspond à un ancien client → affiche les suggestions.
+  // Si aucun match → le réceptionniste continue de taper le nom du nouveau client.
+  function searchClientsByName(query: string) {
+    if (nameSuggestionsTimeoutRef.current) clearTimeout(nameSuggestionsTimeoutRef.current);
     if (!query.trim() || query.trim().length < 2) {
-      setClientSearchResults([]);
-      setClientSearchOpen(false);
+      setNameSuggestions([]);
+      setNameSuggestionsOpen(false);
       return;
     }
-    setClientSearchLoading(true);
-    clientSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("tenant_id", tenantId)
-          .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%,email.ilike.%${query}%`)
-          .order("full_name")
-          .limit(8);
-        setClientSearchResults((data as Client[]) || []);
-        setClientSearchOpen(true);
-      } catch {
-        setClientSearchResults([]);
-      } finally {
-        setClientSearchLoading(false);
-      }
-    }, 300);
+    setNameSuggestionsLoading(true);
+    nameSuggestionsTimeoutRef.current = setTimeout(() => {
+      const q = query.trim().toLowerCase();
+      const results = clients.filter((c) =>
+        c.full_name.toLowerCase().includes(q) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q))
+      ).slice(0, 8);
+      setNameSuggestions(results);
+      setNameSuggestionsOpen(results.length > 0);
+      setNameSuggestionsLoading(false);
+    }, 150);
   }
 
-  function selectClientFromSearch(client: Client) {
+  function selectClientFromSuggestions(client: Client) {
     setFormData({
       ...formData,
       client_id: client.id,
-      newClientName: "",
-      newClientPhone: "",
-      newClientEmail: "",
-      newClientIdType: "",
-      newClientIdNumber: "",
-      newClientEmergencyContact: "",
-      newClientNationality: "",
+      newClientName: client.full_name,
+      newClientPhone: client.phone || "",
+      newClientEmail: client.email || "",
+      newClientIdType: client.id_type || "",
+      newClientIdNumber: client.id_number || "",
+      newClientEmergencyContact: client.emergency_contact || "",
+      newClientNationality: client.nationality || "",
     });
-    setClientSearchQuery(client.full_name);
-    setClientSearchOpen(false);
-    setClientSearchResults([]);
+    setNameSuggestionsOpen(false);
+    setNameSuggestions([]);
   }
 
   function clearClientSelection() {
@@ -1135,8 +1129,7 @@ export default function BookingsPage() {
       newClientEmergencyContact: "",
       newClientNationality: "",
     });
-    setClientSearchQuery("");
-    setClientSearchOpen(false);
+    setNameSuggestionsOpen(false);
   }
 
   // ── CHANGEMENT DE CHAMBRE PENDANT LE SÉJOUR ──────────────────────────────
@@ -2841,40 +2834,45 @@ export default function BookingsPage() {
             </select>
           </div>
 
-          {/* Client — recherche intelligente */}
+          {/* Client — champ unifié avec autocomplete */}
           <div className="relative">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Rechercher un client</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nom du client</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
               <input
                 type="text"
-                value={clientSearchQuery}
+                value={formData.newClientName}
                 onChange={(e) => {
-                  setClientSearchQuery(e.target.value);
-                  if (formData.client_id) clearClientSelection();
-                  searchClients(e.target.value);
+                  const val = e.target.value;
+                  setFormData({ ...formData, newClientName: val });
+                  if (formData.client_id) {
+                    clearClientSelection();
+                    setFormData((prev) => ({ ...prev, newClientName: val }));
+                  }
+                  searchClientsByName(val);
                 }}
-                onFocus={() => { if (clientSearchResults.length > 0) setClientSearchOpen(true); }}
-                placeholder="Nom, téléphone ou email..."
+                onBlur={() => setTimeout(() => setNameSuggestionsOpen(false), 200)}
+                placeholder="Tapez le nom du client..."
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              {clientSearchLoading && (
+              {nameSuggestionsLoading && (
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 animate-spin" />
               )}
-              {formData.client_id && !clientSearchLoading && (
+              {formData.client_id && !nameSuggestionsLoading && (
                 <button type="button" onClick={clearClientSelection} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600">
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
-            {/* Résultats de recherche */}
-            {clientSearchOpen && clientSearchResults.length > 0 && (
+            {/* Suggestions clients existants */}
+            {nameSuggestionsOpen && nameSuggestions.length > 0 && (
               <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg max-h-60 overflow-auto">
-                {clientSearchResults.map((c) => (
+                {nameSuggestions.map((c) => (
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => selectClientFromSearch(c)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectClientFromSuggestions(c)}
                     className="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700 last:border-0"
                   >
                     <p className="text-sm font-medium text-slate-900 dark:text-white">{c.full_name}</p>
@@ -2886,25 +2884,17 @@ export default function BookingsPage() {
                 ))}
               </div>
             )}
-            {clientSearchOpen && clientSearchQuery.length >= 2 && clientSearchResults.length === 0 && !clientSearchLoading && (
-              <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-4 text-center">
-                <p className="text-sm text-zinc-500">Aucun client trouvé</p>
-                <p className="text-xs text-zinc-400 mt-1">Remplissez les champs ci-dessous pour créer un nouveau client</p>
-              </div>
-            )}
           </div>
 
+          {/* Champs détaillés — visibles uniquement si aucun client existant n'est sélectionné */}
           {!formData.client_id && (
             <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/30">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Nom du nouveau client" value={formData.newClientName} onChange={(e) => setFormData({ ...formData, newClientName: e.target.value })} placeholder="Jean Kouassi" />
                 <Input label="Téléphone (optionnel)" value={formData.newClientPhone} onChange={(e) => setFormData({ ...formData, newClientPhone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+                <Input label="Email (optionnel)" type="email" value={formData.newClientEmail} onChange={(e) => setFormData({ ...formData, newClientEmail: e.target.value })} placeholder="jean@example.com" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Email (optionnel)" type="email" value={formData.newClientEmail} onChange={(e) => setFormData({ ...formData, newClientEmail: e.target.value })} placeholder="jean@example.com" />
                 <Input label="Contact d'urgence (optionnel)" value={formData.newClientEmergencyContact} onChange={(e) => setFormData({ ...formData, newClientEmergencyContact: e.target.value })} placeholder="+225 01 00 00 00 00" />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de pièce</label>
                   <select
@@ -2920,6 +2910,8 @@ export default function BookingsPage() {
                     <option value="Autre">Autre</option>
                   </select>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Input label="Numéro de pièce (optionnel)" value={formData.newClientIdNumber} onChange={(e) => setFormData({ ...formData, newClientIdNumber: e.target.value })} placeholder="Numéro..." />
                 <Input label="Nationalité (optionnel)" value={formData.newClientNationality} onChange={(e) => setFormData({ ...formData, newClientNationality: e.target.value })} placeholder="Ivoirienne" />
               </div>
