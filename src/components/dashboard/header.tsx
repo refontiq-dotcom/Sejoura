@@ -230,15 +230,21 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         .select("*")
         .eq("tenant_id", userData.tenant_id)
         .or(`recipient_role.is.null,recipient_role.eq.${userData.role || ""}`)
-        // Exclure les notifications générées par l'utilisateur connecté
-        // (ses propres actions : check-in, check-out, facture, etc.)
-        .or(`created_by.is.null,created_by.neq.${userData.id}`)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(30);
 
       if (error) return;
 
-      const formatted: NotificationItem[] = (data || []).map((n) => ({
+      // Filtrer côté client : exclure les notifications créées par l'utilisateur
+      // connecté (ses propres actions : check-in, check-out, facture, etc.)
+      const filtered = (data || []).filter((n) => {
+        // Si created_by est null (anciennes notifs ou notifs système) → afficher
+        if (!n.created_by) return true;
+        // Si created_by ne correspond pas à l'utilisateur courant → afficher
+        return n.created_by !== userData.id;
+      });
+
+      const formatted: NotificationItem[] = filtered.slice(0, 20).map((n) => ({
         id: n.id,
         title: n.title,
         message: n.message,
