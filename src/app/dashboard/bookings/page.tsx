@@ -255,13 +255,13 @@ export default function BookingsPage() {
           setPortalUpsell(true);
           return null;
         }
-        toast.error(json?.error || "Impossible de générer l'accès client.");
+        toast.error(json?.error || "L'accès client n'a pas pu être généré 🔑");
         return null;
       }
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       return { url: `${origin}${json.url}` };
     } catch {
-      toast.error("Une erreur est survenue.");
+      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
       return null;
     } finally {
       setPortalLoading(false);
@@ -470,7 +470,7 @@ export default function BookingsPage() {
       await loadInvoices(userData.tenant_id);
       await loadExtensionRequests(userData.tenant_id);
     } catch (err) {
-      toast.error("Impossible de charger les données initiales.");
+      toast.error("Oups, les données n'ont pas pu se charger... Réessayez 🔄");
       console.error(err);
     } finally {
       setLoading(false);
@@ -507,7 +507,7 @@ export default function BookingsPage() {
         setBookings(enriched);
       }
     } catch (err) {
-      toast.error("Impossible de charger les réservations.");
+      toast.error("Les réservations sont introuvables pour l'instant 🤔");
       console.error(err);
     }
   }
@@ -573,7 +573,7 @@ export default function BookingsPage() {
          return types;
        }
       } catch (err) {
-        toast.error("Impossible de charger les chambres.");
+        toast.error("Les chambres ne veulent pas se charger... 🛏️");
         console.error(err);
       }
       return [];
@@ -663,7 +663,7 @@ export default function BookingsPage() {
 
         if (!response.ok) {
           const result = await response.json().catch(() => ({}));
-          toast.error((result as { error?: string }).error || "Erreur lors de la génération de la facture.", { id: loadingToast });
+          toast.error((result as { error?: string }).error || "La facture n'a pas pu être générée 📄", { id: loadingToast });
           return;
         }
 
@@ -704,7 +704,7 @@ export default function BookingsPage() {
           if (alreadyGenerated) {
             toast("Facture existante retrouvée.", { id: loadingToast, duration: 3000 });
           } else {
-            toast.success("Facture générée avec succès !", { id: loadingToast });
+            toast.success("Facture prête ! 🧾", { id: loadingToast });
           }
         } else {
           // Fallback : réponse JSON (ancien comportement)
@@ -724,7 +724,7 @@ export default function BookingsPage() {
     async function handleSendInvoice(invoice: Invoice) {
       const email = emailInput.trim();
       if (!email) {
-        toast.error("Veuillez indiquer une adresse e-mail.");
+        toast.error("Ajoutez une adresse email pour envoyer la facture ✉️");
         return;
       }
       const loadingToast = toast.loading("Envoi de la facture...", { duration: Infinity });
@@ -747,9 +747,9 @@ export default function BookingsPage() {
         }));
         setInvoiceToSend(null);
         setEmailInput("");
-        toast.success("Facture marquée comme envoyée.", { id: loadingToast });
+        toast.success("Facture envoyée par email ✉️", { id: loadingToast });
       } catch (err) {
-        toast.error("Erreur lors de l'envoi.", { id: loadingToast });
+        toast.error("L'envoi a échoué... Vérifiez votre connexion ✉️", { id: loadingToast });
         console.error(err);
       }
     }
@@ -772,7 +772,7 @@ export default function BookingsPage() {
           window.open(result.invoice.pdf_url, "_blank", "noopener,noreferrer");
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture.");
+        toast.error(err instanceof Error ? err.message : "Impossible d'ouvrir la facture 📄");
       }
     }
 
@@ -823,19 +823,19 @@ export default function BookingsPage() {
   async function handleSave() {
     setError("");
     if (!formData.accommodation_id || !formData.room_id || !formData.check_in_date || !formData.check_out_date) {
-      setError("Veuillez remplir tous les champs obligatoires.");
+      setError("Il manque des champs obligatoires ! Remplissez tout 📋");
       return;
     }
 
     const nights = calculateNights(formData.check_in_date, formData.check_out_date);
     if (nights <= 0) {
-      setError("La date de départ doit être après la date d'arrivée.");
+      setError("La date de départ doit être après l'arrivée 📅");
       return;
     }
 
     const negotiatedPrice = parseInt(formData.negotiated_price) || 0;
     if (negotiatedPrice <= 0) {
-      setError("Le prix négocié doit être supérieur à 0.");
+      setError("Le prix doit être supérieur à 0 💰");
       return;
     }
 
@@ -865,7 +865,7 @@ export default function BookingsPage() {
           .single();
 
         if (clientErr) {
-          setError("Erreur lors de la création du client: " + clientErr.message);
+          setError("Oups, le client n'a pas pu être créé : " + clientErr.message);
           setSaving(false);
           return;
         }
@@ -873,7 +873,7 @@ export default function BookingsPage() {
       }
 
       if (!clientId) {
-        setError("Veuillez sélectionner ou créer un client.");
+        setError("On a besoin d'un client ! Sélectionnez un existant ou créez-en un 👤");
         setSaving(false);
         return;
       }
@@ -891,13 +891,13 @@ export default function BookingsPage() {
       });
 
       if (checkErr) {
-        setError("Erreur lors de la vérification de disponibilité.");
+        setError("La vérification de disponibilité a échoué 🔄");
         setSaving(false);
         return;
       }
 
       if (!isAvailable) {
-        setError("Cette chambre est déjà réservée pour ces dates. Veuillez choisir d'autres dates ou une autre chambre.");
+        setError("Cette chambre est déjà réservée pour ces dates 📅 Essayez d'autres dates ou une autre chambre.");
         setSaving(false);
         return;
       }
@@ -922,9 +922,9 @@ export default function BookingsPage() {
 
       if (bookingErr) {
         if (bookingErr.message.includes("DOUBLE_BOOKING")) {
-          setError("Cette chambre est déjà réservée pour ces dates (conflit détecté par la base de données).");
+          setError("Conflit de réservation détecté ! Cette chambre est prise pour ces dates 🚫");
         } else {
-          setError("Erreur lors de la création: " + bookingErr.message);
+          setError("La réservation n'a pas pu être créée : " + bookingErr.message);
         }
         setSaving(false);
         return;
@@ -953,7 +953,7 @@ export default function BookingsPage() {
 
         if (payErr) {
           // Le paiement a échoué mais la réservation est créée → avertir sans bloquer
-          toast.error("Réservation créée, mais le paiement n'a pas pu être enregistré : " + payErr.message);
+          toast.error("Réservation créée ✅ mais le paiement a échoué : " + payErr.message);
         } else {
           // Mettre à jour le statut de paiement de la réservation
           const paymentStatus = totalAmount > 0 ? "paid" : "unpaid";
@@ -976,14 +976,14 @@ export default function BookingsPage() {
           p_allow_late: false,
         });
         if (checkInErr) {
-          toast.error("La réservation a été créée mais le check-in immédiat a échoué: " + checkInErr.message);
+          toast.error("Réservation créée ✅ mais le check-in a échoué : " + checkInErr.message);
         } else {
           toast.success("Réservation créée, check-in effectué et paiement enregistré ✓");
         }
       } else {
         toast.success(formData.payment_method
           ? "Réservation créée et paiement enregistré ✓"
-          : "Réservation créée avec succès."
+          : "Réservation enregistrée ! 🎉"
         );
       }
 
@@ -1013,10 +1013,10 @@ export default function BookingsPage() {
       });
 
       if (error) {
-        toast.error("Erreur: " + error.message);
+        toast.error("Oups : " + error.message);
       } else {
         setCleaningModalOpen(false);
-        toast.success("Demande de ménage envoyée dans le pool des ménagères.");
+        toast.success("Ménage demandé ! Les ménagères sont prévenues 🧹");
       }
     } catch {
       toast.error("Une erreur est survenue.");
@@ -1093,16 +1093,16 @@ export default function BookingsPage() {
         .eq("id", checkinBooking.client_id);
 
       if (clientErr) {
-        toast.error("Erreur lors de la mise à jour : " + clientErr.message);
+        toast.error("La mise à jour a échoué : " + clientErr.message);
         setCheckinSaving(false);
         return;
       }
 
-      toast.success("Fiche client enregistrée avec succès ✓");
+      toast.success("Fiche client mise à jour 👤");
       setCheckinModalOpen(false);
       loadBookings(tenantId);
     } catch {
-      toast.error("Erreur lors de la sauvegarde.");
+      toast.error("La sauvegarde a foiré 😅");
     } finally {
       setCheckinSaving(false);
     }
@@ -1129,7 +1129,7 @@ export default function BookingsPage() {
           .eq("id", checkinBooking.client_id);
 
         if (clientErr) {
-          toast.error("Erreur lors de la mise à jour des informations du client : " + clientErr.message);
+          toast.error("La mise à jour client a échoué : " + clientErr.message);
           setCheckinSaving(false);
           return;
         }
@@ -1143,7 +1143,7 @@ export default function BookingsPage() {
           .eq("id", checkinBooking.id);
 
         if (roomErr) {
-          toast.error("Erreur lors du changement de chambre : " + roomErr.message);
+          toast.error("Le changement de chambre a échoué : " + roomErr.message);
           setCheckinSaving(false);
           return;
         }
@@ -1152,7 +1152,7 @@ export default function BookingsPage() {
       setCheckinModalOpen(false);
       await executeAction(checkinBooking.id, "check_in");
     } catch {
-      toast.error("Erreur lors du Check-in.");
+      toast.error("Le check-in a échoué 🔄");
     } finally {
       setCheckinSaving(false);
     }
@@ -1263,7 +1263,7 @@ export default function BookingsPage() {
         .eq("id", changeRoomBooking.id);
 
       if (updateErr) {
-        toast.error("Erreur lors de la mise à jour de la réservation : " + updateErr.message);
+        toast.error("La modification de la réservation a échoué : " + updateErr.message);
         setChangeRoomSaving(false);
         return;
       }
@@ -1306,7 +1306,7 @@ export default function BookingsPage() {
           });
 
         if (payErr) {
-          toast.error("Chambre changée, mais le paiement du supplément a échoué : " + payErr.message);
+          toast.error("Chambre changée ✅ mais le paiement du supplément a échoué : " + payErr.message);
         }
       }
 
@@ -1315,7 +1315,7 @@ export default function BookingsPage() {
       setChangeRoomOpen(false);
       await loadBookings(tenantId, accommodationFilterRef.current);
     } catch {
-      toast.error("Erreur lors du changement de chambre.");
+      toast.error("Le changement de chambre a échoué 🛏️");
     } finally {
       setChangeRoomSaving(false);
     }
@@ -1326,7 +1326,7 @@ export default function BookingsPage() {
     // Sécurité : le client doit avoir été vérifié physiquement au moins une fois
     // (CNI enregistrée + au moins un séjour antérieur check-in ou check-out)
     if (!b.client?.id_number) {
-      toast.error("Première visite du client — faites un check-in normal pour vérifier la CNI.");
+      toast.error("C'est la première fois ! Faites un check-in normal pour vérifier la CNI 🪪");
       return;
     }
     setActioningId(b.id);
@@ -1341,7 +1341,7 @@ export default function BookingsPage() {
         .in("status", ["checked_in", "checked_out"])
         .limit(1);
       if (prevErr || !prevBookings || prevBookings.length === 0) {
-        toast.error("Le client n'a jamais séjourné dans l'établissement. Faites un check-in normal d'abord.");
+        toast.error("Client nouveau ! Faites un check-in normal d'abord pour l'enregistrer 🆕");
         setActioningId("");
         return;
       }
@@ -1353,19 +1353,19 @@ export default function BookingsPage() {
       });
       if (error) {
         if (error.message.includes("CHECK_IN_TOO_EARLY")) {
-          toast.error("Check-in trop tôt. L'arrivée est prévue le " + formatDate(b.check_in_date) + ".");
+          toast.error("Trop tôt ! L'arrivée est prévue le " + formatDate(b.check_in_date) + ".");
         } else if (error.message.includes("CHECK_IN_TOO_LATE")) {
-          toast.error("Check-in trop tard. Le séjour a déjà expiré.");
+          toast.error("Trop tard, le séjour a expiré ⏰ Le client ne peut plus être installé.");
         } else {
-          toast.error("Erreur check-in express : " + error.message);
+          toast.error("Check-in express raté : " + error.message);
         }
         return;
       }
       // Afficher la chambre pour programmer la carte
-      toast.success(`Check-in express effectué — Chambre ${b.room?.room_number || "—"} — Programmez la carte et remettez-la au client ✓`, { duration: 8000 });
+      toast.success(`Check-in express terminé ! Remettez la carte à ${b.room?.room_number || "—"} 🔑`, { duration: 8000 });
       await loadBookings(tenantId, accommodationFilterRef.current);
     } catch {
-      toast.error("Erreur lors du check-in express.");
+      toast.error("Le check-in express a échoué 🔄");
     } finally {
       setActioningId("");
     }
@@ -1393,16 +1393,16 @@ export default function BookingsPage() {
         .single();
 
       if (err) {
-        toast.error("Erreur lors de la mise à jour : " + err.message);
+        toast.error("La mise à jour a échoué : " + err.message);
         return;
       }
 
-      toast.success("Informations client mises à jour avec succès ✓");
+      toast.success("Fiche client à jour 👤");
       setSelectedClient(updatedClient);
       setEditingClientInDrawer(false);
       loadBookings(tenantId);
     } catch {
-      toast.error("Erreur de sauvegarde.");
+      toast.error("Oups, la sauvegarde a échoué 📝");
     } finally {
       setDrawerClientSaving(false);
     }
@@ -1465,9 +1465,9 @@ export default function BookingsPage() {
       });
       if (error) {
         if (error.message.includes("DOUBLE_BOOKING")) {
-          setEditError("La chambre est déjà réservée sur la nouvelle période.");
+          setEditError("Conflit ! Cette chambre est déjà réservée sur la nouvelle période 📅");
         } else if (error.message.includes("CHECKED_IN")) {
-          setEditError("La date d'arrivée ne peut plus être modifiée une fois le client installé.");
+          setEditError("L'arrivée ne peut plus être changée après l'installation du client 🔒");
         } else {
           setEditError(error.message);
         }
@@ -1494,7 +1494,7 @@ export default function BookingsPage() {
     if (!extendBooking || !extendDate) return;
     const nights = calculateNights(extendBooking.check_in_date, extendDate);
     if (nights <= 0) {
-      toast.error("La nouvelle date de départ doit être après la date d'arrivée.");
+      toast.error("La date de départ doit être après l'arrivée 📅");
       return;
     }
     setSaving(true);
@@ -1507,11 +1507,11 @@ export default function BookingsPage() {
       });
       if (error) {
         if (error.message.includes("DOUBLE_BOOKING")) {
-          toast.error("La chambre est déjà réservée sur la période prolongée.");
+          toast.error("Conflit ! La chambre est prise sur la période prolongée 📅");
         } else if (error.message.includes("INVALID_CHECK_OUT")) {
           toast.error("La date de départ doit être après la date d'arrivée.");
         } else {
-          toast.error("Erreur lors de la prolongation : " + error.message);
+          toast.error("La prolongation a échoué : " + error.message);
         }
         return;
       }
@@ -1539,7 +1539,7 @@ export default function BookingsPage() {
 
         if (payErr) {
           // Le paiement a échoué mais la prolongation est faite → avertir sans bloquer
-          toast.error("Séjour prolongé, mais le paiement n'a pas pu être enregistré : " + payErr.message);
+          toast.error("Séjour prolongé ✅ mais le paiement a échoué : " + payErr.message);
         } else {
           // Le trigger DB update_booking_payment_status recalcule automatiquement
           // amount_paid et payment_status (source de vérité : somme des paiements
@@ -1597,11 +1597,11 @@ export default function BookingsPage() {
         p_note: null,
       });
       if (error) throw error;
-      toast.success("Demande de prolongation refusée.");
+      toast.success("Prolongation refusée 🚫");
       setRejectTarget(null);
       await loadExtensionRequests(tenantId);
     } catch (err) {
-      toast.error("Impossible de refuser la demande : " + (err as Error).message);
+      toast.error("La demande n'a pas pu être refusée : " + (err as Error).message);
     } finally {
       setRejecting(false);
     }
@@ -1620,7 +1620,7 @@ export default function BookingsPage() {
         .update({ status: "checked_out", actual_check_out: new Date().toISOString() })
         .eq("id", bookingId);
       if (uErr) {
-        toast.error("Impossible de confirmer le check-out : " + uErr.message);
+        toast.error("Le check-out n'a pas pu être confirmé : " + uErr.message);
         return false;
       }
     }
@@ -1648,11 +1648,11 @@ export default function BookingsPage() {
     if (!b) return;
     const amount = Math.round(Number(checkoutForm.amount)) || 0;
     if (amount < 0) {
-      toast.error("Le montant doit être positif.");
+      toast.error("Le montant doit être positif (> 0) 💰");
       return;
     }
     if (amount > 0 && !checkoutForm.payment_method) {
-      toast.error("Sélectionnez un moyen de paiement.");
+      toast.error("Choisissez un moyen de paiement 💳");
       return;
     }
     setCheckoutSaving(true);
@@ -1679,7 +1679,7 @@ export default function BookingsPage() {
           });
 
         if (payErr) {
-          toast.error("Check-out confirmé, mais le règlement n'a pas pu être enregistré : " + payErr.message);
+          toast.error("Check-out confirmé ✅ mais le règlement a échoué : " + payErr.message);
         } else {
           toast.success(`Check-out confirmé — ${fmt(amount)} encaissé ✓`);
         }
@@ -1718,12 +1718,12 @@ export default function BookingsPage() {
         if (inv) inv.status = "sent";
         return { ...prev, [checkoutBooking.id]: inv };
       });
-      toast.info("Solde en attente — le réglera plus tard.");
+      toast.info("Solde en attente — le client réglera plus tard ⏳");
       setCheckoutModalOpen(false);
       setCheckoutBooking(null);
       loadBookings(tenantId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la mise à jour.");
+      toast.error(err instanceof Error ? err.message : "La mise à jour a échoué... Réessayez 🔄");
     } finally {
       setCheckoutSaving(false);
     }
@@ -1745,16 +1745,16 @@ export default function BookingsPage() {
     if (!paymentBooking) return;
     const amount = Math.round(Number(paymentForm.amount));
     if (!amount || amount <= 0) {
-      toast.error("Le montant doit être supérieur à 0.");
+      toast.error("Le montant doit être supérieur à 0 💰");
       return;
     }
     const remaining = Math.max(0, (paymentBooking.total_amount || 0) - (paymentBooking.amount_paid || 0));
     if (amount > remaining) {
-      toast.error(`Le montant ne peut pas dépasser le solde restant (${fmt(remaining)}).`);
+      toast.error(`Le montant dépasse le solde restant (${fmt(remaining)}) 💰`);
       return;
     }
     if (!paymentForm.payment_method) {
-      toast.error("Veuillez sélectionner un moyen de paiement.");
+      toast.error("Sélectionnez d'abord un moyen de paiement 💳");
       return;
     }
     setPaymentSaving(true);
@@ -1780,7 +1780,7 @@ export default function BookingsPage() {
       setPaymentBooking(null);
       loadBookings(tenantId);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du paiement.");
+      toast.error(err instanceof Error ? err.message : "Le paiement n'a pas pu être enregistré 💰");
     } finally {
       setPaymentSaving(false);
     }
@@ -1832,19 +1832,19 @@ export default function BookingsPage() {
            .eq("id", bookingId);
 
          if (updateErr) {
-           toast.error("Impossible d'effectuer l'action : " + updateErr.message);
+           toast.error("L'action a échoué : " + updateErr.message);
            return;
          }
        }
 
-       toast.success("Action effectuée avec succès ✓");
+       toast.success("C'est fait ! ✅");
        setConfirmAction(null);
        await runOverstayCheck();
        loadBookings(tenantId);
        // Génération automatique de la facture au check-out (best-effort)
        if (action === "check_out") autoGenerateInvoice(bookingId);
      } catch (err) {
-       toast.error("Une erreur est survenue lors de l'action.");
+       toast.error("L'action a échoué 🔄");
        console.error(err);
      }
   }
@@ -1873,7 +1873,7 @@ export default function BookingsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Export CSV réussi");
+    toast.success("Export CSV prêt ! 📊");
   }
 
   const filteredBookings = bookings.filter((b) => {
@@ -1998,7 +1998,7 @@ export default function BookingsPage() {
                         if (b) {
                           openExtendModal(b, req);
                         } else {
-                          toast.error("Réservation introuvable.");
+                          toast.error("Réservation introuvable 🤷");
                         }
                       }}
                     >
