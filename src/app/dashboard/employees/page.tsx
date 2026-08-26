@@ -358,14 +358,20 @@ export default function EmployeesPage() {
     setHistoryModalOpen(true);
     try {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("employee_assignments")
         .select(`*, accommodation:accommodations(id, name, city)`)
         .eq("user_id", emp.id)
         .order("start_date", { ascending: false })
         .limit(20);
+      if (error) {
+        console.error("Erreur chargement historique affectations:", error);
+        toast.error("Le chargement de l'historique a échoué.");
+        return;
+      }
       if (data) setHistoryData(data as unknown as (EmployeeAssignment & { accommodation?: Accommodation })[]);
-    } catch {
+    } catch (err) {
+      console.error("Exception chargement historique:", err);
       toast.error("Le chargement a échoué : historique.");
     }
   }
@@ -526,7 +532,7 @@ export default function EmployeesPage() {
                         {getInitials(emp.full_name)}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{emp.full_name}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate cursor-pointer hover:text-[var(--primary-color,#0C1C33)] transition-colors" onClick={() => openHistory(emp)}>{emp.full_name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <Badge variant={emp.role === "admin_residence" ? "info" : emp.role === "menagere" ? "theme" : "default"}>
                             {getRoleLabel(emp.role)}
@@ -632,7 +638,7 @@ export default function EmployeesPage() {
                             {getInitials(emp.full_name)}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-slate-900 dark:text-white">{emp.full_name}</p>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white cursor-pointer hover:text-[var(--primary-color,#0C1C33)] transition-colors" onClick={() => openHistory(emp)}>{emp.full_name}</p>
                             {emp.email && <p className="text-xs text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{emp.email}</p>}
                           </div>
                         </div>
