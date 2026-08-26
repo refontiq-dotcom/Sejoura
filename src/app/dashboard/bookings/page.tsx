@@ -156,6 +156,13 @@ export default function BookingsPage() {
   const [nameSuggestionsLoading, setNameSuggestionsLoading] = useState(false);
   const nameSuggestionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Cleanup du timeout autocomplete au démontage
+  useEffect(() => {
+    return () => {
+      if (nameSuggestionsTimeoutRef.current) clearTimeout(nameSuggestionsTimeoutRef.current);
+    };
+  }, []);
+
   const [changeRoomOpen, setChangeRoomOpen] = useState(false);
   const [changeRoomBooking, setChangeRoomBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [changeRoomTypeId, setChangeRoomTypeId] = useState<string>("");
@@ -713,6 +720,10 @@ export default function BookingsPage() {
     }
 
   function openAddModal() {
+    // Si le réceptionniste n'a qu'une résidence, auto-charger les chambres
+    if (accommodations.length === 1) {
+      loadRoomsForAccommodation(accommodations[0].id);
+    }
     setFormData({
       accommodation_id: "",
       room_type_id: "",
@@ -735,6 +746,8 @@ export default function BookingsPage() {
       immediateCheckIn: false,
     });
     setError("");
+    setNameSuggestions([]);
+    setNameSuggestionsOpen(false);
     setModalOpen(true);
   }
 
@@ -2844,10 +2857,16 @@ export default function BookingsPage() {
                 value={formData.newClientName}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setFormData({ ...formData, newClientName: val });
                   if (formData.client_id) {
-                    clearClientSelection();
-                    setFormData((prev) => ({ ...prev, newClientName: val }));
+                    // On sort du mode "client existant" — on garde les infos
+                    // pré-remplies pour que le réceptionniste puisse les éditer
+                    setFormData((prev) => ({
+                      ...prev,
+                      client_id: "",
+                      newClientName: val,
+                    }));
+                  } else {
+                    setFormData({ ...formData, newClientName: val });
                   }
                   searchClientsByName(val);
                 }}
