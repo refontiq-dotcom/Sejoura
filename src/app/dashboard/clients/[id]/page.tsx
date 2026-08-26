@@ -121,7 +121,13 @@ export default function ClientProfilePage() {
         }
 
         const [profileRes, bookingsRes] = await Promise.all([
-          supabase.rpc("get_client_profile", { p_client_id: clientId }),
+          supabase.rpc("get_client_profile", { p_client_id: clientId }).then((res) => {
+            // Si le RPC retourne null ou un objet sans ok, construire un payload par défaut
+            if (!res.error && (!res.data || res.data.ok === undefined || res.data.ok === null)) {
+              return { data: { ok: true, client: null, profile: null }, error: null };
+            }
+            return res;
+          }),
           supabase
             .from("bookings")
             .select(
@@ -133,12 +139,13 @@ export default function ClientProfilePage() {
         ]);
 
         if (profileRes.error) {
-          toast.error("Impossible de charger le dossier client.");
+          console.error("get_client_profile RPC error:", profileRes.error);
+          toast.error("Erreur lors du chargement du dossier client : " + (profileRes.error.message || "Erreur inconnue"));
           setPayload(null);
         } else {
           const data = profileRes.data as ClientProfilePayload;
-          if (!data?.ok) {
-            toast.error(data?.error || "Client introuvable.");
+          if (!data || data.ok === false || data.ok === undefined) {
+            toast.error(data?.error || "Client introuvable ou dossier vide.");
             setPayload(null);
           } else {
             setPayload(data);
