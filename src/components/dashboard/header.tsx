@@ -37,6 +37,7 @@ interface NotificationItem {
   type: "info" | "warning" | "success" | "error";
   isRead: boolean;
   link?: string | null;
+  createdBy?: string | null;
 }
 
 const ROLE_LABELS = (lang: string): Record<string, string> => (translations[lang as Lang] ?? translations.fr).header.roleLabels as Record<string, string>;
@@ -230,8 +231,8 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         .eq("tenant_id", userData.tenant_id)
         .or(`recipient_role.is.null,recipient_role.eq.${userData.role || ""}`)
         // Exclure les notifications générées par l'utilisateur connecté
-        // (ses propres actions : check-in, check-out, réservation, etc.)
-        .or(`user_id.is.null,user_id.neq.${userData.id}`)
+        // (ses propres actions : check-in, check-out, facture, etc.)
+        .or(`created_by.is.null,created_by.neq.${userData.id}`)
         .order("created_at", { ascending: false })
         .limit(20);
 
@@ -245,6 +246,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
         type: (n.type as NotificationItem["type"]) || "info",
         isRead: n.is_read,
         link: n.link,
+        createdBy: n.created_by,
       }));
       setNotifications(formatted);
     } catch {
