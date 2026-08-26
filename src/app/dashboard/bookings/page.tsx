@@ -57,6 +57,7 @@ import {
   Pencil,
   History,
   ArrowRight,
+  ArrowLeftRight,
   Info,
   Wallet,
   CheckCircle2,
@@ -147,6 +148,12 @@ export default function BookingsPage() {
   });
   const [checkinRoomTypeId, setCheckinRoomTypeId] = useState<string>("");
   const [checkinRoomId, setCheckinRoomId] = useState<string>("");
+  // Changement de chambre pendant le séjour
+  const [changeRoomOpen, setChangeRoomOpen] = useState(false);
+  const [changeRoomBooking, setChangeRoomBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [changeRoomTypeId, setChangeRoomTypeId] = useState<string>("");
+  const [changeRoomId, setChangeRoomId] = useState<string>("");
+  const [changeRoomSaving, setChangeRoomSaving] = useState(false);
 
   // Mode édition client dans le tiroir d'informations
   const [editingClientInDrawer, setEditingClientInDrawer] = useState(false);
@@ -1058,6 +1065,100 @@ export default function BookingsPage() {
     }
   }
 
+  // ── CHANGEMENT DE CHAMBRE PENDANT LE SÉJOUR ──────────────────────────────
+  function openChangeRoomModal(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    setChangeRoomBooking(b);
+    setChangeRoomTypeId(b.room?.room_type_id || "");
+    setChangeRoomId("");
+    setChangeRoomOpen(true);
+  }
+
+  // Calcul du supplément pro-rata quand on change de chambre
+  function calcChangeRoomSupplement(): { oldNights: number; remainingNights: number; oldPricePerNight: number; newPricePerNight: number; supplement: number } {
+    if (!changeRoomBooking || !changeRoomId) return { oldNights: 0, remainingNights: 0, oldPricePerNight: 0, newPricePerNight: 0, supplement: 0 };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkOut = new Date(changeRoomBooking.check_out_date);
+    checkOut.setHours(0, 0, 0, 0);
+    const remainingNights = Math.max(1, Math.ceil((checkOut.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    const oldPricePerNight = changeRoomBooking.negotiated_price || 0;
+    const newRoom = rooms.find((r) => r.id === changeRoomId);
+    const newRoomType = roomTypes.find((rt) => rt.id === changeRoomTypeId);
+    const newPricePerNight = newRoomType?.base_price || oldPricePerNight;
+    const oldNights = (changeRoomBooking.nights_count || 1) - remainingNights;
+    const oldCost = oldNights * oldPricePerNight;
+    const newCost = remainingNights * newPricePerNight;
+    const totalAlreadyPaid = changeRoomBooking.amount_paid || 0;
+    const newTotal = oldCost + newCost;
+    const supplement = Math.max(0, newTotal - totalAlreadyPaid);
+    return { oldNights, remainingNights, oldPricePerNight, newPricePerNight, supplement };
+  }
+
+  // Confirmation du changement de chambre
+  async function handleConfirmChangeRoom() {
+    if (!changeRoomBooking || !changeRoomId) return;
+    const { supplement, remainingNights, newPricePerNight } = calcChangeRoomSupplement();
+    setChangeRoomSaving(true);
+    try {
+      const supabase = createClient();
+      const oldRoomId = changeRoomBooking.room_id;
+
+      // 1. Mettre à jour la réservation : chambre + prix
+      const { error: updateErr } = await supabase
+        .from("bookings")
+        .update({
+          room_id: changeRoomId,
+          negotiated_price: newPricePerNight,
+          total_amount: (changeRoomBooking.negotiated_price || 0) * ((changeRoomBooking.nights_count || 1) - remainingNights) + newPricePerNight * remainingNights,
+        })
+        .eq("id", changeRoomBooking.id);
+
+      if (updateErr) {
+        toast.error("Erreur lors de la mise à jour de la réservation : " + updateErr.message);
+        setChangeRoomSaving(false);
+        return;
+      }
+
+      // 2. Libérer l'ancienne chambre → cleaning
+      if (oldRoomId) {
+        await supabase.from("rooms").update({ status: "cleaning" }).eq("id", oldRoomId);
+      }
+
+      // 3. Occuper la nouvelle chambre
+      await supabase.from("rooms").update({ status: "occupied" }).eq("id", changeRoomId);
+
+      // 4. Enregistrer le paiement du supplément
+      if (supplement > 0) {
+        const { error: payErr } = await supabase
+          .from("payments")
+          .insert({
+            tenant_id: changeRoomBooking.tenant_id,
+            booking_id: changeRoomBooking.id,
+            accommodation_id: changeRoomBooking.accommodation_id,
+            amount: supplement,
+            payment_method: "cash",
+            payment_date: new Date().toISOString(),
+            received_by: userId,
+            operation_type: "booking",
+            notes: `Changement de chambre — supplément ${remainingNights} nuit(s)`,
+          });
+
+        if (payErr) {
+          toast.error("Chambre changée, mais le paiement du supplément a échoué : " + payErr.message);
+        }
+      }
+
+      const newRoom = rooms.find((r) => r.id === changeRoomId);
+      toast.success(`Chambre changée → ${newRoom?.room_number || "—"}${supplement > 0 ? ` — supplément de ${fmt(supplement)} enregistré` : ""} ✓`);
+      setChangeRoomOpen(false);
+      await loadBookings(tenantId, accommodationFilterRef.current);
+    } catch {
+      toast.error("Erreur lors du changement de chambre.");
+    } finally {
+      setChangeRoomSaving(false);
+    }
+  }
+
   // Sauvegarde des modifications du client depuis le drawer latéral
   async function handleSaveDrawerClient() {
     if (!selectedClient) return;
@@ -1961,6 +2062,11 @@ export default function BookingsPage() {
                             {b.status === "checked_in" && (
                               <DropdownMenuItem onSelect={() => openExtendModal(b)}>
                                 <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
+                              </DropdownMenuItem>
+                            )}
+                            {b.status === "checked_in" && (
+                              <DropdownMenuItem onSelect={() => openChangeRoomModal(b)}>
+                                <ArrowLeftRight className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Changer de chambre
                               </DropdownMenuItem>
                             )}
                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
@@ -3346,6 +3452,113 @@ export default function BookingsPage() {
             </div>
           </div>
         </Modal>
+
+      {/* ============ MODAL CHANGEMENT DE CHAMBRE ============ */}
+      <Modal
+        open={changeRoomOpen}
+        onClose={() => setChangeRoomOpen(false)}
+        title="Changer de chambre"
+        description={changeRoomBooking ? `${changeRoomBooking.client?.full_name || "Client"} · Actuellement : Ch. ${changeRoomBooking.room?.room_number || "—"}` : ""}
+        size="md"
+      >
+        <div className="space-y-4">
+          {/* Résumé du séjour actuel */}
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800 text-xs">
+            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Changement de chambre en cours de séjour</p>
+              <p className="mt-0.5">La chambre actuelle sera libérée et mise en ménage. Si le nouveau type de chambre a un tarif différent, le supplément sera calculé sur les nuits restantes.</p>
+            </div>
+          </div>
+
+          {/* Sélection type + chambre */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Nouveau type de chambre</label>
+              <select
+                value={changeRoomTypeId}
+                onChange={(e) => {
+                  setChangeRoomTypeId(e.target.value);
+                  const firstRoom = rooms.find((r) => r.room_type_id === e.target.value && r.status === "available");
+                  setChangeRoomId(firstRoom?.id || "");
+                }}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="">Sélectionner un type</option>
+                {roomTypes.map((rt) => (
+                  <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price)}/nuit</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Chambre disponible</label>
+              <select
+                value={changeRoomId}
+                onChange={(e) => setChangeRoomId(e.target.value)}
+                disabled={!changeRoomTypeId}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] disabled:opacity-50"
+              >
+                <option value="">Sélectionner une chambre</option>
+                {rooms
+                  .filter((r) => r.room_type_id === changeRoomTypeId && r.status === "available")
+                  .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      Chambre {r.room_number}{r.floor ? ` (étage ${r.floor})` : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Récapitulatif financier */}
+          {changeRoomId && (() => {
+            const { oldNights, remainingNights, oldPricePerNight, newPricePerNight, supplement } = calcChangeRoomSupplement();
+            return (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2 text-sm">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Récapitulatif</p>
+                <div className="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>Nuits déjà consommées ({oldNights})</span>
+                  <span className="font-medium">{formatAmount(oldNights * oldPricePerNight)}</span>
+                </div>
+                <div className="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>Nuits restantes ({remainingNights}) × {formatAmount(newPricePerNight)}</span>
+                  <span className="font-medium">{formatAmount(remainingNights * newPricePerNight)}</span>
+                </div>
+                <div className="border-t border-slate-200 dark:border-slate-600 pt-2 flex justify-between font-semibold">
+                  <span>Nouveau total</span>
+                  <span>{formatAmount(oldNights * oldPricePerNight + remainingNights * newPricePerNight)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500">
+                  <span>Déjà payé</span>
+                  <span>- {formatAmount(changeRoomBooking?.amount_paid || 0)}</span>
+                </div>
+                {supplement > 0 && (
+                  <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
+                    <span>Supplément à payer</span>
+                    <span>{formatAmount(supplement)}</span>
+                  </div>
+                )}
+                {supplement === 0 && (
+                  <div className="flex justify-between text-green-600 dark:text-green-400 font-semibold">
+                    <span>Aucun supplément</span>
+                    <span>✓</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setChangeRoomOpen(false)}>
+              Annuler
+            </Button>
+            <Button className="flex-1" onClick={handleConfirmChangeRoom} loading={changeRoomSaving} disabled={!changeRoomId}>
+              <ArrowLeftRight className="w-4 h-4" /> Confirmer le changement
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ============ MODAL PAIEMENT PARTIEL ============ */}
       <Modal
