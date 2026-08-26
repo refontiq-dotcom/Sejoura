@@ -2941,6 +2941,25 @@ export default function BookingsPage() {
               <p className="mt-0.5">Vérifiez et complétez les informations d'identité du client (CNI/Passeport) avant de valider son entrée dans l'établissement.</p>
             </div>
           </div>
+          {/* Chambre assignée — information visible pour la remise de clé */}
+          {checkinBooking?.room && (
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center flex-shrink-0">
+                <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                  {checkinBooking.room.room_number}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                  Chambre {checkinBooking.room.room_number}
+                </p>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  {checkinBooking.room_type?.name || "Type inconnu"} · Arrivée {formatDate(checkinBooking.check_in_date)} → Départ {formatDate(checkinBooking.check_out_date)}
+                </p>
+              </div>
+            </div>
+          )}
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input
