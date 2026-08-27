@@ -1242,6 +1242,31 @@ CREATE POLICY "audit_logs_select_super_admin" ON audit_logs
 -- car les fonctions trigger sont SECURITY DEFINER
 
 -- ----------------------------------------------------------------------------
+-- 23l-bis. TRIGGER: traçabilité — associer l'acteur (user_id) aux logs d'audit
+-- Remplit user_id depuis le JWT de la requête (auth.uid() -> users.id) lorsque
+-- l'insertion ne le renseigne pas. Garantit que chaque action est attribuée à
+-- la personne connectée qui l'a réellement effectuée.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fill_audit_log_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.user_id IS NULL THEN
+    SELECT id INTO NEW.user_id
+    FROM users
+    WHERE auth_user_id = auth.uid()
+    LIMIT 1;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_audit_logs_fill_user ON audit_logs;
+CREATE TRIGGER trg_audit_logs_fill_user
+  BEFORE INSERT ON audit_logs
+  FOR EACH ROW
+  EXECUTE FUNCTION fill_audit_log_user();
+
+-- ----------------------------------------------------------------------------
 -- 23m. POLITIQUES RLS — notifications
 -- ----------------------------------------------------------------------------
 CREATE POLICY "notifications_select_own" ON notifications

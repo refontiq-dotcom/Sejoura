@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import {
   formatDate,
+  formatDateTime,
   getExpenseCategoryLabel,
   getPaymentMethodLabel,
+  getInitials,
   getMobileMoneyOperatorLabel,
+  getRoleLabel,
   isMobileMoney,
   MOBILE_MONEY_OPERATORS,
   canAccessPlanFeature,
@@ -76,48 +79,47 @@ function getAuditActionInfo(action: string) {
   return { label: guess.charAt(0).toUpperCase() + guess.slice(1), emoji: "📝", color: "text-[var(--foreground-muted)]", bg: "bg-[var(--surface-sunken)]", category: "systeme" };
 }
 
-function buildAuditSummary(log: AuditLog, users: Record<string, string>): string {
-  const who = users[log.user_id || ""] || "Le système";
+function buildAuditSummary(log: AuditLog): string {
   const vals = log.new_values || log.old_values || {};
   const fmtNum = (n: unknown) => new Intl.NumberFormat("fr-FR").format(Number(n)).replace(/[\u202F\u00A0]/g, " ");
 
   switch (log.action) {
     case "booking.checked_in":
-      return who + " a effectué le check-in" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "") + (vals.client_name ? " pour " + vals.client_name : "");
+      return "Check-in effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "") + (vals.client_name ? " pour " + vals.client_name : "");
     case "booking.checked_out":
-      return who + " a effectué le check-out" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
+      return "Check-out effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
     case "booking.cancelled":
-      return who + " a annulé la réservation" + (vals.client_name ? " de " + vals.client_name : "");
+      return "Réservation annulée" + (vals.client_name ? " pour " + vals.client_name : "");
     case "booking.created":
-      return who + " a créé une réservation" + (vals.client_name ? " pour " + vals.client_name : "") + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
+      return "Réservation créée" + (vals.client_name ? " pour " + vals.client_name : "") + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
     case "price_change": {
       const old = log.old_values?.negotiated_price;
       const nw = log.new_values?.negotiated_price;
       if (old != null && nw != null) {
         const diff = Number(nw) - Number(old);
         const sign = diff > 0 ? "+" : "";
-        return who + " a modifié le prix : " + fmtNum(old) + " → " + fmtNum(nw) + " FCFA (" + sign + fmtNum(diff) + " FCFA)";
+        return "Prix modifié : " + fmtNum(old) + " → " + fmtNum(nw) + " FCFA (" + sign + fmtNum(diff) + " FCFA)";
       }
-      return who + " a modifié le prix";
+      return "Prix modifié";
     }
     case "overstay_detected":
       return "Dépassement de séjour détecté automatiquement" + (vals.client_name ? " pour " + vals.client_name : "");
     case "auto_checkout":
       return "Check-out automatique effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
     case "invoice_generated":
-      return who + " a généré " + (vals.invoice_number ? "la facture " + vals.invoice_number : "une facture") + (vals.total_amount ? " — " + fmtNum(vals.total_amount) + " FCFA" : "");
+      return "Facture générée" + (vals.invoice_number ? " " + vals.invoice_number : "") + (vals.total_amount ? " — " + fmtNum(vals.total_amount) + " FCFA" : "");
     case "expense.created":
-      return who + " a enregistré une dépense" + (vals.amount ? " de " + fmtNum(vals.amount) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
+      return "Dépense enregistrée" + (vals.amount ? " de " + fmtNum(vals.amount) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
     case "expense.updated":
-      return who + " a modifié une dépense" + (vals.description ? " : " + vals.description : "");
+      return "Dépense modifiée" + (vals.description ? " : " + vals.description : "");
     case "auth.login":
-      return who + " s'est connecté(e)";
+      return "Connexion au tableau de bord";
     case "auth.logout":
-      return who + " s'est déconnecté(e)";
+      return "Déconnexion";
     case "employee.created":
-      return who + " a ajouté l'employé" + (vals.full_name ? " " + vals.full_name : "");
+      return "Employé ajouté" + (vals.full_name ? " : " + vals.full_name : "");
     case "employee.deleted":
-      return who + " a supprimé l'employé" + (vals.full_name ? " " + vals.full_name : "");
+      return "Employé supprimé" + (vals.full_name ? " : " + vals.full_name : "");
     case "subscription.activated":
       return "Abonnement " + (vals.plan || "") + " activé";
     case "subscription.expired":
@@ -125,7 +127,7 @@ function buildAuditSummary(log: AuditLog, users: Record<string, string>): string
     case "subscription.plan_changed":
       return "Formule changée" + (vals.plan ? " vers " + vals.plan : "");
     default:
-      return who + " a effectué une action sur " + log.entity_type;
+      return "Action sur " + log.entity_type;
   }
 }
 
@@ -285,6 +287,7 @@ import {
   Search,
   Users,
   User,
+  UserRound,
   Phone,
   Pencil,
   Trash2,
@@ -986,6 +989,8 @@ export default function AccountingPage() {
   const [entityLabelById, setEntityLabelById] = useState<Record<string, string>>({});
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [auditFilter, setAuditFilter] = useState<string | null>(null);
+  const [auditActorFilter, setAuditActorFilter] = useState<string | null>(null);
+  const [auditSearch, setAuditSearch] = useState("");
   const [auditStartDate, setAuditStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); });
   const [auditEndDate, setAuditEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [invoices, setInvoices] = useState<EnrichedInvoice[]>([]);
@@ -994,6 +999,7 @@ export default function AccountingPage() {
   const [clients, setClients] = useState<ClientWithStats[]>([]);
   const [totalClientCount, setTotalClientCount] = useState(0);
   const [usersById, setUsersById] = useState<Record<string, string>>({});
+  const [rolesById, setRolesById] = useState<Record<string, string>>({});
 
   const [tenantId, setTenantId] = useState("");
   const [userId, setUserId] = useState("");
@@ -1130,10 +1136,10 @@ export default function AccountingPage() {
           return q;
         })(),
         supabase.from("payments").select("*").eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
-        supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(120),
+        supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(500),
         supabase.from("invoices").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
         supabase.from("accommodations").select("id, name").eq("tenant_id", tid).order("name"),
-        supabase.from("users").select("id, full_name").eq("tenant_id", tid),
+        supabase.from("users").select("id, full_name, role").eq("tenant_id", tid),
       ]);
 
       if (exp.data) setExpenses(exp.data as unknown as Expense[]);
@@ -1202,8 +1208,13 @@ export default function AccountingPage() {
       if (acc.data) setAccommodations(acc.data as { id: string; name: string }[]);
       if (usersRes.data) {
         const map: Record<string, string> = {};
-        (usersRes.data as { id: string; full_name: string }[]).forEach((u) => (map[u.id] = u.full_name));
+        const roleMap: Record<string, string> = {};
+        (usersRes.data as { id: string; full_name: string; role: string }[]).forEach((u) => {
+          map[u.id] = u.full_name;
+          roleMap[u.id] = u.role;
+        });
         setUsersById(map);
+        setRolesById(roleMap);
       }
 
       // Enrichir les paiements avec les infos de réservation
@@ -1998,12 +2009,34 @@ export default function AccountingPage() {
   // ── Données dérivées pour le journal d'audit ──
   const filteredAuditLogs = auditLogs
     .filter((l) => !auditFilter || getAuditActionInfo(l.action).category === auditFilter)
+    .filter((l) => !auditActorFilter || (l.user_id || "systeme") === auditActorFilter)
     .filter((l) => {
       const d = l.created_at.slice(0, 10);
       return d >= auditStartDate && d <= auditEndDate;
+    })
+    .filter((l) => {
+      if (!auditSearch.trim()) return true;
+      const q = auditSearch.trim().toLowerCase();
+      const haystack = [
+        getAuditActionInfo(l.action).label,
+        buildAuditSummary(l),
+        usersById[l.user_id || ""],
+        l.action,
+        l.entity_type,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
     });
   const groupedAuditLogs = groupAuditLogsByDate(filteredAuditLogs);
   const presentAuditCategories = [...new Set(auditLogs.map((l) => getAuditActionInfo(l.action).category))];
+  const presentAuditActors = [
+    ...new Set(auditLogs.map((l) => l.user_id || "systeme")),
+  ].map((id) => ({
+    id,
+    name: id === "systeme" ? "Le système" : usersById[id] || "Inconnu",
+  })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
   const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
     { key: "overview", label: "Vue d'ensemble", icon: Wallet },
@@ -2893,20 +2926,46 @@ export default function AccountingPage() {
             <div className="rounded-xl bg-[var(--surface)] border border-[var(--border-card)] p-3.5">
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-[13px] font-semibold text-[var(--foreground)] flex items-center gap-2">
-                  <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d'audit
+                  <History className="w-4 h-4 text-[var(--foreground-subtle)]" /> Journal d&apos;audit
                 </h2>
                 <span className="text-[11px] text-[var(--foreground-subtle)]">{filteredAuditLogs.length} / {auditLogs.length} entrées</span>
               </div>
 
-              {/* Filtre par date */}
-              <div className="flex items-center gap-1.5 mb-3">
-                <Calendar className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
-                <input type="date" value={auditStartDate} onChange={(e) => setAuditStartDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
-                <span className="text-[11px] text-[var(--foreground-muted)]">→</span>
-                <input type="date" value={auditEndDate} onChange={(e) => setAuditEndDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
-                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setDate(d.getDate() - 7); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">7j</button>
-                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setMonth(d.getMonth() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">30j</button>
-                <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setFullYear(d.getFullYear() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">12m</button>
+              {/* Filtres : date, acteur, recherche */}
+              <div className="flex flex-col gap-2 mb-3">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+                  <input type="date" value={auditStartDate} onChange={(e) => setAuditStartDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
+                  <span className="text-[11px] text-[var(--foreground-muted)]">→</span>
+                  <input type="date" value={auditEndDate} onChange={(e) => setAuditEndDate(e.target.value)} className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)] [color-scheme:dark]" />
+                  <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setDate(d.getDate() - 7); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">7j</button>
+                  <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setMonth(d.getMonth() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">30j</button>
+                  <button onClick={() => { const d = new Date(); setAuditEndDate(d.toISOString().slice(0, 10)); d.setFullYear(d.getFullYear() - 1); setAuditStartDate(d.toISOString().slice(0, 10)); }} className="text-[10px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)] hover:text-[var(--foreground)]">12m</button>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <UserRound className="w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+                  <select
+                    value={auditActorFilter || ""}
+                    onChange={(e) => setAuditActorFilter(e.target.value || null)}
+                    className="text-[11px] px-2 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--border-strong)]"
+                  >
+                    <option value="">Tous les acteurs</option>
+                    <option value="systeme">⚙️ Le système</option>
+                    {presentAuditActors.filter((a) => a.id !== "systeme").map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                  <div className="relative flex-1 min-w-[180px]">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--foreground-subtle)]" />
+                    <input
+                      type="text"
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                      placeholder="Rechercher dans le journal…"
+                      className="w-full pl-7 pr-3 py-1 rounded-md border border-[var(--border)] bg-[var(--surface-sunken)] text-[11px] text-[var(--foreground)] placeholder:text-[var(--foreground-subtle)] outline-none focus:ring-1 focus:ring-[var(--border-strong)]"
+                    />
+                  </div>
+                </div>
               </div>
 
               {presentAuditCategories.length > 1 && (
@@ -2929,7 +2988,9 @@ export default function AccountingPage() {
               {filteredAuditLogs.length === 0 ? (
                 <div className="text-center py-8">
                   <ScrollText className="w-10 h-10 text-[var(--foreground-muted)] mx-auto mb-3" />
-                  <p className="text-sm text-[var(--foreground-subtle)]">{auditFilter ? "Aucune action dans cette catégorie" : "Aucune action enregistrée"}</p>
+                  <p className="text-sm text-[var(--foreground-subtle)]">
+                    {auditFilter || auditActorFilter || auditSearch ? "Aucune action ne correspond aux filtres" : "Aucune action enregistrée"}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2939,15 +3000,31 @@ export default function AccountingPage() {
                       <div className="space-y-1.5">
                         {g.items.map((log) => {
                           const info = getAuditActionInfo(log.action);
-                          const summary = buildAuditSummary(log, usersById);
-                          const time = new Date(log.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                          const summary = buildAuditSummary(log);
+                          const fullDate = formatDateTime(log.created_at);
+                          const actorName = log.user_id
+                            ? usersById[log.user_id] || "Utilisateur inconnu"
+                            : "Le système";
+                          const actorRole = log.user_id ? getRoleLabel(rolesById[log.user_id] || "") : null;
+                          const actorInitials = log.user_id ? getInitials(actorName) : "S";
                           return (
                             <div key={log.id} onClick={() => setSelectedLog(log)} className={`flex items-start gap-3 p-3 rounded-lg ${info.bg} border border-[var(--border)]/40 cursor-pointer hover:brightness-95 transition-all`}>
                               <span className="text-xl mt-0.5 flex-shrink-0">{info.emoji}</span>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-0.5">
                                   <span className={`text-[11px] font-semibold ${info.color}`}>{info.label}</span>
-                                  <span className="text-[10px] text-[var(--foreground-muted)]">{time}</span>
+                                  <span className="text-[10px] text-[var(--foreground-muted)]">{fullDate}</span>
+                                </div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="w-[18px] h-[18px] rounded-full bg-[var(--foreground)] text-[var(--surface)] text-[8px] font-bold flex items-center justify-center flex-shrink-0 uppercase">
+                                    {actorInitials}
+                                  </span>
+                                  <span className="text-[11px] font-medium text-[var(--foreground)]">{actorName}</span>
+                                  {actorRole && (
+                                    <span className="text-[9px] px-1.5 py-px rounded-full border border-[var(--border)] bg-[var(--surface-sunken)] text-[var(--foreground-muted)]">
+                                      {actorRole}
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-[var(--foreground-subtle)] leading-relaxed line-clamp-2">{summary}</p>
                               </div>
@@ -3532,7 +3609,7 @@ export default function AccountingPage() {
       >
         {selectedLog && (() => {
           const info = getAuditActionInfo(selectedLog.action);
-          const summary = buildAuditSummary(selectedLog, usersById);
+          const summary = buildAuditSummary(selectedLog);
           const time = new Date(selectedLog.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           return (
           <div className="space-y-4">
@@ -3559,7 +3636,16 @@ export default function AccountingPage() {
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Utilisateur</p>
-                <p className="text-[var(--foreground)]">{usersById[selectedLog.user_id || ""] || "Système"}</p>
+                <p className="text-[var(--foreground)]">
+                  {selectedLog.user_id
+                    ? usersById[selectedLog.user_id] || "Utilisateur inconnu"
+                    : "Le système"}
+                </p>
+                {selectedLog.user_id && rolesById[selectedLog.user_id] && (
+                  <p className="text-[10px] text-[var(--foreground-muted)] mt-0.5">
+                    {getRoleLabel(rolesById[selectedLog.user_id])}
+                  </p>
+                )}
               </div>
             </div>
 
