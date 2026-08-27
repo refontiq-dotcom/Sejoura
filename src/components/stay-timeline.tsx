@@ -186,6 +186,11 @@ export function StayTimeline({ bookingId, tenantId, clientId }: StayTimelineProp
       return;
     }
     setSaving(true);
+    if (!bookingId) {
+      setSaving(false);
+      toast.error("Cette note doit être rattachée à une réservation. Sélectionnez d'abord le séjour concerné.");
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.from("stay_notes").insert({
       tenant_id: tenantId,
@@ -199,7 +204,10 @@ export function StayTimeline({ bookingId, tenantId, clientId }: StayTimelineProp
     setSaving(false);
 
     if (error) {
-      toast.error(error.message || "L'action a échoué : enregistrer la note.");
+      const message = /null value in column "booking_id"/.test(error.message)
+        ? "Impossible d'enregistrer la note : le séjour associé est introuvable. Réessayez ou re-sélectionnez la réservation."
+        : error.message || "L'action a échoué : enregistrer la note.";
+      toast.error(message);
       return;
     }
 

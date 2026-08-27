@@ -1338,7 +1338,7 @@ export default function AccountingPage() {
         .from("clients")
         .select(`
           *,
-          bookings(booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count, accommodation_id)
+          bookings(id, booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count, accommodation_id)
         `)
         .eq("tenant_id", tid)
         .order("created_at", { ascending: false })
