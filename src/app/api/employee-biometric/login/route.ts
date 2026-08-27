@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
+  type AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestOrigin, getRpId, normalizeTransports } from "@/lib/webauthn";
@@ -15,7 +16,12 @@ import { signInEmployeeServerSide } from "@/lib/employee-auth";
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: { action?: string; userId?: string; response?: AuthenticationResponseJSON };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
+    }
     const { action, userId } = body;
 
     if (!action || !userId) {
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     // ── Action : VERIFY ───────────────────────────────────────────────────────
-    const credentialId = body.response?.id as string | undefined;
+    const credentialId = body.response?.id;
     if (!credentialId) {
       return NextResponse.json({ error: "Réponse biométrique invalide." }, { status: 400 });
     }
@@ -122,6 +128,10 @@ export async function POST(request: Request) {
       stored = JSON.parse(passkey.public_key as string);
     } catch {
       return NextResponse.json({ error: "Clé biométrique corrompue." }, { status: 500 });
+    }
+
+    if (!body.response) {
+      return NextResponse.json({ error: "Réponse biométrique invalide." }, { status: 400 });
     }
 
     const verification = await verifyAuthenticationResponse({

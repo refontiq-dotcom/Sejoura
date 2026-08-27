@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
+  type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyPin } from "@/lib/pin";
@@ -20,7 +21,12 @@ import { pinRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: { action?: string; userId?: string; pin?: string; response?: RegistrationResponseJSON };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
+    }
     const { action, userId, pin } = body;
 
     if (!action || !userId || !pin || !/^\d{4}$/.test(pin)) {
@@ -125,6 +131,10 @@ export async function POST(request: Request) {
     const expectedChallenge = challengeRows?.[0]?.challenge as string | undefined;
     if (!expectedChallenge) {
       return NextResponse.json({ error: "Session d'enrôlement expirée. Réessayez." }, { status: 400 });
+    }
+
+    if (!body.response) {
+      return NextResponse.json({ error: "Réponse biométrique invalide." }, { status: 400 });
     }
 
     const verification = await verifyRegistrationResponse({

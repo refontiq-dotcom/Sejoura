@@ -63,7 +63,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { password } = (await req.json()) as { password?: string };
+    let password: string | undefined;
+    try {
+      const body = await req.json();
+      password = body?.password;
+    } catch {
+      return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
+    }
     if (!password || typeof password !== "string" || password.length < 6) {
       recordAttempt(ip, false);
       return NextResponse.json({ error: "Mot de passe invalide." }, { status: 400 });

@@ -16,7 +16,12 @@ import { pinRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: { action?: string; userId?: string; pin?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
+    }
     const { action, userId, pin } = body;
 
     // Validation des entrées

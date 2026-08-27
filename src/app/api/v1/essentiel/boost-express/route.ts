@@ -36,7 +36,15 @@ async function verifyAdminAuth(request: Request, tenantId: string) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Body JSON invalide. Fournissez tenantId et accommodationId." },
+        { status: 400 }
+      );
+    }
     const tenantId = typeof body?.tenantId === "string" ? body.tenantId.trim() : "";
     const accommodationId =
       typeof body?.accommodationId === "string" ? body.accommodationId.trim() : "";
