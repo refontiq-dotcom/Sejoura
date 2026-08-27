@@ -19,6 +19,7 @@ import {
   getOverstayLabel,
   getOverstayColor,
   isBookingOverdue,
+  translateRpcError,
   MOBILE_MONEY_OPERATORS,
   formatAmount,
 } from "@/lib/utils";
@@ -1022,7 +1023,7 @@ export default function BookingsPage() {
       });
 
       if (error) {
-        toast.error("Oups : " + error.message);
+        toast.error(translateRpcError(error, "Oups, la demande de ménage a échoué. Réessayez dans un instant."));
       } else {
         setCleaningModalOpen(false);
         toast.success("Ménage demandé ! Les ménagères sont prévenues 🧹");
@@ -1366,7 +1367,7 @@ export default function BookingsPage() {
         } else if (error.message.includes("CHECK_IN_TOO_LATE")) {
           toast.error("Trop tard, le séjour a expiré ⏰ Le client ne peut plus être installé.");
         } else {
-          toast.error("Check-in express raté : " + error.message);
+          toast.error(translateRpcError(error, "Le check-in express a échoué. Réessayez dans un instant."));
         }
         return;
       }
@@ -1402,7 +1403,7 @@ export default function BookingsPage() {
         .single();
 
       if (err) {
-        toast.error("La mise à jour a échoué : " + err.message);
+        toast.error(translateRpcError(err, "La mise à jour de la fiche client a échoué. Réessayez dans un instant."));
         return;
       }
 
@@ -1478,7 +1479,7 @@ export default function BookingsPage() {
         } else if (error.message.includes("CHECKED_IN")) {
           setEditError("L'arrivée ne peut plus être changée après l'installation du client 🔒");
         } else {
-          setEditError(error.message);
+          setEditError(translateRpcError(error, "La modification a échoué. Réessayez dans un instant, ou contactez le support si le problème persiste."));
         }
         return;
       }
@@ -1520,7 +1521,7 @@ export default function BookingsPage() {
         } else if (error.message.includes("INVALID_CHECK_OUT")) {
           toast.error("La date de départ doit être après la date d'arrivée.");
         } else {
-          toast.error("La prolongation a échoué : " + error.message);
+          toast.error(translateRpcError(error, "La prolongation a échoué. Réessayez dans un instant, ou contactez le support si le problème persiste."));
         }
         return;
       }
@@ -1548,7 +1549,7 @@ export default function BookingsPage() {
 
         if (payErr) {
           // Le paiement a échoué mais la prolongation est faite → avertir sans bloquer
-          toast.error("Séjour prolongé ✅ mais le paiement a échoué : " + payErr.message);
+          toast.error(`Séjour prolongé, mais le paiement du supplément (${fmt(paidAmount)}) n'a pas été enregistré. Enregistrez-le manuellement dans la caisse.`);
         } else {
           // Le trigger DB update_booking_payment_status recalcule automatiquement
           // amount_paid et payment_status (source de vérité : somme des paiements

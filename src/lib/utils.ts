@@ -462,3 +462,28 @@ export function getPlanLimits(plan: string): {
 export function canAccessPlanFeature(plan: string, feature: string): boolean {
   return canAccessFeature(feature, plan);
 }
+
+/**
+ * Traduit une erreur RPC/Postgres brute en un message clair pour l'utilisateur.
+ * Les erreurs métier lancées dans les fonctions SQL portent un code avant le
+ * « : » (ex. « DOUBLE_BOOKING: ... ») ou des motifs connus. Tout ce qui n'est
+ * pas reconnu retombe sur `fallback` : on n'expose jamais le SQL brut à l'écran.
+ */
+export function translateRpcError(
+  error: { message?: string } | null | undefined,
+  fallback: string
+): string {
+  const msg = error?.message ?? "";
+  const patterns: Array<{ match: string; friendly: string }> = [
+    { match: "DOUBLE_BOOKING", friendly: "Conflit de dates : cette chambre vient d'être réservée sur la période demandée." },
+    { match: "INVALID_CHECK_OUT", friendly: "La date de départ doit être après la date d'arrivée." },
+    { match: "CHECKED_IN", friendly: "La date d'arrivée ne peut plus être modifiée une fois le client installé." },
+    { match: "BOOKING_NOT_ACTIVE", friendly: "La réservation n'est plus active et ne peut plus être modifiée." },
+    { match: "CHECK_IN_TOO_EARLY", friendly: "L'arrivée est trop tôt : le check-in ne peut pas être fait avant la date prévue." },
+    { match: "CHECK_IN_TOO_LATE", friendly: "Trop tard : la date de départ est déjà dépassée, le client ne peut plus être installé." },
+  ];
+  for (const { match, friendly } of patterns) {
+    if (msg.includes(match)) return friendly;
+  }
+  return fallback;
+}
