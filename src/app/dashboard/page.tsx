@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -154,8 +155,14 @@ function ClientDrawer({
 }) {
   const { lang } = useLanguage();
   const dt = (translations[lang] ?? translations["fr"]).dashboard;
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
-  return (
+  if (!portalTarget) return null;
+
+  return createPortal(
     <>
       {/* Overlay — hidden on mobile, visible on desktop */}
       <div
@@ -344,7 +351,8 @@ function ClientDrawer({
         )}
         </div>
       </div>
-    </>
+    </>,
+    portalTarget
   );
 }
 

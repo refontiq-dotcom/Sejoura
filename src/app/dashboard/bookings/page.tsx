@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -2593,7 +2594,8 @@ export default function BookingsPage() {
        )}
 
       {/* Drawer — Détails client (panneau latéral droit) */}
-      {selectedClient && (
+      {selectedClient &&
+        createPortal(
         <>
           {/* Backdrop — hidden on mobile (bottom sheet needs no overlay), full on desktop */}
           <div
@@ -2842,7 +2844,8 @@ export default function BookingsPage() {
               </div>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {/* Modal nouvelle réservation */}
