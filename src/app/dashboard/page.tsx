@@ -997,12 +997,25 @@ export default function DashboardPage() {
         });
 
         // Nombre de séjours en dépassement (client encore en chambre après le
-        // départ prévu) : affiché en bannière d'alerte sur le dashboard.
-        setOverstayCount(
-          bookings.filter(
-            (b) => b.status === "checked_in" && (b.is_overstay || isBookingOverdue(b))
-          ).length
-        );
+        // départ prévu) : calculé sur TOUTES les réservations checked_in du
+        // tenant — et non sur la fenêtre de dates du jour — pour rester
+        // cohérent avec le filtre « Dépassement » de la page Réservations.
+        {
+          let overstayQuery = supabase
+            .from("bookings")
+            .select("id, status, check_out_date, check_out_time, is_overstay")
+            .eq("tenant_id", tenantId)
+            .eq("status", "checked_in");
+          if (activeAccommodationId) {
+            overstayQuery = overstayQuery.eq("accommodation_id", activeAccommodationId);
+          }
+          const overstayData = await overstayQuery;
+          setOverstayCount(
+            (overstayData.data || []).filter(
+              (b) => b.is_overstay || isBookingOverdue(b)
+            ).length
+          );
+        }
 
         // Une réservation arrivant ET repartant le jour cible génère deux mouvements distincts
         const movements: Movement[] = targetBookings.flatMap((b) => {

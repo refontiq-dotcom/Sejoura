@@ -489,8 +489,7 @@ export default function BookingsPage() {
           room:rooms(*, room_type:room_types(*))
         `)
         .eq("tenant_id", tId)
-        .order("created_at", { ascending: false })
-        .limit(200);
+        .order("created_at", { ascending: false });
 
       // Filtrer par résidence pour les réceptionnistes
       if (accommodationId) {
