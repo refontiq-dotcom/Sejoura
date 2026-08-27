@@ -209,6 +209,18 @@ function auditFieldLabel(key: string): string {
   return AUDIT_FIELD_LABELS[key] ?? key.replace(/_/g, " ");
 }
 
+/** Libellé français d'un type d'entité du journal d'audit */
+const AUDIT_ENTITY_LABELS: Record<string, string> = {
+  booking: "Réservation",
+  invoice: "Facture",
+  client: "Client",
+  room: "Chambre",
+  accommodation: "Établissement",
+  expense: "Dépense",
+  payment: "Paiement",
+  user: "Utilisateur",
+};
+
 /** Formate une valeur brute pour l'affichage */
 // Champs qui contiennent des UUIDs internes — on les cache
 const UUID_FIELDS = new Set([
@@ -971,6 +983,7 @@ export default function AccountingPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [payments, setPayments] = useState<EnrichedPayment[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [entityLabelById, setEntityLabelById] = useState<Record<string, string>>({});
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [auditFilter, setAuditFilter] = useState<string | null>(null);
   const [auditStartDate, setAuditStartDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); });
@@ -1124,7 +1137,68 @@ export default function AccountingPage() {
       ]);
 
       if (exp.data) setExpenses(exp.data as unknown as Expense[]);
-      if (log.data) setAuditLogs(log.data as unknown as AuditLog[]);
+      if (log.data) {
+        const logs = log.data as unknown as AuditLog[];
+        setAuditLogs(logs);
+
+        // Résoudre les identifiants techniques (UUID) des entités en libellés
+        // lisibles (code de réservation, nom du client, numéro de facture…)
+        // pour la modale de détail du journal d'audit.
+        const labels: Record<string, string> = {};
+        const idsByType: Record<string, string[]> = {};
+        logs.forEach((l) => {
+          if (l.entity_type && l.entity_id) {
+            (idsByType[l.entity_type] ||= []).push(l.entity_id);
+          }
+        });
+
+        if (idsByType.booking?.length) {
+          const { data: bks } = await supabase
+            .from("bookings")
+            .select("id, booking_code")
+            .in("id", idsByType.booking);
+          (bks || []).forEach((b: { id: string; booking_code: string }) => {
+            labels[b.id] = b.booking_code;
+          });
+        }
+        if (idsByType.invoice?.length) {
+          const { data: invs } = await supabase
+            .from("invoices")
+            .select("id, invoice_number")
+            .in("id", idsByType.invoice);
+          (invs || []).forEach((i: { id: string; invoice_number: string }) => {
+            labels[i.id] = i.invoice_number;
+          });
+        }
+        if (idsByType.client?.length) {
+          const { data: cls } = await supabase
+            .from("clients")
+            .select("id, full_name")
+            .in("id", idsByType.client);
+          (cls || []).forEach((c: { id: string; full_name: string }) => {
+            labels[c.id] = c.full_name;
+          });
+        }
+        if (idsByType.room?.length) {
+          const { data: rms } = await supabase
+            .from("rooms")
+            .select("id, room_number")
+            .in("id", idsByType.room);
+          (rms || []).forEach((r: { id: string; room_number: string }) => {
+            labels[r.id] = `Ch. ${r.room_number}`;
+          });
+        }
+        if (idsByType.accommodation?.length) {
+          const { data: accs } = await supabase
+            .from("accommodations")
+            .select("id, name")
+            .in("id", idsByType.accommodation);
+          (accs || []).forEach((a: { id: string; name: string }) => {
+            labels[a.id] = a.name;
+          });
+        }
+        setEntityLabelById(labels);
+      }
       if (acc.data) setAccommodations(acc.data as { id: string; name: string }[]);
       if (usersRes.data) {
         const map: Record<string, string> = {};
@@ -3476,7 +3550,12 @@ export default function AccountingPage() {
             <div className="grid grid-cols-2 gap-3 text-[12px]">
               <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Entité</p>
-                <p className="text-[var(--foreground)]">{selectedLog.entity_type}{selectedLog.entity_id ? ` #${selectedLog.entity_id.substring(0, 8)}` : ""}</p>
+                <p className="text-[var(--foreground)]">
+                  {AUDIT_ENTITY_LABELS[selectedLog.entity_type] || selectedLog.entity_type}
+                  {selectedLog.entity_id
+                    ? ` #${entityLabelById[selectedLog.entity_id] || selectedLog.entity_id.substring(0, 8)}`
+                    : ""}
+                </p>
               </div>
               <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--border)]/50">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] mb-1">Utilisateur</p>
