@@ -188,8 +188,8 @@ export const translations = {
       nights: "nuit",
       guests: "Voyageurs",
       overstay: {
-        title: "{count} séjour{count, plural, one {} other {s}} en dépassement",
-        subtitle: "Client{count, plural, one {} other {s}} encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.",
+        title: "{count} séjour(s) en dépassement",
+        subtitle: "Client(s) encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.",
         viewBookings: "Voir les réservations",
       },
       arrivalsExpected: "Arrivées prévues",
@@ -786,8 +786,8 @@ export const translations = {
       nights: "night",
       guests: "Guests",
       overstay: {
-        title: "{count} stay{count, plural, one {} other {s}} overdue",
-        subtitle: "Client{count, plural, one {} other {s}} still in room after scheduled departure — extend stay or vacate room.",
+        title: "{count} stay(s) overdue",
+        subtitle: "Client(s) still in room after scheduled departure — extend stay or vacate room.",
         viewBookings: "View bookings",
       },
       arrivalsExpected: "Expected arrivals",
