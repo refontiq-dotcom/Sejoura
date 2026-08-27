@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
+
+const lookupLimiter = createRateLimiter({ windowMs: 60_000, max: 30 }); // 30 req/min
 
 /**
  * GET /api/stay/lookup?token=...
@@ -11,6 +14,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export async function GET(request: Request) {
   try {
+    const rlKey = getRateLimitKey(request);
+    const rl = lookupLimiter.check(rlKey);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de requêtes. Réessayez dans ${rl.resetIn}s.` },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token") || "";
 

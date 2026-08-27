@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 const ALLOWED_TYPES = ["cleaning", "linen", "assistance"];
+const requestLimiter = createRateLimiter({ windowMs: 60_000, max: 10 }); // 10 req/min
 
 /**
  * POST /api/stay/request
@@ -12,6 +14,15 @@ const ALLOWED_TYPES = ["cleaning", "linen", "assistance"];
  */
 export async function POST(request: Request) {
   try {
+    const rlKey = getRateLimitKey(request);
+    const rl = requestLimiter.check(rlKey);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de requêtes. Réessayez dans ${rl.resetIn}s.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json().catch(() => null);
     const token = typeof body?.token === "string" ? body.token : "";
     const requestType = typeof body?.request_type === "string" ? body.request_type : "";
