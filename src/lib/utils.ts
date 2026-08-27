@@ -167,7 +167,7 @@ export function normalizePhone(phone: string): string {
     return "+" + cleaned.substring(2);
   }
   if (cleaned.startsWith("0")) {
-    return "+225" + cleaned.substring(1); // Côte d'Ivoire par défaut
+    return "+225" + cleaned; // Côte d'Ivoire par défaut — garder le 0
   }
   return "+225" + cleaned;
 }
