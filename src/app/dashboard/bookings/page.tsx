@@ -69,7 +69,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
 import { ClientScoreBadge } from "@/components/client-score-badge";
-import PdfPreview from "@/components/pdf-preview";
+
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
@@ -3654,59 +3654,40 @@ export default function BookingsPage() {
             open={invoiceModalOpen}
             onClose={() => setInvoiceModalOpen(false)}
             title="Facture générée"
-            size="md"
+            size="sm"
           >
-            <div className="space-y-3">
-              {invoicesMap[selectedBookingForInvoice.id]?.pdf_url && (
-                <div className="aspect-[3/4] bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <PdfPreview
-                    url={invoicesMap[selectedBookingForInvoice.id]?.pdf_url || ""}
-                    className="w-full h-full p-2"
-                  />
-                </div>
-              )}
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/30">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Numéro de facture</p>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                  <p className="text-slate-500 dark:text-slate-400">Numéro</p>
+                  <p className="font-medium text-slate-900 dark:text-white">
                     {invoicesMap[selectedBookingForInvoice.id]?.invoice_number || "—"}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Montant total</p>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                <div className="text-right">
+                  <p className="text-slate-500 dark:text-slate-400">Montant</p>
+                  <p className="font-bold text-slate-900 dark:text-white">
                     {fmt(invoicesMap[selectedBookingForInvoice.id]?.total_amount || 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Statut</p>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {invoicesMap[selectedBookingForInvoice.id]?.status === "draft"
-                      ? "Brouillon"
-                      : invoicesMap[selectedBookingForInvoice.id]?.status === "sent"
-                      ? "Envoyée"
-                      : invoicesMap[selectedBookingForInvoice.id]?.status === "paid"
-                      ? "Payée"
-                      : "Non payée"}
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-1">
                 <Button
                   variant="outline"
-                  className="flex-1 gap-2"
+                  size="sm"
+                  className="flex-1 gap-1.5"
                   onClick={() => handleDownloadInvoice(invoicesMap[selectedBookingForInvoice.id])}
                   disabled={!invoicesMap[selectedBookingForInvoice.id]?.pdf_url}
                 >
-                  <Download className="w-4 h-4" /> Télécharger
+                  <Download className="w-3.5 h-3.5" /> Télécharger
                 </Button>
                 <Button
-                  className="flex-1 gap-2"
+                  size="sm"
+                  className="flex-1 gap-1.5"
                   onClick={() => openSendInvoiceModal(invoicesMap[selectedBookingForInvoice.id])}
                 >
-                  <MessageSquare className="w-4 h-4" /> Envoyer
+                  <MessageSquare className="w-3.5 h-3.5" /> Envoyer
                 </Button>
               </div>
             </div>
