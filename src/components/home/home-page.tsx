@@ -83,6 +83,18 @@ const messages: Record<Lang, Record<string, string>> = {
     acceptTerms: "J'accepte les",
     terms: "CGU",
     privateInfo: "Vos informations restent privées",
+    // Trust / Social proof
+    trustTitle: "Ils nous font confiance",
+    trustStat: "50+ établissements",
+    trustStatDesc: "hôtels & résidences en Côte d'Ivoire",
+    testimonial1Quote:
+      "Séjoura a transformé notre gestion. Le ménage est automatique, la caisse est claire, et les réservations arrivent sans effort.",
+    testimonial1Name: "M. Kouassi",
+    testimonial1Role: "Gérant, Hôtel Riviera Abidjan",
+    testimonial2Quote:
+      "Avant c'était le chaos. Maintenant je vois en 2 secondes qui arrive, qui part, et combien on a encaissé aujourd'hui.",
+    testimonial2Name: "Mme Aya",
+    testimonial2Role: "Directrice, Résidence Palm Beach",
     // Footer
     footerRights: "© 2026 Séjoura by Refontiq.",
     footerContact: "Abidjan, Côte d'Ivoire",
@@ -155,6 +167,19 @@ const messages: Record<Lang, Record<string, string>> = {
     acceptTerms: "I accept the",
     terms: "Terms",
     privateInfo: "Your information stays private",
+    // Trust / Social proof
+    trustTitle: "They trust us",
+    trustStat: "50+ establishments",
+    trustStatDesc: "hotels & residences in Ivory Coast",
+    testimonial1Quote:
+      "Séjoura transformed our management. Cleaning is automatic, cash is clear, and bookings arrive without effort.",
+    testimonial1Name: "Mr. Kouassi",
+    testimonial1Role: "Manager, Hôtel Riviera Abidjan",
+    testimonial2Quote:
+      "Before it was chaos. Now I see in 2 seconds who arrives, who leaves, and how much we collected today.",
+    testimonial2Name: "Mrs. Aya",
+    testimonial2Role: "Director, Résidence Palm Beach",
+    // Footer
     footerRights: "© 2026 Séjoura by Refontiq.",
     footerContact: "Abidjan, Côte d'Ivoire",
     footerPowered: "A solution by",
@@ -1460,6 +1485,66 @@ export function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* Trust / Social proof */}
+      <section className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
+                {t.trustTitle}
+              </h2>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-white">{t.trustStat}</span>
+                <span className="text-xs sm:text-sm text-white/60">{t.trustStatDesc}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              ))}
+            </div>
+          </div>
+
+          {/* Testimonials */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Testimonial 1 */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+              <p className="text-sm sm:text-base text-white/90 leading-relaxed mb-4">
+                « {t.testimonial1Quote} »
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-bold text-sm">
+                  {t.testimonial1Name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{t.testimonial1Name}</p>
+                  <p className="text-[11px] text-white/50">{t.testimonial1Role}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Testimonial 2 */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+              <p className="text-sm sm:text-base text-white/90 leading-relaxed mb-4">
+                « {t.testimonial2Quote} »
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-600/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold text-sm">
+                  {t.testimonial2Name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{t.testimonial2Name}</p>
+                  <p className="text-[11px] text-white/50">{t.testimonial2Role}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Mobile auth modal */}
       {authModalMode && (
