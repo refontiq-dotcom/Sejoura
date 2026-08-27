@@ -1366,7 +1366,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              {overstayCount} {t.overstay.title.replace("{count}", String(overstayCount))}
+              {t.overstay.title.replace("{count}", String(overstayCount))}
             </p>
             <p className="text-xs text-red-600/80 dark:text-red-400/80 truncate">
               {t.overstay.subtitle.replace("{count}", String(overstayCount))}
