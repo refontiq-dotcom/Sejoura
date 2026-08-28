@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export type NotificationItem = {
@@ -128,6 +129,30 @@ export function NotificationsProvider({
       // Silencieux
     }
   }
+
+  const pathname = usePathname();
+
+  async function autoMarkReadByPath() {
+    if (!pathname || !tenantId) return;
+    const matches = notifications.filter((n) => n.link && !n.isRead && pathname === n.link);
+    if (matches.length === 0) return;
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .in("id", matches.map((n) => n.id));
+
+      setNotifications((prev) =>
+        prev.map((n) => (matches.some((m) => m.id === n.id) ? { ...n, isRead: true, readAt: new Date().toISOString() } : n))
+      );
+    } catch {
+      // Silencieux
+    }
+  }
+
+  useEffect(() => {
+    autoMarkReadByPath();
+  }, [pathname, notifications]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
