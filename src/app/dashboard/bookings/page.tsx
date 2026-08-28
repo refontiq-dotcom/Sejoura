@@ -109,11 +109,19 @@ export default function BookingsPage() {
   const [extendMobileOperator, setExtendMobileOperator] = useState("");
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editBooking, setEditBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
+  const [thirdPartyCheckInBlock, setThirdPartyCheckInBlock] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [editForm, setEditForm] = useState({
     check_in_date: "",
     check_out_date: "",
     room_id: "",
     negotiated_price: "",
+    is_third_party: false,
+    occupant_full_name: "",
+    occupant_phone: "",
+    occupant_id_type: "",
+    occupant_id_number: "",
+    occupant_nationality: "",
+    occupant_address: "",
   });
   const [editError, setEditError] = useState("");
   // Règlement au check-out : si un solde reste dû, la réceptionniste encaisse
@@ -312,6 +320,13 @@ export default function BookingsPage() {
     payment_method: "",
     mobile_money_operator: "",
     immediateCheckIn: false,
+    is_third_party: false,
+    occupant_full_name: "",
+    occupant_phone: "",
+    occupant_id_type: "",
+    occupant_id_number: "",
+    occupant_nationality: "",
+    occupant_address: "",
   });
 
   useEffect(() => {
@@ -876,6 +891,13 @@ export default function BookingsPage() {
       payment_method: "",
       mobile_money_operator: "",
       immediateCheckIn: false,
+      is_third_party: false,
+      occupant_full_name: "",
+      occupant_phone: "",
+      occupant_id_type: "",
+      occupant_id_number: "",
+      occupant_nationality: "",
+      occupant_address: "",
     });
     setError("");
     setNameSuggestions([]);
@@ -900,6 +922,25 @@ export default function BookingsPage() {
     if (negotiatedPrice <= 0) {
       setError("Le prix doit être supérieur à 0 💰");
       return;
+    }
+
+    if (formData.is_third_party) {
+      if (!formData.occupant_full_name.trim()) {
+        setError("Le nom complet de l'occupant est requis pour une réservation tiers 👤");
+        return;
+      }
+      if (!formData.occupant_id_type) {
+        setError("Le type de pièce de l'occupant est requis pour une réservation tiers 🪪");
+        return;
+      }
+      if (!formData.occupant_id_number.trim()) {
+        setError("Le numéro de pièce de l'occupant est requis pour une réservation tiers 🪪");
+        return;
+      }
+      if (!formData.occupant_nationality.trim()) {
+        setError("La nationalité de l'occupant est requise pour une réservation tiers 🌍");
+        return;
+      }
     }
 
     setSaving(true);
@@ -981,6 +1022,13 @@ export default function BookingsPage() {
         p_special_requests: formData.special_requests || null,
         p_created_by: userId,
         p_booking_source: 'manual',
+        p_is_third_party: formData.is_third_party,
+        p_occupant_full_name: formData.occupant_full_name || null,
+        p_occupant_phone: formData.occupant_phone || null,
+        p_occupant_id_type: formData.occupant_id_type || null,
+        p_occupant_id_number: formData.occupant_id_number || null,
+        p_occupant_nationality: formData.occupant_nationality || null,
+        p_occupant_address: formData.occupant_address || null,
       });
 
       if (bookingErr) {
@@ -1500,6 +1548,13 @@ export default function BookingsPage() {
       check_out_date: booking.check_out_date,
       room_id: booking.room_id || "",
       negotiated_price: String(booking.negotiated_price ?? ""),
+      is_third_party: booking.is_third_party || false,
+      occupant_full_name: booking.occupant_full_name || "",
+      occupant_phone: booking.occupant_phone || "",
+      occupant_id_type: booking.occupant_id_type || "",
+      occupant_id_number: booking.occupant_id_number || "",
+      occupant_nationality: booking.occupant_nationality || "",
+      occupant_address: booking.occupant_address || "",
     });
     setEditError("");
     setEditModalOpen(true);
@@ -1525,6 +1580,14 @@ export default function BookingsPage() {
         p_check_out_date: editForm.check_out_date || null,
         p_room_id: editForm.room_id || null,
         p_negotiated_price: editForm.negotiated_price ? Math.round(Number(editForm.negotiated_price)) : null,
+        p_is_third_party: editForm.is_third_party,
+        p_occupant_full_name: editForm.occupant_full_name || null,
+        p_occupant_phone: editForm.occupant_phone || null,
+        p_occupant_id_type: editForm.occupant_id_type || null,
+        p_occupant_id_number: editForm.occupant_id_number || null,
+        p_occupant_nationality: editForm.occupant_nationality || null,
+        p_occupant_address: editForm.occupant_address || null,
+        p_id_registration_status: editBooking.id_registration_status || "not_required",
       });
       if (error) {
         if (error.message.includes("DOUBLE_BOOKING")) {
@@ -1853,6 +1916,15 @@ export default function BookingsPage() {
   // le bouton principal et le menu restent désactivés pendant l'exécution.
   async function handlePrimaryAction(bookingId: string, action: "check_in" | "check_out") {
     if (actioningId) return;
+    const target = bookings.find(b => b.id === bookingId);
+    if (!target) return;
+
+    if (action === "check_in" && target.is_third_party && target.id_registration_status === "pending") {
+      setThirdPartyCheckInBlock(target);
+      setActioningId("");
+      return;
+    }
+
     setActioningId(bookingId);
     try {
       await handleAction(bookingId, action);
@@ -1869,36 +1941,26 @@ export default function BookingsPage() {
                        action === "cancel" ? "cancel_booking" :
                        "mark_no_show";
 
-       const { error: rpcErr } = await supabase.rpc(rpcName, {
-         p_booking_id: bookingId,
-         p_user_id: userId,
-         ...(rpcName === "check_in_booking" ? { p_allow_early: false, p_allow_late: false } : {}),
-       });
+        const { error: rpcErr } = await supabase.rpc(rpcName, {
+          p_booking_id: bookingId,
+          p_user_id: userId,
+          ...(rpcName === "check_in_booking" ? { p_allow_early: false, p_allow_late: false } : {}),
+        });
 
-       if (rpcErr) {
-         // Fallback direct sur la table bookings si la fonction RPC échoue (ex: statut intermédiaire)
-         const statusMap: Record<string, string> = {
-           check_in: "checked_in",
-           check_out: "checked_out",
-           cancel: "cancelled",
-           no_show: "no_show",
-         };
-         const extraFields = action === "check_in" ? { actual_check_in: new Date().toISOString() } :
-                             action === "check_out" ? { actual_check_out: new Date().toISOString() } : {};
+        if (rpcErr) {
+          if (action === "check_in" && rpcErr.message.includes("PENDING_ID")) {
+            const booking = bookings.find(b => b.id === bookingId);
+            setThirdPartyCheckInBlock(booking || null);
+            setConfirmAction(null);
+            setActioningId("");
+            return;
+          }
 
-         const { error: updateErr } = await supabase
-           .from("bookings")
-           .update({
-             status: statusMap[action],
-             ...extraFields,
-           })
-           .eq("id", bookingId);
-
-         if (updateErr) {
-           toast.error("L'action a échoué : " + updateErr.message);
-           return;
-         }
-       }
+          toast.error(translateRpcError(rpcErr, "L'action a échoué. Réessayez dans un instant."));
+          setConfirmAction(null);
+          setActioningId("");
+          return;
+        }
 
        toast.success("C'est fait ! ✅");
        setConfirmAction(null);
@@ -1914,19 +1976,53 @@ export default function BookingsPage() {
 
   function exportToCSV() {
     if (filteredBookings.length === 0) return;
-    const headers = ["Code", "Client", "Téléphone", "Chambre", "Arrivée", "Départ", "Nuits", "Montant Total", "Statut Paiement", "Statut"];
-    const rows = filteredBookings.map(b => [
-      b.booking_code,
-      b.client?.full_name || "",
-      b.client?.phone || "",
-      b.room?.room_number || "",
-      b.check_in_date,
-      b.check_out_date,
-      b.nights_count,
-      b.total_amount,
-      getPaymentStatusLabel(b.payment_status),
-      getBookingStatusLabel(b.status)
-    ]);
+    const headers = [
+      "Code",
+      "Occupant",
+      "Téléphone occupant",
+      "Type pièce",
+      "Numéro pièce",
+      "Nationalité occupant",
+      "Payeur",
+      "Téléphone payeur",
+      "Chambre",
+      "Arrivée",
+      "Départ",
+      "Nuits",
+      "Montant Total",
+      "Statut Paiement",
+      "Statut",
+      "Tiers",
+      "ID enregistrée"
+    ];
+    const rows = filteredBookings.map(b => {
+      const occupantName = b.is_third_party ? (b.occupant_full_name || "") : (b.client?.full_name || "");
+      const occupantPhone = b.is_third_party ? (b.occupant_phone || "") : (b.client?.phone || "");
+      const occupantIdType = b.is_third_party ? (b.occupant_id_type || "") : "";
+      const occupantIdNumber = b.is_third_party ? (b.occupant_id_number || "") : "";
+      const occupantNationality = b.is_third_party ? (b.occupant_nationality || "") : "";
+      const payerName = b.client?.full_name || "";
+      const payerPhone = b.client?.phone || "";
+      return [
+        b.booking_code,
+        occupantName,
+        occupantPhone,
+        occupantIdType,
+        occupantIdNumber,
+        occupantNationality,
+        payerName,
+        payerPhone,
+        b.room?.room_number || "",
+        b.check_in_date,
+        b.check_out_date,
+        b.nights_count,
+        b.total_amount,
+        getPaymentStatusLabel(b.payment_status),
+        getBookingStatusLabel(b.status),
+        b.is_third_party ? "Oui" : "Non",
+        b.id_registration_status || ""
+      ];
+    });
     const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -2227,9 +2323,21 @@ export default function BookingsPage() {
                       {b.client?.full_name?.charAt(0) || "?"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        {b.client?.full_name || "Client sans profil"}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                          {b.is_third_party ? (b.occupant_full_name || "Occupant non renseigné") : (b.client?.full_name || "Client sans profil")}
+                        </p>
+                        {b.is_third_party && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                            Tiers
+                          </span>
+                        )}
+                        {b.is_third_party && b.id_registration_status === 'pending' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                            ID à enregistrer
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         {b.booking_code} · {b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}
                       </p>
@@ -2318,11 +2426,16 @@ export default function BookingsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Séjour</DropdownMenuLabel>
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
-                              <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
-                                <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
+                            {b.is_third_party && b.id_registration_status === 'pending' && (
+                              <DropdownMenuItem onSelect={() => openEditModal(b)} className="text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium">
+                                <Pencil className="w-4 h-4" /> Enregistrer ID occupant
                               </DropdownMenuItem>
                             )}
+                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                               <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
+                                 <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
+                               </DropdownMenuItem>
+                             )}
                             <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
                               <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
                             </DropdownMenuItem>
@@ -2451,7 +2564,21 @@ export default function BookingsPage() {
                           onClick={() => setSelectedClient(b.client!)}
                           className="text-left hover:underline decoration-1 decoration-[var(--muted-hover)]"
                         >
-                          <p className="text-sm font-medium text-slate-900 dark:text-white">{b.client.full_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                              {b.is_third_party ? (b.occupant_full_name || "Occupant non renseigné") : b.client.full_name}
+                            </p>
+                            {b.is_third_party && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                Tiers
+                              </span>
+                            )}
+                            {b.is_third_party && b.id_registration_status === 'pending' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
+                                ID à enregistrer
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-400 dark:text-slate-500">{b.client.phone || ""}</p>
                           {hasClientProfiles && (
                             <ClientScoreBadge
@@ -2534,29 +2661,34 @@ export default function BookingsPage() {
                           <DropdownMenuTrigger aria-label="Plus d'actions" disabled={actioningId === b.id} className="h-10 w-10 md:h-8 md:w-8">
                             <MoreHorizontal className="w-4 h-4" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Séjour</DropdownMenuLabel>
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
-                              <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
-                                <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
-                              <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => copyStayLink(b)}>
-                              <Copy className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Copier le lien du séjour
-                            </DropdownMenuItem>
-                            {b.status === "checked_in" && (
-                              <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
-                                <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
-                              </DropdownMenuItem>
-                            )}
-                            {b.status === "checked_in" && (
-                              <DropdownMenuItem onSelect={() => openExtendModal(b)}>
-                                <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
-                              </DropdownMenuItem>
-                            )}
+                           <DropdownMenuContent align="end">
+                             <DropdownMenuLabel>Séjour</DropdownMenuLabel>
+                             {b.is_third_party && b.id_registration_status === 'pending' && (
+                               <DropdownMenuItem onSelect={() => openEditModal(b)} className="text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 font-medium">
+                                 <Pencil className="w-4 h-4" /> Enregistrer ID occupant
+                               </DropdownMenuItem>
+                             )}
+                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                               <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
+                                 <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
+                               </DropdownMenuItem>
+                             )}
+                             <DropdownMenuItem onSelect={() => shareStayWhatsApp(b)} className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+                               <MessageSquare className="w-4 h-4" /> Envoyer l&apos;accès par WhatsApp
+                             </DropdownMenuItem>
+                             <DropdownMenuItem onSelect={() => copyStayLink(b)}>
+                               <Copy className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Copier le lien du séjour
+                             </DropdownMenuItem>
+                             {b.status === "checked_in" && (
+                               <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
+                                 <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                               </DropdownMenuItem>
+                             )}
+                             {b.status === "checked_in" && (
+                               <DropdownMenuItem onSelect={() => openExtendModal(b)}>
+                                 <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
+                               </DropdownMenuItem>
+                             )}
                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
                               <DropdownMenuItem onSelect={() => openEditModal(b)}>
                                 <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier les dates / tarifs
@@ -3178,6 +3310,61 @@ export default function BookingsPage() {
             </div>
           </div>
 
+          <div 
+            className="flex items-center gap-3 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/50 dark:bg-indigo-900/10 cursor-pointer" 
+            onClick={() => setFormData({ ...formData, is_third_party: !formData.is_third_party })}
+          >
+            <input 
+              type="checkbox" 
+              checked={formData.is_third_party} 
+              onChange={(e) => setFormData({ ...formData, is_third_party: e.target.checked })}
+              className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Réservation tiers (payeur ≠ occupant)</p>
+               <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Le payeur n&apos;est pas la personne qui occupe la chambre.</p>
+            </div>
+          </div>
+
+          {formData.is_third_party && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Informations de l'occupant</p>
+              <Input label="Nom complet de l'occupant" value={formData.occupant_full_name} onChange={(e) => setFormData({ ...formData, occupant_full_name: e.target.value })} placeholder="Jean Dupont" required />
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Téléphone (optionnel)" value={formData.occupant_phone} onChange={(e) => setFormData({ ...formData, occupant_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+                <Input label="Nationalité" value={formData.occupant_nationality} onChange={(e) => setFormData({ ...formData, occupant_nationality: e.target.value })} placeholder="Ivoirienne" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Type de pièce</label>
+                  <select
+                    value={formData.occupant_id_type}
+                    onChange={(e) => setFormData({ ...formData, occupant_id_type: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    <option value="CNI">CNI</option>
+                    <option value="PASSPORT">PASSPORT</option>
+                    <option value="DRIVER_LICENSE">DRIVER_LICENSE</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+                <Input label="Numéro de pièce" value={formData.occupant_id_number} onChange={(e) => setFormData({ ...formData, occupant_id_number: e.target.value })} placeholder="1234567890" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Adresse (optionnel)</label>
+                <textarea
+                  value={formData.occupant_address}
+                  onChange={(e) => setFormData({ ...formData, occupant_address: e.target.value })}
+                  rows={2}
+                  placeholder="Adresse de l'occupant"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={handleSave} loading={saving}>Créer la réservation</Button>
@@ -3402,6 +3589,63 @@ export default function BookingsPage() {
               onChange={(e) => setEditForm({ ...editForm, negotiated_price: e.target.value })}
             />
           </div>
+
+          <div
+            className="flex items-center gap-3 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/50 dark:bg-indigo-900/10 cursor-pointer"
+            onClick={() => setEditForm({ ...editForm, is_third_party: !editForm.is_third_party })}
+          >
+            <input
+              type="checkbox"
+              checked={editForm.is_third_party}
+              onChange={(e) => setEditForm({ ...editForm, is_third_party: e.target.checked })}
+              className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Réservation tiers (payeur ≠ occupant)</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Le payeur n&apos;est pas la personne qui occupe la chambre.</p>
+            </div>
+          </div>
+
+          {editForm.is_third_party && (
+            <div className="mt-2 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Informations de l&apos;occupant</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input label="Nom complet de l'occupant" value={editForm.occupant_full_name} onChange={(e) => setEditForm({ ...editForm, occupant_full_name: e.target.value })} placeholder="Jean Dupont" required={editForm.is_third_party} />
+                <Input label="Téléphone (optionnel)" value={editForm.occupant_phone} onChange={(e) => setEditForm({ ...editForm, occupant_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de pièce</label>
+                  <select
+                    value={editForm.occupant_id_type}
+                    onChange={(e) => setEditForm({ ...editForm, occupant_id_type: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Sélectionner</option>
+                    <option value="CNI">CNI</option>
+                    <option value="PASSPORT">PASSPORT</option>
+                    <option value="DRIVER_LICENSE">DRIVER_LICENSE</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+                <Input label="Numéro de pièce" value={editForm.occupant_id_number} onChange={(e) => setEditForm({ ...editForm, occupant_id_number: e.target.value })} placeholder="1234567890" required={editForm.is_third_party} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input label="Nationalité" value={editForm.occupant_nationality} onChange={(e) => setEditForm({ ...editForm, occupant_nationality: e.target.value })} placeholder="Ivoirienne" required={editForm.is_third_party} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Adresse (optionnel)</label>
+                <textarea
+                  value={editForm.occupant_address}
+                  onChange={(e) => setEditForm({ ...editForm, occupant_address: e.target.value })}
+                  rows={2}
+                  placeholder="Adresse de l'occupant"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          )}
 
           {editBooking && (() => {
             const nights = calculateNights(editForm.check_in_date, editForm.check_out_date);
@@ -3982,6 +4226,39 @@ export default function BookingsPage() {
             </Button>
             <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={handleRecordPayment} loading={paymentSaving}>
               <CheckCircle2 className="w-4 h-4 mr-1.5" /> Enregistrer le paiement
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ============ MODAL BLOCAGE CHECK-IN TIERS ============ */}
+      <Modal
+        open={!!thirdPartyCheckInBlock}
+        onClose={() => setThirdPartyCheckInBlock(null)}
+        title="Identité de l'occupant non enregistrée"
+        description={thirdPartyCheckInBlock ? `${thirdPartyCheckInBlock.occupant_full_name || "Occupant non renseigné"} · Ch. ${thirdPartyCheckInBlock.room?.room_number || "—"}` : ""}
+      >
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <p className="text-sm">
+              Cette réservation est payée par un tiers. L'identité de l'occupant doit être enregistrée avant de pouvoir faire le check-in.
+            </p>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setThirdPartyCheckInBlock(null)}>
+              Annuler
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => {
+                if (thirdPartyCheckInBlock) {
+                  openEditModal(thirdPartyCheckInBlock);
+                }
+                setThirdPartyCheckInBlock(null);
+              }}
+            >
+              <Pencil className="w-4 h-4 mr-1.5" /> Enregistrer l'identité
             </Button>
           </div>
         </div>

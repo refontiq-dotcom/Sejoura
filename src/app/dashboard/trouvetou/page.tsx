@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -25,6 +25,15 @@ import {
   Lock,
   CalendarCheck,
   Banknote,
+  Calendar,
+  Users,
+  Minus,
+  Plus,
+  Moon,
+  User,
+  Phone,
+  Mail,
+  FileText,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCurrency } from "@/hooks/use-currency";
@@ -265,6 +274,385 @@ function BoostExpressModal({ accommodation, tenantId, onClose, onSuccess }: Boos
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Composant : Modal de Réservation Intelligente
+// ─────────────────────────────────────────────────────────────────────────────
+interface BookingModalProps {
+  type: RoomTypeListing;
+  onClose: () => void;
+  onSuccess: () => void;
+  fmt: (n: number) => string;
+}
+
+function BookingModal({ type, onClose, onSuccess, fmt }: BookingModalProps) {
+  // Dates : par défaut aujourd'hui → demain
+  const todayStr = () => new Date().toISOString().slice(0, 10);
+  const tomorrowStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+
+  const [checkIn,  setCheckIn]  = useState(todayStr());
+  const [checkOut, setCheckOut] = useState(tomorrowStr());
+  const [guests,   setGuests]   = useState(1);
+  const [guestName,  setGuestName]  = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [notes,    setNotes]    = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [step,     setStep]     = useState<1 | 2>(1); // 1=dates, 2=client
+
+  // ── Calcul intelligent des nuitées ──────────────────────────────────────
+  const calcNights = useCallback((ci: string, co: string): number => {
+    const diff = new Date(co).getTime() - new Date(ci).getTime();
+    return Math.max(0, Math.round(diff / 86_400_000));
+  }, []);
+
+  const nights = calcNights(checkIn, checkOut);
+  const total  = nights * type.base_price;
+
+  // ── Quand l'arrivée change, départ = arrivée + max(1, nuits actuelles) ──
+  function handleCheckInChange(val: string) {
+    setCheckIn(val);
+    const currentNights = Math.max(1, calcNights(checkIn, checkOut));
+    const dep = new Date(val);
+    dep.setDate(dep.getDate() + currentNights);
+    setCheckOut(dep.toISOString().slice(0, 10));
+  }
+
+  // ── Quand le départ change, bloquer < arrivée + 1 nuit ──────────────────
+  function handleCheckOutChange(val: string) {
+    const minDep = new Date(checkIn);
+    minDep.setDate(minDep.getDate() + 1);
+    if (new Date(val) < minDep) {
+      setCheckOut(minDep.toISOString().slice(0, 10));
+    } else {
+      setCheckOut(val);
+    }
+  }
+
+  // ── Ajustement rapide du nombre de nuits (+/-) ───────────────────────────
+  function adjustNights(delta: number) {
+    const n = Math.max(1, nights + delta);
+    const dep = new Date(checkIn);
+    dep.setDate(dep.getDate() + n);
+    setCheckOut(dep.toISOString().slice(0, 10));
+  }
+
+  // ── Date minimum pour l'input arrivée (aujourd'hui) ─────────────────────
+  const minCheckIn  = todayStr();
+  const minCheckOut = (() => {
+    const d = new Date(checkIn);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  // ── Fermeture Échap ──────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // ── Soumission ───────────────────────────────────────────────────────────
+  async function handleSubmit() {
+    if (!guestName.trim()) { toast.error("Le nom du client est requis."); return; }
+    if (!guestPhone.trim()) { toast.error("Le numéro de téléphone est requis."); return; }
+    if (nights < 1) { toast.error("La durée doit être d'au moins 1 nuit."); return; }
+
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+
+      const res = await fetch("/api/v1/trouvetou/quick-booking", {
+        method : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          room_type_id   : type.id,
+          check_in_date  : checkIn,
+          check_out_date : checkOut,
+          number_of_guests: guests,
+          notes,
+          guest: { full_name: guestName, phone: guestPhone, email: guestEmail || null },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`✅ Réservation créée — Code : ${data.booking_code ?? "OK"}`);
+        onSuccess();
+        onClose();
+      } else {
+        toast.error(data.error || "Erreur lors de la création de la réservation.");
+      }
+    } catch {
+      toast.error("Erreur de connexion 🌐");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Créer une réservation"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-2xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-[#0C1C33] to-[#0f2a4a] text-white">
+          <div className="flex items-center gap-3">
+            <span className="p-2 rounded-xl bg-white/10">
+              <CalendarCheck className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="text-base font-bold">Nouvelle Réservation</h3>
+              <p className="text-xs text-blue-200 truncate max-w-[220px]">{type.name} · {type.accommodation_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Fermer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* ── Indicateur d'étapes ──────────────────────────────────────────── */}
+        <div className="flex items-center px-6 pt-4 pb-2 gap-3">
+          {([1, 2] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => { if (s === 2 && nights >= 1) setStep(s); else if (s === 1) setStep(s); }}
+              className={`flex items-center gap-2 text-xs font-semibold transition-colors ${
+                step === s ? "text-[#0C1C33] dark:text-white" : "text-slate-400 dark:text-slate-500 hover:text-slate-600"
+              }`}
+            >
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                step === s
+                  ? "bg-[#0C1C33] dark:bg-white border-[#0C1C33] dark:border-white text-white dark:text-[#0C1C33]"
+                  : step > s
+                  ? "bg-emerald-500 border-emerald-500 text-white"
+                  : "border-slate-300 dark:border-slate-600 text-slate-400"
+              }`}>
+                {step > s ? <Check className="w-3 h-3" /> : s}
+              </span>
+              {s === 1 ? "Dates & Durée" : "Informations Client"}
+            </button>
+          ))}
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+        </div>
+
+        {/* ── Corps ───────────────────────────────────────────────────────── */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-5">
+
+          {step === 1 && (
+            <>
+              {/* Grille dates + nuits */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Arrivée */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#0C1C33] dark:text-blue-400" />
+                      Arrivée
+                    </label>
+                    <input
+                      type="date"
+                      value={checkIn}
+                      min={minCheckIn}
+                      onChange={(e) => handleCheckInChange(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0C1C33] dark:focus:ring-blue-500 focus:outline-none transition-shadow"
+                    />
+                  </div>
+                  {/* Départ */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Départ
+                    </label>
+                    <input
+                      type="date"
+                      value={checkOut}
+                      min={minCheckOut}
+                      onChange={(e) => handleCheckOutChange(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-shadow"
+                    />
+                  </div>
+                </div>
+
+                {/* Compteur nuits rapide */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4 text-[#0C1C33] dark:text-blue-400" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      {nights} nuit{nights > 1 ? "s" : ""}
+                    </span>
+                    {nights === 0 && (
+                      <span className="text-xs text-red-500 font-medium">⚠ Minimum 1 nuit</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => adjustNights(-1)}
+                      disabled={nights <= 1}
+                      className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-40"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-8 text-center text-sm font-black text-slate-900 dark:text-white">{nights}</span>
+                    <button
+                      onClick={() => adjustNights(1)}
+                      className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre de voyageurs */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Nombre de voyageurs
+                </label>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setGuests(Math.max(1, guests - 1))} className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 disabled:opacity-40" disabled={guests <= 1}>
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-xl font-black text-slate-900 dark:text-white w-8 text-center">{guests}</span>
+                  <button onClick={() => setGuests(Math.min(type.capacity, guests + 1))} className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700" disabled={guests >= type.capacity}>
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">max. {type.capacity} pers.</span>
+                </div>
+              </div>
+
+              {/* Récapitulatif prix */}
+              {nights >= 1 && (
+                <div className="rounded-xl bg-gradient-to-br from-[#0C1C33] to-[#0f2a4a] p-4 text-white space-y-2">
+                  <p className="text-xs font-semibold text-blue-300 uppercase tracking-wider">Récapitulatif</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-200">{fmt(type.base_price)} × {nights} nuit{nights > 1 ? "s" : ""}</span>
+                    <span className="font-bold">{fmt(total)}</span>
+                  </div>
+                  <div className="h-px bg-white/10" />
+                  <div className="flex justify-between">
+                    <span className="text-sm font-semibold text-blue-200">Total estimé</span>
+                    <span className="text-lg font-black text-[#C2944E]">{fmt(total)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              {/* Infos client */}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5" /> Nom complet du client *
+                  </label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Ex: Kouamé Diallo"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0C1C33] dark:focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5" /> Téléphone *
+                  </label>
+                  <input
+                    type="tel"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="Ex: +225 07 00 00 00 00"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0C1C33] dark:focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5" /> Email <span className="text-slate-400 font-normal normal-case">(optionnel)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="client@exemple.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0C1C33] dark:focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> Demandes spéciales <span className="text-slate-400 font-normal normal-case">(optionnel)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Lit bébé, allergie, heure d'arrivée..."
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-[#0C1C33] dark:focus:ring-blue-500 focus:outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Récap final */}
+              <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-4 space-y-2 text-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Récapitulatif Final</p>
+                <div className="flex justify-between"><span className="text-slate-600 dark:text-slate-400">Arrivée</span><span className="font-semibold text-slate-900 dark:text-white">{new Date(checkIn + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600 dark:text-slate-400">Départ</span><span className="font-semibold text-slate-900 dark:text-white">{new Date(checkOut + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600 dark:text-slate-400">Durée</span><span className="font-semibold text-slate-900 dark:text-white">{nights} nuit{nights > 1 ? "s" : ""}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600 dark:text-slate-400">Voyageurs</span><span className="font-semibold text-slate-900 dark:text-white">{guests} personne{guests > 1 ? "s" : ""}</span></div>
+                <div className="h-px bg-slate-200 dark:bg-slate-700" />
+                <div className="flex justify-between"><span className="font-bold text-slate-800 dark:text-white">Total</span><span className="font-black text-[#C2944E] text-base">{fmt(total)}</span></div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Footer ──────────────────────────────────────────────────────── */}
+        <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex items-center justify-between gap-3">
+          {step === 1 ? (
+            <>
+              <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                Annuler
+              </button>
+              <button
+                onClick={() => { if (nights >= 1) setStep(2); else toast.error("Minimum 1 nuit requise."); }}
+                className="px-5 py-2 rounded-xl bg-[#0C1C33] hover:bg-[#0f2a4a] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
+              >
+                Suivant : Infos Client
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setStep(1)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5">
+                ← Retour
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !guestName.trim() || !guestPhone.trim()}
+                className="px-5 py-2 rounded-xl bg-[#0C1C33] hover:bg-[#0f2a4a] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-60"
+              >
+                {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarCheck className="w-3.5 h-3.5" />}
+                Confirmer la Réservation
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Composant : Badge de statut visibilité (header)
 // Affiché hors rendu pour éviter sa recréation à chaque rendu parent.
 // Reflète l'état RÉEL des boosts (pas seulement le plan).
@@ -336,6 +724,10 @@ export default function TrouvetouDashboardPage() {
 
   // Toggle Boost Entreprise (par établissement)
   const [boostSavingId, setBoostSavingId] = useState<string | null>(null);
+
+  // Modal Réservation Rapide
+  const [bookingTarget, setBookingTarget] = useState<RoomTypeListing | null>(null);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
   // État d'erreur de chargement (avec bouton Réessayer)
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -969,6 +1361,15 @@ export default function TrouvetouDashboardPage() {
                         )}
                       </button>
 
+                      {/* Bouton Réservation rapide */}
+                      <button
+                        onClick={() => { setBookingTarget(type); setBookingModalOpen(true); }}
+                        className="p-2 rounded-xl bg-[#0C1C33] hover:bg-[#0f2a4a] text-white transition-colors shadow-sm"
+                        title="Créer une réservation pour ce type de chambre"
+                      >
+                        <CalendarCheck className="w-4 h-4" />
+                      </button>
+
                       {/* Gérer le type */}
                       <Link
                         href={`/dashboard/residences/${type.accommodation_id}`}
@@ -991,10 +1392,17 @@ export default function TrouvetouDashboardPage() {
         <BoostExpressModal
           accommodation={boostExpressTarget}
           tenantId={tenantId}
-          onClose={() => {
-            setBoostExpressModalOpen(false);
-            setBoostExpressTarget(null);
-          }}
+          onClose={() => { setBoostExpressModalOpen(false); setBoostExpressTarget(null); }}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {/* ── Modal Réservation Rapide ─────────────────────────────────────────── */}
+      {bookingModalOpen && bookingTarget && (
+        <BookingModal
+          type={bookingTarget}
+          fmt={fmt}
+          onClose={() => { setBookingModalOpen(false); setBookingTarget(null); }}
           onSuccess={fetchData}
         />
       )}

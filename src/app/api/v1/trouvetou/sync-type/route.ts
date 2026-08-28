@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
 import { syncListingsToTrouvetou } from "@/lib/trouvetou/sync";
 
+
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/trouvetou/sync-type
 // Synchronisation robuste fiche publique ↔ type de chambre.

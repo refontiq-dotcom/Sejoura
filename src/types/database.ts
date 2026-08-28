@@ -46,6 +46,8 @@ export type PaymentMethod = "cash" | "wave" | "pi_spi" | "mobile_money" | "bank"
 
 export type BookingSource = "manual" | "external" | "client_request";
 
+export type IdRegistrationStatus = "pending" | "registered" | "not_required";
+
 export type ExpenseCategory =
   | "salaries"
   | "utilities"
@@ -349,6 +351,14 @@ export interface Booking {
   is_overstay: boolean;
   overstay_detected_at: string | null;
   overstay_auto_checked_out: boolean;
+  is_third_party: boolean;
+  occupant_full_name: string | null;
+  occupant_phone: string | null;
+  occupant_id_type: string | null;
+  occupant_id_number: string | null;
+  occupant_nationality: string | null;
+  occupant_address: string | null;
+  id_registration_status: IdRegistrationStatus;
   created_by: string;
   created_at: string;
   updated_at: string;

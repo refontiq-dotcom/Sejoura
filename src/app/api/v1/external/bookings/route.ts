@@ -123,7 +123,18 @@ export async function POST(request: Request) {
       guest,
       payment_method, // 'online' | 'offline'
       payment_provider, // 'wave' | 'orange_money' | 'mtn' | 'moov_africa' | 'pi_spi'
+      is_third_party,
+      occupant,
     } = body;
+
+    const isThirdParty = Boolean(is_third_party);
+
+    if (isThirdParty && (!occupant?.full_name || typeof occupant.full_name !== "string" || !occupant.full_name.trim())) {
+      return NextResponse.json(
+        { error: "Pour une réservation tiers, occupant.full_name est requis" },
+        { status: 400 }
+      );
+    }
 
     if (!room_type_id || !check_in_date || !check_out_date) {
       return NextResponse.json(
@@ -279,6 +290,7 @@ export async function POST(request: Request) {
     const initialStatus = isOnlinePayment ? "pending_payment" : "confirmed";
 
     // 6. Créer la réservation
+    const occupantPayload = isThirdParty && occupant ? occupant : {};
     const { data: booking, error: bookingErr } = await admin.rpc("create_booking", {
       p_tenant_id: tenantId,
       p_accommodation_id: roomType.accommodation_id,
@@ -295,6 +307,14 @@ export async function POST(request: Request) {
       p_created_by: ownerUser.id,
       p_initial_status: initialStatus,
       p_booking_source: 'external',
+      p_is_third_party: isThirdParty,
+      p_occupant_full_name: occupantPayload.full_name ? String(occupantPayload.full_name).trim() : null,
+      p_occupant_phone: occupantPayload.phone ? String(occupantPayload.phone).trim() : null,
+      p_occupant_id_type: occupantPayload.id_type || null,
+      p_occupant_id_number: occupantPayload.id_number ? String(occupantPayload.id_number).trim() : null,
+      p_occupant_nationality: occupantPayload.nationality ? String(occupantPayload.nationality).trim() : null,
+      p_occupant_address: occupantPayload.address ? String(occupantPayload.address).trim() : null,
+      p_id_registration_status: 'pending',
     });
 
     if (bookingErr) {
