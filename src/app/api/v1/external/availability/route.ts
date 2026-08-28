@@ -88,16 +88,16 @@ export async function GET(request: Request) {
           .from("bookings")
           .select("room_id")
           .in("room_id", roomIds)
-          .in("status", ["confirmed", "checked_in"])
+          .in("status", ["pending_payment", "confirmed", "checked_in"])
           .lt("check_in_date", checkOut)
           .gt("check_out_date", checkIn);
 
         for (const b of bookings ?? []) occupiedRoomIds.add(b.room_id);
       }
 
-      // 3. Chambres libres (pas de réservation qui chevauche + pas occupées)
+      // 3. Chambres libres (pas de réservation qui chevauche sur les dates)
       const availableRooms = (rooms ?? []).filter(
-        (r) => r.status !== "occupied" && !occupiedRoomIds.has(r.id)
+        (r) => !occupiedRoomIds.has(r.id)
       );
 
       return NextResponse.json({
