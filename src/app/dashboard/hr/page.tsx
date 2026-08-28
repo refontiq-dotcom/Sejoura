@@ -1,7 +1,9 @@
 "use client";
 
 import { toast } from "sonner";
-import { useState, useEffect, useMemo } from "react";
+import { Suspense } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { TableSkeleton } from "@/components/ui/skeletons";
-import { formatDate, canAccessPlanFeature } from "@/lib/utils";
+import { formatDate, canAccessPlanFeature, getRoleLabel, translateRpcError } from "@/lib/utils";
 import {
   IdCard,
   Plus,
@@ -21,8 +23,9 @@ import {
   Mail,
   Building2,
   Briefcase,
+  ShieldCheck,
 } from "lucide-react";
-import type { Accommodation, HrEmployee, HrContractType, HrEmployeeStatus } from "@/types/database";
+import type { Accommodation, HrEmployee, HrContractType, HrEmployeeStatus, User } from "@/types/database";
 
 const CONTRACT_TYPE_LABELS: Record<HrContractType, string> = {
   cdi: "CDI",
@@ -60,15 +63,18 @@ const EMPTY_FORM = {
   status: "active" as HrEmployeeStatus,
   accommodation_id: "",
   notes: "",
+  linked_user_id: "",
 };
 
-export default function HrPage() {
+function HrPageContent() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState("");
   const [currentUserId, setCurrentUserId] = useState("");
   const [plan, setPlan] = useState("");
   const [records, setRecords] = useState<HrEmployee[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
+  const [systemAccounts, setSystemAccounts] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | HrEmployeeStatus>("all");
 
@@ -78,12 +84,28 @@ export default function HrPage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<HrEmployee | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const prefillHandledRef = useRef(false);
 
   const hasAccess = canAccessPlanFeature(plan, "hrModule");
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pré-remplissage depuis la page Employés ("Créer le dossier RH") — une
+  // seule fois, pour ne pas rouvrir le formulaire après un enregistrement.
+  useEffect(() => {
+    if (loading || prefillHandledRef.current) return;
+    const linkUserId = searchParams.get("linkUserId");
+    if (!linkUserId) return;
+    const account = systemAccounts.find((u) => u.id === linkUserId);
+    if (!account) return;
+    prefillHandledRef.current = true;
+    openNew();
+    applyLinkedAccount(linkUserId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, systemAccounts]);
 
   async function loadData() {
     try {
@@ -101,15 +123,17 @@ export default function HrPage() {
       setTenantId(userData.tenant_id);
       setCurrentUserId(userData.id);
 
-      const [subRes, accRes, hrRes] = await Promise.all([
+      const [subRes, accRes, hrRes, usersRes] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("tenant_id", userData.tenant_id).maybeSingle(),
         supabase.from("accommodations").select("id, name, city, tenant_id").eq("tenant_id", userData.tenant_id).order("name"),
         supabase.from("hr_employees").select("*").eq("tenant_id", userData.tenant_id).order("created_at", { ascending: false }),
+        supabase.from("users").select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active").eq("tenant_id", userData.tenant_id).order("full_name"),
       ]);
 
       if (subRes.data) setPlan(subRes.data.plan);
       if (accRes.data) setAccommodations(accRes.data as unknown as Accommodation[]);
       if (hrRes.data) setRecords(hrRes.data as unknown as HrEmployee[]);
+      if (usersRes.data) setSystemAccounts(usersRes.data as unknown as User[]);
     } catch {
       toast.error("Les dossiers RH ne se chargent pas 📋");
     } finally {
@@ -153,8 +177,29 @@ export default function HrPage() {
       status: rec.status,
       accommodation_id: rec.accommodation_id || "",
       notes: rec.notes || "",
+      linked_user_id: rec.user_id || "",
     });
     setModalOpen(true);
+  }
+
+  // Applique les infos d'un compte système existant au formulaire (nom,
+  // téléphone, email, établissement) et mémorise le lien. Évite de ressaisir
+  // deux fois les mêmes informations pour une personne qui a déjà un accès.
+  function applyLinkedAccount(userId: string) {
+    if (!userId) {
+      setForm((f) => ({ ...f, linked_user_id: "" }));
+      return;
+    }
+    const account = systemAccounts.find((u) => u.id === userId);
+    if (!account) return;
+    setForm((f) => ({
+      ...f,
+      linked_user_id: userId,
+      full_name: account.full_name,
+      phone: account.phone,
+      email: account.email || f.email,
+      accommodation_id: account.accommodation_id || f.accommodation_id,
+    }));
   }
 
   async function handleSave() {
@@ -196,6 +241,7 @@ export default function HrPage() {
         status: form.status,
         accommodation_id: form.accommodation_id || null,
         notes: form.notes.trim() || null,
+        user_id: form.linked_user_id || null,
       };
 
       if (editing) {
@@ -210,7 +256,7 @@ export default function HrPage() {
       setModalOpen(false);
       loadData();
     } catch (err) {
-      toast.error("L'action a échoué : enregistrer le dossier : " + ((err as Error)?.message || "erreur"));
+      toast.error(translateRpcError(err as Error, "L'action a échoué : enregistrer le dossier : " + ((err as Error)?.message || "erreur")));
     } finally {
       setSaving(false);
     }
@@ -233,6 +279,17 @@ export default function HrPage() {
       setDeleting(false);
     }
   }
+
+  // Comptes système déjà liés à un autre dossier RH, à exclure de la liste
+  // (sauf celui actuellement lié au dossier en cours d'édition).
+  const linkedElsewhere = useMemo(() => {
+    const set = new Set(records.filter((r) => r.user_id && r.id !== editing?.id).map((r) => r.user_id as string));
+    return set;
+  }, [records, editing]);
+  const availableAccounts = useMemo(
+    () => systemAccounts.filter((u) => !linkedElsewhere.has(u.id)),
+    [systemAccounts, linkedElsewhere]
+  );
 
   const filtered = useMemo(() => {
     let list = records;
@@ -319,6 +376,7 @@ export default function HrPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map((rec) => {
               const acc = accommodations.find((a) => a.id === rec.accommodation_id);
+              const linkedAccount = rec.user_id ? systemAccounts.find((u) => u.id === rec.user_id) : null;
               return (
                 <Card key={rec.id} className="p-4 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
@@ -340,6 +398,9 @@ export default function HrPage() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant="outline">{CONTRACT_TYPE_LABELS[rec.contract_type]}</Badge>
                     <Badge variant="outline">Embauché le {formatDate(rec.hire_date)}</Badge>
+                    {linkedAccount && (
+                      <Badge variant="theme"><ShieldCheck className="w-3 h-3" /> Accès ({getRoleLabel(linkedAccount.role)})</Badge>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 pt-1 border-t border-[var(--border)]">
@@ -366,6 +427,26 @@ export default function HrPage() {
       {/* Modal création / édition */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Modifier le dossier" : "Nouveau dossier employé"} size="lg">
         <div className="space-y-3 pt-1 max-h-[70vh] overflow-y-auto pr-1">
+          {availableAccounts.length > 0 && (
+            <div className="w-full">
+              <label className="block text-[11px] font-medium text-[var(--foreground-muted)] mb-0.5">
+                Lier à un compte existant (accès à l&apos;application)
+              </label>
+              <select
+                value={form.linked_user_id}
+                onChange={(e) => applyLinkedAccount(e.target.value)}
+                className="w-full rounded-md border border-[var(--input-border)] bg-[var(--input-bg)] text-sm text-[var(--foreground)] px-2.5 py-2 focus:outline-none focus:ring-1.5 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="">Aucun (pas d&apos;accès à l&apos;application)</option>
+                {availableAccounts.map((u) => (
+                  <option key={u.id} value={u.id}>{u.full_name} — {getRoleLabel(u.role)}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[var(--foreground-subtle)] mt-1">
+                Remplit automatiquement le nom, le téléphone, l&apos;email et l&apos;établissement depuis le compte choisi.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Nom complet *" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
             <Input label="Poste *" placeholder="Ex: Réceptionniste, Agent d'entretien..." value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
@@ -457,5 +538,13 @@ export default function HrPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+export default function HrPage() {
+  return (
+    <Suspense fallback={<TableSkeleton rows={6} cols={5} />}>
+      <HrPageContent />
+    </Suspense>
   );
 }

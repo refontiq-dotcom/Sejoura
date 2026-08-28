@@ -9,8 +9,8 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { EmployeesSkeleton } from "@/components/ui/skeletons";
-import { getRoleLabel, getPlanLimits, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
-import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal } from "lucide-react";
+import { getRoleLabel, getPlanLimits, canAccessPlanFeature, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
+import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal, IdCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
 
@@ -23,6 +23,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [tempAssignments, setTempAssignments] = useState<TempAssignmentMap>({});
+  const [hrLinkedUserIds, setHrLinkedUserIds] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [tenantId, setTenantId] = useState("");
   const [plan, setPlan] = useState("");
@@ -91,6 +92,17 @@ export default function EmployeesPage() {
 
       if (subData) setPlan(subData.plan);
       if (accData) setAccommodations(accData as unknown as Accommodation[]);
+
+      // Dossiers RH déjà liés à un compte — pour afficher le badge et éviter
+      // de proposer deux fois le même compte au moment de lier un dossier.
+      if (canAccessPlanFeature(subData?.plan || "free", "hrModule")) {
+        const { data: hrData } = await supabase
+          .from("hr_employees")
+          .select("user_id")
+          .eq("tenant_id", userData.tenant_id)
+          .not("user_id", "is", null);
+        if (hrData) setHrLinkedUserIds(new Set(hrData.map((r: { user_id: string }) => r.user_id)));
+      }
 
       if (empData) {
         const emps = empData as unknown as User[];
@@ -549,6 +561,15 @@ export default function EmployeesPage() {
                           ) : (
                             <Badge variant="error"><Ban className="w-3 h-3" /> Révoqué</Badge>
                           )}
+                          {canAccessPlanFeature(plan, "hrModule") && (
+                            hrLinkedUserIds.has(emp.id) ? (
+                              <Badge variant="theme"><IdCard className="w-3 h-3" /> Dossier RH</Badge>
+                            ) : (
+                              <a href={`/dashboard/hr?linkUserId=${emp.id}`} className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--primary-color,#0C1C33)] hover:underline">
+                                <IdCard className="w-3 h-3" /> Créer le dossier RH
+                              </a>
+                            )
+                          )}
                         </div>
                       </div>
                     </div>
@@ -654,6 +675,17 @@ export default function EmployeesPage() {
                         <Badge variant={emp.role === "admin_residence" ? "info" : emp.role === "menagere" ? "theme" : "default"}>
                           {getRoleLabel(emp.role)}
                         </Badge>
+                        {canAccessPlanFeature(plan, "hrModule") && (
+                          <div className="mt-1">
+                            {hrLinkedUserIds.has(emp.id) ? (
+                              <Badge variant="theme" className="text-[10px] gap-1 px-1.5 py-0.5"><IdCard className="w-3 h-3" /> Dossier RH</Badge>
+                            ) : (
+                              <a href={`/dashboard/hr?linkUserId=${emp.id}`} className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--primary-color,#0C1C33)] hover:underline">
+                                <IdCard className="w-3 h-3" /> Créer le dossier RH
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3">
                         <div className="space-y-1">

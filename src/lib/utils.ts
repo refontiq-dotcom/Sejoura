@@ -483,6 +483,7 @@ export function translateRpcError(
     { match: "BOOKING_NOT_ACTIVE", friendly: "La réservation n'est plus active et ne peut plus être modifiée." },
     { match: "CHECK_IN_TOO_EARLY", friendly: "L'arrivée est trop tôt : le check-in ne peut pas être fait avant la date prévue." },
     { match: "CHECK_IN_TOO_LATE", friendly: "Trop tard : la date de départ est déjà dépassée, le client ne peut plus être installé." },
+    { match: "idx_hr_employees_unique_user", friendly: "Ce compte est déjà lié à un autre dossier RH. Un compte ne peut être lié qu'à un seul dossier à la fois." },
   ];
   for (const { match, friendly } of patterns) {
     if (msg.includes(match)) return friendly;
