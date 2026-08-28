@@ -56,7 +56,7 @@ export function useOnlineBookingBadge(user: User | null) {
           last_viewed_at: new Date().toISOString(),
         },
         {
-          onConflict: ["tenant_id", "user_id"],
+          onConflict: "tenant_id,user_id",
         }
       );
 
