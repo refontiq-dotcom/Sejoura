@@ -198,6 +198,7 @@ export default function BookingsPage() {
     }
     return "all";
   });
+  const [filterOnline, setFilterOnline] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -1993,7 +1994,8 @@ export default function BookingsPage() {
       "Statut Paiement",
       "Statut",
       "Tiers",
-      "ID enregistrée"
+      "ID enregistrée",
+      "Source"
     ];
     const rows = filteredBookings.map(b => {
       const occupantName = b.is_third_party ? (b.occupant_full_name || "") : (b.client?.full_name || "");
@@ -2003,6 +2005,7 @@ export default function BookingsPage() {
       const occupantNationality = b.is_third_party ? (b.occupant_nationality || "") : "";
       const payerName = b.client?.full_name || "";
       const payerPhone = b.client?.phone || "";
+      const source = b.booking_source === "external" ? "En ligne" : b.booking_source === "manual" ? "Manuelle" : b.booking_source || "";
       return [
         b.booking_code,
         occupantName,
@@ -2020,7 +2023,8 @@ export default function BookingsPage() {
         getPaymentStatusLabel(b.payment_status),
         getBookingStatusLabel(b.status),
         b.is_third_party ? "Oui" : "Non",
-        b.id_registration_status || ""
+        b.id_registration_status || "",
+        source
       ];
     });
     const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -2052,6 +2056,8 @@ export default function BookingsPage() {
         b.room?.room_number?.toLowerCase().includes(q)
       );
     }
+    if (filterOnline === "online" && b.booking_source !== "external") return false;
+    if (filterOnline === "manual" && b.booking_source !== "manual") return false;
     return true;
   });
 
@@ -2234,6 +2240,15 @@ export default function BookingsPage() {
           <option value="cancelled">Annulée</option>
           <option value="no_show">No-show</option>
         </select>
+        <select
+          value={filterOnline}
+          onChange={(e) => setFilterOnline(e.target.value)}
+          className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+        >
+          <option value="all">Toutes réservations</option>
+          <option value="online">Réservations en ligne</option>
+          <option value="manual">Réservations manuelles</option>
+        </select>
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setViewMode("table")}
@@ -2332,9 +2347,19 @@ export default function BookingsPage() {
                             Tiers
                           </span>
                         )}
+                        {b.booking_source === 'external' && !b.is_third_party && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                            En ligne
+                          </span>
+                        )}
                         {b.is_third_party && b.id_registration_status === 'pending' && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
                             ID à enregistrer
+                          </span>
+                        )}
+                        {b.booking_source === 'external' && b.status === 'pending_payment' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200">
+                            Paiement en attente
                           </span>
                         )}
                       </div>
@@ -2573,9 +2598,19 @@ export default function BookingsPage() {
                                 Tiers
                               </span>
                             )}
+                            {b.booking_source === 'external' && !b.is_third_party && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                En ligne
+                              </span>
+                            )}
                             {b.is_third_party && b.id_registration_status === 'pending' && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
                                 ID à enregistrer
+                              </span>
+                            )}
+                            {b.booking_source === 'external' && b.status === 'pending_payment' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-200">
+                                Paiement en attente
                               </span>
                             )}
                           </div>
