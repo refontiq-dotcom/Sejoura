@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateFinancialReportPdf } from "@/lib/accounting-report-pdf";
+import { canAccessFeature } from "@/lib/subscription-plans";
 import type { Expense, Payment, Tenant } from "@/types/database";
 
 export async function POST(request: Request) {
@@ -48,6 +49,21 @@ export async function POST(request: Request) {
 
     const admin = createAdminClient();
     const tid = userData.tenant_id;
+
+    // Le rapport financier (bénéfice net inclus) est réservé à la
+    // comptabilité avancée — formule Entreprise uniquement.
+    const { data: subscription } = await admin
+      .from("subscriptions")
+      .select("plan")
+      .eq("tenant_id", tid)
+      .maybeSingle();
+
+    if (!canAccessFeature("advancedAccounting", subscription?.plan)) {
+      return NextResponse.json(
+        { error: "Le rapport financier (bénéfice net, journal d'audit) est réservé à la formule Entreprise." },
+        { status: 403 }
+      );
+    }
 
     let paymentsQuery = admin
       .from("payments")
