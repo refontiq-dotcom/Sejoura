@@ -160,6 +160,9 @@ export default function BookingsPage() {
   });
   const [checkinRoomTypeId, setCheckinRoomTypeId] = useState<string>("");
   const [checkinRoomId, setCheckinRoomId] = useState<string>("");
+  // Chambres du même type disponibles sur la période du séjour (check-in)
+  const [checkinAvailableRooms, setCheckinAvailableRooms] = useState<(Room & { room_type?: RoomType })[]>([]);
+  const [checkinRoomsLoading, setCheckinRoomsLoading] = useState(false);
   // Changement de chambre pendant le séjour
   // Autocomplete client dans le champ "Nom du nouveau client"
   const [nameSuggestions, setNameSuggestions] = useState<Client[]>([]);
@@ -1183,6 +1186,64 @@ export default function BookingsPage() {
     setCheckinRoomTypeId(b.room?.room_type_id || "");
     setCheckinRoomId(b.room_id || "");
     setCheckinModalOpen(true);
+    // Charger les chambres du même type libres sur la période du séjour :
+    // le client a réservé un TYPE en ligne, la réceptionniste peut lui
+    // attribuer n'importe quelle chambre de ce type disponible à l'arrivée.
+    loadCheckinAvailableRooms(b);
+  }
+
+  // Chambres du même type libres sur la période check_in → check_out du séjour.
+  // On s'appuie sur les réservations qui chevauchent (et non sur le statut de
+  // la chambre) : une chambre "occupied" dont le client part le jour même
+  // reste proposable pour l'arrivée d'un nouveau client.
+  async function loadCheckinAvailableRooms(b: Booking & { client?: Client; room?: Room; room_type?: RoomType }) {
+    const typeId = b.room?.room_type_id;
+    if (!b.accommodation_id || !typeId) {
+      setCheckinAvailableRooms([]);
+      return;
+    }
+    setCheckinRoomsLoading(true);
+    try {
+      const supabase = createClient();
+      // 1. Toutes les chambres de l'établissement du type réservé
+      const { data: typeRooms, error: roomErr } = await supabase
+        .from("rooms")
+        .select("*, room_type:room_types(*)")
+        .eq("accommodation_id", b.accommodation_id)
+        .eq("room_type_id", typeId)
+        .order("room_number");
+      if (roomErr) throw roomErr;
+
+      // 2. Réservations qui chevauchent la période (hors celle-ci)
+      const { data: overlaps, error: bookingErr } = await supabase
+        .from("bookings")
+        .select("room_id")
+        .eq("accommodation_id", b.accommodation_id)
+        .in("status", ["pending_payment", "confirmed", "checked_in"])
+        .neq("id", b.id)
+        .lt("check_in_date", b.check_out_date)
+        .gt("check_out_date", b.check_in_date);
+      if (bookingErr) throw bookingErr;
+
+      const busyRoomIds = new Set((overlaps ?? []).map((o) => o.room_id).filter(Boolean));
+      const free = (typeRooms as unknown as (Room & { room_type?: RoomType })[]).filter(
+        (r) => !busyRoomIds.has(r.id)
+      );
+      // La chambre assignée en ligne reste toujours proposable : le client peut
+      // la conserver même si une autre réservation chevauche par incohérence.
+      if (b.room_id && !free.some((r) => r.id === b.room_id)) {
+        const currentRoom = (typeRooms as unknown as (Room & { room_type?: RoomType })[]).find(
+          (r) => r.id === b.room_id
+        );
+        if (currentRoom) free.unshift(currentRoom);
+      }
+      setCheckinAvailableRooms(free);
+    } catch (err) {
+      console.error("Erreur chargement chambres check-in:", err);
+      setCheckinAvailableRooms([]);
+    } finally {
+      setCheckinRoomsLoading(false);
+    }
   }
 
   // Enregistre uniquement les informations client (sans changer le statut de la réservation)
@@ -3726,34 +3787,32 @@ export default function BookingsPage() {
             <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Chambre assignée</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de chambre</label>
-                <select
-                  value={checkinRoomTypeId}
-                  onChange={(e) => {
-                    setCheckinRoomTypeId(e.target.value);
-                    // Reset room selection when type changes
-                    const firstRoom = rooms.find((r) => r.room_type_id === e.target.value && r.status === "available");
-                    setCheckinRoomId(firstRoom?.id || "");
-                  }}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="">Sélectionner un type</option>
-                  {roomTypes.map((rt) => (
-                    <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price)}/nuit</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Type de chambre (réservé)</label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={checkinRoomTypeId ? roomTypes.find((rt) => rt.id === checkinRoomTypeId)?.name || `Type ${checkinRoomTypeId}` : "—"}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm disabled:opacity-60"
+                />
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  Le type choisi en ligne ne change pas. Seul le numéro de chambre peut être modifié à l'arrivée.
+                </p>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Chambre disponible</label>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Chambre disponible du même type
+                </label>
                 <select
                   value={checkinRoomId}
                   onChange={(e) => setCheckinRoomId(e.target.value)}
-                  disabled={!checkinRoomTypeId}
+                  disabled={!checkinRoomTypeId || checkinRoomsLoading}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
                 >
-                  <option value="">Sélectionner une chambre</option>
-                  {rooms
-                    .filter((r) => r.room_type_id === checkinRoomTypeId && r.status === "available")
+                  <option value="">
+                    {checkinRoomsLoading ? "Chargement…" : checkinAvailableRooms.length === 0 ? "Aucune chambre libre sur ces dates" : "Sélectionner une chambre"}
+                  </option>
+                  {checkinAvailableRooms
                     .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
                     .map((r) => (
                       <option key={r.id} value={r.id}>
@@ -3761,11 +3820,14 @@ export default function BookingsPage() {
                       </option>
                     ))}
                 </select>
+                {checkinRoomsLoading && (
+                  <p className="mt-1 text-[11px] text-slate-400">Vérification des disponibilités sur la période…</p>
+                )}
               </div>
             </div>
-            {checkinBooking?.room && checkinRoomId !== checkinBooking.room_id && (
+            {checkinBooking?.room && checkinRoomId !== checkinBooking.room_id && checkinRoomId && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                ⚠️ Changement de chambre : {checkinBooking.room.room_number} → {rooms.find((r) => r.id === checkinRoomId)?.room_number || "—"}
+                ⚠️ Changement de chambre : {checkinBooking.room.room_number} → {checkinAvailableRooms.find((r) => r.id === checkinRoomId)?.room_number || "—"}
               </p>
             )}
           </div>
