@@ -1682,11 +1682,24 @@ export default function AccountingPage() {
 
   const hasAccess = canAccessPlanFeature(plan, "advancedAccounting");
 
+  // Garde-fou : bloque toute action de la comptabilité avancée pour les
+  // plans non autorisés et propose la formule qui la débloque, au lieu de
+  // laisser le bouton exécuter l'action (qui échouerait de toute façon
+  // côté serveur pour le rapport financier).
+  function requireAdvancedAccounting(): boolean {
+    if (hasAccess) return true;
+    toast.error(
+      "La comptabilité avancée (dépenses, factures, bénéfice net, journal d'audit) est réservée à la formule Entreprise. Passez à la formule supérieure pour la débloquer."
+    );
+    return false;
+  }
+
   // ============================================================================
   // Actions métier
   // ============================================================================
 
   function openNewExpense() {
+    if (!requireAdvancedAccounting()) return;
     setEditingExpense(null);
     setExpenseForm({
       category: "utilities",
@@ -1699,6 +1712,7 @@ export default function AccountingPage() {
   }
 
   function openEditExpense(exp: Expense) {
+    if (!requireAdvancedAccounting()) return;
     setEditingExpense(exp);
     setExpenseForm({
       category: exp.category,
@@ -1711,6 +1725,7 @@ export default function AccountingPage() {
   }
 
   async function handleSaveExpense() {
+    if (!requireAdvancedAccounting()) return;
     if (!expenseForm.category) {
       toast.error("Choisissez une catégorie 📂");
       return;
@@ -1759,6 +1774,7 @@ export default function AccountingPage() {
   }
 
   async function handleDeleteExpense() {
+    if (!requireAdvancedAccounting()) return;
     if (!deletingExpense) return;
     try {
       const supabase = createClient();
@@ -1789,6 +1805,7 @@ export default function AccountingPage() {
   }
 
   function exportExpensesCSV() {
+    if (!requireAdvancedAccounting()) return;
     if (filteredExpenses.length === 0) return;
     downloadCSV(
       `depenses_${startDate}_${endDate}.csv`,
@@ -1805,6 +1822,7 @@ export default function AccountingPage() {
   }
 
   function exportRevenueCSV() {
+    if (!requireAdvancedAccounting()) return;
     if (filteredPayments.length === 0) return;
     downloadCSV(
       `recettes_${startDate}_${endDate}.csv`,
@@ -1823,6 +1841,7 @@ export default function AccountingPage() {
   }
 
   function exportInvoicesCSV() {
+    if (!requireAdvancedAccounting()) return;
     if (filteredInvoices.length === 0) return;
     downloadCSV(
       `factures_${startDate}_${endDate}.csv`,
@@ -1842,6 +1861,7 @@ export default function AccountingPage() {
   }
 
   async function handleOpenInvoice(inv: EnrichedInvoice) {
+    if (!requireAdvancedAccounting()) return;
     try {
       const isVirtual = inv.id.startsWith("virtual-");
       const url = isVirtual
@@ -1871,6 +1891,7 @@ export default function AccountingPage() {
 
   // Changement intelligent de statut facture
   function openInvoiceStatusChange(invoice: Invoice, newStatus: InvoiceStatus) {
+    if (!requireAdvancedAccounting()) return;
     // Vérifie que la transition est valide
     const validTransitions = VALID_INVOICE_TRANSITIONS[invoice.status];
     if (!validTransitions.includes(newStatus)) {
@@ -1938,6 +1959,7 @@ export default function AccountingPage() {
   }
 
   function exportClientsCSV() {
+    if (!requireAdvancedAccounting()) return;
     if (filteredClients.length === 0) return;
     downloadCSV(
       `clients_${todayISO()}.csv`,
@@ -1958,6 +1980,7 @@ export default function AccountingPage() {
   }
 
   async function handleExportPdf() {
+    if (!requireAdvancedAccounting()) return;
     setExportingPdf(true);
     try {
       const res = await fetch("/api/accounting/report", {
@@ -2598,7 +2621,7 @@ export default function AccountingPage() {
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => setDeletingExpense(exp)}
+                          onClick={() => { if (requireAdvancedAccounting()) setDeletingExpense(exp); }}
                           title="Supprimer"
                           className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                         >
@@ -2664,7 +2687,7 @@ export default function AccountingPage() {
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => setDeletingExpense(exp)}
+                              onClick={() => { if (requireAdvancedAccounting()) setDeletingExpense(exp); }}
                               title="Supprimer"
                               className="p-1.5 rounded-md text-[var(--foreground-subtle)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                             >
