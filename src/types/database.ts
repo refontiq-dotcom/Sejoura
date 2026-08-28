@@ -29,7 +29,8 @@ export type BookingStatus =
   | "cancelled"
   | "no_show"
   | "checked_in"
-  | "checked_out";
+  | "checked_out"
+  | "pending_payment";
 
 export type RoomStatus = "available" | "occupied" | "alert" | "cleaning";
 
