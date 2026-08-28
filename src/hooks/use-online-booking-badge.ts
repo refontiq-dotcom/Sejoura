@@ -8,9 +8,8 @@ export function useOnlineBookingBadge(user: User | null) {
   const supabase = createClient();
 
   useEffect(() => {
-    if (!user?.tenant_id || !user?.id) return;
+    if (!user?.tenant_id) return;
     const tenantId = user.tenant_id;
-    const userId = user.id;
 
     async function load() {
       setLoading(true);
@@ -21,7 +20,6 @@ export function useOnlineBookingBadge(user: User | null) {
           .from("staff_notification_states")
           .select("last_viewed_at")
           .eq("tenant_id", tenantId)
-          .eq("user_id", userId)
           .maybeSingle();
 
         if (state?.last_viewed_at) {
@@ -49,22 +47,20 @@ export function useOnlineBookingBadge(user: User | null) {
     }
 
     load();
-  }, [user?.tenant_id, user?.id]);
+  }, [user?.tenant_id]);
 
   async function markAsViewed() {
-    if (!user?.tenant_id || !user?.id) return;
+    if (!user?.tenant_id) return;
     const tenantId = user.tenant_id;
-    const userId = user.id;
 
     try {
       await supabase.from("staff_notification_states").upsert(
         {
           tenant_id: tenantId,
-          user_id: userId,
           last_viewed_at: new Date().toISOString(),
         },
         {
-          onConflict: "tenant_id,user_id",
+          onConflict: "tenant_id",
         }
       );
     } catch {
