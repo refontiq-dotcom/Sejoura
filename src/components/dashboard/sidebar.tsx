@@ -61,6 +61,7 @@ interface SidebarProps {
   /** Couleur exacte du canvas (<main>) en mode clair : l'onglet actif utilise
    *  la MÊME valeur pour fusionner parfaitement avec le fond pastel de la page. */
   mainBg?: string;
+  onlineBookingCount?: number;
 }
 
 export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg }: SidebarProps) {
@@ -179,6 +180,8 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
         {filteredItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
           const Icon = item.icon;
+          const isBookings = item.href === "/dashboard/bookings";
+          const badgeCount = isBookings && onlineBookingCount > 0 ? onlineBookingCount : item.badge;
 
           return (
             <Link
@@ -191,7 +194,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
               }}
               className={
                 isCollapsed
-                  ? `flex items-center justify-center w-8 h-8 rounded-md mx-auto my-0.5 transition-all ${
+                  ? `flex items-center justify-center w-8 h-8 rounded-md mx-auto my-0.5 transition-all relative ${
                       !isActive ? "hover:bg-white/10" : ""
                     }`
                   : isActive
@@ -206,15 +209,24 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
                   {navLabels[item.href] || item.label}
                 </span>
               )}
-              {item.badge && !isCollapsed && (
+              {badgeCount && !isCollapsed && (
                 <span
-                  className="ml-auto px-1.5 py-px text-[10px] rounded-full font-bold"
+                  className={`ml-auto px-1.5 py-px text-[10px] rounded-full font-bold ${
+                    isBookings && onlineBookingCount > 0
+                      ? "bg-emerald-500 text-white"
+                      : ""
+                  }`}
                   style={{
-                    backgroundColor: isActive ? themeStyles.sidebarBg : themeStyles.accentColor,
-                    color: isActive ? "var(--main-bg)" : (themeStyles.isDark ? "#0C1C33" : "#FFFFFF"),
+                    backgroundColor: isBookings && onlineBookingCount > 0 ? undefined : (isActive ? themeStyles.sidebarBg : themeStyles.accentColor),
+                    color: isBookings && onlineBookingCount > 0 ? undefined : (isActive ? "var(--main-bg)" : (themeStyles.isDark ? "#0C1C33" : "#FFFFFF")),
                   }}
                 >
-                  {item.badge}
+                  {badgeCount}
+                </span>
+              )}
+              {isCollapsed && isBookings && onlineBookingCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[var(--sidebar-bg)]">
+                  {onlineBookingCount > 99 ? "99+" : onlineBookingCount}
                 </span>
               )}
             </Link>

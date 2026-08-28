@@ -57,6 +57,7 @@ export default function DashboardLayout({
   const [retryCount, setRetryCount] = useState(0);
   // Heure locale du navigateur pour le greeting (évite le décalage UTC côté serveur)
   const [localHour, setLocalHour] = useState(() => new Date().getHours());
+  const [onlineBookingCount, setOnlineBookingCount] = useState(0);
 
   // L'étape 2 (onboarding) est décidée côté serveur via le client admin
   // (service_role) pour être insensible aux politiques RLS du navigateur.
@@ -369,6 +370,25 @@ export default function DashboardLayout({
     checkAuth();
   }, [router, retryCount, setAccommodations, setActiveAccommodationId]);
 
+  // Compter les réservations en ligne pour le badge sidebar
+  useEffect(() => {
+    if (!user?.tenant_id) return;
+    async function countOnlineBookings() {
+      try {
+        const supabase = createClient();
+        const { count } = await supabase
+          .from("bookings")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", user.tenant_id)
+          .eq("booking_source", "external");
+        setOnlineBookingCount(count || 0);
+      } catch {
+        // Silencieux : le badge est optionnel
+      }
+    }
+    countOnlineBookings();
+  }, [user?.tenant_id]);
+
   // Titre / sous-titre intelligents selon la page courante.
   // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).
   // Sur les autres pages : titre et description propres à chaque module.
@@ -532,6 +552,7 @@ export default function DashboardLayout({
             setSidebarCollapsed(true);
           }
         }}
+        onlineBookingCount={onlineBookingCount}
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
