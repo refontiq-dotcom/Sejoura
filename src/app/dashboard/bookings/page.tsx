@@ -797,6 +797,58 @@ export default function BookingsPage() {
       setEmailInput("");
     }
 
+  // Formulaire intelligent : garantit au moins une nuitée entre l'arrivée
+  // et le départ, quel que soit le champ modifié en premier. L'utilisateur
+  // reste libre de modifier l'autre date ensuite.
+  function shiftDate(dateStr: string, days: number): string {
+    const d = new Date(`${dateStr}T00:00:00`);
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function handleCheckInChange(dateStr: string) {
+    setFormData((prev) => {
+      const next = { ...prev, check_in_date: dateStr };
+      if (dateStr && (!next.check_out_date || next.check_out_date <= dateStr)) {
+        next.check_out_date = shiftDate(dateStr, 1);
+      }
+      return next;
+    });
+  }
+
+  function handleCheckOutChange(dateStr: string) {
+    setFormData((prev) => {
+      const next = { ...prev, check_out_date: dateStr };
+      if (dateStr && (!next.check_in_date || next.check_in_date >= dateStr)) {
+        next.check_in_date = shiftDate(dateStr, -1);
+      }
+      return next;
+    });
+  }
+
+  function handleEditCheckInChange(dateStr: string) {
+    setEditForm((prev) => {
+      const next = { ...prev, check_in_date: dateStr };
+      if (dateStr && (!next.check_out_date || next.check_out_date <= dateStr)) {
+        next.check_out_date = shiftDate(dateStr, 1);
+      }
+      return next;
+    });
+  }
+
+  function handleEditCheckOutChange(dateStr: string) {
+    setEditForm((prev) => {
+      const next = { ...prev, check_out_date: dateStr };
+      if (dateStr && (!next.check_in_date || next.check_in_date >= dateStr)) {
+        next.check_in_date = shiftDate(dateStr, -1);
+      }
+      return next;
+    });
+  }
+
   function openAddModal() {
     const singleAccId = accommodations.length === 1 ? accommodations[0].id : "";
     // Si une seule résidence, la pré-sélectionner pour que la vérification
@@ -2866,8 +2918,8 @@ export default function BookingsPage() {
 
           {/* ═══ ÉTAPE 1 : Dates ═══ */}
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Date d'arrivée" type="date" value={formData.check_in_date} onChange={(e) => setFormData({ ...formData, check_in_date: e.target.value })} />
-            <Input label="Date de départ" type="date" value={formData.check_out_date} onChange={(e) => setFormData({ ...formData, check_out_date: e.target.value })} />
+            <Input label="Date d'arrivée" type="date" value={formData.check_in_date} onChange={(e) => handleCheckInChange(e.target.value)} />
+            <Input label="Date de départ" type="date" value={formData.check_out_date} onChange={(e) => handleCheckOutChange(e.target.value)} />
           </div>
 
           {formData.check_in_date && formData.check_out_date && calculateNights(formData.check_in_date, formData.check_out_date) <= 0 && (
@@ -3295,7 +3347,7 @@ export default function BookingsPage() {
               type="date"
               value={editForm.check_in_date}
               disabled={editBooking?.status === "checked_in"}
-              onChange={(e) => setEditForm({ ...editForm, check_in_date: e.target.value })}
+              onChange={(e) => handleEditCheckInChange(e.target.value)}
             />
             {editBooking?.status === "checked_in" && (
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Client installé : la date d&apos;arrivée ne peut plus être modifiée.</p>
@@ -3308,7 +3360,7 @@ export default function BookingsPage() {
               type="date"
               value={editForm.check_out_date}
               min={editForm.check_in_date || undefined}
-              onChange={(e) => setEditForm({ ...editForm, check_out_date: e.target.value })}
+              onChange={(e) => handleEditCheckOutChange(e.target.value)}
             />
           </div>
 
