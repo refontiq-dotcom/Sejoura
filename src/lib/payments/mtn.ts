@@ -116,13 +116,13 @@ export class MtnPaymentService implements PaymentProvider {
    * {
    *   "amount": "15000",
    *   "currency": "XOF",
-   *   "externalId": "SJ-2026-0001",
+   *   "externalId": "RES-26-0001",
    *   "payer": {
    *     "partyIdType": "MSISDN",
    *     "partyId": "2250700000000"     // Numéro du client (avec indicatif)
    *   },
    *   "payerMessage": "Acompte séjour Séjoura",
-   *   "payeeNote": "Réservation SJ-2026-0001"
+   *   "payeeNote": "Réservation RES-26-0001"
    * }
    *
    * Réponse : HTTP 202 (Accepted) — pas de body
@@ -194,7 +194,7 @@ export class MtnPaymentService implements PaymentProvider {
    * Réponse :
    * {
    *   "financialTransactionId": "363440463",
-   *   "externalId": "SJ-2026-0001",
+   *   "externalId": "RES-26-0001",
    *   "amount": "15000",
    *   "currency": "XOF",
    *   "status": "SUCCESSFUL" | "FAILED" | "PENDING",
@@ -241,7 +241,7 @@ export class MtnPaymentService implements PaymentProvider {
    * MTN envoie un POST sur X-Callback-Url avec le corps suivant :
    * {
    *   "financialTransactionId": "363440463",
-   *   "externalId": "SJ-2026-0001",
+   *   "externalId": "RES-26-0001",
    *   "status": "SUCCESSFUL" | "FAILED"
    * }
    *

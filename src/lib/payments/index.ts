@@ -14,7 +14,7 @@
  *
  * const result = await service.initiatePayment({
  *   amount: 15000,
- *   reference: "SJ-2026-0001",
+ *   reference: "RES-26-0001",
  *   description: "Acompte réservation Séjoura",
  *   returnUrl: "https://trouvetou.vercel.app/booking/success",
  *   cancelUrl: "https://trouvetou.vercel.app/booking/cancelled",

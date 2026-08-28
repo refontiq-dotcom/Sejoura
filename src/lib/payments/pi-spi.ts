@@ -97,7 +97,7 @@ export class PiSpiPaymentService implements PaymentProvider {
    *   "merchant_id": "PISPI_XXXXXXXXXXXX",
    *   "amount": 15000,
    *   "currency": "XOF",
-   *   "reference": "SJ-2026-0001",
+   *   "reference": "RES-26-0001",
    *   "description": "Acompte réservation Séjoura",
    *   "return_url": "https://trouvetou.../booking/success",
    *   "cancel_url": "https://trouvetou.../booking/cancelled",
@@ -226,7 +226,7 @@ export class PiSpiPaymentService implements PaymentProvider {
    * Corps du webhook typique PI-SPI :
    * {
    *   "transaction_id": "PISPI_XXXX",
-   *   "reference": "SJ-2026-0001",
+   *   "reference": "RES-26-0001",
    *   "status": "SUCCESS" | "FAILED",
    *   "amount": 15000,
    *   "timestamp": 1724158200,

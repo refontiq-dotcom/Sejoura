@@ -23,7 +23,7 @@ describe("anomaly-detection", () => {
   const baseBookings: BookingRecord[] = [
     {
       id: "b1",
-      bookingCode: "SJ-2026-0001",
+      bookingCode: "RES-26-0001",
       basePrice: 20000,
       negotiatedPrice: 20000,
       totalAmount: 60000,

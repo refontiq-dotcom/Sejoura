@@ -534,5 +534,5 @@ export function generateInvoiceNumber(tenantId: string, seq: number): string {
   const year = new Date().getFullYear();
   const month = String(new Date().getMonth() + 1).padStart(2, "0");
   const num = String(seq).padStart(4, "0");
-  return `F-${year}-${month}-${num}`;
+  return `FAC/${year}${month}/${num}`;
 }

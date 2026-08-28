@@ -58,7 +58,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *   "merchant_code": "MCH_XXXX",
    *   "amount": 15000,
    *   "currency": "XOF",
-   *   "order_id": "SJ-2026-0001",
+   *   "order_id": "RES-26-0001",
    *   "customer_phone": "0100000000",  // Numéro Moov du client
    *   "description": "Acompte séjour",
    *   "callback_url": "https://sejoura.../webhook",
@@ -160,7 +160,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    * Corps du webhook attendu :
    * {
    *   "transaction_id": "TXN_XXXX",
-   *   "order_id": "SJ-2026-0001",
+   *   "order_id": "RES-26-0001",
    *   "status": "SUCCESS" | "FAILED",
    *   "amount": 15000
    * }

@@ -35,7 +35,7 @@ export interface PaymentAnomaly {
   ratio?: number;
   /** ID de la réservation concernée (null pour les anomalies globales) */
   bookingId: string | null;
-  /** Code de réservation (SJ-XXXX-XXXX) */
+  /** Code de réservation (RES-YY-NNNN) */
   bookingCode?: string;
   /** ID du paiement */
   paymentId?: string;

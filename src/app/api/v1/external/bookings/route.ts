@@ -66,7 +66,7 @@ export async function GET(request: Request) {
 //
 // Sélectionne automatiquement une chambre disponible du type sur la période,
 // réutilise le client (même téléphone) sinon le crée, puis appelle la fonction
-// `create_booking` (anti double-booking, code SJ-YYYY-NNNN). Statut : `confirmed`.
+// `create_booking` (anti double-booking, code RES-YY-NNNN). Statut : `confirmed`.
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {

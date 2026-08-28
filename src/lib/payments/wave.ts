@@ -56,8 +56,8 @@ export class WavePaymentService implements PaymentProvider {
    *   "amount": "15000",                // FCFA, en STRING selon l'API Wave
    *   "error_url": "https://...",
    *   "success_url": "https://...",
-   *   "payment_reason": "Acompte réservation SJ-2026-0001",
-   *   "client_reference": "SJ-2026-0001"
+   *   "payment_reason": "Acompte réservation RES-26-0001",
+   *   "client_reference": "RES-26-0001"
    * }
    *
    * Réponse Wave :
@@ -65,7 +65,7 @@ export class WavePaymentService implements PaymentProvider {
    *   "id": "cos_...",                  // ID de la session (à stocker)
    *   "checkout_status": "open",
    *   "wave_launch_url": "https://pay.wave.com/m/...",
-   *   "client_reference": "SJ-2026-0001"
+   *   "client_reference": "RES-26-0001"
    * }
    */
   async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {

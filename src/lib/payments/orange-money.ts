@@ -103,7 +103,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    * {
    *   "merchant_key": "xxxx",           // Clé marchand (fournie par Orange)
    *   "currency": "OUV",                // Devise UEMOA
-   *   "order_id": "SJ-2026-0001",
+   *   "order_id": "RES-26-0001",
    *   "amount": 15000,
    *   "return_url": "https://...",
    *   "cancel_url": "https://...",
@@ -224,7 +224,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   "status": "SUCCESS",
    *   "txnid": "CI210129xxx",
    *   "amount": 15000,
-   *   "orderId": "SJ-2026-0001"
+   *   "orderId": "RES-26-0001"
    * }
    */
   validateWebhookSignature(payload: unknown, signature: string): boolean {
