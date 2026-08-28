@@ -9,6 +9,8 @@ export function useOnlineBookingBadge(user: User | null) {
 
   useEffect(() => {
     if (!user?.tenant_id || !user?.id) return;
+    const tenantId = user.tenant_id;
+    const userId = user.id;
 
     async function load() {
       setLoading(true);
@@ -16,8 +18,8 @@ export function useOnlineBookingBadge(user: User | null) {
         const { data: state } = await supabase
           .from("staff_notification_states")
           .select("last_viewed_at")
-          .eq("tenant_id", user.tenant_id)
-          .eq("user_id", user.id)
+          .eq("tenant_id", tenantId)
+          .eq("user_id", userId)
           .maybeSingle();
 
         const lastViewed = state?.last_viewed_at || "2024-01-01T00:00:00Z";
@@ -25,7 +27,7 @@ export function useOnlineBookingBadge(user: User | null) {
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
-          .eq("tenant_id", user.tenant_id)
+          .eq("tenant_id", tenantId)
           .eq("booking_source", "external")
           .gt("created_at", lastViewed)
           .not("status", "in", ["cancelled", "no_show"]);
@@ -43,12 +45,14 @@ export function useOnlineBookingBadge(user: User | null) {
 
   async function markAsViewed() {
     if (!user?.tenant_id || !user?.id) return;
+    const tenantId = user.tenant_id;
+    const userId = user.id;
 
     try {
       await supabase.from("staff_notification_states").upsert(
         {
-          tenant_id: user.tenant_id,
-          user_id: user.id,
+          tenant_id: tenantId,
+          user_id: userId,
           last_viewed_at: new Date().toISOString(),
         },
         {
