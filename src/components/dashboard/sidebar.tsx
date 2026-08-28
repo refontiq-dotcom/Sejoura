@@ -64,7 +64,7 @@ interface SidebarProps {
   onlineBookingCount?: number;
 }
 
-export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg }: SidebarProps) {
+export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg, onlineBookingCount = 0 }: SidebarProps) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
   const t = translations[lang].sidebar;
