@@ -56,6 +56,7 @@ export function Breadcrumbs() {
     shift: "Mon Shift / Caisse",
     accounting: t.accounting,
     employees: t.employees,
+    hr: lang === "en" ? "HR Records" : "Dossiers RH",
     settings: t.settings,
     subscription: t.subscription,
     suggestions: "Suggestions",
