@@ -16,6 +16,7 @@ import { LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
 import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
+import { useOnlineBookingBadge } from "@/hooks/use-online-booking-badge";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 import type { User, Accommodation } from "@/types/database";
@@ -57,7 +58,7 @@ export default function DashboardLayout({
   const [retryCount, setRetryCount] = useState(0);
   // Heure locale du navigateur pour le greeting (évite le décalage UTC côté serveur)
   const [localHour, setLocalHour] = useState(() => new Date().getHours());
-  const [onlineBookingCount, setOnlineBookingCount] = useState(0);
+  const { count: onlineBookingCount, markAsViewed } = useOnlineBookingBadge(user);
 
   // L'étape 2 (onboarding) est décidée côté serveur via le client admin
   // (service_role) pour être insensible aux politiques RLS du navigateur.
@@ -370,25 +371,12 @@ export default function DashboardLayout({
     checkAuth();
   }, [router, retryCount, setAccommodations, setActiveAccommodationId]);
 
-  // Compter les réservations en ligne pour le badge sidebar
+  // Marquer les réservations en ligne comme consultées quand on ouvre le module Réservations
   useEffect(() => {
-    if (!user?.tenant_id) return;
-    const tenantId = user.tenant_id;
-    async function countOnlineBookings() {
-      try {
-        const supabase = createClient();
-        const { count } = await supabase
-          .from("bookings")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .eq("booking_source", "external");
-        setOnlineBookingCount(count || 0);
-      } catch {
-        // Silencieux : le badge est optionnel
-      }
+    if (pathname === "/dashboard/bookings") {
+      markAsViewed();
     }
-    countOnlineBookings();
-  }, [user?.tenant_id]);
+  }, [pathname, markAsViewed]);
 
   // Titre / sous-titre intelligents selon la page courante.
   // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).
