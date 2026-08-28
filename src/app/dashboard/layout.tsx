@@ -17,6 +17,7 @@ import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { useOnlineBookingBadge } from "@/hooks/use-online-booking-badge";
+import { NotificationsProvider } from "@/contexts/notifications-context";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 import type { User, Accommodation } from "@/types/database";
@@ -566,13 +567,19 @@ export default function DashboardLayout({
           />
           <Breadcrumbs />
         </div>
-        <main 
-          style={{ backgroundColor: mainBg }} 
+        <main
+          style={{ backgroundColor: mainBg }}
           className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
         >
-          <div key={pathname} className="animate-page-enter">
-            {children}
-          </div>
+          <NotificationsProvider
+            tenantId={user.tenant_id ?? ""}
+            userId={user.id ?? ""}
+            userRole={user.role ?? ""}
+          >
+            <div key={pathname} className="animate-page-enter">
+              {children}
+            </div>
+          </NotificationsProvider>
         </main>
       </div>
 
