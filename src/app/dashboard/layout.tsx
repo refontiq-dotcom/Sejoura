@@ -373,13 +373,14 @@ export default function DashboardLayout({
   // Compter les réservations en ligne pour le badge sidebar
   useEffect(() => {
     if (!user?.tenant_id) return;
+    const tenantId = user.tenant_id;
     async function countOnlineBookings() {
       try {
         const supabase = createClient();
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
-          .eq("tenant_id", user.tenant_id)
+          .eq("tenant_id", tenantId)
           .eq("booking_source", "external");
         setOnlineBookingCount(count || 0);
       } catch {
