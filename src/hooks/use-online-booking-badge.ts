@@ -14,6 +14,8 @@ export function useOnlineBookingBadge(user: User | null) {
 
     async function load() {
       setLoading(true);
+      let lastViewed = "2024-01-01T00:00:00Z";
+
       try {
         const { data: state } = await supabase
           .from("staff_notification_states")
@@ -22,8 +24,14 @@ export function useOnlineBookingBadge(user: User | null) {
           .eq("user_id", userId)
           .maybeSingle();
 
-        const lastViewed = state?.last_viewed_at || "2024-01-01T00:00:00Z";
+        if (state?.last_viewed_at) {
+          lastViewed = state.last_viewed_at;
+        }
+      } catch {
+        // Si la table n'existe pas encore, on utilise la valeur par défaut
+      }
 
+      try {
         const { count } = await supabase
           .from("bookings")
           .select("*", { count: "exact", head: true })
@@ -59,11 +67,11 @@ export function useOnlineBookingBadge(user: User | null) {
           onConflict: "tenant_id,user_id",
         }
       );
-
-      setCount(0);
     } catch {
       // Silencieux
     }
+
+    setCount(0);
   }
 
   useEffect(() => {
