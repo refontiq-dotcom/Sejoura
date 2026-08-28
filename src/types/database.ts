@@ -564,6 +564,34 @@ export interface Expense {
   updated_at: string;
 }
 
+export type HrContractType = "cdi" | "cdd" | "stage" | "journalier" | "prestataire";
+export type HrEmployeeStatus = "active" | "on_leave" | "terminated";
+
+export interface HrEmployee {
+  id: string;
+  tenant_id: string;
+  accommodation_id: string | null;
+  user_id: string | null;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  position: string;
+  national_id_number: string | null;
+  birth_date: string | null;
+  hire_date: string;
+  contract_type: HrContractType;
+  contract_start_date: string;
+  contract_end_date: string | null;
+  base_salary: number | null;
+  cnps_number: string | null;
+  status: HrEmployeeStatus;
+  termination_date: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Invoice {
   id: string;
   tenant_id: string;

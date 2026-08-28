@@ -54,6 +54,7 @@ export function canAccessFeature(feature: string, plan?: string | null): boolean
     case "cleaningModule":
     case "basicAccounting": // factures + export, sans audit/bénéfice net
     case "clientPortal": // en lecture seule sur Croissance, complet sur Entreprise
+    case "hrModule": // dossiers employés + contrats (v1, sans calcul de paie)
       return normalized === "croissance" || normalized === "entreprise";
     default:
       return normalized === "entreprise" || normalized === "croissance" || normalized === "essentiel";

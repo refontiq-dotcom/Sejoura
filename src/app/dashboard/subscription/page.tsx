@@ -181,6 +181,7 @@ export default function SubscriptionPage() {
         "Module ménage complet (pool, timers, appli ménagère)",
         "Comptabilité basique (factures + export mensuel)",
         "Portail client en consultation",
+        "Module RH (dossiers employés, contrats)",
         "Boost Express Trouvetou (ponctuel, payant)",
       ],
     },

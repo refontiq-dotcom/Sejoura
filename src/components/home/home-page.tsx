@@ -790,6 +790,10 @@ export function HomePage() {
                 <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
                 {lang === "fr" ? "Portail client en consultation" : "Read-only client portal"}
               </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Module RH (dossiers employés, contrats)" : "HR module (employee records, contracts)"}
+              </li>
             </ul>
           </div>
           {/* Entreprise */}

@@ -54,6 +54,13 @@ describe("subscription-plans", () => {
     expect(canAccessFeature("trouvetouBoost", "entreprise")).toBe(true);
   });
 
+  it("débloque le module RH (dossiers employés) dès la Croissance", () => {
+    expect(canAccessFeature("hrModule", "essentiel")).toBe(false);
+    expect(canAccessFeature("hrModule", "croissance")).toBe(true);
+    expect(canAccessFeature("hrModule", "entreprise")).toBe(true);
+    expect(canAccessFeature("hrModule", "free")).toBe(false);
+  });
+
   it("propose le portail client en 3 niveaux : aucun / lecture seule / complet", () => {
     expect(getClientPortalMode("free")).toBe("none");
     expect(getClientPortalMode("essentiel")).toBe("none");

@@ -239,6 +239,7 @@ export default function DashboardLayout({
           const adminOnlyRoutes = [
             "/dashboard/accounting",
             "/dashboard/employees",
+            "/dashboard/hr",
             "/dashboard/settings",
             "/dashboard/subscription",
             // /dashboard/residences (liste), /dashboard/residences/[id] (détail avec chambres),
@@ -410,6 +411,13 @@ export default function DashboardLayout({
       "/dashboard/cleaning": d.cleaning,
       "/dashboard/accounting": d.accounting,
       "/dashboard/employees": d.employees,
+      "/dashboard/hr": {
+        title: lang === "en" ? "HR Records" : "Dossiers RH",
+        subtitle:
+          lang === "en"
+            ? "Employee files and contracts"
+            : "Dossiers employés et contrats",
+      },
       "/dashboard/subscription": d.subscription,
       "/dashboard/settings": { title: d.settings.pageTitle, subtitle: d.settings.pageSubtitle },
       "/dashboard/suggestions": {
