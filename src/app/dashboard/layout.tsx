@@ -545,43 +545,43 @@ export default function DashboardLayout({
         onlineBookingCount={onlineBookingCount}
       />
 
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
-        <div
-          className={`sticky top-0 z-30 transition-transform duration-300 will-change-transform ${
-            headerHidden ? "-translate-y-full" : "translate-y-0"
-          }`}
-        >
-          <Header
-            title={headerMeta.title}
-            subtitle={headerMeta.subtitle}
-            onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            userName={user.full_name}
-            userRole={user.role}
-            userEmail={user.email}
-            avatarUrl={user.avatar_url}
-            lastLogin={user.last_login_at}
-            companyName={companyName}
-            plan={plan}
-            monthlyPrice={monthlyPrice}
-            scrolled={headerScrolled}
-          />
-          <Breadcrumbs />
-        </div>
-        <main
-          style={{ backgroundColor: mainBg }}
-          className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
-        >
-          <NotificationsProvider
-            tenantId={user.tenant_id ?? ""}
-            userId={user.id ?? ""}
-            userRole={user.role ?? ""}
+      <NotificationsProvider
+        tenantId={user.tenant_id ?? ""}
+        userId={user.id ?? ""}
+        userRole={user.role ?? ""}
+      >
+        <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
+          <div
+            className={`sticky top-0 z-30 transition-transform duration-300 will-change-transform ${
+              headerHidden ? "-translate-y-full" : "translate-y-0"
+            }`}
+          >
+            <Header
+              title={headerMeta.title}
+              subtitle={headerMeta.subtitle}
+              onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              userName={user.full_name}
+              userRole={user.role}
+              userEmail={user.email}
+              avatarUrl={user.avatar_url}
+              lastLogin={user.last_login_at}
+              companyName={companyName}
+              plan={plan}
+              monthlyPrice={monthlyPrice}
+              scrolled={headerScrolled}
+            />
+            <Breadcrumbs />
+          </div>
+          <main
+            style={{ backgroundColor: mainBg }}
+            className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
           >
             <div key={pathname} className="animate-page-enter">
               {children}
             </div>
-          </NotificationsProvider>
-        </main>
-      </div>
+          </main>
+        </div>
+      </NotificationsProvider>
 
       {needsOnboarding && (
         <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md" />
