@@ -189,7 +189,7 @@ export async function POST(request: Request) {
       const occupiedRoomIds = new Set((bookings ?? []).map((b) => b.room_id));
 
       availableRoom =
-        (rooms ?? []).find((r) => r.status !== "occupied" && !occupiedRoomIds.has(r.id)) ?? null;
+        (rooms ?? []).find((r) => !occupiedRoomIds.has(r.id)) ?? null;
     }
 
     if (!availableRoom) {
