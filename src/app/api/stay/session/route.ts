@@ -53,15 +53,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
     }
 
-    // Formule Entreprise uniquement
+    // Formule Croissance (lecture seule) ou Entreprise (complet)
     const { data: subscription } = await admin
       .from("subscriptions")
       .select("plan")
       .eq("tenant_id", booking.tenant_id)
       .maybeSingle();
-    if (!subscription || normalizePlan(subscription.plan) !== "entreprise") {
+    const plan = normalizePlan(subscription?.plan);
+    if (plan !== "croissance" && plan !== "entreprise") {
       return NextResponse.json(
-        { error: "L'espace client est réservé à la formule Entreprise." },
+        { error: "L'espace client est réservé aux formules Croissance et Entreprise." },
         { status: 403 }
       );
     }

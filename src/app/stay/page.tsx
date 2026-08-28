@@ -191,6 +191,9 @@ function StayPortal() {
   const room = data.room!;
   const client = data.client!;
   const guestInfo = data.tenant?.guest_info ?? null;
+  // Croissance = consultation seule : pas de demandes de service ni de
+  // prolongation. Entreprise = portail complet.
+  const isReadOnly = tenant.portal_mode === "readonly";
 
   const checkOutDate = new Date(`${booking.check_out_date}T${booking.check_out_time || "11:00"}`);
   const checkInDate = new Date(`${booking.check_in_date}T${booking.check_in_time || "14:00"}`);
@@ -400,8 +403,8 @@ function StayPortal() {
               )}
             </div>
 
-            {/* Prolongation de séjour */}
-            {(isCheckedIn || booking.status === "confirmed") && (
+            {/* Prolongation de séjour — réservé au portail complet (Entreprise) */}
+            {!isReadOnly && (isCheckedIn || booking.status === "confirmed") && (
               <button
                 onClick={openExtend}
                 className="flex w-full items-center justify-between rounded-3xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm transition active:scale-[0.98] dark:border-amber-900 dark:bg-amber-900/20"
@@ -497,24 +500,26 @@ function StayPortal() {
               </div>
             ) : null}
 
-            {/* Accès rapides */}
-            <button
-              onClick={() => setTab("services")}
-              className="flex w-full items-center justify-between rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-left dark:border-emerald-900 dark:bg-emerald-900/30"
-            >
-              <span className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white"><Sparkles className="h-5 w-5" /></span>
-                <span>
-                  <span className="block text-sm font-bold text-emerald-900 dark:text-emerald-100">Besoin de quelque chose ?</span>
-                  <span className="block text-xs text-emerald-700 dark:text-emerald-300">Demandez un service à la réception</span>
+            {/* Accès rapides — réservé au portail complet (Entreprise) */}
+            {!isReadOnly && (
+              <button
+                onClick={() => setTab("services")}
+                className="flex w-full items-center justify-between rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-left dark:border-emerald-900 dark:bg-emerald-900/30"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white"><Sparkles className="h-5 w-5" /></span>
+                  <span>
+                    <span className="block text-sm font-bold text-emerald-900 dark:text-emerald-100">Besoin de quelque chose ?</span>
+                    <span className="block text-xs text-emerald-700 dark:text-emerald-300">Demandez un service à la réception</span>
+                  </span>
                 </span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-emerald-600" />
-            </button>
+                <ArrowRight className="h-4 w-4 text-emerald-600" />
+              </button>
+            )}
           </>
         )}
 
-        {tab === "services" && (
+        {tab === "services" && !isReadOnly && (
           <>
             <div className="px-1 pt-1">
               <h2 className="text-lg font-extrabold">Services</h2>
@@ -659,9 +664,11 @@ function StayPortal() {
 
       {/* ── Barre de navigation basse ── */}
       <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-[var(--border)] bg-white/90 backdrop-blur-lg dark:bg-slate-900/90">
-        <div className="grid grid-cols-4">
+        <div className={isReadOnly ? "grid grid-cols-3" : "grid grid-cols-4"}>
           <TabButton active={tab === "home"} onClick={() => setTab("home")} icon={Home} label="Accueil" />
-          <TabButton active={tab === "services"} onClick={() => setTab("services")} icon={ShoppingBag} label="Services" />
+          {!isReadOnly && (
+            <TabButton active={tab === "services"} onClick={() => setTab("services")} icon={ShoppingBag} label="Services" />
+          )}
           <TabButton active={tab === "payment"} onClick={() => setTab("payment")} icon={Wallet} label="Paiement" />
           <TabButton active={tab === "contact"} onClick={() => setTab("contact")} icon={Contact} label="Contact" />
         </div>

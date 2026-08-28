@@ -3726,11 +3726,11 @@ export default function BookingsPage() {
           </Modal>
         )}
 
-        {/* Modal Upsell Espace client (formule Entreprise) */}
+        {/* Modal Upsell Espace client — n'apparaît que pour Essentiel (pas de portail) */}
         <Modal
           open={portalUpsell}
           onClose={() => setPortalUpsell(false)}
-          title="Espace client — Formule Entreprise"
+          title="Espace client — dès la formule Croissance"
           size="sm"
         >
           <div className="space-y-4 pt-1">
@@ -3740,14 +3740,14 @@ export default function BookingsPage() {
               </span>
               <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                 Offrez à chaque client une <strong>page séjour privée</strong>, accessible depuis son
-                mobile : infos du séjour, demandes de services et suivi du paiement, actives pendant
-                toute la durée du séjour — automatiquement prolongées en cas de prolongation.
+                mobile. En Croissance : infos du séjour et suivi du paiement en consultation. En
+                Entreprise : en plus, demandes de services et demande de prolongation.
               </p>
             </div>
             <div className="flex flex-col gap-2">
               <a href="/dashboard/subscription">
                 <Button className="w-full gap-2" loading={portalLoading}>
-                  <Sparkles className="h-4 w-4" /> Passer à la formule Entreprise
+                  <Sparkles className="h-4 w-4" /> Voir les formules
                 </Button>
               </a>
               <Button variant="outline" onClick={() => setPortalUpsell(false)}>

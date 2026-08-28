@@ -655,6 +655,8 @@ export interface ClientStayPayload {
     primary_color: string;
     contact_phone: string | null;
     guest_info: GuestInfo | null;
+    /** "readonly" (Croissance : consultation seule) ou "full" (Entreprise : services + prolongation) */
+    portal_mode: "readonly" | "full";
   };
   accommodation?: {
     name: string;
