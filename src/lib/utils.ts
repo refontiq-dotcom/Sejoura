@@ -255,6 +255,8 @@ export function getPlanLabel(plan: string, lang: Lang = "fr"): string {
     trial: { fr: "Essai gratuit", en: "Free trial" },
     standard: { fr: "Essentiel", en: "Essentiel" },
     essentiel: { fr: "Essentiel", en: "Essentiel" },
+    croissance: { fr: "Croissance", en: "Growth" },
+    growth: { fr: "Croissance", en: "Growth" },
     enterprise: { fr: "Entreprise", en: "Enterprise" },
     entreprise: { fr: "Entreprise", en: "Enterprise" },
   };

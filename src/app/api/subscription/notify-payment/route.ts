@@ -10,7 +10,7 @@ import {
   sendTelegramMessage,
 } from "@/lib/telegram";
 
-const ALLOWED_PLANS = ["essentiel", "entreprise", "standard", "enterprise"];
+const ALLOWED_PLANS = ["essentiel", "croissance", "entreprise", "standard", "growth", "enterprise"];
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/subscription/notify-payment

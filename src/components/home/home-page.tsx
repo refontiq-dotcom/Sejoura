@@ -728,7 +728,7 @@ export function HomePage() {
               : "1 month free at signup, no credit card required. Cancel anytime."}
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Essentiel */}
           <div className="bg-slate-50 dark:bg-[#262626]/60 p-6 rounded-2xl border border-slate-200 dark:border-[#404040]">
             <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl">
@@ -738,7 +738,7 @@ export function HomePage() {
               {lang === "fr" ? "1 établissement maximum" : "Up to 1 establishment"}
             </p>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
-              15 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+              9 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
@@ -755,23 +755,53 @@ export function HomePage() {
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-emerald-500 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Comptabilité de base" : "Basic accounting"}
+                {lang === "fr" ? "Zéro frais d'installation" : "Zero setup fee"}
+              </li>
+            </ul>
+          </div>
+          {/* Croissance */}
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-2xl border-2 border-emerald-500 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/20 relative">
+            <span className="absolute -top-3 left-6 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+              {lang === "fr" ? "Le plus choisi" : "Most chosen"}
+            </span>
+            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl mt-1">
+              {lang === "fr" ? "Croissance" : "Growth"}
+            </h5>
+            <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
+              {lang === "fr" ? "Jusqu'à 35 unités & module ménage" : "Up to 35 units & cleaning module"}
+            </p>
+            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mb-4">
+              24 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+            </div>
+            <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "35 unités & 5 comptes système" : "35 units & 5 system accounts"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Module ménage complet (pool, timers)" : "Full cleaning module (pool, timers)"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Comptabilité (factures + export mensuel)" : "Accounting (invoices + monthly export)"}
+              </li>
+              <li className="flex items-start">
+                <Check className="w-4 h-4 text-emerald-600 mt-0.5 mr-2 shrink-0" />
+                {lang === "fr" ? "Portail client en consultation" : "Read-only client portal"}
               </li>
             </ul>
           </div>
           {/* Entreprise */}
           <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border-2 border-blue-500 shadow-lg shadow-blue-100 dark:shadow-blue-900/20 relative">
-            <span className="absolute -top-3 left-6 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-              {lang === "fr" ? "Le plus choisi" : "Most chosen"}
-            </span>
-            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl mt-1">
+            <h5 className="font-black text-slate-900 dark:text-[#e8e8e8] text-xl">
               Entreprise
             </h5>
             <p className="text-slate-500 dark:text-[#a0a0a0] text-xs mb-4">
               {lang === "fr" ? "Établissements illimités & API" : "Unlimited establishments & API"}
             </p>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
-              55 000 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+              54 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
@@ -780,11 +810,11 @@ export function HomePage() {
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Module ménage automatique & vitrine Trouvetou" : "Automatic cleaning & Trouvetou showcase"}
+                {lang === "fr" ? "Comptabilité complète & bénéfice net" : "Full accounting & net profit"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
-                {lang === "fr" ? "Paiement en ligne Wave" : "Wave online payment"}
+                {lang === "fr" ? "Portail client complet & profil intelligent" : "Full client portal & smart profile"}
               </li>
               <li className="flex items-start">
                 <Check className="w-4 h-4 text-blue-600 mt-0.5 mr-2 shrink-0" />
@@ -797,6 +827,11 @@ export function HomePage() {
             </ul>
           </div>
         </div>
+        <p className="text-xs text-slate-500 dark:text-[#a0a0a0] text-center pt-2">
+          {lang === "fr"
+            ? "2 mois offerts sur l'engagement annuel, tous plans confondus."
+            : "2 months free on annual commitment, all plans."}
+        </p>
       </div>
     ),
     FAQ: (
@@ -824,15 +859,15 @@ export function HomePage() {
               q: lang === "fr" ? "L'essai gratuit dure combien de temps ?" : "How long is the free trial?",
               a:
                 lang === "fr"
-                  ? "1 mois offert dès l'inscription, sans carte bancaire et sans engagement. À la fin de l'essai, vous choisissez l'offre Essentiel (15 000 FCFA/mois) ou Entreprise (55 000 FCFA/mois)."
-                  : "1 month free at signup, no credit card and no commitment. At the end of the trial, you choose Essentiel (15,000 XOF/month) or Entreprise (55,000 XOF/month).",
+                  ? "1 mois offert dès l'inscription, sans carte bancaire et sans engagement. À la fin de l'essai, vous choisissez l'offre Essentiel (9 900 FCFA/mois), Croissance (24 900 FCFA/mois) ou Entreprise (54 900 FCFA/mois)."
+                  : "1 month free at signup, no credit card and no commitment. At the end of the trial, you choose Essentiel (9,900 XOF/month), Croissance (24,900 XOF/month) or Entreprise (54,900 XOF/month).",
             },
             {
               q: lang === "fr" ? "Différence entre les offres ?" : "Difference between the plans?",
               a:
                 lang === "fr"
-                  ? "Le plan Essentiel (15 000 FCFA/mois) convient jusqu'à 1 établissement avec 1 admin et 1 réceptionniste. Le plan Entreprise (55 000 FCFA/mois) ajoute les établissements illimités, le module ménage automatique, la vitrine Trouvetou, le paiement en ligne Wave, l'accès API et un support dédié 24/7."
-                  : "The Essentiel plan (15,000 XOF/month) suits up to 1 establishment with 1 admin and 1 receptionist. The Entreprise plan (55,000 XOF/month) adds unlimited establishments, automatic cleaning, the Trouvetou showcase, Wave online payment, API access and dedicated 24/7 support.",
+                  ? "Le plan Essentiel (9 900 FCFA/mois) convient jusqu'à 1 établissement avec 1 admin et 1 réceptionniste. Le plan Croissance (24 900 FCFA/mois) ajoute le module ménage complet, la comptabilité et jusqu'à 35 unités. Le plan Entreprise (54 900 FCFA/mois) ajoute les établissements illimités, la comptabilité complète, le portail client complet, l'accès API et un support dédié 24/7."
+                  : "The Essentiel plan (9,900 XOF/month) suits up to 1 establishment with 1 admin and 1 receptionist. The Croissance plan (24,900 XOF/month) adds the full cleaning module, accounting and up to 35 units. The Entreprise plan (54,900 XOF/month) adds unlimited establishments, full accounting, the full client portal, API access and dedicated 24/7 support.",
             },
             {
               q: lang === "fr" ? "Comment mes clients paient-ils ?" : "How do my clients pay?",

@@ -12,8 +12,9 @@ manuellement l'activation.
 Déroulé :
 
 1. Sur la page `/dashboard/subscription`, le gérant choisit son forfait
-   (Essentiel 15 000 FCFA ou Entreprise 55 000 FCFA) et clique sur
-   « Payer via Wave » (lien `https://pay.wave.com/...` ouvert dans un nouvel onglet).
+   (Essentiel 9 900 FCFA, Croissance 24 900 FCFA ou Entreprise 54 900 FCFA)
+   et clique sur « Payer via Wave » (lien `https://pay.wave.com/...` ouvert
+   dans un nouvel onglet).
 2. Une fois le paiement effectué, il revient dans la modal et saisit le
    numéro Wave expéditeur puis clique sur « Soumettre pour activation rapide » :
    la route `POST /api/subscription/notify-payment` passe l'abonnement en
@@ -30,8 +31,9 @@ Déroulé :
    Un bouton « Rejeter » (avec confirmation) permet au contraire de marquer la
    demande comme `rejected` via la RPC `reject_subscription_payment` : le gérant
    est notifié et peut soumettre une nouvelle demande. Les demandes dont le
-   montant ne correspond pas au tarif du plan (15 000 FCFA Essentiel /
-   55 000 FCFA Entreprise) sont signalées visuellement avant validation.
+   montant ne correspond pas au tarif du plan (9 900 FCFA Essentiel /
+   24 900 FCFA Croissance / 54 900 FCFA Entreprise) sont signalées
+   visuellement avant validation.
 
 Migrations correspondantes :
 - `supabase/migrations/20260812_subscription_manual_payment_flow.sql`

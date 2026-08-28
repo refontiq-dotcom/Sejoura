@@ -164,20 +164,38 @@ export default function SubscriptionPage() {
         "10 unités maximum (chambres ou appartements)",
         "2 comptes système max (Admin + Réceptionniste / Ménagère)",
         "Réservations, check-in/out et reçus PDF",
-        "Vitrine Trouvetou et Boost Express",
+        "Vitrine Trouvetou",
+        "Zéro frais d'installation",
+      ],
+    },
+    {
+      key: "croissance",
+      name: "Croissance",
+      tagline: "Pour les résidences en expansion",
+      price: getPlanPrice("croissance"),
+      icon: Sparkles,
+      iconClasses: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600",
+      features: [
+        "1 établissement, 35 unités maximum",
+        "5 comptes système max",
+        "Module ménage complet (pool, timers, appli ménagère)",
+        "Comptabilité basique (factures + export mensuel)",
+        "Portail client en consultation",
+        "Boost Express Trouvetou (ponctuel, payant)",
       ],
     },
     {
       key: "entreprise",
       name: "Entreprise",
-      tagline: "Pour les établissements qui se développent",
+      tagline: "Pour les groupes multi-résidences",
       price: getPlanPrice("entreprise"),
       icon: Crown,
       iconClasses: "bg-purple-100 dark:bg-purple-900/30 text-purple-600",
       features: [
         "Établissements & unités illimités",
-        "Comptabilité avancée et bénéfice net réel",
-        "Boost Trouvetou et visibilité comparateur",
+        "Comptabilité complète et bénéfice net réel",
+        "Portail client complet (demandes de service)",
+        "Profil client intelligent et statistiques avancées",
         "API Séjoura export / webhooks",
         "Rôles sur mesure et support dédié",
       ],
@@ -193,7 +211,7 @@ export default function SubscriptionPage() {
   const dateExpired = !!endDate && !isPending && new Date(endDate).getTime() < now;
   const isExpired = subStatus === "expired" || isLocked || dateExpired;
 
-  const planOrder: Record<string, number> = { essentiel: 1, entreprise: 2 };
+  const planOrder: Record<string, number> = { essentiel: 1, croissance: 2, entreprise: 3 };
   const currentRank = planOrder[currentPlan] ?? 0;
   const pendingTargetPlan = isPending
     ? normalizePlan(pendingRequest?.plan ?? subscription?.plan ?? currentPlan)
@@ -216,9 +234,11 @@ export default function SubscriptionPage() {
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
               currentPlan === "entreprise" ? "bg-purple-100 dark:bg-purple-900/30" :
+              currentPlan === "croissance" ? "bg-emerald-100 dark:bg-emerald-900/30" :
               "bg-blue-100 dark:bg-blue-900/30"
             }`}>
               {currentPlan === "entreprise" ? <Crown className="w-7 h-7 text-purple-600" /> :
+               currentPlan === "croissance" ? <Sparkles className="w-7 h-7 text-emerald-600" /> :
                <Zap className="w-7 h-7 text-blue-600" />}
             </div>
             <div>
@@ -277,11 +297,11 @@ export default function SubscriptionPage() {
       )}
 
       {/* Plans */}
-      <div id="plans-section" className="grid grid-cols-1 md:grid-cols-2 gap-6 scroll-mt-4">
+      <div id="plans-section" className="grid grid-cols-1 md:grid-cols-3 gap-6 scroll-mt-4">
         {plans.map((plan) => {
           const isCurrent = currentPlan === plan.key;
           const Icon = plan.icon;
-          const isHighlight = plan.key === "entreprise";
+          const isHighlight = plan.key === "croissance";
           return (
             <div
               key={plan.key}

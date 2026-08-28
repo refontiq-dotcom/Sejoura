@@ -67,7 +67,9 @@ export async function GET(request: Request) {
     const plan            = subscription?.plan || "standard";
     const subActive       = subscription?.status === "active";
     const isEnterprisePlan = plan === "entreprise" || plan === "enterprise";
-    const isEssentielPlan  = plan === "essentiel";
+    // Essentiel et Croissance n'ont pas le Boost Permanent — ils peuvent
+    // utiliser le Boost Express ponctuel (payant).
+    const isExpressEligiblePlan = plan === "essentiel" || plan === "croissance";
 
     // 2. Récupérer les établissements avec toutes les colonnes boost
     const { data: accommodations, error: accError } = await admin
@@ -93,7 +95,7 @@ export async function GET(request: Request) {
     const emptyResponse = {
       plan,
       isEnterprisePlan,
-      isEssentielPlan,
+      isExpressEligiblePlan,
       accommodations: [],
       types: [],
       metrics: { totalViews: 0, totalWhatsappClicks: 0 },
@@ -267,7 +269,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       plan,
       isEnterprisePlan,
-      isEssentielPlan,
+      isExpressEligiblePlan,
       metrics: {
         totalTrouvetouBookings,
         totalTrouvetouRevenue,

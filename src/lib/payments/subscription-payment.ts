@@ -37,7 +37,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPaymentService } from "@/lib/payments";
-import { getPlanPrice, normalizePlan } from "@/lib/subscription-plans";
+import { getPlanPrice, getWavePayLink, normalizePlan } from "@/lib/subscription-plans";
+import { getPlanLabel } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,21 +51,22 @@ export type SubscriptionPaymentResult = {
 };
 
 // ─── Plan Config ─────────────────────────────────────────────────────────────
+// Dérivée de src/lib/subscription-plans.ts (source de vérité unique des prix)
+// pour éviter toute divergence entre ce fichier et la grille tarifaire réelle.
 
-export const SUBSCRIPTION_PLANS = {
-  essentiel: {
-    label: "Plan Essentiel",
-    price: 15000, // FCFA/mois
-    wavePayLink: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=15000",
-    description: "Abonnement mensuel Séjoura — Plan Essentiel",
-  },
-  entreprise: {
-    label: "Plan Entreprise",
-    price: 55000, // FCFA/mois
-    wavePayLink: "https://pay.wave.com/m/M_ci_RImDyQYI8ccj/c/ci/?amount=55000",
-    description: "Abonnement mensuel Séjoura — Plan Entreprise",
-  },
-} as const;
+const PLAN_KEYS = ["essentiel", "croissance", "entreprise"] as const;
+
+export const SUBSCRIPTION_PLANS = Object.fromEntries(
+  PLAN_KEYS.map((key) => [
+    key,
+    {
+      label: `Plan ${getPlanLabel(key)}`,
+      price: getPlanPrice(key), // FCFA/mois
+      wavePayLink: getWavePayLink(key),
+      description: `Abonnement mensuel Séjoura — Plan ${getPlanLabel(key)}`,
+    },
+  ])
+) as Record<(typeof PLAN_KEYS)[number], { label: string; price: number; wavePayLink: string; description: string }>;
 
 // ─── Service de paiement d'abonnement ────────────────────────────────────────
 
@@ -78,12 +80,12 @@ export const SUBSCRIPTION_PLANS = {
  * affiche le flux de paiement actuel (aucune régression).
  *
  * @param tenantId   - UUID du tenant (gérant)
- * @param plan       - Plan cible ("essentiel" | "entreprise")
+ * @param plan       - Plan cible ("essentiel" | "croissance" | "entreprise")
  * @param reference  - Référence unique (ex: "SUB-2026-08-tenantId")
  */
 export async function initiateSubscriptionPayment(
   tenantId: string,
-  plan: "essentiel" | "entreprise",
+  plan: "essentiel" | "croissance" | "entreprise",
   reference: string
 ): Promise<SubscriptionPaymentResult> {
   const planConfig = SUBSCRIPTION_PLANS[plan];

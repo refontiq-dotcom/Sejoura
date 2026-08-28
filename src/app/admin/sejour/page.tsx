@@ -62,7 +62,7 @@ interface PaymentRequestWithTenant extends SubscriptionPaymentRequest {
 }
 
 type TenantStatusFilter = "all" | "active" | "suspended" | "locked" | "pending";
-type PlanFilter = "all" | "essentiel" | "entreprise";
+type PlanFilter = "all" | "essentiel" | "croissance" | "entreprise";
 
 const PAGE_SIZE = 10;
 const POLL_INTERVAL_MS = 30_000;
@@ -350,6 +350,7 @@ export default function SuperAdminPage() {
     const colors: Record<string, string> = {
       Gratuit: "#94a3b8",
       Essentiel: "#0ea5e9",
+      Croissance: "#10b981",
       Entreprise: "#f59e0b",
     };
     return Array.from(counts.entries()).map(([name, value]) => ({
@@ -777,6 +778,7 @@ export default function SuperAdminPage() {
         >
           <option value="all">Tous les plans</option>
           <option value="essentiel">Essentiel</option>
+          <option value="croissance">Croissance</option>
           <option value="entreprise">Entreprise</option>
         </select>
       </div>

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizePlan, getPlanPrice } from "@/lib/subscription-plans";
+import { formatFCFA } from "@/lib/utils";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/essentiel/boost-express
-// Active le Boost Express ponctuel pour un établissement (plan ESSENTIEL).
+// Active le Boost Express ponctuel pour un établissement (plans ESSENTIEL et
+// CROISSANCE — le Boost Permanent est inclus dès la formule ENTREPRISE).
 // Le Boost Express est temporaire (durée configurable, défaut 3 jours).
 // L'accès au Boost Permanent (is_permanently_boosted) reste interdit ici.
 // ──────────────────────────────────────────────────────────────────────────────
@@ -83,16 +86,16 @@ export async function POST(request: Request) {
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
-    const plan = subscription?.plan ?? "";
+    const plan = normalizePlan(subscription?.plan);
     const status = subscription?.status ?? "";
 
-    if (plan !== "essentiel") {
+    if (plan !== "essentiel" && plan !== "croissance") {
       return NextResponse.json(
         {
           error:
-            plan === "entreprise" || plan === "enterprise"
+            plan === "entreprise"
               ? "Votre formule ENTREPRISE inclut déjà le Boost Permanent. Le Boost Express n'est pas nécessaire."
-              : "Le Boost Express est réservé à la formule ESSENTIEL (15 000 FCFA/mois).",
+              : `Le Boost Express est réservé aux formules ESSENTIEL (${formatFCFA(getPlanPrice("essentiel"))}/mois) et CROISSANCE (${formatFCFA(getPlanPrice("croissance"))}/mois).`,
         },
         { status: 403 }
       );
@@ -210,7 +213,7 @@ export async function DELETE(request: Request) {
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
-    if (subscription?.plan !== "essentiel") {
+    if (normalizePlan(subscription?.plan) !== "essentiel" && normalizePlan(subscription?.plan) !== "croissance") {
       return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
     }
 

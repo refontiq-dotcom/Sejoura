@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlanPrice } from "@/lib/subscription-plans";
+import { formatFCFA } from "@/lib/utils";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/enterprise/boost
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
 
     if (!isEnterprise) {
       return NextResponse.json(
-        { error: "Le Boost Permanent Trouvetou est réservé à la formule Entreprise (55 000 FCFA/mois)" },
+        { error: `Le Boost Permanent Trouvetou est réservé à la formule Entreprise (${formatFCFA(getPlanPrice("entreprise"))}/mois)` },
         { status: 403 }
       );
     }
