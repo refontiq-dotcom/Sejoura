@@ -24,6 +24,8 @@ import {
   Building2,
   Briefcase,
   ShieldCheck,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import type { Accommodation, HrEmployee, HrContractType, HrEmployeeStatus, User } from "@/types/database";
 
@@ -77,6 +79,7 @@ function HrPageContent() {
   const [systemAccounts, setSystemAccounts] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | HrEmployeeStatus>("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<HrEmployee | null>(null);
@@ -347,7 +350,7 @@ function HrPageContent() {
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
           <Input
             icon={<Search className="w-4 h-4" />}
             placeholder="Rechercher un nom, un poste, un téléphone..."
@@ -365,6 +368,22 @@ function HrPageContent() {
             <option value="on_leave">En congé</option>
             <option value="terminated">Contrat terminé</option>
           </select>
+          <div className="flex items-center gap-0.5 border border-[var(--input-border)] rounded-md p-0.5 bg-[var(--input-bg)]">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`p-1.5 rounded transition-colors ${viewMode === "list" ? "bg-[var(--primary-color)] text-white" : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"}`}
+              title="Vue liste"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded transition-colors ${viewMode === "grid" ? "bg-[var(--primary-color)] text-white" : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"}`}
+              title="Vue cartes"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {filtered.length === 0 ? (
@@ -372,6 +391,96 @@ function HrPageContent() {
             <IdCard className="w-8 h-8 mx-auto text-[var(--foreground-subtle)] mb-2" />
             <p className="text-sm text-[var(--foreground-muted)]">Aucun dossier employé pour le moment.</p>
           </Card>
+        ) : viewMode === "list" ? (
+          <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--surface-muted)]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">Nom / Poste</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] hidden sm:table-cell">Téléphone</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)]">Statut</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] hidden md:table-cell">Contrat</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] hidden lg:table-cell">Établissement</th>
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground-muted)] text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {filtered.map((rec) => {
+                  const acc = accommodations.find((a) => a.id === rec.accommodation_id);
+                  const linkedAccount = rec.user_id ? systemAccounts.find((u) => u.id === rec.user_id) : null;
+                  return (
+                    <tr key={rec.id} className="hover:bg-[var(--surface-muted)]/50 transition-colors">
+                      <td className="px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[var(--foreground)] truncate max-w-[180px] sm:max-w-none">{rec.full_name}</p>
+                          <p className="text-[11px] text-[var(--foreground-muted)] flex items-center gap-1 mt-0.5">
+                            <Briefcase className="w-3 h-3" /> {rec.position}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1 sm:hidden">
+                            <Phone className="w-3 h-3 text-[var(--foreground-subtle)]" />
+                            <span className="text-[11px] text-[var(--foreground-muted)]">{rec.phone}</span>
+                          </div>
+                          {linkedAccount && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <ShieldCheck className="w-3 h-3 text-[var(--primary-color)]" />
+                              <span className="text-[10px] text-[var(--primary-color)] font-medium">Accès ({getRoleLabel(linkedAccount.role)})</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 hidden sm:table-cell">
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3 h-3 text-[var(--foreground-subtle)]" />
+                          <span className="text-xs text-[var(--foreground-muted)]">{rec.phone}</span>
+                        </div>
+                        {rec.email && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Mail className="w-3 h-3 text-[var(--foreground-subtle)]" />
+                            <span className="text-[11px] text-[var(--foreground-subtle)] truncate max-w-[140px]">{rec.email}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant={STATUS_VARIANT[rec.status]}>{STATUS_LABELS[rec.status]}</Badge>
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <Badge variant="outline" className="text-[10px]">{CONTRACT_TYPE_LABELS[rec.contract_type]}</Badge>
+                        <p className="text-[10px] text-[var(--foreground-subtle)] mt-1">Embauché le {formatDate(rec.hire_date)}</p>
+                      </td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
+                        {acc ? (
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3 h-3 text-[var(--foreground-subtle)]" />
+                            <span className="text-xs text-[var(--foreground-muted)]">{acc.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-[var(--foreground-subtle)]">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openEdit(rec)}
+                            className="p-1.5 rounded-md text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
+                            title="Modifier"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => { if (requireHrAccess()) setDeleteTarget(rec); }}
+                            className="p-1.5 rounded-md text-[var(--foreground-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map((rec) => {
