@@ -26,6 +26,7 @@ import {
   BedDouble,
   User,
   Info,
+  Globe,
 } from "lucide-react";
 import {
   getPaymentStatusLabel,
@@ -783,6 +784,7 @@ export default function DashboardPage() {
   const loadRetriesRef = useRef(0);
   const dashboardLoadedRef = useRef(false);
   const [overstayCount, setOverstayCount] = useState(0);
+  const [onlineBookingCount, setOnlineBookingCount] = useState(0);
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
 
@@ -1023,6 +1025,22 @@ export default function DashboardPage() {
               (b) => b.is_overstay || isBookingOverdue(b)
             ).length
           );
+        }
+
+        // Nombre de réservations en ligne (booking_source = 'external') en
+        // attente de traitement (confirmées, pas encore check-in).
+        {
+          let onlineQuery = supabase
+            .from("bookings")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("booking_source", "external")
+            .eq("status", "confirmed");
+          if (activeAccommodationId) {
+            onlineQuery = onlineQuery.eq("accommodation_id", activeAccommodationId);
+          }
+          const onlineData = await onlineQuery;
+          setOnlineBookingCount(onlineData.count || 0);
         }
 
         // Une réservation arrivant ET repartant le jour cible génère deux mouvements distincts
@@ -1387,6 +1405,31 @@ export default function DashboardPage() {
             onClick={() => router.push("/dashboard/bookings?status=overdue")}
             >
             {t.overstay.viewBookings}
+          </Button>
+        </div>
+      )}
+
+      {/* 0c. ALERTE RÉSERVATIONS EN LIGNE */}
+      {onlineBookingCount > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 animate-fade-in">
+          <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
+            <Globe className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+              {t.onlineBookings.title.replace("{count}", String(onlineBookingCount))}
+            </p>
+            <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 truncate">
+              {t.onlineBookings.subtitle}
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-shrink-0 border-indigo-300 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+            onClick={() => router.push("/dashboard/bookings?source=online")}
+            >
+            {t.onlineBookings.viewBookings}
           </Button>
         </div>
       )}

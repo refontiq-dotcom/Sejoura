@@ -193,6 +193,11 @@ export const translations = {
         subtitle: "Client(s) encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.",
         viewBookings: "Voir les réservations",
       },
+      onlineBookings: {
+        title: "{count} réservation(s) en ligne",
+        subtitle: "Réservations reçues en ligne en attente de confirmation",
+        viewBookings: "Voir les réservations",
+      },
       arrivalsExpected: "Arrivées prévues",
       departuresExpected: "Départs prévus",
       roomsToClean: "Chambres à nettoyer",
@@ -790,6 +795,11 @@ export const translations = {
       overstay: {
         title: "{count} stay(s) overdue",
         subtitle: "Client(s) still in room after scheduled departure — extend stay or vacate room.",
+        viewBookings: "View bookings",
+      },
+      onlineBookings: {
+        title: "{count} online booking(s)",
+        subtitle: "Online bookings awaiting confirmation",
         viewBookings: "View bookings",
       },
       arrivalsExpected: "Expected arrivals",
