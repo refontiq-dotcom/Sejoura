@@ -16,6 +16,7 @@ import {
   ClipboardList,
   Store,
   IdCard,
+  DoorOpen,
 } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
@@ -42,6 +43,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
   { label: "Établissements", href: "/dashboard/residences", icon: Building2, roles: ["admin_residence"] },
+  { label: "Chambres", href: "/dashboard/rooms", icon: DoorOpen, roles: ["admin_residence", "receptionniste"] },
   { label: "Réservations", href: "/dashboard/bookings", icon: CalendarCheck, roles: ["admin_residence", "receptionniste"] },
   { label: "Suivi ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste"] },
   { label: "Mon Shift / Caisse", href: "/dashboard/shift", icon: ClipboardList, roles: ["receptionniste", "menagere"] },

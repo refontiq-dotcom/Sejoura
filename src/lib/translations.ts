@@ -22,6 +22,7 @@ export const translations = {
       navItems: [
         { label: "Tableau de bord", href: "/dashboard" },
         { label: "Établissements", href: "/dashboard/residences" },
+        { label: "Chambres", href: "/dashboard/rooms" },
         { label: "Réservations", href: "/dashboard/bookings" },
         { label: "Suivi ménage", href: "/dashboard/cleaning" },
         { label: "Mon Shift / Caisse", href: "/dashboard/shift" },
@@ -626,6 +627,7 @@ export const translations = {
       navItems: [
         { label: "Dashboard", href: "/dashboard" },
         { label: "Residences", href: "/dashboard/residences" },
+        { label: "Rooms", href: "/dashboard/rooms" },
         { label: "Bookings", href: "/dashboard/bookings" },
         { label: "Cleaning", href: "/dashboard/cleaning" },
         { label: "Accounting", href: "/dashboard/accounting" },
