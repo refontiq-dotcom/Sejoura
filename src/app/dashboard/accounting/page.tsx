@@ -1323,7 +1323,7 @@ export default function AccountingPage() {
       // Réservations pour les créances
       const { data: bkAll } = await supabase
         .from("bookings")
-        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date, accommodation_id")
+        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date, accommodation_id, tourist_tax_amount")
         .eq("tenant_id", tid)
         .order("check_in_date", { ascending: false })
         .limit(300);
@@ -1551,7 +1551,26 @@ export default function AccountingPage() {
   const cashOut = Math.abs(filteredPayments.filter((p) => p.amount < 0).reduce((s, p) => s + p.amount, 0));
   const totalExpenses = filteredExpenses.reduce((s, e) => s + e.amount, 0);
   const totalOutflows = totalExpenses + cashOut;
-  const netProfit = totalRevenue - totalOutflows;
+  // Taxe de nuitée collectée sur la période (informatif — à reverser à la
+  // mairie avant le 15 du mois suivant). Comptée une seule fois par
+  // réservation payée, même si plusieurs paiements partiels existent.
+  // Exclue du bénéfice net : cette somme n'appartient pas à l'établissement.
+  const touristTaxCollected = useMemo(() => {
+    const paidBookingIds = new Set(
+      filteredPayments.filter((p) => p.amount > 0 && p.booking_id).map((p) => p.booking_id as string)
+    );
+    let total = 0;
+    const seen = new Set<string>();
+    bookings.forEach((b) => {
+      if (paidBookingIds.has(b.id) && b.payment_status === "paid" && b.tourist_tax_amount && !seen.has(b.id)) {
+        seen.add(b.id);
+        total += b.tourist_tax_amount;
+      }
+    });
+    return total;
+  }, [filteredPayments, bookings]);
+
+  const netProfit = totalRevenue - totalOutflows - touristTaxCollected;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
   // Période précédente (comparaison)
@@ -2180,6 +2199,16 @@ export default function AccountingPage() {
               badge="Créances"
             />
           </div>
+
+          {touristTaxCollected > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                <strong>Taxe de nuitée collectée sur la période : {fmt(touristTaxCollected)}.</strong> À reverser au
+                trésorier municipal avant le 15 du mois suivant l&apos;encaissement. Ce montant est exclu du bénéfice
+                net ci-dessus, calculé pour le compte de la mairie.
+              </p>
+            </div>
+          )}
 
           {/* Répartition par mode de paiement */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-5 lg:gap-x-6 p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-[var(--shadow-sm)]">

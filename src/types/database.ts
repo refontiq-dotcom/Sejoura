@@ -246,6 +246,8 @@ export interface Accommodation {
   theme_color?: string | null;
   image_url?: string | null;
   guest_info?: GuestInfo | null;
+  tourist_tax_enabled?: boolean;
+  tourist_tax_rate?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -348,6 +350,7 @@ export interface Booking {
   booking_source: BookingSource;
   status: BookingStatus;
   number_of_guests: number;
+  tourist_tax_amount?: number;
   special_requests: string | null;
   is_overstay: boolean;
   overstay_detected_at: string | null;

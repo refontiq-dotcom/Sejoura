@@ -3345,6 +3345,20 @@ export default function BookingsPage() {
              <Input label="Nombre de clients" type="number" value={formData.number_of_guests} onChange={(e) => setFormData({ ...formData, number_of_guests: e.target.value })} placeholder="1" />
            </div>
 
+          {(() => {
+            const acc = accommodations.find((a) => a.id === formData.accommodation_id);
+            const nights = calculateNights(formData.check_in_date, formData.check_out_date);
+            if (!acc?.tourist_tax_enabled || !acc.tourist_tax_rate || nights <= 0) return null;
+            const guests = Math.max(parseInt(formData.number_of_guests) || 1, 1);
+            const taxAmount = acc.tourist_tax_rate * nights * guests;
+            return (
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-xs text-amber-700 dark:text-amber-300">
+                Taxe de nuitée à collecter : {fmt(acc.tourist_tax_rate)} × {nights} nuit(s) × {guests} client(s) ={" "}
+                <strong>{fmt(taxAmount)}</strong> (à reverser à la mairie, non comptée comme revenu)
+              </div>
+            );
+          })()}
+
            <div>
              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Moyen de paiement</label>
              <select

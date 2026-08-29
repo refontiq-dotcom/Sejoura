@@ -40,6 +40,8 @@ export default function ResidencesPage() {
     image_url: "",
     latitude: "",
     longitude: "",
+    tourist_tax_enabled: false,
+    tourist_tax_rate: "",
   });
 
   useEffect(() => {
@@ -126,6 +128,8 @@ export default function ResidencesPage() {
       image_url: "",
       latitude: "",
       longitude: "",
+      tourist_tax_enabled: false,
+      tourist_tax_rate: "",
     });
     setModalOpen(true);
   }
@@ -145,6 +149,8 @@ export default function ResidencesPage() {
       image_url: acc.image_url || "",
       latitude: acc.latitude != null ? acc.latitude.toString() : "",
       longitude: acc.longitude != null ? acc.longitude.toString() : "",
+      tourist_tax_enabled: acc.tourist_tax_enabled || false,
+      tourist_tax_rate: acc.tourist_tax_rate != null ? String(acc.tourist_tax_rate) : "",
     });
     setModalOpen(true);
   }
@@ -169,6 +175,10 @@ export default function ResidencesPage() {
   async function handleSave() {
     if (!formData.name) {
       toast.error("Le nom de l'établissement est requis.");
+      return;
+    }
+    if (formData.tourist_tax_enabled && !formData.tourist_tax_rate) {
+      toast.error("Indiquez le tarif de la taxe de nuitée, ou désactivez-la.");
       return;
     }
     setSaving(true);
@@ -198,6 +208,8 @@ export default function ResidencesPage() {
         image_url: formData.image_url || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+        tourist_tax_enabled: formData.tourist_tax_enabled,
+        tourist_tax_rate: formData.tourist_tax_enabled && formData.tourist_tax_rate ? Number(formData.tourist_tax_rate) : null,
       };
 
       const { error } = editingResidence
@@ -499,6 +511,37 @@ export default function ResidencesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Input label="Latitude (optionnel)" type="number" step="any" value={formData.latitude} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} placeholder="5.3453170" />
             <Input label="Longitude (optionnel)" type="number" step="any" value={formData.longitude} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} placeholder="-4.0082560" />
+          </div>
+
+          {/* Taxe de nuitée (annexe fiscale 2026) */}
+          <div className="rounded-xl border border-[var(--border)] p-3 space-y-2.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.tourist_tax_enabled}
+                onChange={(e) => setFormData({ ...formData, tourist_tax_enabled: e.target.checked })}
+                className="w-4 h-4 rounded accent-[var(--primary-color,#0C1C33)]"
+              />
+              <span className="text-sm font-semibold text-[var(--foreground)]">Taxe de nuitée (obligatoire depuis janvier 2026)</span>
+            </label>
+            {formData.tourist_tax_enabled && (
+              <>
+                <Input
+                  label="Tarif (FCFA par nuitée et par occupant)"
+                  type="number"
+                  min="0"
+                  value={formData.tourist_tax_rate}
+                  onChange={(e) => setFormData({ ...formData, tourist_tax_rate: e.target.value })}
+                  placeholder="1000"
+                />
+                <p className="text-[11px] text-[var(--foreground-subtle)] leading-relaxed">
+                  Barème légal indicatif — vérifiez le tarif exact de votre commune : résidences meublées, 500 FCFA
+                  (commune ≤ 20 000 habitants) ou 1000 FCFA (commune &gt; 20 000 habitants, y compris le District
+                  autonome d&apos;Abidjan). Séjoura calcule le montant automatiquement sur chaque réservation ; à vous
+                  de le reverser à la mairie avant le 15 du mois suivant.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">

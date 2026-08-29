@@ -448,6 +448,19 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
       .text(fmt(taxAmount), col3Right + padX, taxY, { width: totalW - padX * 2, align: "right" });
   }
 
+  // Taxe de nuitée (annexe fiscale 2026) : collectée pour le compte de la
+  // mairie, distincte de la TVA — affichée uniquement si l'établissement l'a
+  // activée. Ligne informative : n'affecte pas invoice.total_amount stocké
+  // (utilisé ailleurs pour le suivi des soldes de paiement).
+  const touristTaxAmount = booking.tourist_tax_amount || 0;
+  if (touristTaxAmount > 0) {
+    rowTop += 16;
+    const touristTaxY = rowTop + (12 - 9) / 2;
+    doc
+      .text("Taxe de nuitée", 352, touristTaxY, { width: 100, align: "right" })
+      .text(fmt(touristTaxAmount), col3Right + padX, touristTaxY, { width: totalW - padX * 2, align: "right" });
+  }
+
   // --- Total ---
   rowTop += 16;
   doc
@@ -464,7 +477,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .fillColor(textColor)
     .font("Helvetica-Bold")
     .text("TOTAL :", 352, totalY, { width: 100, align: "right" })
-    .text(fmt(invoice.total_amount), col3Right + padX, totalY, { width: totalW - padX * 2, align: "right" });
+    .text(fmt((invoice.total_amount || 0) + touristTaxAmount), col3Right + padX, totalY, { width: totalW - padX * 2, align: "right" });
 
   // ==========================================================================
   // STATUT DU PAIEMENT
@@ -483,9 +496,10 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .font("Helvetica-Bold")
     .text(`Statut du paiement : ${paymentStatusLabel}`, 60, y);
 
-  // Synthèse du règlement : montant payé et reste à payer
+  // Synthèse du règlement : montant payé et reste à payer (inclut la taxe
+  // de nuitée, puisqu'elle est réglée par le client en même temps).
   const paidAmount = Math.max(0, booking.amount_paid || 0);
-  const balance = Math.max(0, (invoice.total_amount || 0) - paidAmount);
+  const balance = Math.max(0, (invoice.total_amount || 0) + touristTaxAmount - paidAmount);
 
   doc
     .fontSize(9)
