@@ -17,6 +17,7 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { useOnlineBookingBadge } from "@/hooks/use-online-booking-badge";
 import { NotificationsProvider } from "@/contexts/notifications-context";
+import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 import type { User, Accommodation } from "@/types/database";
@@ -583,7 +584,16 @@ export default function DashboardLayout({
             className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
           >
             <div key={pathname} className="animate-page-enter">
-              {children}
+              <CurrentUserProvider
+                value={{
+                  user,
+                  tenantId: user.tenant_id ?? "",
+                  plan,
+                  loading: false,
+                }}
+              >
+                {children}
+              </CurrentUserProvider>
             </div>
           </main>
         </div>

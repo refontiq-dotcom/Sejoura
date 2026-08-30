@@ -38,6 +38,7 @@ import { SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import type { Tenant, User as UserType, GuestInfo } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 import { IdeaBoxSection } from "@/components/dashboard/idea-box";
 import { GuestInfoEditor } from "@/components/dashboard/guest-info-editor";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -63,6 +64,7 @@ export default function SettingsPage() {
   const [logoError, setLogoError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const { user: contextUser } = useCurrentUser();
   const [user, setUser] = useState<UserType | null>(null);
   const [activeSection, setActiveSection] = useState(() => {
     if (typeof window !== "undefined") {
@@ -125,16 +127,13 @@ export default function SettingsPage() {
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // L'utilisateur et le tenant viennent désormais du contexte partagé
+      // (déjà chargés par le layout) — plus besoin de revérifier la
+      // session ni de rappeler la table users ici.
+      if (!contextUser) return;
+      const userData = contextUser;
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, auth_user_id, full_name, phone, email, role, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .maybeSingle();
-
-        if (userData) {
+        {
          setUser(userData as unknown as UserType);
          setAccountForm({
            full_name: userData.full_name || "",
@@ -199,7 +198,7 @@ export default function SettingsPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [contextUser]);
 
   // Set employee login link after mount to avoid hydration mismatch
   useEffect(() => {

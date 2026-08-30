@@ -41,6 +41,7 @@ import {
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { isMobileMoney, getMobileMoneyOperatorLabel, MOBILE_MONEY_OPERATORS } from "@/lib/utils";
 import type { Payment, Booking, Shift } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 interface ShiftPayment extends Payment {
   booking?: {
@@ -95,11 +96,11 @@ export default function ShiftPage() {
   const router = useRouter();
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("");
-  const [userId, setUserId] = useState("");
-  const [tenantId, setTenantId] = useState("");
+  const { user, tenantId } = useCurrentUser();
+  const userName = user?.full_name || "";
+  const userId = user?.id || "";
   const [accommodationId, setAccommodationId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = user?.role === "admin_residence";
   const [payments, setPayments] = useState<ShiftPayment[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
@@ -153,25 +154,16 @@ export default function ShiftPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tenantId]);
 
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push("/"); return; }
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, full_name, role, tenant_id, accommodation_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData) return;
-      setUserName(userData.full_name);
-      setUserId(userData.id);
-      setTenantId(userData.tenant_id);
-      setIsAdmin(userData.role === "admin_residence");
+      // userId, tenantId et rôle viennent désormais du contexte partagé
+      // (déjà chargés par le layout, qui redirige déjà vers "/" si non
+      // connecté — plus besoin de revérifier la session ici).
+      if (!user || !tenantId) return;
+      const userData = user;
 
       const isReceptionist = userData.role === "receptionniste";
       const isAdminUser = userData.role === "admin_residence";
@@ -182,7 +174,7 @@ export default function ShiftPage() {
         const { data: shiftData } = await supabase
           .from("shifts")
           .select("*")
-          .eq("tenant_id", userData.tenant_id)
+          .eq("tenant_id", tenantId)
           .eq("receptionist_id", userData.id)
           .eq("status", "open")
           .order("opened_at", { ascending: false })
@@ -198,7 +190,7 @@ export default function ShiftPage() {
       const { data: closedData } = await supabase
         .from("shifts")
         .select("*")
-        .eq("tenant_id", userData.tenant_id)
+        .eq("tenant_id", tenantId)
         .eq("status", "closed")
         .order("closed_at", { ascending: false })
         .limit(15);
@@ -209,7 +201,7 @@ export default function ShiftPage() {
       const { data: staffData } = await supabase
         .from("users")
         .select("id, full_name")
-        .eq("tenant_id", userData.tenant_id);
+        .eq("tenant_id", tenantId);
       if (staffData) {
         staffData.forEach((u: { id: string; full_name: string }) => { staffMap[u.id] = u.full_name; });
         setStaffNames(staffMap);

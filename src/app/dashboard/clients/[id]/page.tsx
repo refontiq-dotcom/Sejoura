@@ -30,6 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { ClientProfilePayload, ClientProfileSignal } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 type BookingRow = {
   id: string;
@@ -82,39 +83,24 @@ export default function ClientProfilePage() {
   const [loading, setLoading] = useState(true);
   const [payload, setPayload] = useState<ClientProfilePayload | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-  const [tenantId, setTenantId] = useState("");
+  const { tenantId, plan } = useCurrentUser();
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   // Fiche intelligente réservée à la formule Entreprise
   const [locked, setLocked] = useState(false);
 
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !tenantId) return;
 
     async function load() {
       setLoading(true);
       try {
         const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          router.push("/");
-          return;
-        }
-
-        const { data: userData } = await supabase
-          .from("users")
-          .select("tenant_id")
-          .eq("auth_user_id", session.user.id)
-          .single();
-        if (!userData?.tenant_id) return;
-        setTenantId(userData.tenant_id);
+        // tenantId et plan viennent désormais du contexte partagé (déjà
+        // chargés par le layout) — plus besoin de revérifier la session
+        // ni de rappeler users/subscriptions ici.
 
         // Contrôle d'accès : la fiche intelligente est réservée à Entreprise
-        const { data: subData } = await supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("tenant_id", userData.tenant_id)
-          .maybeSingle();
-        if (!canAccessFeature("clientSmartProfile", subData?.plan)) {
+        if (!canAccessFeature("clientSmartProfile", plan)) {
           setLocked(true);
           setLoading(false);
           return;
@@ -162,7 +148,7 @@ export default function ClientProfilePage() {
 
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [clientId, tenantId, plan]);
 
   const profile = payload?.profile ?? null;
   const client = payload?.client ?? null;

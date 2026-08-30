@@ -71,6 +71,7 @@ import { canAccessFeature } from "@/lib/subscription-plans";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -214,10 +215,8 @@ export default function BookingsPage() {
   // Réservation dont une action (check-in/check-out) est en cours : permet de
   // désactiver le bouton principal et le menu pour éviter les doubles clics.
   const [actioningId, setActioningId] = useState<string>("");
-  const [tenantId, setTenantId] = useState<string>("");
-  const [userId, setUserId] = useState<string>("");
-  // Formule d'abonnement : contrôle l'accès à l'espace client (Entreprise uniquement)
-  const [plan, setPlan] = useState("free");
+  const { user, tenantId, plan } = useCurrentUser();
+  const userId = user?.id || "";
   const [portalUpsell, setPortalUpsell] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   // Filtre de résidence appliqué au rechargement des réservations (réceptionniste
@@ -421,26 +420,10 @@ export default function BookingsPage() {
   async function loadInitData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id, role, accommodation_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData) return;
-      setTenantId(userData.tenant_id);
-      setUserId(userData.id);
-
-      // Formule d'abonnement (gating espace client Entreprise)
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .maybeSingle();
-      if (subData) setPlan(subData.plan);
+      // tenantId, userId et plan viennent désormais du contexte partagé
+      // (déjà chargés par le layout) — plus besoin de revérifier la session.
+      if (!tenantId || !user) return;
+      const userData = user;
 
       // Résoudre l'affectation active (temporaire ou permanente) pour l'utilisateur
       const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
@@ -463,7 +446,7 @@ export default function BookingsPage() {
 
       // Scores de réputation (vue client_profiles) pour le badge du drawer —
       // réservé à la formule Entreprise.
-      const hasClientProfiles = canAccessFeature("clientSmartProfile", subData?.plan);
+      const hasClientProfiles = canAccessFeature("clientSmartProfile", plan);
       setHasClientProfiles(hasClientProfiles);
       if (hasClientProfiles) {
         const { data: profileData } = await supabase
@@ -488,9 +471,9 @@ export default function BookingsPage() {
         userData.role === "receptionniste" ? (activeAccId ?? "all") : (activeAccommodationId ?? "all")
       );
       await runOverstayCheck();
-      await loadBookings(userData.tenant_id, accommodationFilterRef.current);
-      await loadInvoices(userData.tenant_id);
-      await loadExtensionRequests(userData.tenant_id);
+      await loadBookings(tenantId, accommodationFilterRef.current);
+      await loadInvoices(tenantId);
+      await loadExtensionRequests(tenantId);
     } catch (err) {
       toast.error("Oups, les données n'ont pas pu se charger... Réessayez 🔄");
       console.error(err);

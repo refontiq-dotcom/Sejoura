@@ -13,12 +13,14 @@ import { formatAmount, getPlanLimits, getPlanLabel } from "@/lib/utils";
 import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 export default function ResidencesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const { user, tenantId, plan } = useCurrentUser();
+  const isReadOnly = user?.role === "receptionniste";
   const [residences, setResidences] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType[]>>({});
   const [roomsCount, setRoomsCount] = useState<Record<string, number>>({});
@@ -26,7 +28,6 @@ export default function ResidencesPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingResidence, setEditingResidence] = useState<Accommodation | null>(null);
-  const [plan, setPlan] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -46,35 +47,25 @@ export default function ResidencesPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   async function loadData(silent = false) {
     if (!silent) setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // tenantId, role et plan viennent désormais du contexte partagé
+      // (déjà chargés par le layout) — plus besoin de revérifier la
+      // session ni de rappeler la table users ici.
+      if (!tenantId) return;
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("tenant_id, role")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData?.tenant_id) return;
-
-      setIsReadOnly(userData.role === "receptionniste");
-
-      const [subResult, accResult] = await Promise.all([
-        supabase.from("subscriptions").select("plan").eq("tenant_id", userData.tenant_id).single(),
+      const [accResult] = await Promise.all([
         supabase
           .from("accommodations")
           .select("*")
-          .eq("tenant_id", userData.tenant_id)
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false }),
       ]);
-
-      if (subResult.data) setPlan(subResult.data.plan);
 
       const accData = accResult.data;
       if (accData) {
@@ -184,16 +175,8 @@ export default function ResidencesPage() {
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData?.tenant_id) return;
+      // tenantId vient désormais du contexte partagé.
+      if (!tenantId) return;
 
       const payload = {
         name: formData.name,
@@ -214,7 +197,7 @@ export default function ResidencesPage() {
 
       const { error } = editingResidence
         ? await supabase.from("accommodations").update(payload).eq("id", editingResidence.id)
-        : await supabase.from("accommodations").insert({ ...payload, tenant_id: userData.tenant_id });
+        : await supabase.from("accommodations").insert({ ...payload, tenant_id: tenantId });
       if (error) throw error;
 
       setModalOpen(false);

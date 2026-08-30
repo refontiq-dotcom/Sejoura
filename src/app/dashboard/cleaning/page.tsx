@@ -48,6 +48,7 @@ import {
   Sparkle,
 } from "lucide-react";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 type TaskWithRelations = CleaningTask & { room?: Room; accommodation?: Accommodation };
 type StatusFilter = "all" | "pending" | "active" | "done" | "expired" | "alert";
@@ -100,13 +101,12 @@ export default function CleaningPage() {
   const t = (translations[lang] ?? translations["fr"]).cleaning;
 
   const [loading, setLoading] = useState(true);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, tenantId, plan } = useCurrentUser();
+  const userId = user?.id || "";
+  const isReadOnly = user?.role === "receptionniste" || user?.role === "admin_residence";
+  const isAdmin = user?.role === "admin_residence";
   const [tasks, setTasks] = useState<TaskWithRelations[]>([]);
   const [maidNames, setMaidNames] = useState<Record<string, string>>({});
-  const [userId, setUserId] = useState("");
-  const [tenantId, setTenantId] = useState("");
-  const [plan, setPlan] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [accFilter, setAccFilter] = useState<string>("all");
@@ -132,7 +132,8 @@ export default function CleaningPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // Suit la résidence active (sélecteur du header) : le filtre de résidence
   // suit automatiquement tant que l'utilisateur n'a pas choisi une valeur
@@ -145,27 +146,10 @@ export default function CleaningPage() {
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id, role, accommodation_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData) return;
-      setUserId(userData.id);
-      setTenantId(userData.tenant_id);
-      setIsReadOnly(userData.role === "receptionniste" || userData.role === "admin_residence");
-      setIsAdmin(userData.role === "admin_residence");
-
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
+      // userId, tenantId, rôle et plan viennent désormais du contexte
+      // partagé (déjà chargés par le layout).
+      if (!tenantId || !user) return;
+      const userData = user;
 
       const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
 
@@ -176,7 +160,7 @@ export default function CleaningPage() {
           room:rooms(*),
           accommodation:accommodations(*)
         `)
-        .eq("tenant_id", userData.tenant_id)
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false });
 
       if (activeAccId && userData.role !== "admin_residence") {

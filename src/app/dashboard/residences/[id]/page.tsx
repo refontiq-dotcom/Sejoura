@@ -12,6 +12,7 @@ import { formatAmount, getRoomStatusLabel, getRoomStatusColor } from "@/lib/util
 import { ROOM_AMENITIES } from "@/lib/amenities";
 import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, ImagePlus, Store, Check, X } from "lucide-react";
 import type { Accommodation, RoomType, Room } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 export default function ResidenceDetailPage() {
   const params = useParams();
@@ -20,7 +21,8 @@ export default function ResidenceDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const { user, tenantId } = useCurrentUser();
+  const isReadOnly = user?.role === "receptionniste";
   const [residence, setResidence] = useState<Accommodation | null>(null);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -43,34 +45,21 @@ export default function ResidenceDetailPage() {
   useEffect(() => {
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [residenceId]);
+  }, [residenceId, tenantId]);
 
   async function loadData(silent = false) {
     if (!silent) setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = "/";
-        return;
-      }
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("tenant_id, role")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData?.tenant_id) return;
-
-      // Mode lecture seule pour les réceptionnistes
-      setIsReadOnly(userData.role === "receptionniste");
+      // tenantId et role viennent désormais du contexte partagé (déjà
+      // chargés par le layout) — plus besoin de revérifier la session ici.
+      if (!tenantId) return;
 
       const { data: accData } = await supabase
         .from("accommodations")
         .select("*")
         .eq("id", residenceId)
-        .eq("tenant_id", userData.tenant_id)
+        .eq("tenant_id", tenantId)
         .single();
 
       if (!accData) {

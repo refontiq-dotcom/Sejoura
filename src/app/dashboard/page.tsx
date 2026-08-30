@@ -50,6 +50,7 @@ import { createClient } from "@/lib/supabase/client";
 import { DashboardSkeletons } from "@/components/ui/skeletons";
 import { AlertCircle, PlusCircle, RefreshCw, Plus } from "lucide-react";
 import type { Booking, Client, Room, RoomType } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 // ============================================================================
 // TYPES
@@ -779,9 +780,9 @@ export default function DashboardPage() {
   const [roomStatusData, setRoomStatusData] = useState<RoomStatusData[]>([]);
   const [monthlyRevenue, setMonthlyRevenue] = useState<MonthlyRevenueData[]>([]);
   const [trendPercentage, setTrendPercentage] = useState(0);
-  const [userId, setUserId] = useState<string>("");
-  const [userRole, setUserRole] = useState<string>("");
-  const [tenantId, setTenantId] = useState<string>("");
+  const { user, tenantId } = useCurrentUser();
+  const userId = user?.id || "";
+  const userRole = user?.role || "";
   const [actionLoading, setActionLoading] = useState<string>("");
   const [hasAccommodations, setHasAccommodations] = useState(true);
   const [error, setError] = useState(false);
@@ -809,45 +810,24 @@ export default function DashboardPage() {
     setError(false);
     try {
         const supabase = createClient();
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          throw new Error(sessionError.message || "Erreur de session Supabase");
-        }
-        if (!sessionData?.session) {
-          if (!isSilent) setLoading(false);
-          return;
-        }
 
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("id, tenant_id, role")
-          .eq("auth_user_id", sessionData.session.user.id)
-          .maybeSingle();
-
-        if (userError || !userData?.tenant_id) {
-          // Après l'étape 2 (onboarding), le profil peut prendre quelques secondes
-          // à être visible côté client après la création par service_role.
-          // On retry en silence sans bloquer l'utilisateur.
+        // tenantId vient désormais du contexte partagé (déjà chargé par le
+        // layout) — plus besoin de revérifier la session ni de rappeler la
+        // table users ici. S'il n'est pas encore disponible (onboarding en
+        // cours), on retente en silence, comme avant.
+        if (!tenantId) {
           if (!isSilent && loadRetriesRef.current < 10) {
             loadRetriesRef.current += 1;
             const delay = 1000 + loadRetriesRef.current * 500;
             setTimeout(() => loadDashboardData(false, date), delay);
             return;
           }
-          // Après tous les retries, afficher le dashboard vide (plan free)
-          // au lieu d'un écran d'erreur bloquant.
-          console.warn("loadDashboardData: user data not available after retries, showing empty dashboard");
-          // Afficher le dashboard vide sans données utilisateur
+          console.warn("loadDashboardData: tenantId not available after retries, showing empty dashboard");
           setHasAccommodations(false);
           if (!isSilent) setLoading(false);
           return;
         }
 
-        setUserId(userData.id);
-        setUserRole(userData.role || "");
-        setTenantId(userData.tenant_id);
-
-        const tenantId = userData.tenant_id;
         const now = new Date();
         const today = toLocalISODate(now);
         const targetDate = date || today;
@@ -1209,7 +1189,7 @@ export default function DashboardPage() {
       } finally {
         if (!isSilent) setLoading(false);
       }
-  }, [activeAccommodationId, lang]);
+  }, [activeAccommodationId, lang, tenantId]);
 
   useEffect(() => {
     let cancelled = false;

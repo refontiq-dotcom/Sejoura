@@ -27,6 +27,7 @@ import Link from "next/link";
 import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 
 // ── Actions d'audit : emojis + labels FR + couleurs + catégories ──
@@ -1001,9 +1002,8 @@ export default function AccountingPage() {
   const [usersById, setUsersById] = useState<Record<string, string>>({});
   const [rolesById, setRolesById] = useState<Record<string, string>>({});
 
-  const [tenantId, setTenantId] = useState("");
-  const [userId, setUserId] = useState("");
-  const [plan, setPlan] = useState("standard");
+  const { user, tenantId, plan } = useCurrentUser();
+  const userId = user?.id || "";
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [preset, setPreset] = useState<PeriodKey>("month");
@@ -1061,7 +1061,8 @@ export default function AccountingPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // Suit la résidence active : les dépenses se refiltrent automatiquement
   // tant que l'utilisateur n'a pas choisi une résidence explicite.
@@ -1106,27 +1107,11 @@ export default function AccountingPage() {
   async function loadData(accId?: string) {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // tenantId, userId et plan viennent désormais du contexte partagé
+      // (déjà chargés par le layout) — plus besoin de revérifier la session.
+      if (!tenantId) return;
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData) return;
-      setUserId(userData.id);
-      setTenantId(userData.tenant_id);
-
-      const { data: subData } = await supabase
-        .from("subscriptions")
-        .select("plan")
-        .eq("tenant_id", userData.tenant_id)
-        .single();
-      if (subData) setPlan(subData.plan);
-
-      const tid = userData.tenant_id;
+      const tid = tenantId;
 
       const [exp, pay, log, inv, acc, usersRes] = await Promise.all([
         (() => {

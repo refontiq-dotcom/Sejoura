@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { EmployeesSkeleton } from "@/components/ui/skeletons";
 import { getRoleLabel, getPlanLimits, canAccessPlanFeature, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
+import { useCurrentUser } from "@/contexts/current-user-context";
 import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal, IdCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
@@ -19,14 +20,13 @@ type TempAssignmentMap = Record<string, { accommodation_id: string; end_date: st
 
 export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
-  const [currentAdminId, setCurrentAdminId] = useState("");
+  const { user, tenantId, plan } = useCurrentUser();
+  const currentAdminId = user?.id || "";
   const [employees, setEmployees] = useState<User[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [tempAssignments, setTempAssignments] = useState<TempAssignmentMap>({});
   const [hrLinkedUserIds, setHrLinkedUserIds] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
-  const [tenantId, setTenantId] = useState("");
-  const [plan, setPlan] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterAcc, setFilterAcc] = useState("all");
@@ -49,57 +49,43 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData) return;
-      setTenantId(userData.tenant_id);
-      setCurrentAdminId(userData.id);
+      // tenantId, currentAdminId et plan viennent désormais du contexte
+      // partagé (déjà chargés par le layout) — plus besoin de revérifier
+      // la session ni de rappeler la table users ici.
+      if (!tenantId) return;
 
       // Whitelist de colonnes : password_hash / auth_user_id / pin_code ne doivent
       // jamais quitter le serveur. Les requêtes sont parallélisées.
-      const [subData, accData, empData] = await Promise.all([
-        supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("tenant_id", userData.tenant_id)
-          .maybeSingle()
-          .then((r) => r.data),
+      const [accData, empData] = await Promise.all([
         supabase
           .from("accommodations")
           .select("id, name, city, tenant_id")
-          .eq("tenant_id", userData.tenant_id)
+          .eq("tenant_id", tenantId)
           .order("name")
           .then((r) => r.data),
         supabase
           .from("users")
           .select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active, created_at")
-          .eq("tenant_id", userData.tenant_id)
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .then((r) => r.data),
       ]);
 
-      if (subData) setPlan(subData.plan);
       if (accData) setAccommodations(accData as unknown as Accommodation[]);
 
       // Dossiers RH déjà liés à un compte — pour afficher le badge et éviter
       // de proposer deux fois le même compte au moment de lier un dossier.
-      if (canAccessPlanFeature(subData?.plan || "free", "hrModule")) {
+      if (canAccessPlanFeature(plan || "free", "hrModule")) {
         const { data: hrData } = await supabase
           .from("hr_employees")
           .select("user_id")
-          .eq("tenant_id", userData.tenant_id)
+          .eq("tenant_id", tenantId)
           .not("user_id", "is", null);
         if (hrData) setHrLinkedUserIds(new Set(hrData.map((r: { user_id: string }) => r.user_id)));
       }

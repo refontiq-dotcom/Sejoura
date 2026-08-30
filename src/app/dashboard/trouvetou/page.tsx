@@ -38,6 +38,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useCurrency } from "@/hooks/use-currency";
 import { getPlanPrice } from "@/lib/subscription-plans";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 // ─── Types locaux ──────────────────────────────────────────────────────────────
 
@@ -713,7 +714,7 @@ export default function TrouvetouDashboardPage() {
   const [plan, setPlan]                 = useState<string>("standard");
   const [isEnterprisePlan, setIsEnterprisePlan] = useState<boolean>(false);
   const [isExpressEligiblePlan, setIsEssentielPlan]   = useState<boolean>(false);
-  const [tenantId, setTenantId]         = useState<string>("");
+  const { tenantId } = useCurrentUser();
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [types, setTypes]               = useState<RoomTypeListing[]>([]);
   const [metrics, setMetrics]           = useState({ totalTrouvetouBookings: 0, totalTrouvetouRevenue: 0 });
@@ -732,7 +733,7 @@ export default function TrouvetouDashboardPage() {
   // État d'erreur de chargement (avec bouton Réessayer)
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [tenantId]);
 
   async function getAccessToken(): Promise<string | null> {
     const supabase = createClient();
@@ -745,25 +746,20 @@ export default function TrouvetouDashboardPage() {
     setLoadError(null);
     try {
       const supabase = createClient();
+      // tenantId vient désormais du contexte partagé (déjà chargé par le
+      // layout) — seul le token d'accès (pour l'en-tête Authorization de
+      // l'appel API) nécessite encore une lecture de la session locale.
+      if (!tenantId) {
+        setLoadError("Aucun établissement associé à votre compte.");
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setLoadError("Session expirée. Reconnectez-vous pour accéder à votre vitrine.");
         return;
       }
 
-      const { data: user } = await supabase
-        .from("users")
-        .select("tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!user?.tenant_id) {
-        setLoadError("Aucun établissement associé à votre compte.");
-        return;
-      }
-      setTenantId(user.tenant_id);
-
-      const res = await fetch(`/api/v1/trouvetou/listings?tenantId=${user.tenant_id}`, {
+      const res = await fetch(`/api/v1/trouvetou/listings?tenantId=${tenantId}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json();

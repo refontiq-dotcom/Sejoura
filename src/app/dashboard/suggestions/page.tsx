@@ -20,6 +20,7 @@ import type {
   FeatureRequestImpact,
   FeatureRequestStatus,
 } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 import {
   ArrowBigUp,
   Building2,
@@ -71,7 +72,8 @@ export default function SuggestionsPage() {
 
   const [ideas, setIdeas] = useState<EnrichedIdea[]>([]);
   const [loading, setLoading] = useState(true);
-  const [myUserId, setMyUserId] = useState("");
+  const { user, tenantId } = useCurrentUser();
+  const myUserId = user?.id || "";
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [syncingVotes, setSyncingVotes] = useState<Set<string>>(new Set());
 
@@ -89,19 +91,9 @@ export default function SuggestionsPage() {
   const loadData = useCallback(async () => {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = LOGIN_ROUTE;
-        return;
-      }
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_user_id", session.user.id)
-        .maybeSingle();
-      const currentUserId = userData?.id || "";
-      setMyUserId(currentUserId);
+      // myUserId vient désormais du contexte partagé (déjà chargé par le
+      // layout, qui redirige déjà vers la connexion si nécessaire).
+      const currentUserId = myUserId;
 
       const [{ data: ideaData }, { data: voteData }, { data: tenantData }, { data: authorData }] =
         await Promise.all([
@@ -131,7 +123,7 @@ export default function SuggestionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [myUserId]);
 
   // Temps réel : nouvelles idées et changements de statut se reflètent en direct.
   useEffect(() => {
@@ -282,18 +274,9 @@ export default function SuggestionsPage() {
     setSubmitting(true);
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Session expirée. Reconnectez-vous 🔐");
-        return;
-      }
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .maybeSingle();
-      if (!userData?.tenant_id || !userData.id) {
+      // tenantId et myUserId viennent désormais du contexte partagé (déjà
+      // chargés par le layout) — plus besoin de revérifier la session ici.
+      if (!tenantId || !myUserId) {
         toast.error("Impossible d’identifier votre compte.");
         return;
       }
@@ -304,8 +287,8 @@ export default function SuggestionsPage() {
       const { data: inserted, error } = await supabase
         .from("feature_requests")
         .insert({
-          tenant_id: userData.tenant_id,
-          created_by: userData.id,
+          tenant_id: tenantId,
+          created_by: myUserId,
           title: trimmedTitle,
           description: trimmedDescription,
           category,

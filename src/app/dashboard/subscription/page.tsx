@@ -25,6 +25,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import type { Subscription } from "@/types/database";
+import { useCurrentUser } from "@/contexts/current-user-context";
 
 // Icône stylisée de l'application Wave (bloc bleu + W)
 function WaveIcon({ className = "" }: { className?: string }) {
@@ -43,6 +44,7 @@ function WaveIcon({ className = "" }: { className?: string }) {
 export default function SubscriptionPage() {
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
+  const { tenantId } = useCurrentUser();
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [pendingRequest, setPendingRequest] = useState<{ plan: string } | null>(null);
   const [confirmPlan, setConfirmPlan] = useState<string | null>(null);
@@ -55,28 +57,21 @@ export default function SubscriptionPage() {
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: userData } = await supabase
-        .from("users")
-        .select("tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-
-      if (!userData?.tenant_id) return;
+      // tenantId vient désormais du contexte partagé (déjà chargé par le
+      // layout) — plus besoin de revérifier la session ici.
+      if (!tenantId) return;
 
       const { data: subData } = await supabase
         .from("subscriptions")
         .select("*")
-        .eq("tenant_id", userData.tenant_id)
+        .eq("tenant_id", tenantId)
         .single();
       if (subData) setSubscription(subData as unknown as Subscription);
 
       const { data: reqData } = await supabase
         .from("subscription_payment_requests")
         .select("id, plan")
-        .eq("tenant_id", userData.tenant_id)
+        .eq("tenant_id", tenantId)
         .eq("status", "pending")
         .maybeSingle();
       setPendingRequest((reqData as { plan: string } | null) ?? null);
@@ -91,7 +86,8 @@ export default function SubscriptionPage() {
   useEffect(() => {
     const t = setTimeout(loadData, 0);
     return () => clearTimeout(t);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   function openPayment(plan: string) {
     setSenderPhone("");

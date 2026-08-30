@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { TableSkeleton } from "@/components/ui/skeletons";
 import { formatDate, canAccessPlanFeature, getRoleLabel, translateRpcError } from "@/lib/utils";
+import { useCurrentUser } from "@/contexts/current-user-context";
 import {
   IdCard,
   Plus,
@@ -71,9 +72,8 @@ const EMPTY_FORM = {
 function HrPageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [tenantId, setTenantId] = useState("");
-  const [currentUserId, setCurrentUserId] = useState("");
-  const [plan, setPlan] = useState("");
+  const { user, tenantId, plan } = useCurrentUser();
+  const currentUserId = user?.id || "";
   const [records, setRecords] = useState<HrEmployee[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
   const [systemAccounts, setSystemAccounts] = useState<User[]>([]);
@@ -94,7 +94,7 @@ function HrPageContent() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tenantId]);
 
   // Pré-remplissage depuis la page Employés ("Créer le dossier RH") — une
   // seule fois, pour ne pas rouvrir le formulaire après un enregistrement.
@@ -113,27 +113,17 @@ function HrPageContent() {
   async function loadData() {
     try {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // tenantId, currentUserId et plan viennent désormais du contexte
+      // partagé (déjà chargés par le layout) — plus besoin de revérifier
+      // la session ni de rappeler la table users ici.
+      if (!tenantId) return;
 
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id, tenant_id")
-        .eq("auth_user_id", session.user.id)
-        .single();
-      if (!userData) return;
-
-      setTenantId(userData.tenant_id);
-      setCurrentUserId(userData.id);
-
-      const [subRes, accRes, hrRes, usersRes] = await Promise.all([
-        supabase.from("subscriptions").select("plan").eq("tenant_id", userData.tenant_id).maybeSingle(),
-        supabase.from("accommodations").select("id, name, city, tenant_id").eq("tenant_id", userData.tenant_id).order("name"),
-        supabase.from("hr_employees").select("*").eq("tenant_id", userData.tenant_id).order("created_at", { ascending: false }),
-        supabase.from("users").select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active").eq("tenant_id", userData.tenant_id).order("full_name"),
+      const [accRes, hrRes, usersRes] = await Promise.all([
+        supabase.from("accommodations").select("id, name, city, tenant_id").eq("tenant_id", tenantId).order("name"),
+        supabase.from("hr_employees").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }),
+        supabase.from("users").select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active").eq("tenant_id", tenantId).order("full_name"),
       ]);
 
-      if (subRes.data) setPlan(subRes.data.plan);
       if (accRes.data) setAccommodations(accRes.data as unknown as Accommodation[]);
       if (hrRes.data) setRecords(hrRes.data as unknown as HrEmployee[]);
       if (usersRes.data) setSystemAccounts(usersRes.data as unknown as User[]);
