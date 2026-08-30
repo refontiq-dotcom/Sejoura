@@ -8,7 +8,6 @@ import { ADMIN_LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
 const ADMIN_ONLY_ROUTES = [
   "/dashboard/accounting",
   "/dashboard/employees",
-  "/dashboard/settings",
   "/dashboard/subscription",
   "/dashboard/residences", // Liste des résidences (le détail /dashboard/residences/[id] reste accessible aux réceptionnistes)
 ];
@@ -20,6 +19,8 @@ const EMPLOYEE_ALLOWED_ROUTES = [
   "/dashboard/cleaning", // Ménage
   "/dashboard/shift", // Shift / Caisse
   "/dashboard/residences/", // Détail d'une résidence (avec chambres)
+  "/dashboard/rooms", // Gestion des chambres
+  "/dashboard/settings", // Paramètres (sections limitées pour réceptionnistes)
 ];
 
 function isAdminOnlyRoute(pathname: string): boolean {

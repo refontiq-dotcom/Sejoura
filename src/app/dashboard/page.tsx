@@ -16,9 +16,10 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   X,
   Phone,
   Mail,
@@ -27,6 +28,9 @@ import {
   User,
   Info,
   Globe,
+  Calendar,
+  Loader2,
+  XCircle,
 } from "lucide-react";
 import {
   getPaymentStatusLabel,
@@ -785,6 +789,18 @@ export default function DashboardPage() {
   const dashboardLoadedRef = useRef(false);
   const [overstayCount, setOverstayCount] = useState(0);
   const [onlineBookingCount, setOnlineBookingCount] = useState(0);
+  const [overstayBookings, setOverstayBookings] = useState<Array<{
+    id: string; bookingCode: string; clientName: string; roomNumber: string;
+    accommodationName: string; checkOutDate: string; daysOverdue: number;
+  }>>([]);
+  const [onlineBookingsList, setOnlineBookingsList] = useState<Array<{
+    id: string; bookingCode: string; clientName: string; roomNumber: string;
+    accommodationName: string; checkInDate: string; checkOutDate: string;
+    totalAmount: number; numberOfGuests: number; createdAt: string;
+  }>>([]);
+  const [overstayExpanded, setOverstayExpanded] = useState(false);
+  const [onlineExpanded, setOnlineExpanded] = useState(false);
+  const [bannerActionLoading, setBannerActionLoading] = useState<string>("");
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
 
@@ -1013,18 +1029,38 @@ export default function DashboardPage() {
         {
           let overstayQuery = supabase
             .from("bookings")
-            .select("id, status, check_out_date, check_out_time, is_overstay")
+            .select(`
+              id, booking_code, status, check_out_date, check_out_time, is_overstay,
+              client:clients(full_name),
+              room:rooms(room_number, accommodation:accommodations(name))
+            `)
             .eq("tenant_id", tenantId)
             .eq("status", "checked_in");
           if (activeAccommodationId) {
             overstayQuery = overstayQuery.eq("accommodation_id", activeAccommodationId);
           }
           const overstayData = await overstayQuery;
-          setOverstayCount(
-            (overstayData.data || []).filter(
-              (b) => b.is_overstay || isBookingOverdue(b)
-            ).length
-          );
+          const todayMs = new Date().getTime();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const overdue = (overstayData.data || [] as any[]).filter(
+            (b: any) => b.is_overstay || isBookingOverdue({ status: b.status, check_out_date: b.check_out_date, check_out_time: b.check_out_time })
+          ).map((b: any) => {
+            const checkoutMs = new Date(b.check_out_date).getTime();
+            const daysOverdue = Math.max(1, Math.floor((todayMs - checkoutMs) / 86400000));
+            const room = b.room as { room_number?: string; accommodation?: { name?: string } } | null;
+            const client = b.client as { full_name?: string } | null;
+            return {
+              id: b.id as string,
+              bookingCode: b.booking_code as string,
+              clientName: client?.full_name || "—",
+              roomNumber: room?.room_number || "—",
+              accommodationName: room?.accommodation?.name || "",
+              checkOutDate: b.check_out_date as string,
+              daysOverdue: daysOverdue || 1,
+            };
+          });
+          setOverstayBookings(overdue);
+          setOverstayCount(overdue.length);
         }
 
         // Nombre de réservations en ligne (booking_source = 'external') en
@@ -1032,7 +1068,11 @@ export default function DashboardPage() {
         {
           let onlineQuery = supabase
             .from("bookings")
-            .select("id", { count: "exact", head: true })
+            .select(`
+              id, booking_code, check_in_date, check_out_date, total_amount, number_of_guests, created_at,
+              client:clients(full_name),
+              room:rooms(room_number, accommodation:accommodations(name))
+            `)
             .eq("tenant_id", tenantId)
             .eq("booking_source", "external")
             .eq("status", "confirmed");
@@ -1040,7 +1080,25 @@ export default function DashboardPage() {
             onlineQuery = onlineQuery.eq("accommodation_id", activeAccommodationId);
           }
           const onlineData = await onlineQuery;
-          setOnlineBookingCount(onlineData.count || 0);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const onlineList = (onlineData.data || [] as any[]).map((b: any) => {
+            const room = b.room as { room_number?: string; accommodation?: { name?: string } } | null;
+            const client = b.client as { full_name?: string } | null;
+            return {
+              id: b.id as string,
+              bookingCode: b.booking_code as string,
+              clientName: client?.full_name || "—",
+              roomNumber: room?.room_number || "—",
+              accommodationName: room?.accommodation?.name || "",
+              checkInDate: b.check_in_date as string,
+              checkOutDate: b.check_out_date as string,
+              totalAmount: b.total_amount as number,
+              numberOfGuests: b.number_of_guests as number,
+              createdAt: b.created_at as string,
+            };
+          });
+          setOnlineBookingsList(onlineList);
+          setOnlineBookingCount(onlineList.length);
         }
 
         // Une réservation arrivant ET repartant le jour cible génère deux mouvements distincts
@@ -1250,6 +1308,22 @@ export default function DashboardPage() {
     year: "numeric",
   });
 
+  // Formate une date en "il y a Xh" / "il y a Xjour(s)" / "il y a Xmin"
+  function formatTimeAgo(dateStr: string, locale: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    if (isNaN(then)) return "";
+    const diffMs = now - then;
+    if (diffMs < 0) return locale === "en" ? "just now" : "à l'instant";
+    const minutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMs / 3600000);
+    const days = Math.floor(diffMs / 86400000);
+    if (minutes < 1) return locale === "en" ? "just now" : "à l'instant";
+    if (minutes < 60) return locale === "en" ? `${minutes}m ago` : `il y a ${minutes}min`;
+    if (hours < 24) return locale === "en" ? `${hours}h ago` : `il y a ${hours}h`;
+    return locale === "en" ? `${days}d ago` : `il y a ${days}j`;
+  }
+
   async function handleMovementAction(movementId: string, action: "check_in" | "check_out"): Promise<boolean> {
     // L'id du mouvement est suffixé ("<bookingId>-in" / "<bookingId>-out")
     const bookingId = movementId.replace(/-(in|out)$/, "");
@@ -1281,6 +1355,48 @@ export default function DashboardPage() {
       return false;
     } finally {
       setActionLoading("");
+    }
+  }
+
+  async function handleBannerCheckout(bookingId: string) {
+    setBannerActionLoading(bookingId);
+    try {
+      const supabase = createClient();
+      const { error: rpcErr } = await supabase.rpc("check_out_booking", {
+        p_booking_id: bookingId,
+        p_user_id: userId,
+      });
+      if (rpcErr) {
+        toast.error(lang === "en" ? "Check-out failed: " + rpcErr.message : "Échec du check-out : " + rpcErr.message);
+        return;
+      }
+      toast.success(lang === "en" ? "Check-out completed ✓" : "Check-out effectué avec succès ✓");
+      loadDashboardData(true, selectedDate);
+    } catch {
+      toast.error(lang === "en" ? "Action failed" : "L'action a échoué");
+    } finally {
+      setBannerActionLoading("");
+    }
+  }
+
+  async function handleBannerCancelOnline(bookingId: string) {
+    setBannerActionLoading(bookingId);
+    try {
+      const supabase = createClient();
+      const { error: updErr } = await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", bookingId);
+      if (updErr) {
+        toast.error(lang === "en" ? "Cancellation failed: " + updErr.message : "Annulation échouée : " + updErr.message);
+        return;
+      }
+      toast.success(lang === "en" ? "Booking cancelled" : "Réservation annulée");
+      loadDashboardData(true, selectedDate);
+    } catch {
+      toast.error(lang === "en" ? "Action failed" : "L'action a échoué");
+    } finally {
+      setBannerActionLoading("");
     }
   }
 
@@ -1384,57 +1500,239 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 0b. ALERTE DÉPASSEMENT DE SÉJOUR */}
-      {overstayCount > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 animate-fade-in">
-          <div className="w-9 h-9 rounded-lg bg-red-600 text-white flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-300">
-              {t.overstay.title.replace("{count}", String(overstayCount))}
-            </p>
-            <p className="text-xs text-red-600/80 dark:text-red-400/80 truncate">
-              {t.overstay.subtitle.replace("{count}", String(overstayCount))}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30"
-            onClick={() => router.push("/dashboard/bookings?status=overdue")}
-            >
-            {t.overstay.viewBookings}
-          </Button>
-        </div>
-      )}
+                  {/* 0b. ALERTE DEPASSEMENT DE SEJOUR — intelligente avec urgence dynamique */}
+      {overstayCount > 0 && (() => {
+        // Niveau d'urgence dynamique base sur le max jours de depassement
+        const maxDays = Math.max(...overstayBookings.map(b => b.daysOverdue));
+        const isCritical = maxDays >= 4;
+        const isUrgent = maxDays >= 2;
+        const urgencyLevel = isCritical ? "critical" : isUrgent ? "urgent" : "warning";
 
-      {/* 0c. ALERTE RÉSERVATIONS EN LIGNE */}
+        const bannerBg = isCritical
+          ? "bg-red-100 dark:bg-red-950/50 border-red-400 dark:border-red-700"
+          : isUrgent
+            ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+            : "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800";
+        const iconBg = isCritical
+          ? "bg-red-700 animate-pulse"
+          : isUrgent
+            ? "bg-red-600"
+            : "bg-orange-500";
+        const titleColor = isCritical
+          ? "text-red-800 dark:text-red-200"
+          : isUrgent
+            ? "text-red-700 dark:text-red-300"
+            : "text-orange-700 dark:text-orange-300";
+        const badgeClass = isCritical
+          ? "bg-red-600 text-white animate-pulse"
+          : isUrgent
+            ? "bg-red-500 text-white"
+            : "bg-orange-500 text-white";
+
+        return (
+          <div className={`rounded-xl border animate-fade-in overflow-hidden ${bannerBg}`}>
+            {/* En-tete */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className={`w-9 h-9 rounded-lg text-white flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className={`text-sm font-semibold ${titleColor}`}>
+                    {t.overstay.title.replace("{count}", String(overstayCount))}
+                  </p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                    {isCritical ? t.overstay.urgencyCritical : isUrgent ? t.overstay.urgencyUrgent : t.overstay.urgencyWarning}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  {t.overstay.actionHint}
+                </p>
+              </div>
+              <button
+                onClick={() => setOverstayExpanded(!overstayExpanded)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-white/10 transition-colors"
+              >
+                {overstayExpanded ? t.overstay.hideDetails : t.overstay.showDetails}
+                {overstayExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-shrink-0 border-current opacity-80 hover:opacity-100"
+                onClick={() => router.push("/dashboard/bookings?status=overdue")}
+              >
+                {t.overstay.viewBookings}
+              </Button>
+            </div>
+
+            {/* Resume compact (toujours visible quand replie) */}
+            {!overstayExpanded && overstayBookings.length > 0 && (
+              <div className="px-4 pb-2.5 pt-0">
+                <div className="flex flex-wrap gap-1.5">
+                  {overstayBookings.slice(0, 3).map((b) => (
+                    <span key={b.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/70 dark:bg-white/10 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 text-[10px] font-bold">
+                        {b.clientName.charAt(0)}
+                      </span>
+                      Ch. {b.roomNumber}
+                      <span className="text-red-500 dark:text-red-400 font-bold">+{b.daysOverdue}j</span>
+                    </span>
+                  ))}
+                  {overstayBookings.length > 3 && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-lg bg-white/50 dark:bg-white/5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {t.overstay.moreItems.replace("{count}", String(overstayBookings.length - 3))}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Detail expandable */}
+            {overstayExpanded && (
+              <div className="border-t border-current/10 divide-y divide-current/5">
+                {overstayBookings.map((b) => {
+                  const isCriticalItem = b.daysOverdue >= 4;
+                  const isUrgentItem = b.daysOverdue >= 2;
+                  const itemBadge = isCriticalItem
+                    ? "bg-red-600 text-white"
+                    : isUrgentItem
+                      ? "bg-red-500 text-white"
+                      : "bg-orange-500 text-white";
+                  return (
+                    <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 bg-white/40 dark:bg-white/5">
+                      <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 text-xs font-bold flex-shrink-0">
+                        {b.clientName.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{b.clientName}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Ch. {b.roomNumber}{b.accommodationName ? ` · ${b.accommodationName}` : ""} · {b.bookingCode}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${itemBadge}`}>
+                        +{b.daysOverdue}j
+                      </span>
+                      <button
+                        onClick={() => handleBannerCheckout(b.id)}
+                        disabled={bannerActionLoading === b.id}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {bannerActionLoading === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                        {t.overstay.checkOut}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* 0c. ALERTE RESERVATIONS EN LIGNE — intelligente avec texte temporel */}
       {onlineBookingCount > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 animate-fade-in">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
-            <Globe className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-              {t.onlineBookings.title.replace("{count}", String(onlineBookingCount))}
-            </p>
-            <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 truncate">
-              {t.onlineBookings.subtitle}
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-shrink-0 border-indigo-300 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
-            onClick={() => router.push("/dashboard/bookings?source=online")}
+        <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 animate-fade-in overflow-hidden">
+          {/* En-tete */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
+              <Globe className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                {t.onlineBookings.title.replace("{count}", String(onlineBookingCount))}
+              </p>
+              <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80">
+                {t.onlineBookings.actionHint}
+              </p>
+            </div>
+            <button
+              onClick={() => setOnlineExpanded(!onlineExpanded)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
             >
-            {t.onlineBookings.viewBookings}
-          </Button>
+              {onlineExpanded ? t.onlineBookings.hideDetails : t.onlineBookings.showDetails}
+              {onlineExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-shrink-0 border-indigo-300 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+              onClick={() => router.push("/dashboard/bookings?source=online")}
+            >
+              {t.onlineBookings.viewBookings}
+            </Button>
+          </div>
+
+          {/* Resume compact (toujours visible quand replie) */}
+          {!onlineExpanded && onlineBookingsList.length > 0 && (
+            <div className="px-4 pb-2.5 pt-0">
+              <div className="flex flex-wrap gap-1.5">
+                {onlineBookingsList.slice(0, 3).map((b) => {
+                  const elapsed = formatTimeAgo(b.createdAt, lang);
+                  return (
+                    <span key={b.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/70 dark:bg-white/10 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
+                        {b.clientName.charAt(0)}
+                      </span>
+                      {b.clientName.split(" ")[0]}
+                      <span className="text-indigo-500 dark:text-indigo-400 text-[10px]">· {elapsed}</span>
+                    </span>
+                  );
+                })}
+                {onlineBookingsList.length > 3 && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-white/50 dark:bg-white/5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    {t.onlineBookings.moreItems.replace("{count}", String(onlineBookingsList.length - 3))}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Detail expandable */}
+          {onlineExpanded && (
+            <div className="border-t border-indigo-200 dark:border-indigo-800 divide-y divide-indigo-200/50 dark:divide-indigo-800/50">
+              {onlineBookingsList.map((b) => {
+                const elapsed = formatTimeAgo(b.createdAt, lang);
+                return (
+                  <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 bg-white/50 dark:bg-indigo-950/20">
+                    <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-xs font-bold flex-shrink-0">
+                      {b.clientName.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{b.clientName}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {b.checkInDate} → {b.checkOutDate} · {t.onlineBookings.guests.replace("{count}", String(b.numberOfGuests))}{b.accommodationName ? ` · ${b.accommodationName}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-indigo-500 dark:text-indigo-400 whitespace-nowrap font-medium">
+                      {elapsed}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => router.push(`/dashboard/bookings?checkin=${b.id}`)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {t.onlineBookings.checkIn}
+                      </button>
+                      <button
+                        onClick={() => handleBannerCancelOnline(b.id)}
+                        disabled={bannerActionLoading === b.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30 text-xs font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {bannerActionLoading === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                        {t.onlineBookings.decline}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
+{/* 1. BARRE DE CARTES SPÉCIALES — 4 KPIs */}
       {isReceptionniste ? (
         /* ── Vue Réceptionniste : 4 KPIs colorés, compacts et opérationnels ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

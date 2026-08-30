@@ -650,10 +650,12 @@ export default function SettingsPage() {
     );
   }
 
+  const isEmployee = user?.role === "receptionniste" || user?.role === "menagere";
+
   const sectionLabelMap = Object.fromEntries(
     (t?.settingsSections ?? []).map((s: { key: string; label: string }) => [s.key, s.label])
   );
-  const sections = [
+  const allSections = [
     { key: "company",       label: sectionLabelMap["company"]       || "Entreprise",    icon: Building2 },
     { key: "account",       label: sectionLabelMap["account"]       || "Compte",         icon: User },
     { key: "appearance",    label: sectionLabelMap["appearance"]    || "Apparence",      icon: theme === "dark" ? Moon : Sun },
@@ -667,6 +669,17 @@ export default function SettingsPage() {
     { key: "ideas",         label: sectionLabelMap["ideas"]         || "Boîte à idées", icon: Lightbulb },
     { key: "about",         label: sectionLabelMap["about"]         || "À propos",      icon: Info },
   ];
+
+  // Sections accessibles aux réceptionnistes / ménagères (profil, apparence, notifications, sécurité, à propos)
+  const employeeAllowedSections = new Set(["account", "appearance", "notifications", "security", "about"]);
+  const sections = isEmployee
+    ? allSections.filter((s) => employeeAllowedSections.has(s.key))
+    : allSections;
+
+  // Si la section active n'est pas accessible à l'employé, rediriger vers "account"
+  const effectiveSection = (isEmployee && !employeeAllowedSections.has(activeSection))
+    ? "account"
+    : activeSection;
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -708,7 +721,7 @@ export default function SettingsPage() {
         </Card>
 
         <div className="lg:col-span-9 space-y-3">
-          {activeSection === "company" && (
+          {effectiveSection === "company" && (
             <div className="space-y-3">
               <Card className="p-4">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.companyInfo}</h2>
@@ -844,7 +857,7 @@ export default function SettingsPage() {
           )}
 
 
-          {activeSection === "account" && (
+          {effectiveSection === "account" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.accountInfo}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.accountHelp}</p>
@@ -860,7 +873,7 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {activeSection === "appearance" && (
+          {effectiveSection === "appearance" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.appearance}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{t.appearanceHelp}</p>
@@ -1074,7 +1087,7 @@ export default function SettingsPage() {
           )}
 
           {/* Espace client */}
-          {activeSection === "portal" && (
+          {effectiveSection === "portal" && (
             <div className="space-y-3">
               <Card className="p-4">
                 <div className="flex items-start gap-3">
@@ -1136,7 +1149,7 @@ export default function SettingsPage() {
           )}
 
           {/* Notifications */}
-          {activeSection === "notifications" && (
+          {effectiveSection === "notifications" && (
               <Card className="p-4">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.notificationsTitle}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.notificationsHelp}</p>
@@ -1177,7 +1190,7 @@ export default function SettingsPage() {
           )}
 
           {/* Facturation */}
-          {activeSection === "billing" && (
+          {effectiveSection === "billing" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.billingTitle}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.billingHelp}</p>
@@ -1188,7 +1201,7 @@ export default function SettingsPage() {
           )}
 
           {/* WhatsApp */}
-          {activeSection === "whatsapp" && (
+          {effectiveSection === "whatsapp" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.whatsappTitle}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.whatsappHelp}</p>
@@ -1210,7 +1223,7 @@ export default function SettingsPage() {
           )}
 
           {/* Paiements en ligne */}
-          {activeSection === "payments" && (
+          {effectiveSection === "payments" && (
             <div className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Paiements en ligne</h2>
@@ -1223,7 +1236,7 @@ export default function SettingsPage() {
           )}
 
           {/* Intégrations */}
-          {activeSection === "integrations" && (
+          {effectiveSection === "integrations" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.integrationsTitle}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.integrationsHelp}</p>
@@ -1258,7 +1271,7 @@ export default function SettingsPage() {
           )}
 
           {/* Sécurité */}
-          {activeSection === "security" && (
+          {effectiveSection === "security" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.securityTitle}</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-4">{t.securityHelp}</p>
@@ -1275,10 +1288,10 @@ export default function SettingsPage() {
           )}
 
           {/* Boîte à idées & Roadmap */}
-          {activeSection === "ideas" && <IdeaBoxSection />}
+          {effectiveSection === "ideas" && <IdeaBoxSection />}
 
           {/* À propos */}
-          {activeSection === "about" && (
+          {effectiveSection === "about" && (
             <Card className="p-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
                 {t.aboutTitle}
