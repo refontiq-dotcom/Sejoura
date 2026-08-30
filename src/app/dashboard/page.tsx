@@ -1044,8 +1044,19 @@ export default function DashboardPage() {
         }
 
         // Nombre de réservations en ligne (booking_source = 'external') en
-        // attente de traitement (confirmées, pas encore check-in).
+        // attente de traitement. Seules les NOUVELLES réservations non consultées
+        // sont affichées (cohérent avec le badge du menu).
         {
+          let lastViewed = "2024-01-01T00:00:00Z";
+          try {
+            const { data: state } = await supabase
+              .from("staff_notification_states")
+              .select("last_viewed_at")
+              .eq("tenant_id", tenantId)
+              .maybeSingle();
+            if (state?.last_viewed_at) lastViewed = state.last_viewed_at;
+          } catch {}
+
           let onlineQuery = supabase
             .from("bookings")
             .select(`
@@ -1055,7 +1066,9 @@ export default function DashboardPage() {
             `)
             .eq("tenant_id", tenantId)
             .eq("booking_source", "external")
-            .eq("status", "confirmed");
+            .gt("created_at", lastViewed)
+            .not("status", "in", ["cancelled", "no_show"]);
+
           if (activeAccommodationId) {
             onlineQuery = onlineQuery.eq("accommodation_id", activeAccommodationId);
           }
