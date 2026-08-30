@@ -1624,7 +1624,7 @@ export default function DashboardPage() {
       })()}
 
       {/* 0c. ALERTE RESERVATIONS EN LIGNE — intelligente avec texte temporel */}
-      {onlineBookingCount > 0 && (
+      {onlineBookingCount > 0 && (userRole === "admin_residence" || userRole === "receptionniste") && (
         <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 animate-fade-in overflow-hidden">
           {/* En-tete */}
           <div className="flex items-center gap-3 px-4 py-3">
