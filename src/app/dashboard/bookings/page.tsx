@@ -3789,7 +3789,7 @@ export default function BookingsPage() {
                   type="text"
                   readOnly
                   disabled
-                  value={checkinRoomTypeId ? roomTypes.find((rt) => rt.id === checkinRoomTypeId)?.name || `Type ${checkinRoomTypeId}` : "—"}
+                  value={checkinBooking?.room_type?.name || (checkinRoomTypeId ? roomTypes.find((rt) => rt.id === checkinRoomTypeId)?.name || `Type ${checkinRoomTypeId}` : "—")}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm disabled:opacity-60"
                 />
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
