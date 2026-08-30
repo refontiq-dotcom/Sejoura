@@ -2500,7 +2500,7 @@ export default function BookingsPage() {
                                 <Pencil className="w-4 h-4" /> Enregistrer ID occupant
                               </DropdownMenuItem>
                             )}
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                             {(b.status === "confirmed" || b.status === "checked_in") && (
                                <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
                                  <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
                                </DropdownMenuItem>
@@ -2531,7 +2531,7 @@ export default function BookingsPage() {
                                 <ArrowLeftRight className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Changer de chambre
                               </DropdownMenuItem>
                             )}
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <DropdownMenuItem onSelect={() => openEditModal(b)}>
                                 <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier les dates / tarifs
                               </DropdownMenuItem>
@@ -2559,7 +2559,7 @@ export default function BookingsPage() {
                                 </DropdownMenuItem>
                               </>
                             )}
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
@@ -2747,7 +2747,7 @@ export default function BookingsPage() {
                                  <Pencil className="w-4 h-4" /> Enregistrer ID occupant
                                </DropdownMenuItem>
                              )}
-                              {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                              {(b.status === "confirmed" || b.status === "checked_in") && (
                                <DropdownMenuItem onSelect={() => openCompleteClientModal(b)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 font-medium">
                                  <Pencil className="w-4 h-4" /> Compléter / Modifier la fiche client
                                </DropdownMenuItem>
@@ -2768,7 +2768,7 @@ export default function BookingsPage() {
                                  <Calendar className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Prolonger le séjour
                                </DropdownMenuItem>
                              )}
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <DropdownMenuItem onSelect={() => openEditModal(b)}>
                                 <Pencil className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Modifier les dates / tarifs
                               </DropdownMenuItem>
@@ -2796,7 +2796,7 @@ export default function BookingsPage() {
                                 </DropdownMenuItem>
                               </>
                             )}
-                             {(b.status === "confirmed" || b.status === "checked_in") && !b.client?.id_number && b.booking_source !== 'external' && (
+                             {(b.status === "confirmed" || b.status === "checked_in") && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
