@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const adminSupabase = createAdminClient();
     const { data: idea } = await adminSupabase
       .from("feature_requests")
-      .select("id, title, created_by, tenant_id")
+      .select("id, title, created_by, tenant_id, screenshot_url")
       .eq("id", id)
       .maybeSingle();
     if (!idea) {
@@ -67,6 +67,7 @@ export async function POST(req: Request) {
       `\uD83D\uDCCC *Titre :* ${escapeMarkdown(idea.title)}`,
       `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(tenant?.company_name || "Établissement inconnu")}`,
       `\uD83D\uDC64 *Auteur :* ${escapeMarkdown(author?.full_name || "Utilisateur")}`,
+      idea.screenshot_url ? `\uD83D\uDCF8 *Photo :* [Voir la capture](${idea.screenshot_url})` : "",
       "",
       `\uD83D\uDD17 [Voir sur le Dashboard Admin](${adminUrl})`,
     ].join("\n");

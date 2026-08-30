@@ -361,14 +361,21 @@ export default function AdminIdeasPage() {
                     </div>
 
                     {idea.screenshot_url && (
-                      <a
-                        href={idea.screenshot_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
-                      >
-                        Voir la capture d&apos;écran
-                      </a>
+                      <div className="mt-2">
+                        <a
+                          href={idea.screenshot_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={idea.screenshot_url}
+                            alt={`Capture d'écran de « ${idea.title} »`}
+                            className="max-h-48 rounded-xl border border-slate-200 dark:border-slate-600 object-cover hover:shadow-md transition-shadow"
+                          />
+                        </a>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Capture d&apos;écran jointe</p>
+                      </div>
                     )}
                   </div>
 
