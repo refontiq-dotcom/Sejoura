@@ -7,7 +7,6 @@ import type { OnboardingStatusResponse } from "@/app/api/auth/onboarding-status/
 import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
-import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { useLanguage } from "@/hooks/use-language";
@@ -578,7 +577,6 @@ export default function DashboardLayout({
               monthlyPrice={monthlyPrice}
               scrolled={headerScrolled}
             />
-            <Breadcrumbs />
           </div>
           <main
             style={{ backgroundColor: mainBg }}
