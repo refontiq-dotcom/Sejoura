@@ -849,7 +849,23 @@ export default function DashboardPage() {
         // Fenêtre de 12 mois glissants pour le graphique des recettes
         const twelveMonthsAgo = toLocalISODate(new Date(now.getFullYear(), now.getMonth() - 11, 1));
 
-        const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData] =
+        // Les requêtes principales (subscriptions, bookings du jour, payments,
+        // cleaning_tasks, accommodations) sont déjà parallélisées. On y ajoute
+        // les surcoûts « dépassement » et « réservations en ligne » qui étaient
+        // jusqu'ici en 2 awaits séquentiels (donc 2 RTT supplémentaires). Les
+        // trois queries touchent la même table mais avec des filtres disjoints ;
+        // on les laisse en parallèle (Supabase multiplexe sur la même WebSocket).
+        // Pour le fan-out « en ligne », on a besoin de la date de dernière
+        // consultation (lastViewed) qui dépend d'une autre table — on la
+        // résout en parallèle dans le même Promise.all.
+        const onlineLastViewedPromise = supabase
+          .from("staff_notification_states")
+          .select("last_viewed_at")
+          .eq("tenant_id", tenantId)
+          .maybeSingle()
+          .then((res) => res.data?.last_viewed_at || "2024-01-01T00:00:00Z");
+
+        const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData, overstayRes, onlineRes] =
           await Promise.all([
             supabase
               .from("subscriptions")
@@ -918,6 +934,37 @@ export default function DashboardPage() {
               .from("accommodations")
               .select("id")
               .eq("tenant_id", tenantId),
+            // Dépassements de séjour : toutes les réservations checked_in du tenant
+            (() => {
+              let q = supabase
+                .from("bookings")
+                .select(`
+                  id, booking_code, status, check_out_date, check_out_time, is_overstay,
+                  client:clients(full_name),
+                  room:rooms(room_number, accommodation:accommodations(name))
+                `)
+                .eq("tenant_id", tenantId)
+                .eq("status", "checked_in");
+              if (activeAccommodationId) q = q.eq("accommodation_id", activeAccommodationId);
+              return q;
+            })(),
+            // Réservations en ligne non consultées
+            (async () => {
+              const lastViewed = await onlineLastViewedPromise;
+              let q = supabase
+                .from("bookings")
+                .select(`
+                  id, booking_code, check_in_date, check_out_date, total_amount, number_of_guests, created_at,
+                  client:clients(full_name),
+                  room:rooms(room_number, accommodation:accommodations(name))
+                `)
+                .eq("tenant_id", tenantId)
+                .eq("booking_source", "external")
+                .gt("created_at", lastViewed)
+                .not("status", "in", ["cancelled", "no_show"]);
+              if (activeAccommodationId) q = q.eq("accommodation_id", activeAccommodationId);
+              return q;
+            })(),
           ]);
 
         // Les erreurs sur les requêtes secondaires (bookings, payments, etc.)
@@ -1002,27 +1049,11 @@ export default function DashboardPage() {
           cleaningDone,
         });
 
-        // Nombre de séjours en dépassement (client encore en chambre après le
-        // départ prévu) : calculé sur TOUTES les réservations checked_in du
-        // tenant — et non sur la fenêtre de dates du jour — pour rester
-        // cohérent avec le filtre « Dépassement » de la page Réservations.
+        // Dépassements de séjour (déjà résolus en parallèle dans le fan-out).
         {
-          let overstayQuery = supabase
-            .from("bookings")
-            .select(`
-              id, booking_code, status, check_out_date, check_out_time, is_overstay,
-              client:clients(full_name),
-              room:rooms(room_number, accommodation:accommodations(name))
-            `)
-            .eq("tenant_id", tenantId)
-            .eq("status", "checked_in");
-          if (activeAccommodationId) {
-            overstayQuery = overstayQuery.eq("accommodation_id", activeAccommodationId);
-          }
-          const overstayData = await overstayQuery;
           const todayMs = new Date().getTime();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const overdue = (overstayData.data || [] as any[]).filter(
+          const overdue = ((overstayRes as any).data || [] as any[]).filter(
             (b: any) => b.is_overstay || isBookingOverdue({ status: b.status, check_out_date: b.check_out_date, check_out_time: b.check_out_time })
           ).map((b: any) => {
             const checkoutMs = new Date(b.check_out_date).getTime();
@@ -1043,38 +1074,10 @@ export default function DashboardPage() {
           setOverstayCount(overdue.length);
         }
 
-        // Nombre de réservations en ligne (booking_source = 'external') en
-        // attente de traitement. Seules les NOUVELLES réservations non consultées
-        // sont affichées (cohérent avec le badge du menu).
+        // Réservations en ligne non consultées (déjà résolues en parallèle).
         {
-          let lastViewed = "2024-01-01T00:00:00Z";
-          try {
-            const { data: state } = await supabase
-              .from("staff_notification_states")
-              .select("last_viewed_at")
-              .eq("tenant_id", tenantId)
-              .maybeSingle();
-            if (state?.last_viewed_at) lastViewed = state.last_viewed_at;
-          } catch {}
-
-          let onlineQuery = supabase
-            .from("bookings")
-            .select(`
-              id, booking_code, check_in_date, check_out_date, total_amount, number_of_guests, created_at,
-              client:clients(full_name),
-              room:rooms(room_number, accommodation:accommodations(name))
-            `)
-            .eq("tenant_id", tenantId)
-            .eq("booking_source", "external")
-            .gt("created_at", lastViewed)
-            .not("status", "in", ["cancelled", "no_show"]);
-
-          if (activeAccommodationId) {
-            onlineQuery = onlineQuery.eq("accommodation_id", activeAccommodationId);
-          }
-          const onlineData = await onlineQuery;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const onlineList = (onlineData.data || [] as any[]).map((b: any) => {
+          const onlineList = ((onlineRes as any).data || [] as any[]).map((b: any) => {
             const room = b.room as { room_number?: string; accommodation?: { name?: string } } | null;
             const client = b.client as { full_name?: string } | null;
             return {

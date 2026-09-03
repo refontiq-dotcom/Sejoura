@@ -19,8 +19,7 @@ import {
   DoorOpen,
   Megaphone,
 } from "lucide-react";
-import { useState } from "react";
-import Image from "next/image";
+import { memo, useCallback, useMemo, useState } from "react";
 import { getRoleLabel } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -70,23 +69,26 @@ interface SidebarProps {
   onlineBookingCount?: number;
 }
 
-export function Sidebar({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg, onlineBookingCount = 0 }: SidebarProps) {
+function SidebarImpl({ userRole, userName, companyName, companyLogo = null, themeColor = null, collapsed = false, onToggle, onCloseMobile, mainBg, onlineBookingCount = 0 }: SidebarProps) {
   const { lang } = useLanguage();
   const { theme } = useTheme();
   const t = translations[lang].sidebar;
-  const navLabels = Object.fromEntries(t.navItems.map((item) => [item.href, item.label]));
+  const navLabels = useMemo(
+    () => Object.fromEntries(t.navItems.map((item) => [item.href, item.label])),
+    [t.navItems]
+  );
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const themeStyles = getSidebarThemeStyles(themeColor, theme === "dark");
-  // Couleur de fusion de l'onglet actif : la même que celle du canvas de la
-  // page. Repli sur la variable CSS (--main-bg) si non fournie.
+  const themeStyles = useMemo(
+    () => getSidebarThemeStyles(themeColor, theme === "dark"),
+    [themeColor, theme]
+  );
   const activeTabBg = mainBg || "var(--main-bg)";
 
   const isCollapsed = collapsed;
-  const toggleCollapsed = () => {
-    if (onToggle) onToggle();
-  };
+  const handleToggle = useCallback(() => onToggle?.(), [onToggle]);
+  const handleCloseMobile = useCallback(() => onCloseMobile?.(), [onCloseMobile]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -101,16 +103,20 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
     }
   }
 
-  const filteredItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
+  const filteredItems = useMemo(
+    () => navItems.filter((item) => !item.roles || item.roles.includes(userRole)),
+    [userRole]
   );
 
   return (
     <>
-      {/* Mobile overlay */}
-      <div 
-        className={`lg:hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity ${!isCollapsed ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-        onClick={() => onCloseMobile && onCloseMobile()}
+      {/* Mobile overlay : sans backdrop-blur (très coûteux en repaint
+          plein écran) — voile sombre + transition d'opacité. */}
+      <div
+        className={`lg:hidden fixed inset-0 z-40 bg-slate-900/50 transition-opacity duration-200 ${
+          !isCollapsed ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={handleCloseMobile}
       />
       <aside
         style={{
@@ -119,8 +125,10 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
           "--sidebar-bg": themeStyles.sidebarBg,
           "--main-bg": activeTabBg,
         } as React.CSSProperties}
-        className={`group flex flex-col transition-all duration-300 fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible ${
-          isCollapsed ? "-translate-x-full lg:translate-x-0 lg:w-20" : "translate-x-0 w-60"
+        className={`group flex flex-col fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible transition-transform duration-300 will-change-transform ${
+          isCollapsed
+            ? "-translate-x-full lg:translate-x-0 lg:w-20 w-60"
+            : "translate-x-0 w-60"
         }`}
       >
 
@@ -160,7 +168,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
 
           {/* Integrated Header Toggle Button - Desktop */}
           <button
-            onClick={toggleCollapsed}
+            onClick={handleToggle}
             style={{ color: themeStyles.textColor }}
             className="hidden lg:flex p-1.5 rounded-md hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
             aria-label={isCollapsed ? t.expand : t.collapse}
@@ -193,7 +201,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => onCloseMobile?.()}
+              onClick={handleCloseMobile}
               style={{
                 backgroundColor: isActive ? activeTabBg : "transparent",
                 color: isActive ? themeStyles.activeTextColor : themeStyles.textColor,
@@ -244,7 +252,7 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
         {/* Paramètres Link */}
         <Link
           href="/dashboard/settings"
-          onClick={() => onCloseMobile?.()}
+          onClick={handleCloseMobile}
           style={{
             backgroundColor: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? activeTabBg : "transparent",
             color: pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/") ? themeStyles.activeTextColor : themeStyles.textColor,
@@ -307,3 +315,8 @@ export function Sidebar({ userRole, userName, companyName, companyLogo = null, t
     </>
   );
 }
+
+// `React.memo` court-circuite le re-render si les props sont shallow-égales.
+// Combiné avec les `useCallback` du layout parent, le Sidebar ne re-render
+// plus à chaque update de scroll/timer/état local du layout.
+export const Sidebar = memo(SidebarImpl);
