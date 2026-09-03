@@ -4,6 +4,7 @@
 // Utilisé par les routes serveur pour notifier le Super Admin, notamment :
 //   - /api/feature-requests/notify  (nouvelle suggestion / idée)
 //   - /api/subscription/notify-payment (nouvelle demande de validation d'abonnement)
+//   - /api/ads/notify-payment (nouvelle demande de validation de publicité)
 //
 // Configuration (variables d'environnement, côté serveur uniquement) :
 //   TELEGRAM_BOT_TOKEN → token du bot Telegram (fourni par @BotFather)
