@@ -51,8 +51,8 @@ export default function DashboardLayout({
     }
     return true;
   });
-  // Ref miroir pour que le handler de scroll (attaché une seule fois) lise
-  // l'état courant sans avoir à se reabonner à chaque toggle de la sidebar.
+  // Ref miroir : le handler de scroll (attaché une seule fois) lit l'état
+  // courant via ce ref, sans avoir à se reabonner à chaque toggle sidebar.
   const sidebarCollapsedRef = useRef(sidebarCollapsed);
   useEffect(() => {
     sidebarCollapsedRef.current = sidebarCollapsed;
@@ -94,8 +94,6 @@ export default function DashboardLayout({
   // mot de passe et n'ont pas de code secret.
 
   // Gérer la sidebar responsive : plier en mobile, déplier en desktop.
-  // On cache window.innerWidth (évite un layout read par resize) et on
-  // n'attache le listener qu'une seule fois (deps vides).
   useEffect(() => {
     function handleResize() {
       setSidebarCollapsed(window.innerWidth < MOBILE_BREAKPOINT);
@@ -105,16 +103,14 @@ export default function DashboardLayout({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // En-tête "intelligent" :
-  // - Une ombre discrète + fond opaque apparaissent dès que la page est scrollée.
-  // - Sur mobile (< 1024px), l'en-tête glisse hors écran en scrollant vers le bas
-  //   pour libérer tout l'espace, et réapparaît dès qu'on remonte. On ne le
-  //   masque jamais quand le tiroir de navigation est ouvert.
-  //
-  // Optimisation fluidité : les `setState` sont coalescés dans une seule frame
-  // d'animation (rAF) au lieu d'être déclenchés à chaque événement `scroll`
-  // (qui peut tirer à > 60 Hz sur les écrans 120/144 Hz). `window.innerWidth`
-  // est caché dans un ref pour éviter un layout-forced read à chaque scroll.
+  // En-tête "intelligent" : ombre + masquage sur scroll.
+  // - Les setState sont coalescés dans une seule frame d'animation (rAF) pour
+  //   éviter de re-render à chaque événement `scroll` (peut tirer > 60 Hz sur
+  //   écrans 120/144 Hz).
+  // - `window.innerWidth` est caché dans un ref pour éviter un layout-forced
+  //   read à chaque scroll.
+  // - Le listener est attaché une seule fois (deps vides) et lit
+  //   `sidebarCollapsedRef.current` pour connaître l'état courant.
   useEffect(() => {
     let lastY = window.scrollY;
     const widthRef = { current: typeof window !== "undefined" ? window.innerWidth : 1280 };
@@ -360,13 +356,9 @@ export default function DashboardLayout({
             setMonthlyPrice(subRes.data.monthly_price || 0);
           }
 
-          // Étape 2 obligatoire — la décision fiable vient du serveur
-          // (déjà résolue en parallèle ci-dessus).
           setNeedsOnboarding(serverNeedsOnboarding);
 
           if (accsRes.data) {
-            // Réceptionniste / ménagère : on ne récupère son affectation
-            // qu'après le fan-out pour éviter un round-trip bloquant.
             let accessible = accsRes.data as unknown as Accommodation[];
             if (userData.role === "receptionniste" || userData.role === "menagere") {
               const assignedId = await getActiveAssignmentId(
@@ -400,9 +392,6 @@ export default function DashboardLayout({
             setActiveAccommodationId(activeId);
           }
         } else {
-          // Pas de tenant (étape 2 onboarding) : on a déjà la décision
-          // serveur via la branche précédente ; on s'assure juste qu'elle
-          // est appliquée.
           const serverNeedsOnboarding = await fetchOnboardingStatus();
           setNeedsOnboarding(serverNeedsOnboarding);
         }
@@ -429,11 +418,9 @@ export default function DashboardLayout({
   }, [pathname, markAsViewed]);
 
   // Titre / sous-titre intelligents selon la page courante.
-  // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).
-  // Sur les autres pages : titre et description propres à chaque module.
-  // Mémoïsé : évite de reconstruire l'objet 30+ clés à chaque render du
-  // layout (sinon le Header reçoit une nouvelle `subtitle` à chaque render
-  // et ne peut pas être mis en React.memo).
+  // Mémoïsé : sans useMemo, on reconstruit l'objet 30+ clés à chaque render
+  // du layout, ce qui force le Header à re-render (mémoïsé en aval) car sa
+  // prop `subtitle` change d'identité.
   const headerMeta = useMemo(() => {
     const d = translations[lang];
     const firstName = user?.full_name?.trim().split(/\s+/)[0] || "";
@@ -493,27 +480,20 @@ export default function DashboardLayout({
     return map[p] || { title: t.title, subtitle: t.subtitle };
   }, [lang, pathname, user?.full_name, localHour, t.subtitle, t.title]);
 
-  // Styles dérivés mémoïsés : `derivePastelColor` parse la couleur, et
-  // `getSidebarThemeStyles` est non-trivial ; on évite de les recalculer
-  // à chaque render (sinon Sidebar/Header reçoivent des objets neufs).
+  // Styles dérivés mémoïsés (parse la couleur, non-trivial).
   const activeTheme = useMemo(
     () => getSidebarThemeStyles(themeColor, theme === "dark"),
     [themeColor, theme]
   );
-  // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
-  // pour garantir un contraste suffisant sur fond sombre
   const dynamicPrimaryColor = theme === "dark" ? "#C2944E" : activeTheme.sidebarBg;
-  // Le fond principal de la page Dashboard suit la "Couleur pastel" choisie
-  // dans les Paramètres (nuance pastel dérivée) quand elle est disponible.
   const mainBg = useMemo(() => {
     if (theme === "dark") return activeTheme.mainBg;
     const isPrimaryHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
     return isPrimaryHex ? derivePastelColor(primaryColor) : activeTheme.mainBg;
   }, [theme, activeTheme.mainBg, primaryColor]);
 
-  // Callbacks stables pour Sidebar / Header : sans useCallback, ces handlers
-  // changent d'identité à chaque render et empêchent React.memo de
-  // court-circuiter le re-render des deux composants.
+  // Callbacks stables pour Sidebar / Header (identité stable → React.memo
+  // effectif côté enfant).
   const toggleSidebar = useCallback(
     () => setSidebarCollapsed((c) => !c),
     []
@@ -527,13 +507,21 @@ export default function DashboardLayout({
   function handleOnboardingComplete() {
     setNeedsOnboarding(false);
     toast.success("Bienvenue ! Votre espace est prêt 🏠");
-    // Recharger pour que layout + page rechargent les données du nouvel espace
-    // (tenant, abonnement, établissement créés par service_role).
     window.location.reload();
   }
 
-  // L'étape 2 est obligatoire — aucune fermeture possible sans compléter.
-  // La seule issue est la déconnexion.
+  // Contexte utilisateur mémoïsé : sans useMemo, le CurrentUserProvider
+  // reçoit un nouvel objet à chaque render et force la page entière à
+  // re-render (consommateur principal du dashboard, ~2200 lignes).
+  const currentUserValue = useMemo(
+    () => ({
+      user,
+      tenantId: user?.tenant_id ?? "",
+      plan,
+      loading: false,
+    }),
+    [user, plan]
+  );
 
   if (loading) {
     return (
@@ -581,19 +569,6 @@ export default function DashboardLayout({
   if (!user) {
     return null;
   }
-
-  // Contexte utilisateur mémoïsé : sans useMemo, le CurrentUserProvider
-  // reçoit un nouvel objet à chaque render et force la page entière à
-  // re-render (c'est le consommateur principal du dashboard, ~2200 lignes).
-  const currentUserValue = useMemo(
-    () => ({
-      user,
-      tenantId: user?.tenant_id ?? "",
-      plan,
-      loading: false,
-    }),
-    [user, plan]
-  );
 
   return (
     <div

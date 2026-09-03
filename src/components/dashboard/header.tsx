@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -40,6 +40,15 @@ const AVATAR_GRADIENTS = [
   "from-violet-500 to-purple-600",
   "from-cyan-500 to-sky-600",
 ];
+
+// Constante hoisted : évite de recréer le record à chaque render (était
+// précédemment alloué dans le body de la fonction Header).
+const NOTIF_COLORS: Record<string, string> = {
+  info: "bg-blue-500",
+  warning: "bg-orange-500",
+  success: "bg-green-500",
+  error: "bg-red-500",
+};
 
 function avatarGradient(name: string): string {
   let hash = 0;
@@ -173,7 +182,7 @@ function ResidenceSwitcher() {
   );
 }
 
-export function Header({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false }: HeaderProps) {
+function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useLanguage();
   const t = translations[lang].header;
@@ -227,46 +236,45 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  async function handleNotifClick(notif: NotificationItem) {
-    if (!notif.isRead) {
-      await markAsRead(notif.id);
-    }
-    if (notif.link) {
-      setNotifOpen(false);
-      router.push(notif.link);
-    } else {
-      setNotifOpen(false);
-    }
-  }
+  // Callbacks stables : avant, ces handlers étaient recréés à chaque render
+  // et passés en `onClick` à chaque ligne de notification, ce qui forçait
+  // React à re-monter ces éléments à chaque update.
+  const handleNotifClick = useCallback(
+    async (notif: NotificationItem) => {
+      if (!notif.isRead) {
+        await markAsRead(notif.id);
+      }
+      if (notif.link) {
+        setNotifOpen(false);
+        router.push(notif.link);
+      } else {
+        setNotifOpen(false);
+      }
+    },
+    [markAsRead, router]
+  );
 
-  async function handleMarkAllRead() {
+  const handleMarkAllRead = useCallback(async () => {
     await markAllAsRead();
     toast.success(t.markAllReadSuccess);
-  }
+  }, [markAllAsRead, t.markAllReadSuccess]);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      // Redirection intelligente selon le rôle :
-      // Employés (Réceptionniste/Ménagère) → Page Spéciale Employés
-      // Administrateur → Portail Général
       const isEmployee = userRole === "receptionniste" || userRole === "menagere";
       window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
       toast.error(t.logoutError);
     }
-  }
+  }, [userRole, t.logoutError]);
 
-  const notifColors: Record<string, string> = {
-    info: "bg-blue-500",
-    warning: "bg-orange-500",
-    success: "bg-green-500",
-    error: "bg-red-500",
-  };
-
-  // Group notifications by date
-  function groupNotifications(items: NotificationItem[]) {
+  // Regroupement des notifications mémoïsé : auparavant recalculé à chaque
+  // render (création de Date, comparaison de labels) même quand le dropdown
+  // était fermé. Maintenant seules les dépendances pertinentes déclenchent
+  // le recalcul.
+  const groupedNotifications = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
@@ -275,7 +283,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     const groups: { label: string; items: NotificationItem[] }[] = [];
     let currentGroup = { label: "", items: [] as NotificationItem[] };
 
-    for (const notif of items) {
+    for (const notif of notifications) {
       const notifDate = new Date(notif.time);
       notifDate.setHours(0, 0, 0, 0);
 
@@ -296,9 +304,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     }
     if (currentGroup.items.length > 0) groups.push(currentGroup);
     return groups;
-  }
-
-  const groupedNotifications = groupNotifications(notifications);
+  }, [notifications, lang]);
 
   return (
     <>
@@ -481,7 +487,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
                             }`}
                           >
                             <div className="flex items-start gap-2.5">
-                              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${notifColors[notif.type]}`} />
+                              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${NOTIF_COLORS[notif.type]}`} />
                               <div className="flex-1 min-w-0">
                                 <p className={`text-xs ${notif.isRead ? "font-medium text-[var(--foreground)]" : "font-bold text-[var(--foreground)]"}`}>
                                   {notif.title}
@@ -605,7 +611,7 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
       {/* Command Palette */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 sm:px-0">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
+          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setSearchOpen(false)} />
           <div className="relative w-full max-w-lg bg-[var(--card-bg,var(--surface))] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center px-3 py-2.5 border-b border-[var(--border)]">
               <Search className="w-4 h-4 text-[var(--muted-foreground)] mr-2.5 flex-shrink-0" />
@@ -640,3 +646,10 @@ export function Header({ title, subtitle, onMenuClick, userName, userRole, userE
     </>
   );
 }
+
+// `React.memo` : combiné aux `useCallback` du layout, le Header ne re-render
+// plus à chaque update de scroll/timer du parent. La comparaison shallow
+// détecte les changements réels (title, subtitle, scrolled, etc.) et court-
+// circuite les re-renders inutiles (changements d'état internes au Sidebar,
+// scroll, interval 5 min, etc.).
+export const Header = memo(HeaderImpl);

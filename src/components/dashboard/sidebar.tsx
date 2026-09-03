@@ -20,7 +20,6 @@ import {
   Megaphone,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
-import Image from "next/image";
 import { getRoleLabel } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -74,8 +73,6 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
   const { lang } = useLanguage();
   const { theme } = useTheme();
   const t = translations[lang].sidebar;
-  // `Object.fromEntries` parcourait `t.navItems` à chaque render (O(n)) ; on
-  // mémoïse la table href→label pour la passer à `React.memo` proprement.
   const navLabels = useMemo(
     () => Object.fromEntries(t.navItems.map((item) => [item.href, item.label])),
     [t.navItems]
@@ -87,8 +84,6 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
     () => getSidebarThemeStyles(themeColor, theme === "dark"),
     [themeColor, theme]
   );
-  // Couleur de fusion de l'onglet actif : la même que celle du canvas de la
-  // page. Repli sur la variable CSS (--main-bg) si non fournie.
   const activeTabBg = mainBg || "var(--main-bg)";
 
   const isCollapsed = collapsed;
@@ -115,8 +110,8 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
 
   return (
     <>
-      {/* Mobile overlay : on retire `backdrop-blur-sm` (très coûteux en repaint
-          sur toute la zone) et on conserve un voile sombre + opacité transition. */}
+      {/* Mobile overlay : sans backdrop-blur (très coûteux en repaint
+          plein écran) — voile sombre + transition d'opacité. */}
       <div
         className={`lg:hidden fixed inset-0 z-40 bg-slate-900/50 transition-opacity duration-200 ${
           !isCollapsed ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -130,9 +125,6 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
           "--sidebar-bg": themeStyles.sidebarBg,
           "--main-bg": activeTabBg,
         } as React.CSSProperties}
-        // On n'anime QUE `transform` et `opacity` (compositor) ; la largeur
-        // est imposée par Tailwind sans transition. Cela évite le jank
-        // d'un `transition-all` qui forçait layout + paint à chaque frame.
         className={`group flex flex-col fixed inset-y-0 left-0 z-50 shadow-2xl overflow-visible transition-transform duration-300 will-change-transform ${
           isCollapsed
             ? "-translate-x-full lg:translate-x-0 lg:w-20 w-60"
@@ -323,3 +315,8 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
     </>
   );
 }
+
+// `React.memo` court-circuite le re-render si les props sont shallow-égales.
+// Combiné avec les `useCallback` du layout parent, le Sidebar ne re-render
+// plus à chaque update de scroll/timer/état local du layout.
+export const Sidebar = memo(SidebarImpl);
