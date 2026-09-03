@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateInvoicePdf, generateInvoiceNumber } from "@/lib/invoice-pdf";
@@ -9,6 +10,36 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 function isLegacyPublicUrl(value: string | null) {
   return Boolean(value?.startsWith("http://") || value?.startsWith("https://"));
+}
+
+function generateAccessToken(): string {
+  return randomBytes(24).toString("hex");
+}
+
+/**
+ * Garantit qu'une facture possède un jeton d'accès public (QR Code). Si le
+ * token est absent (facture héritée d'avant la migration), on en génère un et
+ * on persiste la valeur. Cette fonction est idempotente et best-effort : un
+ * échec n'empêche pas la génération de la facture.
+ */
+async function ensureAccessToken(
+  admin: ReturnType<typeof createAdminClient>,
+  invoice: Invoice
+): Promise<Invoice> {
+  if (invoice.access_token) return invoice;
+  const token = generateAccessToken();
+  const { data, error } = await admin
+    .from("invoices")
+    .update({ access_token: token })
+    .eq("id", invoice.id)
+    .select("*")
+    .maybeSingle();
+  if (error || !data) {
+    // Échec du backfill : on continue sans QR Code plutôt que d'échouer.
+    console.error("ensureAccessToken failed:", error);
+    return invoice;
+  }
+  return data as Invoice;
 }
 
 async function getInvoiceAccessUrl(admin: ReturnType<typeof createAdminClient>, pdfPath: string | null) {
@@ -100,6 +131,19 @@ export async function POST(request: Request) {
     }
 
     if (!invoice) return NextResponse.json({ error: "Impossible de préparer la facture." }, { status: 500 });
+    {
+      // Si un jeton vient d'être ajouté rétroactivement à une facture héritée
+      // (PDF existant sans QR Code), on invalide le PDF en cache pour forcer
+      // sa régénération avec le QR Code.
+      const tokenBefore = (invoice as Invoice).access_token;
+      invoice = await ensureAccessToken(admin, invoice);
+      if (!tokenBefore && invoice.access_token && invoice.pdf_url && !isLegacyPublicUrl(invoice.pdf_url)) {
+        const oldPath = invoice.pdf_url;
+        invoice.pdf_url = null;
+        await admin.from("invoices").update({ pdf_url: null }).eq("id", invoice.id);
+        await admin.storage.from(INVOICE_BUCKET).remove([oldPath]).catch(() => {});
+      }
+    }
 
     // ── Synchronisation après prolongation ───────────────────────────────────
     // Si le total de la réservation a changé (prolongation, modification de
@@ -123,7 +167,7 @@ export async function POST(request: Request) {
       }
     }
 
-    let storedPdfPath = invoice.pdf_url;
+    const storedPdfPath = invoice.pdf_url;
     const hadPdf = Boolean(storedPdfPath);
     if (!storedPdfPath) {
       const { data: buckets } = await admin.storage.listBuckets();
@@ -206,14 +250,15 @@ export async function GET(request: Request) {
     if ("error" in authorization) return NextResponse.json({ error: authorization.error }, { status: authorization.status });
 
     const admin = createAdminClient();
-    const { data: invoice, error } = await admin
+    const { data: rawInvoice, error } = await admin
       .from("invoices")
       .select("*")
       .eq("booking_id", bookingId)
       .eq("tenant_id", authorization.user.tenant_id)
       .maybeSingle();
     if (error) return NextResponse.json({ error: "Erreur lors de la récupération de la facture." }, { status: 500 });
-    if (!invoice) return NextResponse.json({ invoice: null });
+    if (!rawInvoice) return NextResponse.json({ invoice: null });
+    const invoice = await ensureAccessToken(admin, rawInvoice as Invoice);
 
     // Si le PDF existe dans le storage, le retourner directement en binaire
     if (invoice.pdf_url && !isLegacyPublicUrl(invoice.pdf_url)) {

@@ -605,6 +605,7 @@ export interface Invoice {
   total_amount: number;
   status: InvoiceStatus;
   pdf_url: string | null;
+  access_token: string | null;
   sent_at: string | null;
   sent_to: string | null;
   created_by: string;

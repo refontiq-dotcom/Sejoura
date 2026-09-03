@@ -1283,6 +1283,7 @@ export default function AccountingPage() {
             total_amount: bk.total_amount,
             status: "draft" as InvoiceStatus,
             pdf_url: null,
+            access_token: null,
             sent_at: null,
             sent_to: null,
             created_by: "",

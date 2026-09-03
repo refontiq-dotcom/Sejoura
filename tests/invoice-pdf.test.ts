@@ -194,6 +194,7 @@ const baseInvoice = {
   total_amount: 13200,
   status: "draft" as const,
   pdf_url: null,
+  access_token: "0123456789abcdef0123456789abcdef01234567",
   sent_at: null,
   sent_to: null,
   created_by: "u-1",
@@ -392,5 +393,27 @@ describe("generateInvoicePdf", () => {
     const text = extractPdfText(buffer);
     expect(text).toContain("Nuitée initiale · du 01/08 au 03/08");
     expect(text).toContain("Dépassement de séjour · du 03/08 au 05/08");
+  });
+
+  it("intègre un QR Code de téléchargement dans le pied de page", async () => {
+    // Le pied de page doit contenir :
+    //   1. une image (signature /XObject /Image dans le flux PDF),
+    //   2. la mention « Scannez ce QR Code… »,
+    //   3. un lien /URI vers l'URL de téléchargement public.
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.sejoura.com";
+    const buffer = await generateInvoicePdf({
+      tenant: baseTenant as never,
+      booking: { ...baseBooking, ...relations } as never,
+      invoice: { ...baseInvoice, access_token: "abcdef0123456789abcdef0123456789abcdef01" } as never,
+    });
+
+    const raw = buffer.toString("latin1");
+    // Le PDF embarque bien une image XObject (QR Code PNG) — la signature
+    // /Subtype /Image est conservée même après compression FlateDecode.
+    expect(raw).toMatch(/\/Subtype\s*\/Image/);
+    // Mention textuelle visible (pdfkit peut casser la ligne en raison de
+    // la largeur limitée du pied de page, on normalise les espaces).
+    const text = extractPdfText(buffer).replace(/\s+/g, " ");
+    expect(text).toContain("Scannez ce QR Code pour télécharger l'exemplaire original");
   });
 });

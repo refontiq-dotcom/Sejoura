@@ -1,7 +1,9 @@
 import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
 import type { BookingExtension, BookingWithRelations, Invoice, Tenant } from "@/types/database";
 import { formatDateLong } from "@/lib/utils";
 import { convertXofTo, getCurrencyDecimals, getCurrencySymbol } from "@/lib/currencyConverter";
+import { getInvoiceDownloadUrl } from "@/lib/invoice-share";
 
 export interface InvoicePdfData {
   tenant: Tenant;
@@ -514,9 +516,22 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .text(`Reste à payer : ${fmt(balance)}`, 60, y + 38);
 
   // ==========================================================================
-  // PIED DE PAGE
+  // PIED DE PAGE — QR Code de téléchargement + mentions légales
   // ==========================================================================
-  const footerY = 740;
+  const footerY = 720;
+  const footerHeight = 56; // y=720..776 : on reste sous la bordure interne (28..774)
+  const downloadUrl = getInvoiceDownloadUrl(invoice);
+
+  // Séparateur fin au-dessus du pied de page
+  doc
+    .lineWidth(0.5)
+    .strokeColor(borderColor)
+    .moveTo(60, footerY)
+    .lineTo(552, footerY)
+    .stroke();
+
+  // --- Bloc gauche (texte) : limité à 380 px pour ne pas chevaucher le QR ---
+  const footerTextWidth = 380;
   doc
     .fontSize(8)
     .fillColor(mutedColor)
@@ -524,8 +539,8 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .text(
       "Merci de votre confiance. Cette facture a été générée automatiquement par Séjoura.",
       60,
-      footerY,
-      { align: "center" }
+      footerY + 8,
+      { width: footerTextWidth, align: "left" }
     );
 
   doc
@@ -535,9 +550,42 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .text(
       `Facture N° ${invoice.invoice_number} • Générée le ${formatDateLong(invoice.created_at)}`,
       60,
-      footerY + 14,
-      { align: "center" }
+      footerY + 22,
+      { width: footerTextWidth, align: "left" }
     );
+
+  // --- Bloc droit : QR Code de téléchargement (si token dispo) ---
+  if (downloadUrl) {
+    try {
+      const qrPng = await QRCode.toBuffer(downloadUrl, {
+        type: "png",
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 160, // pixels ; pdfkit scale au fit ci-dessous
+        color: { dark: "#0C1C33", light: "#FFFFFF" },
+      });
+      const qrSize = 56;
+      const qrX = 612 - 60 - qrSize; // bord droit intérieur (marge 60)
+      const qrY = footerY + (footerHeight - qrSize) / 2;
+      doc.image(qrPng, qrX, qrY, { fit: [qrSize, qrSize] });
+
+      // Mention sous le QR Code
+      doc
+        .fontSize(6.5)
+        .fillColor(mutedColor)
+        .font("Helvetica")
+        .text(
+          "Scannez ce QR Code pour télécharger l'exemplaire original",
+          qrX - 4,
+          qrY + qrSize + 2,
+          { width: qrSize + 8, align: "center", lineBreak: false }
+        );
+    } catch (err) {
+      // Échec silencieux : la facture reste valide sans QR Code plutôt que
+      // d'empêcher la génération (compatibilité ascendante).
+      console.error("QR code generation failed:", err);
+    }
+  }
 
   doc.end();
 

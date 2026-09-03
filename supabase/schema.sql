@@ -523,6 +523,7 @@ CREATE TABLE invoices (
   total_amount    INTEGER NOT NULL,           -- Total TTC (en FCFA)
   status          invoice_status NOT NULL DEFAULT 'draft',
   pdf_url         TEXT,                       -- URL vers le PDF dans Supabase Storage
+  access_token    TEXT,                       -- Jeton public unique (QR Code de téléchargement)
   sent_at         TIMESTAMPTZ,                -- Date d'envoi au client
   sent_to         TEXT,                       -- Destinataire (email ou téléphone)
   created_by      UUID NOT NULL REFERENCES users(id),
@@ -535,6 +536,7 @@ CREATE INDEX idx_invoices_booking ON invoices(booking_id);
 CREATE INDEX idx_invoices_number ON invoices(invoice_number);
 CREATE INDEX idx_invoices_status ON invoices(status);
 CREATE INDEX idx_invoices_created ON invoices(created_at);
+CREATE UNIQUE INDEX idx_invoices_access_token ON invoices(access_token) WHERE access_token IS NOT NULL;
 
 -- ----------------------------------------------------------------------------
 -- 13. TABLE: audit_logs (Journal d'audit — Traçabilité)
