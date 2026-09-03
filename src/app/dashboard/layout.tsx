@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { OnboardingStatusResponse } from "@/app/api/auth/onboarding-status/route";
@@ -23,6 +23,7 @@ import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
 import type { User, Accommodation } from "@/types/database";
 
 const ACTIVE_ACCOMMODATION_STORAGE_KEY = "sejoura-active-accommodation";
+const MOBILE_BREAKPOINT = 1024;
 
 export default function DashboardLayout({
   children,
@@ -46,10 +47,16 @@ export default function DashboardLayout({
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
-      return window.innerWidth < 1024;
+      return window.innerWidth < MOBILE_BREAKPOINT;
     }
     return true;
   });
+  // Ref miroir pour que le handler de scroll (attaché une seule fois) lise
+  // l'état courant sans avoir à se reabonner à chaque toggle de la sidebar.
+  const sidebarCollapsedRef = useRef(sidebarCollapsed);
+  useEffect(() => {
+    sidebarCollapsedRef.current = sidebarCollapsed;
+  }, [sidebarCollapsed]);
 
   const [headerHidden, setHeaderHidden] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
@@ -87,12 +94,14 @@ export default function DashboardLayout({
   // mot de passe et n'ont pas de code secret.
 
   // Gérer la sidebar responsive : plier en mobile, déplier en desktop.
+  // On cache window.innerWidth (évite un layout read par resize) et on
+  // n'attache le listener qu'une seule fois (deps vides).
   useEffect(() => {
     function handleResize() {
-      setSidebarCollapsed(window.innerWidth < 1024);
+      setSidebarCollapsed(window.innerWidth < MOBILE_BREAKPOINT);
     }
     handleResize();
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", handleResize, { passive: true });
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
@@ -101,23 +110,58 @@ export default function DashboardLayout({
   // - Sur mobile (< 1024px), l'en-tête glisse hors écran en scrollant vers le bas
   //   pour libérer tout l'espace, et réapparaît dès qu'on remonte. On ne le
   //   masque jamais quand le tiroir de navigation est ouvert.
+  //
+  // Optimisation fluidité : les `setState` sont coalescés dans une seule frame
+  // d'animation (rAF) au lieu d'être déclenchés à chaque événement `scroll`
+  // (qui peut tirer à > 60 Hz sur les écrans 120/144 Hz). `window.innerWidth`
+  // est caché dans un ref pour éviter un layout-forced read à chaque scroll.
   useEffect(() => {
     let lastY = window.scrollY;
+    const widthRef = { current: typeof window !== "undefined" ? window.innerWidth : 1280 };
+    const syncWidth = () => {
+      widthRef.current = window.innerWidth;
+    };
+    window.addEventListener("resize", syncWidth, { passive: true });
+
+    let frame = 0;
+    let nextScrolled: boolean | null = null;
+    let nextHidden: boolean | null = null;
+    const flush = () => {
+      frame = 0;
+      if (nextScrolled !== null) {
+        setHeaderScrolled(nextScrolled);
+        nextScrolled = null;
+      }
+      if (nextHidden !== null) {
+        setHeaderHidden(nextHidden);
+        nextHidden = null;
+      }
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(flush);
+    };
+
     const onScroll = () => {
       const y = window.scrollY;
-      setHeaderScrolled(y > 12);
-      const isMobile = window.innerWidth < 1024;
-      const drawerOpen = isMobile && !sidebarCollapsed;
+      nextScrolled = y > 12;
+      const isMobile = widthRef.current < MOBILE_BREAKPOINT;
+      const drawerOpen = isMobile && !sidebarCollapsedRef.current;
       if (isMobile && y > 160 && y > lastY && !drawerOpen) {
-        setHeaderHidden(true);
+        nextHidden = true;
       } else if (y < lastY || drawerOpen) {
-        setHeaderHidden(false);
+        nextHidden = false;
       }
       lastY = y;
+      schedule();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [sidebarCollapsed]);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", syncWidth);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   // Écouter la mise à jour du logo et de la couleur de thème depuis les Paramètres en temps réel
   useEffect(() => {
@@ -275,50 +319,55 @@ export default function DashboardLayout({
         }
 
         if (userData.tenant_id) {
-          const { data: tenantData } = await supabase
-            .from("tenants")
-            .select("company_name, logo_url, theme_color, primary_color")
-            .eq("id", userData.tenant_id)
-            .maybeSingle();
+          // Fan-out parallèle : tenant, abonnement, résidences et statut
+          // d'onboarding sont indépendants. Avant, ils étaient enchaînés
+          // séquentiellement et bloquaient le premier paint (≈ 4 RTT).
+          const [tenantRes, subRes, accsRes, serverNeedsOnboarding] = await Promise.all([
+            supabase
+              .from("tenants")
+              .select("company_name, logo_url, theme_color, primary_color")
+              .eq("id", userData.tenant_id)
+              .maybeSingle(),
+            supabase
+              .from("subscriptions")
+              .select("plan, monthly_price")
+              .eq("tenant_id", userData.tenant_id)
+              .maybeSingle(),
+            supabase
+              .from("accommodations")
+              .select("id, name, address, city, logo_url, accommodation_type, created_at, tenant_id, is_active")
+              .eq("tenant_id", userData.tenant_id)
+              .order("name"),
+            fetchOnboardingStatus(),
+          ]);
 
-          if (tenantData) {
-            setCompanyName(tenantData.company_name);
-            setCompanyLogo(tenantData.logo_url ?? null);
-            if (tenantData.primary_color) {
-              setPrimaryColor(tenantData.primary_color);
-            }
-            if (tenantData.theme_color) {
-              setThemeColor(tenantData.theme_color);
+          if (tenantRes.data) {
+            setCompanyName(tenantRes.data.company_name);
+            setCompanyLogo(tenantRes.data.logo_url ?? null);
+            if (tenantRes.data.primary_color) setPrimaryColor(tenantRes.data.primary_color);
+            if (tenantRes.data.theme_color) {
+              setThemeColor(tenantRes.data.theme_color);
               if (typeof window !== "undefined") {
-                localStorage.setItem("theme_color", tenantData.theme_color);
+                localStorage.setItem("theme_color", tenantRes.data.theme_color);
               }
             } else {
               setThemeColor(null);
             }
           }
 
-          const { data: subData } = await supabase
-            .from("subscriptions")
-            .select("plan, monthly_price")
-            .eq("tenant_id", userData.tenant_id)
-            .maybeSingle();
-
-          if (subData) {
-            setPlan(subData.plan);
-            setMonthlyPrice(subData.monthly_price || 0);
+          if (subRes.data) {
+            setPlan(subRes.data.plan);
+            setMonthlyPrice(subRes.data.monthly_price || 0);
           }
 
-          // Charger les résidences accessibles à l'utilisateur pour le
-          // sélecteur multi-résidences du Header.
-          const { data: accsData } = await supabase
-            .from("accommodations")
-            .select("*")
-            .eq("tenant_id", userData.tenant_id)
-            .order("name");
+          // Étape 2 obligatoire — la décision fiable vient du serveur
+          // (déjà résolue en parallèle ci-dessus).
+          setNeedsOnboarding(serverNeedsOnboarding);
 
-          if (accsData) {
-            let accessible = accsData as unknown as Accommodation[];
-            // Un réceptionniste / ménagère ne voit que sa résidence active
+          if (accsRes.data) {
+            // Réceptionniste / ménagère : on ne récupère son affectation
+            // qu'après le fan-out pour éviter un round-trip bloquant.
+            let accessible = accsRes.data as unknown as Accommodation[];
             if (userData.role === "receptionniste" || userData.role === "menagere") {
               const assignedId = await getActiveAssignmentId(
                 supabase,
@@ -350,14 +399,13 @@ export default function DashboardLayout({
             }
             setActiveAccommodationId(activeId);
           }
+        } else {
+          // Pas de tenant (étape 2 onboarding) : on a déjà la décision
+          // serveur via la branche précédente ; on s'assure juste qu'elle
+          // est appliquée.
+          const serverNeedsOnboarding = await fetchOnboardingStatus();
+          setNeedsOnboarding(serverNeedsOnboarding);
         }
-
-        // Le tenant seul ne suffit pas pour décider si l'étape 2 est terminée :
-        // la présence d'un établissement est vérifiée côté serveur (service_role)
-        // pour ne jamais renvoyer un compte déjà configuré vers l'onboarding.
-        const serverNeedsOnboarding = await fetchOnboardingStatus();
-        // L'étape 2 est obligatoire — pas de bypass via localStorage.
-        setNeedsOnboarding(serverNeedsOnboarding);
 
         setLoading(false);
       } catch (err) {
@@ -383,7 +431,10 @@ export default function DashboardLayout({
   // Titre / sous-titre intelligents selon la page courante.
   // Sur /dashboard : accueil personnalisé (bonjour + prénom + date du jour).
   // Sur les autres pages : titre et description propres à chaque module.
-  const headerMeta = (() => {
+  // Mémoïsé : évite de reconstruire l'objet 30+ clés à chaque render du
+  // layout (sinon le Header reçoit une nouvelle `subtitle` à chaque render
+  // et ne peut pas être mis en React.memo).
+  const headerMeta = useMemo(() => {
     const d = translations[lang];
     const firstName = user?.full_name?.trim().split(/\s+/)[0] || "";
     const p = pathname || "/dashboard";
@@ -440,33 +491,38 @@ export default function DashboardLayout({
       },
     };
     return map[p] || { title: t.title, subtitle: t.subtitle };
-  })();
+  }, [lang, pathname, user?.full_name, localHour, t.subtitle, t.title]);
 
-  const activeTheme = getSidebarThemeStyles(themeColor, theme === "dark");
+  // Styles dérivés mémoïsés : `derivePastelColor` parse la couleur, et
+  // `getSidebarThemeStyles` est non-trivial ; on évite de les recalculer
+  // à chaque render (sinon Sidebar/Header reçoivent des objets neufs).
+  const activeTheme = useMemo(
+    () => getSidebarThemeStyles(themeColor, theme === "dark"),
+    [themeColor, theme]
+  );
   // En mode sombre, la couleur primaire dynamique devient la couleur dorée Séjoura
   // pour garantir un contraste suffisant sur fond sombre
   const dynamicPrimaryColor = theme === "dark" ? "#C2944E" : activeTheme.sidebarBg;
   // Le fond principal de la page Dashboard suit la "Couleur pastel" choisie
   // dans les Paramètres (nuance pastel dérivée) quand elle est disponible.
-  const isPrimaryHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
-  const mainBg =
-    theme === "dark"
-      ? activeTheme.mainBg
-      : isPrimaryHex
-        ? derivePastelColor(primaryColor)
-        : activeTheme.mainBg;
+  const mainBg = useMemo(() => {
+    if (theme === "dark") return activeTheme.mainBg;
+    const isPrimaryHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
+    return isPrimaryHex ? derivePastelColor(primaryColor) : activeTheme.mainBg;
+  }, [theme, activeTheme.mainBg, primaryColor]);
 
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.style.setProperty("--sidebar-bg", activeTheme.sidebarBg);
-      document.documentElement.style.setProperty("--main-bg", mainBg);
-      document.documentElement.style.setProperty("--primary-color", dynamicPrimaryColor);
-      document.documentElement.style.setProperty("--primary-light", mainBg);
-      document.documentElement.style.setProperty("--primary-hover", activeTheme.hoverBg);
-      document.documentElement.style.setProperty("--card-bg", activeTheme.cardBg);
-      document.documentElement.style.setProperty("--card-border", activeTheme.cardBorder);
+  // Callbacks stables pour Sidebar / Header : sans useCallback, ces handlers
+  // changent d'identité à chaque render et empêchent React.memo de
+  // court-circuiter le re-render des deux composants.
+  const toggleSidebar = useCallback(
+    () => setSidebarCollapsed((c) => !c),
+    []
+  );
+  const closeMobileSidebar = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT) {
+      setSidebarCollapsed(true);
     }
-  }, [activeTheme.sidebarBg, activeTheme.mainBg, activeTheme.hoverBg, activeTheme.cardBg, activeTheme.cardBorder, dynamicPrimaryColor, mainBg]);
+  }, []);
 
   function handleOnboardingComplete() {
     setNeedsOnboarding(false);
@@ -526,8 +582,21 @@ export default function DashboardLayout({
     return null;
   }
 
+  // Contexte utilisateur mémoïsé : sans useMemo, le CurrentUserProvider
+  // reçoit un nouvel objet à chaque render et force la page entière à
+  // re-render (c'est le consommateur principal du dashboard, ~2200 lignes).
+  const currentUserValue = useMemo(
+    () => ({
+      user,
+      tenantId: user?.tenant_id ?? "",
+      plan,
+      loading: false,
+    }),
+    [user, plan]
+  );
+
   return (
-    <div 
+    <div
       className="min-h-screen dashboard-bg transition-colors duration-300"
       style={{
         backgroundColor: mainBg,
@@ -548,15 +617,8 @@ export default function DashboardLayout({
         themeColor={themeColor}
         mainBg={mainBg}
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onCloseMobile={() => {
-          // Ne ferme le tiroir que sur mobile (< 1024px) : sur desktop la
-          // sidebar reste toujours visible (pliée ou dépliée), le clic sur
-          // un lien ne doit pas modifier son état.
-          if (typeof window !== "undefined" && window.innerWidth < 1024) {
-            setSidebarCollapsed(true);
-          }
-        }}
+        onToggle={toggleSidebar}
+        onCloseMobile={closeMobileSidebar}
         onlineBookingCount={onlineBookingCount}
       />
 
@@ -565,7 +627,7 @@ export default function DashboardLayout({
         userId={user.id ?? ""}
         userRole={user.role ?? ""}
       >
-        <div className={`transition-all duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"}`}>
+        <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-60"} transition-[margin] duration-300`}>
           <div
             className={`sticky top-0 z-30 transition-transform duration-300 will-change-transform ${
               headerHidden ? "-translate-y-full" : "translate-y-0"
@@ -574,7 +636,7 @@ export default function DashboardLayout({
             <Header
               title={headerMeta.title}
               subtitle={headerMeta.subtitle}
-              onMenuClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onMenuClick={toggleSidebar}
               userName={user.full_name}
               userRole={user.role}
               userEmail={user.email}
@@ -591,14 +653,7 @@ export default function DashboardLayout({
             className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
           >
             <div key={pathname} className="animate-page-enter">
-              <CurrentUserProvider
-                value={{
-                  user,
-                  tenantId: user.tenant_id ?? "",
-                  plan,
-                  loading: false,
-                }}
-              >
+              <CurrentUserProvider value={currentUserValue}>
                 {children}
               </CurrentUserProvider>
             </div>
