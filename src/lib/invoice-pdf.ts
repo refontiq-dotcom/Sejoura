@@ -122,7 +122,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
 
   const doc = new PDFDocument({
     size: "A4",
-    margin: 60,
+    margin: 50,
     lang: "fr-FR",
     info: {
       Title: `Facture N° ${invoice.invoice_number}`,
@@ -147,8 +147,8 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   const borderColor = "#E2E8F0";
   const headerFill = "#F1F5F9";
 
-  // Bordure fine de page
-  doc.save().rect(28, 28, 555, 746).lineWidth(0.5).stroke(borderColor).restore();
+  // Bordure fine de page (réduite pour gagner de l'espace vertical utile).
+  doc.save().rect(20, 20, 571, 802).lineWidth(0.5).stroke(borderColor).restore();
 
   // ==========================================================================
   // EN-TÊTE NAVY — bloc ÉMETTEUR (gauche) + bloc TITRE (droite), sans superposition
@@ -272,34 +272,36 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   // ==========================================================================
   // BLOC DESTINATAIRE + DÉTAILS RÉSERVATION
   // ==========================================================================
-  let y = 140;
+  // Compacté pour tenir la facture sur une seule page A4 même dans les cas
+  // chargés (plusieurs prolongations, taxe de nuitée activée, longs libellés).
+  let y = 128;
 
   // --- Facturé à (destinataire, à gauche) ---
   doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("FACTURÉ À", 60, y);
   doc
-    .fontSize(13)
+    .fontSize(12)
     .fillColor(textColor)
     .font("Helvetica-Bold")
-    .text(client?.full_name || "Client", 60, y + 14, { width: 220 });
-  doc.fontSize(9).font("Helvetica").fillColor(mutedColor);
+    .text(client?.full_name || "Client", 60, y + 12, { width: 220 });
+  doc.fontSize(8.5).font("Helvetica").fillColor(mutedColor);
   doc
-    .text(truncateToWidth(doc, client?.phone || "", 220), 60, y + 34, { width: 220 })
-    .text(truncateToWidth(doc, client?.email || "", 220), 60, y + 46, { width: 220 })
-    .text(truncateToWidth(doc, client?.nationality || "", 220), 60, y + 58, { width: 220 });
+    .text(truncateToWidth(doc, client?.phone || "", 220), 60, y + 28, { width: 220 })
+    .text(truncateToWidth(doc, client?.email || "", 220), 60, y + 39, { width: 220 })
+    .text(truncateToWidth(doc, client?.nationality || "", 220), 60, y + 50, { width: 220 });
 
   // --- Réservation (à droite) ---
   const rx = 320;
   const rw = 232;
   doc.fontSize(8).fillColor(mutedColor).font("Helvetica-Bold").text("RÉSERVATION", rx, y);
-  doc.fontSize(9).font("Helvetica").fillColor(mutedColor);
+  doc.fontSize(8.5).font("Helvetica").fillColor(mutedColor);
   const roomLabel = `Chambre : ${room?.room_number || "—"}${roomType?.name ? ` (${roomType.name})` : ""}`;
   doc
-    .text(truncateToWidth(doc, `Code : ${booking.booking_code || "—"}`, rw), rx, y + 16, { width: rw })
-    .text(truncateToWidth(doc, roomLabel, rw), rx, y + 28, { width: rw })
-    .text(truncateToWidth(doc, `Établissement : ${accommodation?.name || "—"}`, rw), rx, y + 40, { width: rw })
-    .text(`Arrivée : ${formatDateLong(booking.check_in_date)}`, rx, y + 52, { width: rw })
-    .text(`Départ : ${formatDateLong(booking.check_out_date)}`, rx, y + 64, { width: rw })
-    .text(`Nombre de nuits : ${booking.nights_count}`, rx, y + 76, { width: rw });
+    .text(truncateToWidth(doc, `Code : ${booking.booking_code || "—"}`, rw), rx, y + 14, { width: rw })
+    .text(truncateToWidth(doc, roomLabel, rw), rx, y + 25, { width: rw })
+    .text(truncateToWidth(doc, `Établissement : ${accommodation?.name || "—"}`, rw), rx, y + 36, { width: rw })
+    .text(`Arrivée : ${formatDateLong(booking.check_in_date)}`, rx, y + 47, { width: rw })
+    .text(`Départ : ${formatDateLong(booking.check_out_date)}`, rx, y + 58, { width: rw })
+    .text(`Nombre de nuits : ${booking.nights_count}`, rx, y + 69, { width: rw });
 
   // ==========================================================================
   // TABLEAU DES LIGNES
@@ -315,9 +317,11 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   const col3Right = col2Right + qtyW;
 
   const padX = 10;
-  const headerH = 24;
-  const rowH = 24;
-  const tableTop = 260;
+  const headerH = 22;
+  const rowH = 22;
+  // Position de départ du tableau : recalculée pour rester compacte après le
+  // bloc destinataire (dont le dernier texte est à y+69 ≈ 197 pt).
+  const tableTop = 218;
 
   // Fond de l'en-tête du tableau
   doc.rect(tableLeft, tableTop, tableWidth, headerH).fill(headerFill);
@@ -432,7 +436,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   });
 
   // --- Sous-total ---
-  rowTop += 6;
+  rowTop += 4;
   const subY = rowTop + (12 - 9) / 2;
   doc
     .fontSize(9)
@@ -443,7 +447,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
 
   const taxAmount = invoice.tax_amount || 0;
   if (taxAmount > 0) {
-    rowTop += 16;
+    rowTop += 13;
     const taxY = rowTop + (12 - 9) / 2;
     doc
       .text(DEFAULT_TAX_RATE.label, 352, taxY, { width: 100, align: "right" })
@@ -456,7 +460,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   // (utilisé ailleurs pour le suivi des soldes de paiement).
   const touristTaxAmount = booking.tourist_tax_amount || 0;
   if (touristTaxAmount > 0) {
-    rowTop += 16;
+    rowTop += 13;
     const touristTaxY = rowTop + (12 - 9) / 2;
     doc
       .text("Taxe de nuitée", 352, touristTaxY, { width: 100, align: "right" })
@@ -464,7 +468,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   }
 
   // --- Total ---
-  rowTop += 16;
+  rowTop += 13;
   doc
     .lineWidth(1)
     .strokeColor(borderColor)
@@ -472,7 +476,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .lineTo(tableLeft + tableWidth, rowTop)
     .stroke();
 
-  rowTop += 8;
+  rowTop += 5;
   const totalY = rowTop + (13 - 11) / 2;
   doc
     .fontSize(11)
@@ -484,7 +488,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
   // ==========================================================================
   // STATUT DU PAIEMENT
   // ==========================================================================
-  y = rowTop + 30;
+  y = rowTop + 20;
   const paymentStatusLabel =
     booking.payment_status === "paid"
       ? "Payé"
@@ -507,19 +511,24 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
     .fontSize(9)
     .fillColor(mutedColor)
     .font("Helvetica")
-    .text(`Montant payé : ${fmt(paidAmount)}`, 60, y + 22);
+    .text(`Montant payé : ${fmt(paidAmount)}`, 60, y + 16);
 
   doc
     .fontSize(9)
     .fillColor(balance > 0 ? textColor : mutedColor)
     .font(balance > 0 ? "Helvetica-Bold" : "Helvetica")
-    .text(`Reste à payer : ${fmt(balance)}`, 60, y + 38);
+    .text(`Reste à payer : ${fmt(balance)}`, 60, y + 29);
 
   // ==========================================================================
   // PIED DE PAGE — QR Code de téléchargement + mentions légales
   // ==========================================================================
-  const footerY = 720;
-  const footerHeight = 56; // y=720..776 : on reste sous la bordure interne (28..774)
+  // Le pied de page est positionné dynamiquement juste sous le bloc paiement
+  // (avec un minimum pour ne pas chevaucher le contenu) et reste borné par
+  // la bordure interne (28..774) afin de garantir une facture mono-page.
+  const MIN_FOOTER_Y = 660;
+  const MAX_FOOTER_Y = 700;
+  const footerY = Math.min(MAX_FOOTER_Y, Math.max(MIN_FOOTER_Y, y + 48));
+  const footerHeight = 56; // y=footerY..footerY+56 : reste sous 774
   const downloadUrl = getInvoiceDownloadUrl(invoice);
 
   // Séparateur fin au-dessus du pied de page
@@ -564,7 +573,7 @@ export async function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> 
         width: 160, // pixels ; pdfkit scale au fit ci-dessous
         color: { dark: "#0C1C33", light: "#FFFFFF" },
       });
-      const qrSize = 56;
+      const qrSize = 48;
       const qrX = 612 - 60 - qrSize; // bord droit intérieur (marge 60)
       const qrY = footerY + (footerHeight - qrSize) / 2;
       doc.image(qrPng, qrX, qrY, { fit: [qrSize, qrSize] });

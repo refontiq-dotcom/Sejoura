@@ -395,6 +395,86 @@ describe("generateInvoicePdf", () => {
     expect(text).toContain("Dépassement de séjour · du 03/08 au 05/08");
   });
 
+  it("tient sur une seule page pour une facture simple", async () => {
+    const buffer = await generateInvoicePdf({
+      tenant: baseTenant as never,
+      booking: { ...baseBooking, ...relations } as never,
+      invoice: baseInvoice as never,
+    });
+    const raw = buffer.toString("latin1");
+    // Le PDF doit comporter exactement un objet /Page (et donc une seule page)
+    const pageMatches = raw.match(/\/Type\s*\/Page[^s]/g) || [];
+    expect(pageMatches.length).toBe(1);
+  });
+
+  it("tient sur une seule page même avec beaucoup de prolongations", async () => {
+    // 1 nuit initiale + 5 prolongations (6 lignes) — cas le plus long possible
+    // avant agrégation (MAX_DETAIL_LINES=7 → 6 < 7).
+    const longBooking = {
+      ...baseBooking,
+      check_in_date: "2026-08-01",
+      check_out_date: "2026-08-10",
+      nights_count: 9,
+      total_amount: 54000,
+    };
+    const longInvoice = { ...baseInvoice, amount: 54000, tax_amount: 0, total_amount: 54000 };
+    const extensions = [2, 2, 1, 1, 3].map((nights, i) => ({
+      id: `ext-${i}`,
+      tenant_id: "t-1",
+      booking_id: "b-1",
+      previous_check_out_date: `2026-08-0${1 + i * 2}`,
+      new_check_out_date: `2026-08-0${3 + i * 2}`,
+      extra_nights: nights,
+      source: "manual" as const,
+      created_by: "u-1",
+      created_at: `2026-08-0${1 + i * 2}T10:00:00Z`,
+    }));
+
+    const buffer = await generateInvoicePdf({
+      tenant: baseTenant as never,
+      booking: { ...longBooking, ...relations } as never,
+      invoice: longInvoice as never,
+      extensions: extensions as never,
+    });
+    const raw = buffer.toString("latin1");
+    const pageMatches = raw.match(/\/Type\s*\/Page[^s]/g) || [];
+    expect(pageMatches.length).toBe(1);
+  });
+
+  it("tient sur une seule page avec taxe de séjour + nom client long + taxe activée", async () => {
+    // Cas réel : un client au nom long, une facture avec sous-total, TVA et
+    // taxe de nuitée (3 lignes sous le tableau), et un nom d'établissement long.
+    const longClient = {
+      ...relations.client,
+      full_name: "Mamadou Lamine Diouf Ndiaye Diop",
+      email: "mamadou.lamine.diop@tres-long-email-professionnel.com",
+      phone: "+221 77 123 45 67",
+    };
+    const longTenant = {
+      ...baseTenant,
+      company_name: "Hôtel Résidence Les Cocotiers du Bord de Mer",
+      address: "Avenue Cheikh Anta Diop, Dakar Plateau",
+    };
+    const invoiceWithTax = {
+      ...baseInvoice,
+      amount: 12000,
+      tax_amount: 1800,
+      total_amount: 13800,
+    };
+    const bookingWithTouristTax = {
+      ...baseBooking,
+      tourist_tax_amount: 1500,
+    };
+    const buffer = await generateInvoicePdf({
+      tenant: longTenant as never,
+      booking: { ...bookingWithTouristTax, ...relations, client: longClient } as never,
+      invoice: invoiceWithTax as never,
+    });
+    const raw = buffer.toString("latin1");
+    const pageMatches = raw.match(/\/Type\s*\/Page[^s]/g) || [];
+    expect(pageMatches.length).toBe(1);
+  });
+
   it("intègre un QR Code de téléchargement dans le pied de page", async () => {
     // Le pied de page doit contenir :
     //   1. une image (signature /XObject /Image dans le flux PDF),
