@@ -1,0 +1,2453 @@
+From 5a10f4b23705f7c9666f9d62a0e693fd9058a2bb Mon Sep 17 00:00:00 2001
+From: Kilo <kilo@anthropic.local>
+Date: Thu, 3 Sep 2026 17:40:57 +0000
+Subject: [PATCH] =?UTF-8?q?feat(ecoles):=20int=C3=A9grer=20le=20portail=20?=
+ =?UTF-8?q?de=20r=C3=A9servation=20Schooly?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Ajoute un client HTTP serveur consommant les routes partenaires
+/api/trouvetou/* de Schooly (Bearer via TROUVETOU_API_KEY_PEPPER).
+Le jeton n'est jamais envoyé au navigateur : tous les appels passent
+par les routes internes /api/ecoles/*.
+
+Nouveautés :
+- src/lib/schooly : client + types + erreurs normalisées
+  (SchoolyApiError, SchoolyConfigError) avec timeout AbortSignal.
+- src/app/api/ecoles : proxy catalogue, création de réservation,
+  confirmation de paiement.
+- src/app/ecoles/partenaires : liste + fiche + formulaire de
+  réservation + page de confirmation.
+- src/components/ecoles : carte établissement, formulaire client
+  (React 19 useFormStatus), contenu de page.
+- tests : client (mock fetch) + routes (vi.mock du module).
+- vitest.config.mts + scripts test/typecheck dans package.json.
+- README et .env.example documentent l'intégration.
+- /ecoles affiche désormais un encart promotionnel vers le nouveau
+  portail sans casser le catalogue générique existant.
+
+La configuration est facultative : sans SCHOOLY_API_URL, la page
+partenaires affiche un message clair et les routes renvoient 503.
+Le reste de l'application reste inchangé.
+---
+ trouvetou/.env.example                        |  24 ++
+ trouvetou/.gitignore                          |   1 +
+ trouvetou/README.md                           |  77 +++++
+ trouvetou/package.json                        |   9 +-
+ .../ecoles/reservations/[id]/payment/route.ts |  78 +++++
+ .../src/app/api/ecoles/reservations/route.ts  | 105 +++++++
+ trouvetou/src/app/api/ecoles/route.ts         |  49 ++++
+ trouvetou/src/app/ecoles/page.tsx             |  30 +-
+ .../partenaires/[id]/confirmation/page.tsx    |  95 ++++++
+ .../src/app/ecoles/partenaires/[id]/page.tsx  | 179 +++++++++++
+ .../ecoles/partenaires/[id]/reserver/page.tsx |  87 ++++++
+ trouvetou/src/app/ecoles/partenaires/page.tsx |  51 ++++
+ trouvetou/src/components/ecoles/config.ts     |  25 ++
+ .../ecoles/ecoles-partenaires-content.tsx     | 160 ++++++++++
+ .../ecoles/schooly-establishment-card.tsx     | 111 +++++++
+ .../ecoles/schooly-reservation-form.tsx       | 277 ++++++++++++++++++
+ trouvetou/src/lib/schooly/client.ts           | 188 ++++++++++++
+ trouvetou/src/lib/schooly/index.ts            |  29 ++
+ trouvetou/src/lib/schooly/types.ts            | 123 ++++++++
+ trouvetou/tests/schooly-client.test.ts        | 234 +++++++++++++++
+ trouvetou/tests/schooly-routes.test.ts        | 258 ++++++++++++++++
+ trouvetou/tests/setup.ts                      |   4 +
+ trouvetou/vitest.config.mts                   |  16 +
+ 23 files changed, 2207 insertions(+), 3 deletions(-)
+ create mode 100644 trouvetou/.env.example
+ create mode 100644 trouvetou/README.md
+ create mode 100644 trouvetou/src/app/api/ecoles/reservations/[id]/payment/route.ts
+ create mode 100644 trouvetou/src/app/api/ecoles/reservations/route.ts
+ create mode 100644 trouvetou/src/app/api/ecoles/route.ts
+ create mode 100644 trouvetou/src/app/ecoles/partenaires/[id]/confirmation/page.tsx
+ create mode 100644 trouvetou/src/app/ecoles/partenaires/[id]/page.tsx
+ create mode 100644 trouvetou/src/app/ecoles/partenaires/[id]/reserver/page.tsx
+ create mode 100644 trouvetou/src/app/ecoles/partenaires/page.tsx
+ create mode 100644 trouvetou/src/components/ecoles/config.ts
+ create mode 100644 trouvetou/src/components/ecoles/ecoles-partenaires-content.tsx
+ create mode 100644 trouvetou/src/components/ecoles/schooly-establishment-card.tsx
+ create mode 100644 trouvetou/src/components/ecoles/schooly-reservation-form.tsx
+ create mode 100644 trouvetou/src/lib/schooly/client.ts
+ create mode 100644 trouvetou/src/lib/schooly/index.ts
+ create mode 100644 trouvetou/src/lib/schooly/types.ts
+ create mode 100644 trouvetou/tests/schooly-client.test.ts
+ create mode 100644 trouvetou/tests/schooly-routes.test.ts
+ create mode 100644 trouvetou/tests/setup.ts
+ create mode 100644 trouvetou/vitest.config.mts
+
+diff --git a/trouvetou/.env.example b/trouvetou/.env.example
+new file mode 100644
+index 0000000..704de48
+--- /dev/null
++++ b/trouvetou/.env.example
+@@ -0,0 +1,24 @@
++# ============================================================================
++# TROUVETOU — Variables d'environnement (exemple)
++# Copier ce fichier vers `.env.local` et compléter les valeurs.
++# ============================================================================
++
++# --- Supabase (lecture publique) ---
++NEXT_PUBLIC_SUPABASE_URL=
++NEXT_PUBLIC_SUPABASE_ANON_KEY=
++
++# --- Supabase admin (server-only, ingestion /api/v1/sync) ---
++TROUVETOU_SUPABASE_URL=
++TROUVETOU_SUPABASE_SERVICE_ROLE_KEY=
++
++# --- URL canonique du site (pour les liens OpenGraph, sitemap, etc.) ---
++NEXT_PUBLIC_SITE_URL=https://trouvetou.vercel.app
++
++# --- Intégration Schooly (partenaires écoles) -----------------------------
++# URL de base de l'instance Schooly (sans slash final).
++SCHOOLY_API_URL=https://schooly.example.com
++
++# Clé partagée avec Schooly (côté serveur uniquement, JAMAIS NEXT_PUBLIC_).
++# Le nom recommandé par Schooly est TROUVETOU_API_KEY_PEPPER. L'ancien nom
++# TROUVETOU_API_KEY reste accepté comme fallback de compatibilité.
++TROUVETOU_API_KEY_PEPPER=
+diff --git a/trouvetou/.gitignore b/trouvetou/.gitignore
+index 83874b0..6d696fd 100644
+--- a/trouvetou/.gitignore
++++ b/trouvetou/.gitignore
+@@ -25,6 +25,7 @@ yarn-error.log*
+ 
+ # env files (can opt-in for committing if needed)
+ .env*
++!.env.example
+ 
+ # vercel
+ .vercel
+diff --git a/trouvetou/README.md b/trouvetou/README.md
+new file mode 100644
+index 0000000..6b15588
+--- /dev/null
++++ b/trouvetou/README.md
+@@ -0,0 +1,77 @@
++# Trouvetou
++
++Portail public d'annonces multi-secteur (hôtels, résidences meublées, écoles,
++cliniques, restaurants). Consomme une base Supabase **dédiée** (catégories,
++providers, listings polymorphes) ainsi que des intégrations partenaires, dont
++**Schooly** pour la réservation en ligne d'écoles.
++
++## Stack
++
++- Next.js 16 (App Router, React 19, TypeScript)
++- Tailwind CSS 4
++- Supabase (lecture publique + ingestion serveur)
++- Framer Motion, Lucide, Swiper
++
++## Démarrage
++
++```bash
++npm install
++cp .env.example .env.local   # compléter SCHOOLY_API_URL + TROUVETOU_API_KEY_PEPPER
++npm run dev
++```
++
++## Tests
++
++```bash
++npm run typecheck
++npm run test
++npm run lint
++```
++
++## Intégration Schooly (écoles partenaires)
++
++Schooly est la source de vérité pour les établissements scolaires. Trouvetou
++expose le portail `/ecoles/partenaires` qui :
++
++- affiche le catalogue des écoles publiées (`GET /api/trouvetou` côté Schooly) ;
++- montre la fiche d'une école avec ses niveaux et places disponibles ;
++- crée un dossier `pending_payment` (`POST /api/trouvetou` côté Schooly) ;
++- confirme le paiement (`POST /api/trouvetou/reservations/:id/payment` côté Schooly).
++
++### Côté Trouvetou
++
++| Route | Rôle |
++|---|---|
++| `src/lib/schooly/client.ts` | Client HTTP serveur (Bearer, AbortSignal timeout). |
++| `src/lib/schooly/types.ts` | Types du contrat API. |
++| `src/app/api/ecoles/route.ts` | `GET /api/ecoles` — proxy catalogue. |
++| `src/app/api/ecoles/reservations/route.ts` | `POST /api/ecoles/reservations` — création de dossier. |
++| `src/app/api/ecoles/reservations/[id]/payment/route.ts` | `POST .../payment` — confirmation de paiement. |
++| `src/app/ecoles/partenaires/page.tsx` | Liste des écoles. |
++| `src/app/ecoles/partenaires/[id]/page.tsx` | Fiche école. |
++| `src/app/ecoles/partenaires/[id]/reserver/page.tsx` | Formulaire de réservation. |
++| `src/app/ecoles/partenaires/[id]/confirmation/page.tsx` | Confirmation. |
++| `src/components/ecoles/*.tsx` | UI dédiée (carte, formulaire, contenu). |
++
++Le jeton Bearer (`TROUVETOU_API_KEY_PEPPER`) n'est **jamais** envoyé au
++navigateur : toutes les requêtes Schooly passent par les routes internes
++`/api/ecoles/*`.
++
++### Configuration requise
++
++```env
++SCHOOLY_API_URL=https://schooly.example.com
++TROUVETOU_API_KEY_PEPPER=<clé partagée avec Schooly>
++```
++
++Si la configuration est absente, la page `/ecoles/partenaires` affiche un
++message clair et renvoie 503 sur `/api/ecoles*` — le reste de l'application
++n'est pas impacté. La page `/ecoles` historique (catalogue générique via
++`listings` Trouvetou) reste inchangée.
++
++## Sécurité
++
++- Clé Bearer **serveur uniquement** (jamais `NEXT_PUBLIC_*`).
++- Validation côté serveur des champs requis avant tout appel Schooly.
++- Timeout `AbortSignal.timeout(10s)` pour éviter les hangs.
++- Erreurs Schooly normalisées (`SchoolyApiError` / `SchoolyConfigError`).
+diff --git a/trouvetou/package.json b/trouvetou/package.json
+index eea092a..8c0cfdf 100644
+--- a/trouvetou/package.json
++++ b/trouvetou/package.json
+@@ -7,7 +7,10 @@
+     "dev": "next dev",
+     "build": "next build",
+     "start": "next start",
+-    "lint": "eslint"
++    "lint": "eslint",
++    "typecheck": "tsc --noEmit",
++    "test": "vitest run",
++    "test:watch": "vitest"
+   },
+   "dependencies": {
+     "@supabase/supabase-js": "^2.111.0",
+@@ -26,6 +29,8 @@
+     "eslint": "^9",
+     "eslint-config-next": "16.2.12",
+     "tailwindcss": "^4",
+-    "typescript": "^5"
++    "typescript": "^5",
++    "vitest": "^2.1.8",
++    "@vitejs/plugin-react": "^4.3.4"
+   }
+ }
+diff --git a/trouvetou/src/app/api/ecoles/reservations/[id]/payment/route.ts b/trouvetou/src/app/api/ecoles/reservations/[id]/payment/route.ts
+new file mode 100644
+index 0000000..c9e5956
+--- /dev/null
++++ b/trouvetou/src/app/api/ecoles/reservations/[id]/payment/route.ts
+@@ -0,0 +1,78 @@
++import { NextResponse, type NextRequest } from "next/server";
++import {
++  confirmSchoolyReservationPayment,
++  isSchoolyConfigured,
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyConfirmPaymentPayload,
++} from "@/lib/schooly";
++
++export const runtime = "nodejs";
++
++/**
++ * `POST /api/ecoles/reservations/:id/payment` — confirme le paiement d'une
++ * réservation Trouvetou côté Schooly. À appeler APRÈS la confirmation réelle
++ * du paiement par le provider (Stripe, CinetPay, ...).
++ */
++export async function POST(
++  request: NextRequest,
++  { params }: { params: Promise<{ id: string }> }
++) {
++  if (!isSchoolyConfigured()) {
++    return NextResponse.json(
++      { error: "Intégration Schooly non configurée", code: "NOT_CONFIGURED" },
++      { status: 503 }
++    );
++  }
++
++  const { id } = await params;
++  if (!id || typeof id !== "string") {
++    return NextResponse.json({ error: "Identifiant manquant" }, { status: 400 });
++  }
++
++  let body: Partial<SchoolyConfirmPaymentPayload>;
++  try {
++    body = (await request.json()) as Partial<SchoolyConfirmPaymentPayload>;
++  } catch {
++    return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
++  }
++
++  if (typeof body.payment_reference !== "string" || body.payment_reference.trim() === "") {
++    return NextResponse.json(
++      { error: "payment_reference requis" },
++      { status: 400 }
++    );
++  }
++  const amount = Number(body.amount_paid);
++  if (!Number.isFinite(amount) || amount <= 0) {
++    return NextResponse.json(
++      { error: "amount_paid doit être un nombre positif" },
++      { status: 400 }
++    );
++  }
++
++  try {
++    const reservation = await confirmSchoolyReservationPayment(id, {
++      payment_reference: body.payment_reference.trim(),
++      amount_paid: amount,
++    }, request.signal);
++    return NextResponse.json({ reservation });
++  } catch (err) {
++    if (err instanceof SchoolyConfigError) {
++      return NextResponse.json(
++        { error: err.message, code: "NOT_CONFIGURED" },
++        { status: 503 }
++      );
++    }
++    if (err instanceof SchoolyApiError) {
++      return NextResponse.json(
++        { error: err.message, code: err.code },
++        { status: err.status }
++      );
++    }
++    return NextResponse.json(
++      { error: "Erreur interne", code: "INTERNAL" },
++      { status: 500 }
++    );
++  }
++}
+diff --git a/trouvetou/src/app/api/ecoles/reservations/route.ts b/trouvetou/src/app/api/ecoles/reservations/route.ts
+new file mode 100644
+index 0000000..b2092f2
+--- /dev/null
++++ b/trouvetou/src/app/api/ecoles/reservations/route.ts
+@@ -0,0 +1,105 @@
++import { NextResponse, type NextRequest } from "next/server";
++import {
++  createSchoolyReservation,
++  isSchoolyConfigured,
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyCreateReservationPayload,
++} from "@/lib/schooly";
++
++export const runtime = "nodejs";
++
++/**
++ * `POST /api/ecoles/reservations` — crée un dossier `pending_payment`
++ * côté Schooly via la route partenaire. Le jeton Bearer est ajouté par le
++ * client serveur, jamais par le navigateur.
++ */
++export async function POST(request: NextRequest) {
++  if (!isSchoolyConfigured()) {
++    return NextResponse.json(
++      { error: "Intégration Schooly non configurée", code: "NOT_CONFIGURED" },
++      { status: 503 }
++    );
++  }
++
++  let payload: Partial<SchoolyCreateReservationPayload>;
++  try {
++    payload = (await request.json()) as Partial<SchoolyCreateReservationPayload>;
++  } catch {
++    return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
++  }
++
++  const validation = validatePayload(payload);
++  if (!validation.ok) {
++    return NextResponse.json({ error: validation.error }, { status: 400 });
++  }
++
++  try {
++    const reservation = await createSchoolyReservation(
++      validation.value,
++      request.signal
++    );
++    return NextResponse.json({ reservation }, { status: 201 });
++  } catch (err) {
++    if (err instanceof SchoolyConfigError) {
++      return NextResponse.json(
++        { error: err.message, code: "NOT_CONFIGURED" },
++        { status: 503 }
++      );
++    }
++    if (err instanceof SchoolyApiError) {
++      return NextResponse.json(
++        { error: err.message, code: err.code },
++        { status: err.status }
++      );
++    }
++    return NextResponse.json(
++      { error: "Erreur interne", code: "INTERNAL" },
++      { status: 500 }
++    );
++  }
++}
++
++type ValidationResult =
++  | { ok: true; value: SchoolyCreateReservationPayload }
++  | { ok: false; error: string };
++
++function validatePayload(
++  payload: Partial<SchoolyCreateReservationPayload>
++): ValidationResult {
++  const required: Array<keyof SchoolyCreateReservationPayload> = [
++    "establishment_id",
++    "level_id",
++    "student_full_name",
++    "parent_full_name",
++    "parent_phone",
++  ];
++
++  for (const field of required) {
++    const value = payload[field];
++    if (typeof value !== "string" || value.trim().length === 0) {
++      return { ok: false, error: `Champ obligatoire manquant : ${field}` };
++    }
++  }
++
++  return {
++    ok: true,
++    value: {
++      establishment_id: payload.establishment_id!.trim(),
++      level_id: payload.level_id!.trim(),
++      student_full_name: payload.student_full_name!.trim(),
++      parent_full_name: payload.parent_full_name!.trim(),
++      parent_phone: payload.parent_phone!.trim(),
++      student_birthdate: normalizeOptionalString(payload.student_birthdate),
++      parent_email: normalizeOptionalString(payload.parent_email),
++    },
++  };
++}
++
++function normalizeOptionalString(value: unknown): string | null | undefined {
++  if (value === undefined) return undefined;
++  if (value === null) return null;
++  if (typeof value !== "string") return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
+diff --git a/trouvetou/src/app/api/ecoles/route.ts b/trouvetou/src/app/api/ecoles/route.ts
+new file mode 100644
+index 0000000..7d816c7
+--- /dev/null
++++ b/trouvetou/src/app/api/ecoles/route.ts
+@@ -0,0 +1,49 @@
++import { NextResponse, type NextRequest } from "next/server";
++import {
++  fetchSchoolyCatalog,
++  isSchoolyConfigured,
++  SchoolyApiError,
++  SchoolyConfigError,
++} from "@/lib/schooly";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++/**
++ * `GET /api/ecoles` — proxie le catalogue Schooly.
++ * Renvoie 503 si l'intégration n'est pas configurée (le front basculera sur
++ * le catalogue générique). 502 en cas d'erreur réseau Schooly. 4xx/5xx tels
++ * quels pour les erreurs applicatives.
++ */
++export async function GET(request: NextRequest) {
++  if (!isSchoolyConfigured()) {
++    return NextResponse.json(
++      { error: "Intégration Schooly non configurée", code: "NOT_CONFIGURED" },
++      { status: 503 }
++    );
++  }
++
++  try {
++    const catalog = await fetchSchoolyCatalog(request.signal);
++    return NextResponse.json(catalog, {
++      headers: { "Cache-Control": "no-store" },
++    });
++  } catch (err) {
++    if (err instanceof SchoolyConfigError) {
++      return NextResponse.json(
++        { error: err.message, code: "NOT_CONFIGURED" },
++        { status: 503 }
++      );
++    }
++    if (err instanceof SchoolyApiError) {
++      return NextResponse.json(
++        { error: err.message, code: err.code },
++        { status: err.status }
++      );
++    }
++    return NextResponse.json(
++      { error: "Erreur interne", code: "INTERNAL" },
++      { status: 500 }
++    );
++  }
++}
+diff --git a/trouvetou/src/app/ecoles/page.tsx b/trouvetou/src/app/ecoles/page.tsx
+index a3218d8..6f0fb51 100644
+--- a/trouvetou/src/app/ecoles/page.tsx
++++ b/trouvetou/src/app/ecoles/page.tsx
+@@ -1,4 +1,6 @@
+ import type { Metadata } from "next";
++import Link from "next/link";
++import { GraduationCap } from "lucide-react";
+ import { CatalogContent } from "@/components/catalog/catalog-content";
+ import { ECOLES_CONFIG } from "@/components/catalog/configs";
+ 
+@@ -16,5 +18,31 @@ export default async function EcolesPage({ searchParams }: EcolesPageProps) {
+   const { q } = await searchParams;
+   const initialQuery = typeof q === "string" ? q : "";
+ 
+-  return <CatalogContent config={ECOLES_CONFIG} initialQuery={initialQuery} />;
++  return (
++    <div>
++      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
++        <Link
++          href="/ecoles/partenaires"
++          className="group flex items-start gap-3 rounded-2xl border border-[#1769e8]/20 bg-gradient-to-r from-[#1769e8]/5 to-[#102a72]/5 px-4 py-3 transition hover:border-[#1769e8]/40 hover:from-[#1769e8]/10"
++        >
++          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1769e8] text-white">
++            <GraduationCap className="h-5 w-5" />
++          </div>
++          <div className="flex-1">
++            <p className="text-sm font-semibold text-foreground">
++              Réservez en ligne avec nos écoles partenaires
++            </p>
++            <p className="mt-0.5 text-xs text-muted-foreground">
++              Consultez les places disponibles par niveau et créez un dossier
++              de réservation en quelques clics.{" "}
++              <span className="font-medium text-[#1769e8] group-hover:underline">
++                Découvrir →
++              </span>
++            </p>
++          </div>
++        </Link>
++      </div>
++      <CatalogContent config={ECOLES_CONFIG} initialQuery={initialQuery} />
++    </div>
++  );
+ }
+diff --git a/trouvetou/src/app/ecoles/partenaires/[id]/confirmation/page.tsx b/trouvetou/src/app/ecoles/partenaires/[id]/confirmation/page.tsx
+new file mode 100644
+index 0000000..a888886
+--- /dev/null
++++ b/trouvetou/src/app/ecoles/partenaires/[id]/confirmation/page.tsx
+@@ -0,0 +1,95 @@
++import type { Metadata } from "next";
++import Link from "next/link";
++import { CircleCheck, CircleAlert } from "lucide-react";
++import { formatFCFA } from "@/lib/utils";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++export const metadata: Metadata = {
++  title: "Réservation créée",
++  robots: { index: false },
++};
++
++interface PageProps {
++  params: Promise<{ id: string }>;
++  searchParams: Promise<{
++    id?: string;
++    status?: string;
++    amount?: string;
++    error?: string;
++  }>;
++}
++
++export default async function SchoolyConfirmationPage({
++  params,
++  searchParams,
++}: PageProps) {
++  const { id } = await params;
++  const { id: reservationId, status, amount, error } = await searchParams;
++
++  const isError = status === "error" || Boolean(error);
++
++  return (
++    <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-10">
++      <div
++        className={`flex flex-col items-center rounded-2xl border bg-white px-6 py-10 text-center shadow-sm ${
++          isError
++            ? "border-destructive/30"
++            : "border-emerald-200"
++        }`}
++      >
++        {isError ? (
++          <CircleAlert className="h-12 w-12 text-destructive" />
++        ) : (
++          <CircleCheck className="h-12 w-12 text-emerald-600" />
++        )}
++
++        <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
++          {isError
++            ? "Le paiement a échoué"
++            : "Dossier de réservation créé"}
++        </h1>
++
++        {isError ? (
++          <p className="mt-2 max-w-md text-sm text-muted-foreground">
++            {error ?? "Le paiement n'a pas pu être confirmé. Aucune place n'a été bloquée pour le moment."}
++          </p>
++        ) : (
++          <p className="mt-2 max-w-md text-sm text-muted-foreground">
++            Votre dossier est enregistré. Pour réserver définitivement une place,
++            veuillez procéder au paiement des frais de réservation
++            {amount && Number(amount) > 0 ? (
++              <>
++                {" "}
++                (<span className="font-semibold">{formatFCFA(Number(amount))}</span>)
++              </>
++            ) : null}
++            .
++          </p>
++        )}
++
++        {reservationId && !isError && (
++          <p className="mt-3 text-xs text-muted-foreground">
++            Référence : <code className="rounded bg-slate-100 px-1.5 py-0.5">{reservationId}</code>
++          </p>
++        )}
++
++        <div className="mt-6 flex flex-wrap justify-center gap-3">
++          <Link
++            href={`/ecoles/partenaires/${encodeURIComponent(id)}`}
++            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-foreground hover:bg-slate-50"
++          >
++            ← Retour à la fiche école
++          </Link>
++          <Link
++            href="/ecoles/partenaires"
++            className="inline-flex items-center rounded-lg bg-[#1769e8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#102a72]"
++          >
++            Voir d&apos;autres écoles
++          </Link>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/trouvetou/src/app/ecoles/partenaires/[id]/page.tsx b/trouvetou/src/app/ecoles/partenaires/[id]/page.tsx
+new file mode 100644
+index 0000000..db9c8b1
+--- /dev/null
++++ b/trouvetou/src/app/ecoles/partenaires/[id]/page.tsx
+@@ -0,0 +1,179 @@
++import type { Metadata } from "next";
++import Image from "next/image";
++import { notFound } from "next/navigation";
++import {
++  fetchSchoolyCatalog,
++  isSchoolyConfigured,
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyEstablishment,
++} from "@/lib/schooly";
++import { SchoolyReservationForm } from "@/components/ecoles/schooly-reservation-form";
++import { PLACEHOLDER_IMAGE, formatFCFA, cn } from "@/lib/utils";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++interface PageProps {
++  params: Promise<{ id: string }>;
++}
++
++async function loadEstablishment(id: string): Promise<SchoolyEstablishment | null> {
++  if (!isSchoolyConfigured()) return null;
++  try {
++    const catalog = await fetchSchoolyCatalog();
++    return catalog.establishments.find((e) => e.id === id) ?? null;
++  } catch (err) {
++    if (err instanceof SchoolyConfigError || err instanceof SchoolyApiError) {
++      console.error("[ecoles/partenaires/[id]]", err.message);
++    }
++    return null;
++  }
++}
++
++export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
++  const { id } = await params;
++  const establishment = await loadEstablishment(id);
++  if (!establishment) {
++    return { title: "École introuvable" };
++  }
++  return {
++    title: establishment.name,
++    description: establishment.description ?? `${establishment.name} — école partenaire Trouvetou.`,
++  };
++}
++
++export default async function SchoolyEstablishmentPage({ params }: PageProps) {
++  const { id } = await params;
++  const establishment = await loadEstablishment(id);
++
++  if (!establishment) {
++    notFound();
++  }
++
++  const cover = establishment.cover_image_url || PLACEHOLDER_IMAGE;
++
++  return (
++    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
++      <nav className="text-sm text-muted-foreground">
++        <a href="/ecoles/partenaires" className="hover:text-foreground transition">
++          Écoles partenaires
++        </a>
++        <span className="mx-1">/</span>
++        <span className="font-medium text-foreground">{establishment.name}</span>
++      </nav>
++
++      <div className="mt-4 grid gap-6 md:grid-cols-[3fr_2fr]">
++        <div>
++          <div className="relative h-56 w-full overflow-hidden rounded-2xl bg-slate-100">
++            <Image
++              src={cover}
++              alt={establishment.name}
++              fill
++              sizes="(max-width: 768px) 100vw, 60vw"
++              className="object-cover"
++              priority
++            />
++          </div>
++          <h1 className="mt-4 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
++            {establishment.name}
++          </h1>
++          {(establishment.address || establishment.city) && (
++            <p className="mt-1 text-sm text-muted-foreground">
++              {[establishment.address, establishment.city]
++                .filter(Boolean)
++                .join(", ")}
++            </p>
++          )}
++          {establishment.description && (
++            <p className="mt-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-line">
++              {establishment.description}
++            </p>
++          )}
++          {establishment.website_url && (
++            <a
++              href={establishment.website_url}
++              target="_blank"
++              rel="noopener noreferrer"
++              className="mt-3 inline-block text-sm text-[#1769e8] hover:underline"
++            >
++              Visiter le site de l&apos;établissement →
++            </a>
++          )}
++        </div>
++
++        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
++          <h2 className="text-lg font-semibold text-foreground">
++            Réserver une place
++          </h2>
++          {establishment.reservation_fee_amount != null &&
++          establishment.reservation_fee_amount > 0 ? (
++            <p className="mt-1 text-sm text-muted-foreground">
++              Frais de réservation :{" "}
++              <span className="font-semibold text-foreground">
++                {formatFCFA(establishment.reservation_fee_amount)}
++              </span>
++            </p>
++          ) : (
++            <p className="mt-1 text-sm text-muted-foreground">
++              Réservation gratuite.
++            </p>
++          )}
++          <div className="mt-4">
++            <SchoolyReservationForm
++              establishment={establishment}
++              action={`/ecoles/partenaires/${encodeURIComponent(establishment.id)}/reserver`}
++              submitLabel="Réserver"
++            />
++          </div>
++        </aside>
++      </div>
++
++      <section className="mt-10">
++        <h2 className="text-lg font-semibold text-foreground">
++          Places disponibles par niveau
++        </h2>
++        {establishment.availability.length === 0 ? (
++          <p className="mt-2 text-sm text-muted-foreground">
++            Aucune information de disponibilité pour le moment.
++          </p>
++        ) : (
++          <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
++            {establishment.availability.map((level) => {
++              const available = level.seats_available > 0;
++              return (
++                <li
++                  key={level.level_id}
++                  className="flex items-center justify-between px-4 py-3 text-sm"
++                >
++                  <div>
++                    <p className="font-medium text-foreground">
++                      {level.level_name}
++                    </p>
++                    <p className="text-xs text-muted-foreground">
++                      {level.total_taken}/{level.total_capacity} places prises
++                    </p>
++                  </div>
++                  <span
++                    className={cn(
++                      "rounded-full px-2.5 py-0.5 text-xs font-semibold",
++                      available
++                        ? "bg-emerald-100 text-emerald-700"
++                        : "bg-amber-100 text-amber-700"
++                    )}
++                  >
++                    {available
++                      ? `${level.seats_available} place${
++                          level.seats_available > 1 ? "s" : ""
++                        }`
++                      : "Complet"}
++                  </span>
++                </li>
++              );
++            })}
++          </ul>
++        )}
++      </section>
++    </div>
++  );
++}
+diff --git a/trouvetou/src/app/ecoles/partenaires/[id]/reserver/page.tsx b/trouvetou/src/app/ecoles/partenaires/[id]/reserver/page.tsx
+new file mode 100644
+index 0000000..bdfd445
+--- /dev/null
++++ b/trouvetou/src/app/ecoles/partenaires/[id]/reserver/page.tsx
+@@ -0,0 +1,87 @@
++import type { Metadata } from "next";
++import { notFound } from "next/navigation";
++import {
++  fetchSchoolyCatalog,
++  isSchoolyConfigured,
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyEstablishment,
++} from "@/lib/schooly";
++import { SchoolyReservationForm } from "@/components/ecoles/schooly-reservation-form";
++import { formatFCFA } from "@/lib/utils";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++interface PageProps {
++  params: Promise<{ id: string }>;
++}
++
++async function loadEstablishment(id: string): Promise<SchoolyEstablishment | null> {
++  if (!isSchoolyConfigured()) return null;
++  try {
++    const catalog = await fetchSchoolyCatalog();
++    return catalog.establishments.find((e) => e.id === id) ?? null;
++  } catch (err) {
++    if (err instanceof SchoolyConfigError || err instanceof SchoolyApiError) {
++      console.error("[ecoles/partenaires/[id]/reserver]", err.message);
++    }
++    return null;
++  }
++}
++
++export const metadata: Metadata = {
++  title: "Réserver une place",
++  description: "Réservez une place dans une école partenaire Schooly.",
++};
++
++export default async function SchoolyReservePage({ params }: PageProps) {
++  const { id } = await params;
++  const establishment = await loadEstablishment(id);
++  if (!establishment) notFound();
++
++  return (
++    <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
++      <nav className="text-sm text-muted-foreground">
++        <a href="/ecoles/partenaires" className="hover:text-foreground transition">
++          Écoles partenaires
++        </a>
++        <span className="mx-1">/</span>
++        <a
++          href={`/ecoles/partenaires/${encodeURIComponent(establishment.id)}`}
++          className="hover:text-foreground transition"
++        >
++          {establishment.name}
++        </a>
++        <span className="mx-1">/</span>
++        <span className="font-medium text-foreground">Réserver</span>
++      </nav>
++
++      <h1 className="mt-4 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
++        Réserver une place — {establishment.name}
++      </h1>
++      {establishment.reservation_fee_amount != null &&
++      establishment.reservation_fee_amount > 0 ? (
++        <p className="mt-1 text-sm text-muted-foreground">
++          Frais de réservation :{" "}
++          <span className="font-semibold text-foreground">
++            {formatFCFA(establishment.reservation_fee_amount)}
++          </span>
++          . Le paiement sera demandé juste après la création du dossier.
++        </p>
++      ) : (
++        <p className="mt-1 text-sm text-muted-foreground">
++          Aucun frais de réservation n&apos;est demandé pour cette école.
++        </p>
++      )}
++
++      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
++        <SchoolyReservationForm
++          establishment={establishment}
++          action="/api/ecoles/reservations"
++          submitLabel="Créer ma réservation"
++        />
++      </div>
++    </div>
++  );
++}
+diff --git a/trouvetou/src/app/ecoles/partenaires/page.tsx b/trouvetou/src/app/ecoles/partenaires/page.tsx
+new file mode 100644
+index 0000000..4ff86df
+--- /dev/null
++++ b/trouvetou/src/app/ecoles/partenaires/page.tsx
+@@ -0,0 +1,51 @@
++import type { Metadata } from "next";
++import { ECOLES_PARTENAIRES_CONFIG } from "@/components/ecoles/config";
++import { EcolesPartenairesContent } from "@/components/ecoles/ecoles-partenaires-content";
++import { fetchSchoolyCatalog, isSchoolyConfigured, SchoolyApiError, SchoolyConfigError } from "@/lib/schooly";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++
++export const metadata: Metadata = {
++  title: "Écoles partenaires — Réservation en ligne",
++  description:
++    "Trouvez une école partenaire, consultez les places disponibles par niveau et réservez en ligne via la plateforme Schooly.",
++};
++
++interface PageProps {
++  searchParams: Promise<{ q?: string }>;
++}
++
++export default async function EcolesPartenairesPage({ searchParams }: PageProps) {
++  const { q } = await searchParams;
++  const initialQuery = typeof q === "string" ? q : "";
++
++  const ready = isSchoolyConfigured();
++  let establishments: Awaited<ReturnType<typeof fetchSchoolyCatalog>>["establishments"] = [];
++  let errorMessage: string | null = null;
++
++  if (ready) {
++    try {
++      const catalog = await fetchSchoolyCatalog();
++      establishments = catalog.establishments;
++    } catch (err) {
++      if (err instanceof SchoolyConfigError) {
++        errorMessage = err.message;
++      } else if (err instanceof SchoolyApiError) {
++        errorMessage = `Le service Schooly a répondu : ${err.message}`;
++      } else {
++        errorMessage = "Impossible de joindre le service Schooly.";
++      }
++    }
++  }
++
++  return (
++    <EcolesPartenairesContent
++      config={ECOLES_PARTENAIRES_CONFIG}
++      ready={ready}
++      establishments={establishments}
++      errorMessage={errorMessage}
++      initialQuery={initialQuery}
++    />
++  );
++}
+diff --git a/trouvetou/src/components/ecoles/config.ts b/trouvetou/src/components/ecoles/config.ts
+new file mode 100644
+index 0000000..b112cdf
+--- /dev/null
++++ b/trouvetou/src/components/ecoles/config.ts
+@@ -0,0 +1,25 @@
++// ============================================================================
++// TROUVETOU — Configuration du portail « Écoles partenaires » (Schooly)
++//
++// Affiche les établissements scolaires publiés sur Schooly et leurs
++// disponibilités par niveau. La réservation se fait via le formulaire
++// `/ecoles/partenaires/[id]/reserver`.
++// ============================================================================
++
++export interface EcolesPartenairesConfig {
++  title: string;
++  breadcrumbLabel: string;
++  searchPlaceholder: string;
++  emptyMessage: string;
++  description: string;
++}
++
++export const ECOLES_PARTENAIRES_CONFIG: EcolesPartenairesConfig = {
++  title: "Écoles partenaires",
++  breadcrumbLabel: "Écoles partenaires",
++  searchPlaceholder: "Rechercher une école, une ville, un programme…",
++  description:
++    "Réservez en ligne une place dans les écoles et établissements privés partenaires. Les disponibilités sont synchronisées en temps réel avec la plateforme Schooly.",
++  emptyMessage:
++    "Aucune école partenaire n'est publiée pour le moment. Revenez bientôt !",
++};
+diff --git a/trouvetou/src/components/ecoles/ecoles-partenaires-content.tsx b/trouvetou/src/components/ecoles/ecoles-partenaires-content.tsx
+new file mode 100644
+index 0000000..9fcdc45
+--- /dev/null
++++ b/trouvetou/src/components/ecoles/ecoles-partenaires-content.tsx
+@@ -0,0 +1,160 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { motion } from "framer-motion";
++import { CircleAlert, GraduationCap, MapPin, Search } from "lucide-react";
++import { SchoolyEstablishmentCard } from "@/components/ecoles/schooly-establishment-card";
++import type { SchoolyEstablishment } from "@/lib/schooly";
++import type { EcolesPartenairesConfig } from "@/components/ecoles/config";
++
++interface EcolesPartenairesContentProps {
++  config: EcolesPartenairesConfig;
++  ready: boolean;
++  establishments: SchoolyEstablishment[];
++  errorMessage: string | null;
++  initialQuery: string;
++}
++
++export function EcolesPartenairesContent({
++  config,
++  ready,
++  establishments,
++  errorMessage,
++  initialQuery = "",
++}: EcolesPartenairesContentProps) {
++  const [query, setQuery] = useState(initialQuery);
++
++  const filtered = useMemo(() => {
++    if (query.trim().length === 0) return establishments;
++    const needle = query.trim().toLowerCase();
++    return establishments.filter((est) => {
++      const haystack = [
++        est.name,
++        est.city,
++        est.address,
++        est.school_type,
++        est.description,
++      ]
++        .filter(Boolean)
++        .join(" ")
++        .toLowerCase();
++      return haystack.includes(needle);
++    });
++  }, [establishments, query]);
++
++  return (
++    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
++      <motion.div
++        initial={{ opacity: 0, y: 16 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ duration: 0.4 }}
++      >
++        <p className="text-sm text-muted-foreground hidden sm:block">
++          Accueil <span className="mx-1">/</span>{" "}
++          <span className="font-medium text-foreground">
++            {config.breadcrumbLabel}
++          </span>
++        </p>
++        <h1 className="mt-2 flex items-center gap-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
++          <GraduationCap className="h-6 w-6 text-[#1769e8]" />
++          {config.title}
++        </h1>
++        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
++          {config.description}
++        </p>
++      </motion.div>
++
++      <div className="sticky top-0 z-30 -mx-4 px-4 bg-white/95 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 pb-3 border-b border-slate-100 mt-5">
++        <div className="flex w-full items-stretch gap-0 rounded-xl bg-white shadow-sm border border-slate-200">
++          <div className="relative flex-1">
++            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
++            <input
++              type="search"
++              value={query}
++              onChange={(e) => setQuery(e.target.value)}
++              placeholder={config.searchPlaceholder}
++              className="h-12 w-full border-0 bg-transparent pl-10 pr-4 text-sm outline-none placeholder:text-slate-400"
++            />
++          </div>
++        </div>
++      </div>
++
++      <div className="mt-6">
++        {!ready ? (
++          <NotConfigured />
++        ) : errorMessage ? (
++          <ErrorState message={errorMessage} />
++        ) : filtered.length === 0 ? (
++          <EmptyState message={config.emptyMessage} hasQuery={query.trim().length > 0} />
++        ) : (
++          <>
++            <p className="mb-3 text-sm text-muted-foreground">
++              <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
++              {filtered.length > 1 ? "écoles trouvées" : "école trouvée"}
++            </p>
++            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
++              {filtered.map((est, i) => (
++                <SchoolyEstablishmentCard
++                  key={est.id}
++                  establishment={est}
++                  index={i}
++                />
++              ))}
++            </div>
++          </>
++        )}
++      </div>
++
++      <p className="mt-10 flex items-center justify-center gap-2 text-center text-sm text-muted-foreground">
++        <MapPin className="h-4 w-4 text-accent" />
++        Catalogue synchronisé avec la plateforme Schooly.
++      </p>
++    </div>
++  );
++}
++
++function NotConfigured() {
++  return (
++    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-amber-300 bg-amber-50/40 px-6 py-16 text-center">
++      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
++        <CircleAlert className="h-7 w-7" />
++      </div>
++      <h3 className="mt-4 text-lg font-semibold text-foreground">
++        Intégration Schooly indisponible
++      </h3>
++      <p className="mt-2 max-w-md text-sm text-muted-foreground">
++        Le portail Écoles partenaires nécessite la configuration de{" "}
++        <code className="rounded bg-amber-100 px-1 py-0.5 text-xs">SCHOOLY_API_URL</code>{" "}
++        et de la clé partagée. Veuillez réessayer plus tard.
++      </p>
++    </div>
++  );
++}
++
++function ErrorState({ message }: { message: string }) {
++  return (
++    <div className="flex flex-col items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/5 px-6 py-16 text-center">
++      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
++        <CircleAlert className="h-7 w-7" />
++      </div>
++      <h3 className="mt-4 text-lg font-semibold text-foreground">
++        📡 Problème de connexion avec Schooly
++      </h3>
++      <p className="mt-2 max-w-md text-sm text-muted-foreground">{message}</p>
++    </div>
++  );
++}
++
++function EmptyState({ message, hasQuery }: { message: string; hasQuery: boolean }) {
++  return (
++    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card px-6 py-16 text-center">
++      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
++        <Search className="h-7 w-7" />
++      </div>
++      <h3 className="mt-4 text-lg font-semibold text-foreground">
++        {hasQuery ? "🔍 Aucune école ne correspond" : "🏫 Catalogue vide"}
++      </h3>
++      <p className="mt-2 max-w-sm text-sm text-muted-foreground">{message}</p>
++    </div>
++  );
++}
+diff --git a/trouvetou/src/components/ecoles/schooly-establishment-card.tsx b/trouvetou/src/components/ecoles/schooly-establishment-card.tsx
+new file mode 100644
+index 0000000..e7dad06
+--- /dev/null
++++ b/trouvetou/src/components/ecoles/schooly-establishment-card.tsx
+@@ -0,0 +1,111 @@
++"use client";
++
++import { motion } from "framer-motion";
++import Image from "next/image";
++import Link from "next/link";
++import { GraduationCap, MapPin, Users } from "lucide-react";
++import { PLACEHOLDER_IMAGE, formatFCFA, cn } from "@/lib/utils";
++import type { SchoolyEstablishment } from "@/lib/schooly";
++
++interface SchoolyEstablishmentCardProps {
++  establishment: SchoolyEstablishment;
++  index?: number;
++}
++
++export function SchoolyEstablishmentCard({
++  establishment,
++  index = 0,
++}: SchoolyEstablishmentCardProps) {
++  const cover = establishment.cover_image_url || PLACEHOLDER_IMAGE;
++  const totalAvailable = establishment.availability.reduce(
++    (acc, level) => acc + Math.max(level.seats_available, 0),
++    0
++  );
++  const hasSeats = totalAvailable > 0;
++  const fee = establishment.reservation_fee_amount;
++
++  return (
++    <motion.div
++      initial={{ opacity: 0, y: 12 }}
++      animate={{ opacity: 1, y: 0 }}
++      transition={{ duration: 0.3, delay: Math.min(index, 6) * 0.04 }}
++    >
++      <Link
++        href={`/ecoles/partenaires/${encodeURIComponent(establishment.id)}`}
++        className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-[#1769e8]/40 hover:shadow-md"
++      >
++        <div className="relative h-40 w-full overflow-hidden bg-slate-100">
++          <Image
++            src={cover}
++            alt={establishment.name}
++            fill
++            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
++            className="object-cover transition group-hover:scale-105"
++          />
++          <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-medium text-[#1769e8]">
++            <GraduationCap className="h-3.5 w-3.5" />
++            {schoolTypeLabel(establishment.school_type)}
++          </div>
++        </div>
++        <div className="flex flex-1 flex-col gap-2 p-4">
++          <h3 className="line-clamp-1 text-base font-semibold text-foreground">
++            {establishment.name}
++          </h3>
++          {establishment.city || establishment.address ? (
++            <p className="flex items-center gap-1 text-xs text-muted-foreground">
++              <MapPin className="h-3.5 w-3.5 shrink-0" />
++              <span className="line-clamp-1">
++                {[establishment.address, establishment.city]
++                  .filter(Boolean)
++                  .join(", ")}
++              </span>
++            </p>
++          ) : null}
++          <p
++            className={cn(
++              "mt-auto flex items-center gap-1 text-xs font-medium",
++              hasSeats ? "text-emerald-600" : "text-amber-600"
++            )}
++          >
++            <Users className="h-3.5 w-3.5" />
++            {hasSeats
++              ? `${totalAvailable} place${totalAvailable > 1 ? "s" : ""} disponible${
++                  totalAvailable > 1 ? "s" : ""
++                }`
++              : "Plus de place pour le moment"}
++          </p>
++          {fee != null && fee > 0 ? (
++            <p className="text-xs text-muted-foreground">
++              Frais de réservation :{" "}
++              <span className="font-semibold text-foreground">
++                {formatFCFA(fee)}
++              </span>
++            </p>
++          ) : null}
++        </div>
++      </Link>
++    </motion.div>
++  );
++}
++
++function schoolTypeLabel(type: string | null): string {
++  if (!type) return "École";
++  switch (type.toLowerCase()) {
++    case "college":
++      return "Collège";
++    case "lycee":
++    case "lycée":
++      return "Lycée";
++    case "primaire":
++      return "Primaire";
++    case "maternelle":
++      return "Maternelle";
++    case "universite":
++    case "université":
++      return "Université";
++    case "centre_formation":
++      return "Centre de formation";
++    default:
++      return type.charAt(0).toUpperCase() + type.slice(1);
++  }
++}
+diff --git a/trouvetou/src/components/ecoles/schooly-reservation-form.tsx b/trouvetou/src/components/ecoles/schooly-reservation-form.tsx
+new file mode 100644
+index 0000000..acd6f00
+--- /dev/null
++++ b/trouvetou/src/components/ecoles/schooly-reservation-form.tsx
+@@ -0,0 +1,277 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { useRouter } from "next/navigation";
++import { useFormStatus } from "react-dom";
++import { CircleAlert, Loader2 } from "lucide-react";
++import type { SchoolyEstablishment } from "@/lib/schooly";
++import { cn } from "@/lib/utils";
++
++interface SchoolyReservationFormProps {
++  establishment: SchoolyEstablishment;
++  /** URL du Route Handler qui crée la réservation. */
++  action: string;
++  /** Libellé du bouton principal. */
++  submitLabel?: string;
++  /** Mode "page dédiée" : redirige vers /confirmation. */
++  redirectToConfirmation?: boolean;
++}
++
++type FieldErrors = Partial<
++  Record<
++    | "level_id"
++    | "student_full_name"
++    | "student_birthdate"
++    | "parent_full_name"
++    | "parent_phone"
++    | "parent_email"
++    | "_root",
++    string
++  >
++>;
++
++export function SchoolyReservationForm({
++  establishment,
++  action,
++  submitLabel = "Réserver ma place",
++  redirectToConfirmation = true,
++}: SchoolyReservationFormProps) {
++  const router = useRouter();
++  const [errors, setErrors] = useState<FieldErrors>({});
++  const [submitting, setSubmitting] = useState(false);
++  const [serverError, setServerError] = useState<string | null>(null);
++
++  const availableLevels = useMemo(
++    () => establishment.availability.filter((l) => l.seats_available > 0),
++    [establishment.availability]
++  );
++
++  async function handleSubmit(formData: FormData) {
++    setErrors({});
++    setServerError(null);
++    setSubmitting(true);
++
++    const payload = {
++      establishment_id: establishment.id,
++      level_id: String(formData.get("level_id") ?? "").trim(),
++      student_full_name: String(formData.get("student_full_name") ?? "").trim(),
++      student_birthdate: emptyToNull(formData.get("student_birthdate")),
++      parent_full_name: String(formData.get("parent_full_name") ?? "").trim(),
++      parent_phone: String(formData.get("parent_phone") ?? "").trim(),
++      parent_email: emptyToNull(formData.get("parent_email")),
++    };
++
++    const localErrors = validateLocally(payload);
++    if (Object.keys(localErrors).length > 0) {
++      setErrors(localErrors);
++      setSubmitting(false);
++      return;
++    }
++
++    try {
++      const res = await fetch(action, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify(payload),
++      });
++      const body = (await res.json().catch(() => ({}))) as {
++        reservation?: { id: string };
++        error?: string;
++      };
++
++      if (!res.ok || !body.reservation) {
++        setServerError(body.error ?? "Impossible de créer la réservation.");
++        setSubmitting(false);
++        return;
++      }
++
++      if (redirectToConfirmation) {
++        router.push(
++          `/ecoles/partenaires/${encodeURIComponent(establishment.id)}/confirmation?id=${encodeURIComponent(body.reservation.id)}`
++        );
++      } else {
++        router.refresh();
++      }
++    } catch (err) {
++      setServerError(
++        err instanceof Error ? err.message : "Erreur réseau inconnue."
++      );
++      setSubmitting(false);
++    }
++  }
++
++  return (
++    <form action={handleSubmit} className="space-y-4" noValidate>
++      {serverError && (
++        <div
++          role="alert"
++          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
++        >
++          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
++          <span>{serverError}</span>
++        </div>
++      )}
++
++      <Field
++        label="Niveau"
++        name="level_id"
++        required
++        error={errors.level_id}
++        options={availableLevels.map((l) => ({
++          value: l.level_id,
++          label: `${l.level_name} — ${l.seats_available} place${
++            l.seats_available > 1 ? "s" : ""
++          }`,
++        }))}
++        placeholder={availableLevels.length === 0 ? "Aucun niveau disponible" : "Choisir un niveau"}
++        disabled={availableLevels.length === 0}
++      />
++
++      <Field
++        label="Nom complet de l'élève"
++        name="student_full_name"
++        required
++        error={errors.student_full_name}
++        placeholder="Ex. Aïcha Diallo"
++      />
++
++      <Field
++        label="Date de naissance"
++        name="student_birthdate"
++        type="date"
++        error={errors.student_birthdate}
++      />
++
++      <Field
++        label="Nom complet du parent"
++        name="parent_full_name"
++        required
++        error={errors.parent_full_name}
++        placeholder="Ex. Mamadou Diallo"
++      />
++
++      <Field
++        label="Téléphone du parent"
++        name="parent_phone"
++        type="tel"
++        required
++        error={errors.parent_phone}
++        placeholder="+225 07 00 00 00 00"
++      />
++
++      <Field
++        label="Email du parent (facultatif)"
++        name="parent_email"
++        type="email"
++        error={errors.parent_email}
++        placeholder="parent@exemple.com"
++      />
++
++      <SubmitButton submitting={submitting} label={submitLabel} />
++    </form>
++  );
++}
++
++function SubmitButton({ submitting, label }: { submitting: boolean; label: string }) {
++  const { pending } = useFormStatus();
++  const busy = submitting || pending;
++  return (
++    <button
++      type="submit"
++      disabled={busy}
++      className={cn(
++        "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1769e8] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#102a72] disabled:opacity-60"
++      )}
++    >
++      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
++      {busy ? "Envoi en cours…" : label}
++    </button>
++  );
++}
++
++interface FieldProps {
++  label: string;
++  name: string;
++  type?: "text" | "email" | "tel" | "date";
++  required?: boolean;
++  error?: string;
++  placeholder?: string;
++  options?: Array<{ value: string; label: string }>;
++  disabled?: boolean;
++}
++
++function Field({
++  label,
++  name,
++  type = "text",
++  required = false,
++  error,
++  placeholder,
++  options,
++  disabled = false,
++}: FieldProps) {
++  return (
++    <label className="block text-sm">
++      <span className="mb-1 block font-medium text-foreground">
++        {label}
++        {required ? <span className="ml-0.5 text-destructive">*</span> : null}
++      </span>
++      {options ? (
++        <select
++          name={name}
++          required={required}
++          defaultValue=""
++          disabled={disabled}
++          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-foreground outline-none focus:border-[#1769e8] focus:ring-2 focus:ring-[#1769e8]/20 disabled:opacity-60"
++        >
++          <option value="" disabled>
++            {placeholder ?? "Choisir…"}
++          </option>
++          {options.map((o) => (
++            <option key={o.value} value={o.value}>
++              {o.label}
++            </option>
++          ))}
++        </select>
++      ) : (
++        <input
++          name={name}
++          type={type}
++          required={required}
++          placeholder={placeholder}
++          disabled={disabled}
++          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-foreground outline-none focus:border-[#1769e8] focus:ring-2 focus:ring-[#1769e8]/20 disabled:opacity-60"
++        />
++      )}
++      {error && (
++        <span className="mt-1 block text-xs text-destructive">{error}</span>
++      )}
++    </label>
++  );
++}
++
++function emptyToNull(value: FormDataEntryValue | null): string | null {
++  if (typeof value !== "string") return null;
++  const trimmed = value.trim();
++  return trimmed.length > 0 ? trimmed : null;
++}
++
++function validateLocally(
++  payload: Record<string, string | null>
++): FieldErrors {
++  const errors: FieldErrors = {};
++  if (!payload.level_id) errors.level_id = "Veuillez choisir un niveau.";
++  if (!payload.student_full_name || payload.student_full_name.length < 2) {
++    errors.student_full_name = "Le nom de l'élève est requis.";
++  }
++  if (!payload.parent_full_name || payload.parent_full_name.length < 2) {
++    errors.parent_full_name = "Le nom du parent est requis.";
++  }
++  if (!payload.parent_phone || payload.parent_phone.length < 6) {
++    errors.parent_phone = "Le téléphone du parent est requis.";
++  }
++  if (payload.parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.parent_email)) {
++    errors.parent_email = "Email invalide.";
++  }
++  return errors;
++}
+diff --git a/trouvetou/src/lib/schooly/client.ts b/trouvetou/src/lib/schooly/client.ts
+new file mode 100644
+index 0000000..01f1568
+--- /dev/null
++++ b/trouvetou/src/lib/schooly/client.ts
+@@ -0,0 +1,188 @@
++// ============================================================================
++// TROUVETOU ↔ SCHOOLY — Client HTTP serveur
++//
++// Consomme les routes partenaires `/api/trouvetou/*` de Schooly. Le Bearer
++// n'est JAMAIS envoyé au navigateur : toutes les pages Trouvetou passent par
++// les routes internes `/api/ecoles/*` (route handlers serveur) qui délèguent
++// à ce client.
++//
++// Configuration requise (côté serveur Trouvetou) :
++//   - SCHOOLY_API_URL          : URL de base Schooly (ex. https://schooly...)
++//   - TROUVETOU_API_KEY_PEPPER : clé partagée avec Schooly
++//                                (fallback accepté : TROUVETOU_API_KEY)
++//
++// Aucune dépendance externe : `fetch` natif Node ≥ 18.
++// ============================================================================
++
++import {
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyCatalog,
++  type SchoolyConfirmPaymentPayload,
++  type SchoolyCreateReservationPayload,
++  type SchoolyReservation,
++} from "./types";
++
++const DEFAULT_TIMEOUT_MS = 10_000;
++
++/** Options internes de bas niveau. */
++interface RequestOptions {
++  method: "GET" | "POST";
++  path: string;
++  body?: unknown;
++  signal?: AbortSignal;
++}
++
++/** Récupère la configuration. Lève `SchoolyConfigError` si elle est incomplète. */
++export function getSchoolyConfig(): {
++  baseUrl: string;
++  apiKey: string;
++} {
++  const baseUrl = process.env.SCHOOLY_API_URL?.trim().replace(/\/+$/, "");
++  const apiKey =
++    process.env.TROUVETOU_API_KEY_PEPPER?.trim() ||
++    process.env.TROUVETOU_API_KEY?.trim();
++
++  if (!baseUrl) {
++    throw new SchoolyConfigError(
++      "SCHOOLY_API_URL n'est pas configuré côté serveur Trouvetou."
++    );
++  }
++  if (!apiKey) {
++    throw new SchoolyConfigError(
++      "TROUVETOU_API_KEY_PEPPER (ou TROUVETOU_API_KEY) n'est pas configuré."
++    );
++  }
++
++  return { baseUrl, apiKey };
++}
++
++/**
++ * Indique si l'intégration Schooly est utilisable sans lever d'exception.
++ * À utiliser dans les pages pour basculer sur le catalogue générique si la
++ * configuration manque (ex. en dev local sans Schooly).
++ */
++export function isSchoolyConfigured(): boolean {
++  try {
++    getSchoolyConfig();
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++async function request<T>({ method, path, body, signal }: RequestOptions): Promise<T> {
++  const { baseUrl, apiKey } = getSchoolyConfig();
++
++  const timeoutSignal = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
++  const composedSignal = signal
++    ? AbortSignal.any([signal, timeoutSignal])
++    : timeoutSignal;
++
++  const init: RequestInit = {
++    method,
++    headers: {
++      Accept: "application/json",
++      Authorization: `Bearer ${apiKey}`,
++      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
++    },
++    signal: composedSignal,
++    cache: "no-store",
++    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
++  };
++
++  let res: Response;
++  try {
++    res = await fetch(`${baseUrl}${path}`, init);
++  } catch (err) {
++    if (err instanceof Error && err.name === "TimeoutError") {
++      throw new SchoolyApiError("Délai d'attente dépassé vers Schooly", 504, "TIMEOUT");
++    }
++    if (err instanceof Error && err.name === "AbortError") {
++      throw new SchoolyApiError("Requête annulée", 499, "ABORTED");
++    }
++    throw new SchoolyApiError(
++      `Impossible de joindre Schooly : ${err instanceof Error ? err.message : "erreur inconnue"}`,
++      502,
++      "NETWORK"
++    );
++  }
++
++  const text = await res.text();
++  const json = text.length > 0 ? safeParseJson(text) : null;
++
++  if (!res.ok) {
++    const message =
++      (json && typeof json === "object" && "error" in json && typeof json.error === "string"
++        ? json.error
++        : null) ?? `Erreur Schooly ${res.status}`;
++    throw new SchoolyApiError(message, res.status);
++  }
++
++  return json as T;
++}
++
++function safeParseJson(text: string): unknown {
++  try {
++    return JSON.parse(text);
++  } catch {
++    return null;
++  }
++}
++
++/**
++ * Récupère le catalogue public des écoles publiées.
++ * `GET /api/trouvetou`
++ */
++export async function fetchSchoolyCatalog(
++  signal?: AbortSignal
++): Promise<SchoolyCatalog> {
++  return request<SchoolyCatalog>({ method: "GET", path: "/api/trouvetou", signal });
++}
++
++/**
++ * Crée un dossier de réservation `pending_payment`.
++ * `POST /api/trouvetou`
++ */
++export async function createSchoolyReservation(
++  payload: SchoolyCreateReservationPayload,
++  signal?: AbortSignal
++): Promise<SchoolyReservation> {
++  const data = await request<{ reservation: SchoolyReservation } | SchoolyReservation>({
++    method: "POST",
++    path: "/api/trouvetou",
++    body: payload,
++    signal,
++  });
++  return extractReservation(data);
++}
++
++/**
++ * Confirme le paiement d'une réservation.
++ * `POST /api/trouvetou/reservations/:id/payment`
++ */
++export async function confirmSchoolyReservationPayment(
++  reservationId: string,
++  payload: SchoolyConfirmPaymentPayload,
++  signal?: AbortSignal
++): Promise<SchoolyReservation> {
++  if (!reservationId || typeof reservationId !== "string") {
++    throw new SchoolyApiError("Identifiant de réservation invalide", 400, "INVALID_ID");
++  }
++  const data = await request<{ reservation: SchoolyReservation } | SchoolyReservation>({
++    method: "POST",
++    path: `/api/trouvetou/reservations/${encodeURIComponent(reservationId)}/payment`,
++    body: payload,
++    signal,
++  });
++  return extractReservation(data);
++}
++
++function extractReservation(
++  data: { reservation: SchoolyReservation } | SchoolyReservation
++): SchoolyReservation {
++  if (data && typeof data === "object" && "reservation" in data && data.reservation) {
++    return data.reservation;
++  }
++  return data as SchoolyReservation;
++}
+diff --git a/trouvetou/src/lib/schooly/index.ts b/trouvetou/src/lib/schooly/index.ts
+new file mode 100644
+index 0000000..3832859
+--- /dev/null
++++ b/trouvetou/src/lib/schooly/index.ts
+@@ -0,0 +1,29 @@
++// ============================================================================
++// TROUVETOU ↔ SCHOOLY — Barrel
++//
++// Réexporte le client, les types et la sonde de configuration. Import depuis
++// `@/lib/schooly` (jamais directement depuis un sous-fichier) pour faciliter
++// les refactors.
++// ============================================================================
++
++export {
++  fetchSchoolyCatalog,
++  createSchoolyReservation,
++  confirmSchoolyReservationPayment,
++  getSchoolyConfig,
++  isSchoolyConfigured,
++} from "./client";
++
++export {
++  SchoolyApiError,
++  SchoolyConfigError,
++  type SchoolyAdvertisement,
++  type SchoolyCatalog,
++  type SchoolyCategory,
++  type SchoolyConfirmPaymentPayload,
++  type SchoolyCreateReservationPayload,
++  type SchoolyEstablishment,
++  type SchoolyLevelAvailability,
++  type SchoolyReservation,
++  type SchoolyReservationStatus,
++} from "./types";
+diff --git a/trouvetou/src/lib/schooly/types.ts b/trouvetou/src/lib/schooly/types.ts
+new file mode 100644
+index 0000000..140d29a
+--- /dev/null
++++ b/trouvetou/src/lib/schooly/types.ts
+@@ -0,0 +1,123 @@
++// ============================================================================
++// TROUVETOU ↔ SCHOOLY — Types du contrat API partenaire
++//
++// Ces types reflètent fidèlement le contrat documenté dans
++// https://github.com/refontiq-dotcom/schooly (TROUVETOU_INTEGRATION.md) et les
++// routes /api/trouvetou/* du dépôt Schooly.
++//
++// Toute modification côté Schooly DOIT être répercutée ici.
++// ============================================================================
++
++/** Catégorie de l'annonce (réservée à `ecoles` côté Schooly). */
++export type SchoolyCategory = "ecoles";
++
++/** Disponibilité d'un niveau pour un établissement donné. */
++export interface SchoolyLevelAvailability {
++  level_id: string;
++  establishment_id: string;
++  level_name: string;
++  total_capacity: number;
++  total_taken: number;
++  seats_available: number;
++}
++
++/** Publicité active sur la période en cours. */
++export interface SchoolyAdvertisement {
++  id: string;
++  establishment_id: string;
++  title: string;
++  description: string | null;
++  image_url: string | null;
++  target_url: string | null;
++  starts_at: string;
++  ends_at: string | null;
++}
++
++/** Établissement scolaire publié sur Trouvetou. */
++export interface SchoolyEstablishment {
++  id: string;
++  name: string;
++  description: string | null;
++  city: string | null;
++  address: string | null;
++  school_type: string | null;
++  latitude: number | null;
++  longitude: number | null;
++  website_url: string | null;
++  cover_image_url: string | null;
++  reservation_fee_amount: number | null;
++  category: SchoolyCategory;
++  availability: SchoolyLevelAvailability[];
++  advertisements: SchoolyAdvertisement[];
++}
++
++/** Réponse de `GET /api/trouvetou` (catalogue). */
++export interface SchoolyCatalog {
++  establishments: SchoolyEstablishment[];
++}
++
++/**
++ * Statut d'une réservation Schooly.
++ * `pending_payment` est l'état initial après création côté Trouvetou ;
++ * Schooly applique la transition `pending_payment` → `reserved` via la
++ * confirmation de paiement.
++ */
++export type SchoolyReservationStatus =
++  | "pending_payment"
++  | "reserved"
++  | "confirmed"
++  | "expired"
++  | "cancelled"
++  | "rejected_fraud"
++  | "waitlisted";
++
++/** Réservation telle que renvoyée par Schooly. */
++export interface SchoolyReservation {
++  id: string;
++  status: SchoolyReservationStatus;
++  qr_code_token: string | null;
++  expires_at: string | null;
++  [key: string]: unknown;
++}
++
++/** Charge utile pour la création d'une réservation (`POST /api/trouvetou`). */
++export interface SchoolyCreateReservationPayload {
++  establishment_id: string;
++  level_id: string;
++  student_full_name: string;
++  parent_full_name: string;
++  parent_phone: string;
++  student_birthdate?: string | null;
++  parent_email?: string | null;
++}
++
++/** Charge utile pour la confirmation de paiement. */
++export interface SchoolyConfirmPaymentPayload {
++  payment_reference: string;
++  amount_paid: number;
++}
++
++/** Erreur normalisée renvoyée par le client. */
++export class SchoolyApiError extends Error {
++  readonly status: number;
++  readonly code: string;
++
++  constructor(message: string, status: number, code: string = "SCHOOLY_ERROR") {
++    super(message);
++    this.name = "SchoolyApiError";
++    this.status = status;
++    this.code = code;
++  }
++}
++
++/**
++ * Erreur levée lorsque la configuration côté Trouvetou est incomplète.
++ * Le code appelant doit afficher un fallback (catalogue générique) et
++ * journaliser l'incident côté serveur.
++ */
++export class SchoolyConfigError extends Error {
++  constructor(message: string) {
++    super(message);
++    this.name = "SchoolyConfigError";
++  }
++}
+diff --git a/trouvetou/tests/schooly-client.test.ts b/trouvetou/tests/schooly-client.test.ts
+new file mode 100644
+index 0000000..35a09a9
+--- /dev/null
++++ b/trouvetou/tests/schooly-client.test.ts
+@@ -0,0 +1,234 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import {
++  SchoolyApiError,
++  SchoolyConfigError,
++  confirmSchoolyReservationPayment,
++  createSchoolyReservation,
++  fetchSchoolyCatalog,
++  getSchoolyConfig,
++  isSchoolyConfigured,
++} from "@/lib/schooly";
++
++const BASE_URL = "https://schooly.example.test";
++const API_KEY = "test-pepper-123";
++
++function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
++  return new Response(JSON.stringify(body), {
++    status: 200,
++    headers: { "Content-Type": "application/json" },
++    ...init,
++  });
++}
++
++function mockFetchOnce(impl: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> | Response) {
++  return vi
++    .spyOn(globalThis, "fetch")
++    .mockImplementation((input, init) => Promise.resolve(impl(input as RequestInfo, init)));
++}
++
++describe("schooly/config", () => {
++  const originalEnv = { ...process.env };
++
++  beforeEach(() => {
++    delete process.env.SCHOOLY_API_URL;
++    delete process.env.TROUVETOU_API_KEY_PEPPER;
++    delete process.env.TROUVETOU_API_KEY;
++  });
++
++  afterEach(() => {
++    process.env = { ...originalEnv };
++  });
++
++  it("lève SchoolyConfigError si SCHOOLY_API_URL manque", () => {
++    process.env.TROUVETOU_API_KEY_PEPPER = API_KEY;
++    expect(() => getSchoolyConfig()).toThrow(SchoolyConfigError);
++  });
++
++  it("lève SchoolyConfigError si la clé manque", () => {
++    process.env.SCHOOLY_API_URL = BASE_URL;
++    expect(() => getSchoolyConfig()).toThrow(SchoolyConfigError);
++  });
++
++  it("accepte le fallback TROUVETOU_API_KEY", () => {
++    process.env.SCHOOLY_API_URL = `${BASE_URL}/`;
++    process.env.TROUVETOU_API_KEY = API_KEY;
++    expect(isSchoolyConfigured()).toBe(true);
++    expect(getSchoolyConfig()).toEqual({ baseUrl: BASE_URL, apiKey: API_KEY });
++  });
++
++  it("retourne la config normalisée (sans slash final)", () => {
++    process.env.SCHOOLY_API_URL = `${BASE_URL}///`;
++    process.env.TROUVETOU_API_KEY_PEPPER = API_KEY;
++    expect(getSchoolyConfig().baseUrl).toBe(BASE_URL);
++  });
++
++  it("isSchoolyConfigured() renvoie false si config manquante", () => {
++    expect(isSchoolyConfigured()).toBe(false);
++  });
++});
++
++describe("schooly/client.fetchSchoolyCatalog", () => {
++  const originalEnv = { ...process.env };
++
++  beforeEach(() => {
++    process.env.SCHOOLY_API_URL = BASE_URL;
++    process.env.TROUVETOU_API_KEY_PEPPER = API_KEY;
++  });
++
++  afterEach(() => {
++    process.env = { ...originalEnv };
++    vi.restoreAllMocks();
++  });
++
++  it("appelle GET /api/trouvetou avec Bearer", async () => {
++    const mock = mockFetchOnce((input, init) => {
++      const url = String(input);
++      expect(url).toBe(`${BASE_URL}/api/trouvetou`);
++      expect(init?.method).toBe("GET");
++      expect((init?.headers as Record<string, string>).Authorization).toBe(
++        `Bearer ${API_KEY}`
++      );
++      return jsonResponse({
++        establishments: [
++          {
++            id: "e1",
++            name: "École A",
++            description: null,
++            city: "Abidjan",
++            address: "Cocody",
++            school_type: "college",
++            latitude: 5.35,
++            longitude: -4.01,
++            website_url: null,
++            cover_image_url: null,
++            reservation_fee_amount: 25000,
++            category: "ecoles",
++            availability: [
++              {
++                level_id: "l1",
++                establishment_id: "e1",
++                level_name: "6ème",
++                total_capacity: 100,
++                total_taken: 60,
++                seats_available: 40,
++              },
++            ],
++            advertisements: [],
++          },
++        ],
++      });
++    });
++
++    const catalog = await fetchSchoolyCatalog();
++
++    expect(mock).toHaveBeenCalledTimes(1);
++    expect(catalog.establishments).toHaveLength(1);
++    expect(catalog.establishments[0].name).toBe("École A");
++    expect(catalog.establishments[0].availability[0].seats_available).toBe(40);
++  });
++
++  it("convertit une réponse 4xx en SchoolyApiError", async () => {
++    mockFetchOnce(() =>
++      jsonResponse({ error: "Clé API invalide" }, { status: 401 })
++    );
++    await expect(fetchSchoolyCatalog()).rejects.toMatchObject({
++      name: "SchoolyApiError",
++      status: 401,
++      message: "Clé API invalide",
++    });
++  });
++
++  it("utilise un message par défaut si la réponse 5xx n'a pas de body JSON", async () => {
++    mockFetchOnce(
++      () =>
++        new Response("Internal Server Error", {
++          status: 500,
++          headers: { "Content-Type": "text/plain" },
++        })
++    );
++    await expect(fetchSchoolyCatalog()).rejects.toBeInstanceOf(SchoolyApiError);
++  });
++
++  it("convertit une erreur réseau en SchoolyApiError NETWORK", async () => {
++    vi.spyOn(globalThis, "fetch").mockImplementation(() => {
++      throw new TypeError("fetch failed");
++    });
++    await expect(fetchSchoolyCatalog()).rejects.toMatchObject({
++      name: "SchoolyApiError",
++      code: "NETWORK",
++    });
++  });
++
++  it("supporte un body réponse `{ reservation }`", async () => {
++    mockFetchOnce(() =>
++      jsonResponse({
++        reservation: {
++          id: "r1",
++          status: "pending_payment",
++          qr_code_token: null,
++          expires_at: null,
++        },
++      })
++    );
++    const res = await createSchoolyReservation({
++      establishment_id: "e1",
++      level_id: "l1",
++      student_full_name: "Aïcha",
++      parent_full_name: "Maman",
++      parent_phone: "+22507000000",
++    });
++    expect(res.id).toBe("r1");
++    expect(res.status).toBe("pending_payment");
++  });
++
++  it("supporte un body réponse directement la réservation", async () => {
++    mockFetchOnce(() =>
++      jsonResponse({
++        id: "r2",
++        status: "pending_payment",
++        qr_code_token: null,
++        expires_at: null,
++      })
++    );
++    const res = await createSchoolyReservation({
++      establishment_id: "e1",
++      level_id: "l1",
++      student_full_name: "Aïcha",
++      parent_full_name: "Maman",
++      parent_phone: "+22507000000",
++    });
++    expect(res.id).toBe("r2");
++  });
++
++  it("refuse un id de réservation invalide", async () => {
++    await expect(
++      confirmSchoolyReservationPayment("", {
++        payment_reference: "tx-1",
++        amount_paid: 1000,
++      })
++    ).rejects.toMatchObject({ code: "INVALID_ID" });
++  });
++
++  it("encode l'id de réservation dans l'URL", async () => {
++    const mock = mockFetchOnce((input, init) => {
++      expect(String(input)).toBe(
++        `${BASE_URL}/api/trouvetou/reservations/r%20with%20space/payment`
++      );
++      expect(init?.method).toBe("POST");
++      expect((init?.headers as Record<string, string>)["Content-Type"]).toBe(
++        "application/json"
++      );
++      const body = JSON.parse(String(init?.body));
++      expect(body).toEqual({ payment_reference: "tx-1", amount_paid: 1000 });
++      return jsonResponse({
++        reservation: { id: "r-1", status: "reserved", qr_code_token: "qr", expires_at: null },
++      });
++    });
++    const res = await confirmSchoolyReservationPayment("r with space", {
++      payment_reference: "tx-1",
++      amount_paid: 1000,
++    });
++    expect(mock).toHaveBeenCalledTimes(1);
++    expect(res.status).toBe("reserved");
++  });
++});
+diff --git a/trouvetou/tests/schooly-routes.test.ts b/trouvetou/tests/schooly-routes.test.ts
+new file mode 100644
+index 0000000..bc29b13
+--- /dev/null
++++ b/trouvetou/tests/schooly-routes.test.ts
+@@ -0,0 +1,258 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++
++// Mock du client Schooly : on remplace les fonctions importées par les routes
++// pour pouvoir contrôler les réponses sans réseau. `vi.hoisted` permet de
++// référencer le mock dans la factory `vi.mock` (qui est hoistée avant les
++// imports).
++const { schoolyMock } = vi.hoisted(() => {
++  class SchoolyApiError extends Error {
++    status: number;
++    code: string;
++    constructor(message: string, status: number, code: string = "SCHOOLY_ERROR") {
++      super(message);
++      this.name = "SchoolyApiError";
++      this.status = status;
++      this.code = code;
++    }
++  }
++  class SchoolyConfigError extends Error {
++    constructor(message: string) {
++      super(message);
++      this.name = "SchoolyConfigError";
++    }
++  }
++  return {
++    schoolyMock: {
++      fetchSchoolyCatalog: vi.fn(),
++      createSchoolyReservation: vi.fn(),
++      confirmSchoolyReservationPayment: vi.fn(),
++      isSchoolyConfigured: vi.fn(),
++      getSchoolyConfig: vi.fn(),
++      SchoolyApiError,
++      SchoolyConfigError,
++    },
++  };
++});
++
++vi.mock("@/lib/schooly", () => schoolyMock);
++
++import { GET as ecolesGet } from "@/app/api/ecoles/route";
++import { POST as reservationsPost } from "@/app/api/ecoles/reservations/route";
++import { POST as paymentPost } from "@/app/api/ecoles/reservations/[id]/payment/route";
++
++function jsonRequest(url: string, method: string, body?: unknown): Request {
++  return new Request(url, {
++    method,
++    headers: { "Content-Type": "application/json" },
++    body: body !== undefined ? JSON.stringify(body) : undefined,
++  });
++}
++
++const originalEnv = { ...process.env };
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  process.env = { ...originalEnv };
++});
++
++afterEach(() => {
++  process.env = { ...originalEnv };
++});
++
++describe("GET /api/ecoles", () => {
++  it("renvoie 503 si l'intégration n'est pas configurée", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(false);
++    const res = await ecolesGet(jsonRequest("http://localhost/api/ecoles", "GET") as unknown as never);
++    expect(res.status).toBe(503);
++    const body = await res.json();
++    expect(body.code).toBe("NOT_CONFIGURED");
++  });
++
++  it("renvoie le catalogue si configuré", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.fetchSchoolyCatalog.mockResolvedValue({
++      establishments: [
++        { id: "e1", name: "A", category: "ecoles", availability: [], advertisements: [] },
++      ],
++    });
++    const res = await ecolesGet(jsonRequest("http://localhost/api/ecoles", "GET") as unknown as never);
++    expect(res.status).toBe(200);
++    const body = await res.json();
++    expect(body.establishments[0].id).toBe("e1");
++  });
++
++  it("propage une SchoolyApiError avec le bon status", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.fetchSchoolyCatalog.mockRejectedValue(
++      new schoolyMock.SchoolyApiError("Plus de place", 409, "NO_SEAT")
++    );
++    const res = await ecolesGet(jsonRequest("http://localhost/api/ecoles", "GET") as unknown as never);
++    expect(res.status).toBe(409);
++    const body = await res.json();
++    expect(body.code).toBe("NO_SEAT");
++  });
++});
++
++describe("POST /api/ecoles/reservations", () => {
++  const validBody = {
++    establishment_id: "e1",
++    level_id: "l1",
++    student_full_name: "Aïcha Diallo",
++    parent_full_name: "Maman Diallo",
++    parent_phone: "+22507000000",
++    student_birthdate: "2015-01-01",
++    parent_email: "maman@example.com",
++  };
++
++  it("renvoie 400 si un champ obligatoire manque", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    const res = await reservationsPost(
++      jsonRequest("http://localhost/api/ecoles/reservations", "POST", {
++        ...validBody,
++        parent_phone: "",
++      }) as unknown as never
++    );
++    expect(res.status).toBe(400);
++  });
++
++  it("renvoie 400 si le JSON est invalide", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    const req = new Request("http://localhost/api/ecoles/reservations", {
++      method: "POST",
++      body: "not-json",
++      headers: { "Content-Type": "application/json" },
++    });
++    const res = await reservationsPost(req as unknown as never);
++    expect(res.status).toBe(400);
++  });
++
++  it("renvoie 201 + reservation si tout est valide", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.createSchoolyReservation.mockResolvedValue({
++      id: "r1",
++      status: "pending_payment",
++    });
++    const res = await reservationsPost(
++      jsonRequest("http://localhost/api/ecoles/reservations", "POST", validBody) as unknown as never
++    );
++    expect(res.status).toBe(201);
++    const body = await res.json();
++    expect(body.reservation.id).toBe("r1");
++    expect(schoolyMock.createSchoolyReservation).toHaveBeenCalledWith(
++      expect.objectContaining({
++        establishment_id: "e1",
++        level_id: "l1",
++        student_full_name: "Aïcha Diallo",
++        parent_phone: "+22507000000",
++        parent_email: "maman@example.com",
++      }),
++      expect.anything()
++    );
++  });
++
++  it("convertit les chaînes vides en null pour les champs facultatifs", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.createSchoolyReservation.mockResolvedValue({ id: "r1" });
++    await reservationsPost(
++      jsonRequest("http://localhost/api/ecoles/reservations", "POST", {
++        ...validBody,
++        student_birthdate: "",
++        parent_email: "",
++      }) as unknown as never
++    );
++    expect(schoolyMock.createSchoolyReservation).toHaveBeenCalledWith(
++      expect.objectContaining({ student_birthdate: null, parent_email: null }),
++      expect.anything()
++    );
++  });
++
++  it("renvoie 503 si non configuré", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(false);
++    const res = await reservationsPost(
++      jsonRequest("http://localhost/api/ecoles/reservations", "POST", validBody) as unknown as never
++    );
++    expect(res.status).toBe(503);
++  });
++
++  it("propage une 409 NO_SEAT depuis Schooly", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.createSchoolyReservation.mockRejectedValue(
++      new schoolyMock.SchoolyApiError("Plus de place disponible", 409, "NO_SEAT")
++    );
++    const res = await reservationsPost(
++      jsonRequest("http://localhost/api/ecoles/reservations", "POST", validBody) as unknown as never
++    );
++    expect(res.status).toBe(409);
++  });
++});
++
++describe("POST /api/ecoles/reservations/[id]/payment", () => {
++  it("renvoie 400 si amount_paid est invalide", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    const res = await paymentPost(
++      jsonRequest("http://localhost/api/ecoles/reservations/r1/payment", "POST", {
++        payment_reference: "tx-1",
++        amount_paid: -10,
++      }) as unknown as never,
++      { params: Promise.resolve({ id: "r1" }) }
++    );
++    expect(res.status).toBe(400);
++  });
++
++  it("renvoie 400 si payment_reference est vide", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    const res = await paymentPost(
++      jsonRequest("http://localhost/api/ecoles/reservations/r1/payment", "POST", {
++        payment_reference: "  ",
++        amount_paid: 1000,
++      }) as unknown as never,
++      { params: Promise.resolve({ id: "r1" }) }
++    );
++    expect(res.status).toBe(400);
++  });
++
++  it("renvoie 200 + reservation si tout est valide", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.confirmSchoolyReservationPayment.mockResolvedValue({
++      id: "r1",
++      status: "reserved",
++    });
++    const res = await paymentPost(
++      jsonRequest("http://localhost/api/ecoles/reservations/r1/payment", "POST", {
++        payment_reference: "tx-1",
++        amount_paid: 25000,
++      }) as unknown as never,
++      { params: Promise.resolve({ id: "r1" }) }
++    );
++    expect(res.status).toBe(200);
++    const body = await res.json();
++    expect(body.reservation.status).toBe("reserved");
++  });
++
++  it("renvoie 503 si non configuré", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(false);
++    const res = await paymentPost(
++      jsonRequest("http://localhost/api/ecoles/reservations/r1/payment", "POST", {
++        payment_reference: "tx-1",
++        amount_paid: 1000,
++      }) as unknown as never,
++      { params: Promise.resolve({ id: "r1" }) }
++    );
++    expect(res.status).toBe(503);
++  });
++
++  it("propage un 404 depuis Schooly", async () => {
++    schoolyMock.isSchoolyConfigured.mockReturnValue(true);
++    schoolyMock.confirmSchoolyReservationPayment.mockRejectedValue(
++      new schoolyMock.SchoolyApiError("Réservation introuvable", 404, "NOT_FOUND")
++    );
++    const res = await paymentPost(
++      jsonRequest("http://localhost/api/ecoles/reservations/r1/payment", "POST", {
++        payment_reference: "tx-1",
++        amount_paid: 1000,
++      }) as unknown as never,
++      { params: Promise.resolve({ id: "r1" }) }
++    );
++    expect(res.status).toBe(404);
++  });
++});
+diff --git a/trouvetou/tests/setup.ts b/trouvetou/tests/setup.ts
+new file mode 100644
+index 0000000..a20719e
+--- /dev/null
++++ b/trouvetou/tests/setup.ts
+@@ -0,0 +1,4 @@
++// Polyfill / noop pour les tests Node.
++// Ajoute ici les polyfills globaux si nécessaire (TextEncoder, fetch, ...).
++// Node 18+ fournit déjà fetch, AbortSignal.timeout, etc.
++export {};
+diff --git a/trouvetou/vitest.config.mts b/trouvetou/vitest.config.mts
+new file mode 100644
+index 0000000..bc2283d
+--- /dev/null
++++ b/trouvetou/vitest.config.mts
+@@ -0,0 +1,16 @@
++import { defineConfig } from "vitest/config";
++import path from "node:path";
++
++export default defineConfig({
++  test: {
++    environment: "node",
++    globals: false,
++    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
++    setupFiles: ["tests/setup.ts"],
++  },
++  resolve: {
++    alias: {
++      "@": path.resolve(__dirname, "./src"),
++    },
++  },
++});
+-- 
+2.55.0
+
