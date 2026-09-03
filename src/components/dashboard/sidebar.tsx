@@ -17,7 +17,6 @@ import {
   Store,
   IdCard,
   DoorOpen,
-  Megaphone,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { getRoleLabel } from "@/lib/utils";
@@ -51,7 +50,6 @@ const navItems: NavItem[] = [
   { label: "Employés", href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },
   { label: "Dossiers RH", href: "/dashboard/hr", icon: IdCard, roles: ["admin_residence"] },
   { label: "Vitrine Trouvetou", href: "/dashboard/trouvetou", icon: Store, roles: ["admin_residence"] },
-  { label: "Publicités", href: "/dashboard/ads", icon: Megaphone, roles: ["admin_residence"] },
 ];
 
 interface SidebarProps {

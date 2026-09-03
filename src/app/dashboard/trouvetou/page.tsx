@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Store,
   Sparkles,
@@ -34,11 +35,13 @@ import {
   Phone,
   Mail,
   FileText,
+  Megaphone,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useCurrency } from "@/hooks/use-currency";
 import { getPlanPrice } from "@/lib/subscription-plans";
 import { useCurrentUser } from "@/contexts/current-user-context";
+import { TrouvetouAdsPanel } from "@/components/dashboard/trouvetou-ads-panel";
 
 // ─── Types locaux ──────────────────────────────────────────────────────────────
 
@@ -707,8 +710,11 @@ function HeaderVisibilityBadge({
 // ─────────────────────────────────────────────────────────────────────────────
 // Page principale
 // ─────────────────────────────────────────────────────────────────────────────
-export default function TrouvetouDashboardPage() {
+function TrouvetouDashboardPage() {
   const { fmt } = useCurrency();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab") === "ads" ? "ads" : "vitrine";
   const [loading, setLoading]           = useState(true);
   const [savingTypeId, setSavingTypeId] = useState<string | null>(null);
   const [plan, setPlan]                 = useState<string>("standard");
@@ -855,7 +861,7 @@ export default function TrouvetouDashboardPage() {
   }
 
   // ─── Dérivations ─────────────────────────────────────────────────────────────
-  if (loadError) {
+  if (activeTab !== "ads" && loadError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center px-4">
         <AlertCircle className="w-8 h-8 text-red-500" />
@@ -870,7 +876,7 @@ export default function TrouvetouDashboardPage() {
     );
   }
 
-  if (loading) {
+  if (activeTab !== "ads" && loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -882,6 +888,11 @@ export default function TrouvetouDashboardPage() {
   const publishedCount = types.filter((t) => t.is_effectively_listed).length;
   const anyExpressActive = accommodations.some((a) => a.is_express_boost_active);
   const anyPermanentBoost = accommodations.some((a) => a.is_permanently_boosted);
+
+  function setTab(tab: "vitrine" | "ads") {
+    const url = tab === "ads" ? "/dashboard/trouvetou?tab=ads" : "/dashboard/trouvetou";
+    router.replace(url, { scroll: false });
+  }
 
   return (
     <div className="space-y-8 pb-12">
@@ -928,6 +939,40 @@ export default function TrouvetouDashboardPage() {
           </div>
         </div>
       </div>
+
+      <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 w-full sm:w-auto" role="tablist" aria-label="Options de la vitrine Trouvetou">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "vitrine"}
+          onClick={() => setTab("vitrine")}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            activeTab === "vitrine"
+              ? "bg-[var(--card-bg,white)] text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+          }`}
+        >
+          <Store className="w-4 h-4" />
+          Vitrine
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "ads"}
+          onClick={() => setTab("ads")}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
+            activeTab === "ads"
+              ? "bg-[var(--card-bg,white)] text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+          }`}
+        >
+          <Megaphone className="w-4 h-4" />
+          Publicités
+        </button>
+      </div>
+
+      {activeTab === "ads" ? <TrouvetouAdsPanel /> : (
+      <>
 
       {/* ── Statistiques dynamiques Trouvetou ───────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1402,6 +1447,23 @@ export default function TrouvetouDashboardPage() {
           onSuccess={fetchData}
         />
       )}
+      </>
+      )}
     </div>
+  );
+}
+
+export default function TrouvetouPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-sm font-medium text-slate-500">Chargement de votre Vitrine Trouvetou...</p>
+        </div>
+      }
+    >
+      <TrouvetouDashboardPage />
+    </Suspense>
   );
 }

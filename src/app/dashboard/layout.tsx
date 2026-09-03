@@ -457,12 +457,12 @@ export default function DashboardLayout({
             : "Dossiers employés et contrats",
       },
       "/dashboard/subscription": d.subscription,
-      "/dashboard/ads": {
-        title: lang === "en" ? "Ads" : "Publicités",
+      "/dashboard/trouvetou": {
+        title: lang === "en" ? "Trouvetou Showcase" : "Vitrine Trouvetou",
         subtitle:
           lang === "en"
-            ? "Create and manage Trouvetou advertisements"
-            : "Créez et gérez vos publicités Trouvetou",
+            ? "Publish listings and advertisements on Trouvetou"
+            : "Publiez vos fiches et publicités sur Trouvetou",
       },
       "/dashboard/settings": { title: d.settings.pageTitle, subtitle: d.settings.pageSubtitle },
       "/dashboard/suggestions": {

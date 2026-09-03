@@ -188,7 +188,7 @@ BEGIN
     'Publicité activée',
     'Votre publicité a été validée et est désormais diffusée sur Trouvetou.',
     'success',
-    '/dashboard/ads'
+    '/dashboard/trouvetou?tab=ads'
   );
 
   RETURN v_request;
@@ -243,7 +243,7 @@ BEGIN
     'Paiement publicité rejeté',
     'Votre preuve de règlement n''a pas pu être confirmée. Vous pouvez soumettre une nouvelle demande.',
     'warning',
-    '/dashboard/ads'
+    '/dashboard/trouvetou?tab=ads'
   );
 
   RETURN v_request;

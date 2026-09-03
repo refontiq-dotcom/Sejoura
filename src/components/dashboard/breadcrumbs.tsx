@@ -59,6 +59,7 @@ export function Breadcrumbs() {
     hr: lang === "en" ? "HR Records" : "Dossiers RH",
     settings: t.settings,
     subscription: t.subscription,
+    trouvetou: lang === "en" ? "Trouvetou Showcase" : "Vitrine Trouvetou",
     ads: t.ads ?? (lang === "en" ? "Ads" : "Publicités"),
     suggestions: "Suggestions",
   };

@@ -10,7 +10,6 @@ const ADMIN_ONLY_ROUTES = [
   "/dashboard/employees",
   "/dashboard/subscription",
   "/dashboard/residences", // Liste des résidences (le détail /dashboard/residences/[id] reste accessible aux réceptionnistes)
-  "/dashboard/ads",
 ];
 
 // Routes autorisées pour les Employés (Réceptionnistes) dans le dashboard
