@@ -3,6 +3,10 @@
     {
       "path": "/api/v1/cron/subscription-renewal",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/ads-expire",
+      "schedule": "0 * * * *"
     }
   ]
 }

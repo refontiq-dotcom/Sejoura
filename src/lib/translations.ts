@@ -30,6 +30,7 @@ export const translations = {
         { label: "Employés", href: "/dashboard/employees" },
         { label: "Dossiers RH", href: "/dashboard/hr" },
         { label: "Vitrine Trouvetou", href: "/dashboard/trouvetou" },
+        { label: "Publicités", href: "/dashboard/ads" },
         { label: "Paramètres", href: "/dashboard/settings" },
       ],
       logoutTooltip: "Se déconnecter",
@@ -84,6 +85,7 @@ export const translations = {
       employees: "Employés",
       settings: "Paramètres",
       subscription: "Abonnement",
+      ads: "Publicités",
       details: "Détails",
     },
     onboarding: {
@@ -651,6 +653,7 @@ export const translations = {
         { label: "Employees", href: "/dashboard/employees" },
         { label: "HR Records", href: "/dashboard/hr" },
         { label: "Trouvetou Showcase", href: "/dashboard/trouvetou" },
+        { label: "Ads", href: "/dashboard/ads" },
         { label: "Settings", href: "/dashboard/settings" },
       ],
       logoutTooltip: "Logout",
@@ -705,6 +708,7 @@ export const translations = {
       employees: "Employees",
       settings: "Settings",
       subscription: "Subscription",
+      ads: "Ads",
       details: "Details",
     },
     onboarding: {

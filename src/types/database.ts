@@ -152,6 +152,54 @@ export interface SubscriptionPaymentRequest {
   updated_at: string;
 }
 
+export type AdvertisementStatus = "draft" | "pending_payment" | "active" | "expired" | "rejected";
+
+export interface AdvertisementTargeting {
+  cities?: string[];
+  audience?: "all" | "tourists" | "locals" | "business";
+  country?: string;
+}
+
+export interface Advertisement {
+  id: string;
+  tenant_id: string;
+  created_by: string | null;
+  title: string;
+  description: string | null;
+  image_url: string;
+  redirect_url: string;
+  targeting: AdvertisementTargeting;
+  duration_days: number;
+  amount: number;
+  status: AdvertisementStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  sender_phone: string | null;
+  trouvetou_external_id: string | null;
+  trouvetou_synced_at: string | null;
+  trouvetou_unpublished_at: string | null;
+  trouvetou_is_published: boolean;
+  trouvetou_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdvertisementPaymentRequest {
+  id: string;
+  tenant_id: string;
+  advertisement_id: string;
+  amount: number;
+  duration_days: number;
+  status: "pending" | "validated" | "rejected";
+  requested_by: string | null;
+  validated_by: string | null;
+  validated_at: string | null;
+  sender_phone: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: string;
   tenant_id: string | null;
@@ -844,6 +892,16 @@ export interface Database {
         Insert: Omit<SubscriptionPaymentRequest, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<SubscriptionPaymentRequest, "id" | "created_at" | "updated_at">>;
       };
+      advertisements: {
+        Row: Advertisement;
+        Insert: Omit<Advertisement, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<Advertisement, "id" | "created_at" | "updated_at">>;
+      };
+      advertisement_payment_requests: {
+        Row: AdvertisementPaymentRequest;
+        Insert: Omit<AdvertisementPaymentRequest, "id" | "created_at" | "updated_at">;
+        Update: Partial<Omit<AdvertisementPaymentRequest, "id" | "created_at" | "updated_at">>;
+      };
       users: {
         Row: User;
         Insert: Omit<User, "id" | "created_at" | "updated_at">;
@@ -1068,6 +1126,18 @@ export interface Database {
       reject_subscription_payment: {
         Args: { p_request_id: string };
         Returns: SubscriptionPaymentRequest;
+      };
+      validate_advertisement_payment: {
+        Args: { p_request_id: string };
+        Returns: AdvertisementPaymentRequest;
+      };
+      reject_advertisement_payment: {
+        Args: { p_request_id: string };
+        Returns: AdvertisementPaymentRequest;
+      };
+      expire_advertisements: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       sync_subscription_statuses: {
         Args: Record<string, never>;

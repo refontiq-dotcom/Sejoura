@@ -47,9 +47,16 @@ import {
   Phone,
   Lightbulb,
   LayoutGrid,
+  Megaphone,
 } from "lucide-react";
 import { ADMIN_LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
-import type { Tenant, Subscription, SubscriptionPaymentRequest } from "@/types/database";
+import type {
+  Tenant,
+  Subscription,
+  SubscriptionPaymentRequest,
+  AdvertisementPaymentRequest,
+  Advertisement,
+} from "@/types/database";
 
 interface PaymentRequestWithTenant extends SubscriptionPaymentRequest {
   tenants: {
@@ -59,6 +66,11 @@ interface PaymentRequestWithTenant extends SubscriptionPaymentRequest {
     contact_phone: string;
     city: string | null;
   } | null;
+}
+
+interface AdPaymentRequestWithTenant extends AdvertisementPaymentRequest {
+  tenants: PaymentRequestWithTenant["tenants"];
+  advertisement: Pick<Advertisement, "id" | "title" | "image_url" | "duration_days" | "amount" | "status"> | null;
 }
 
 type TenantStatusFilter = "all" | "active" | "suspended" | "locked" | "pending";
@@ -88,8 +100,11 @@ export default function SuperAdminPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [subscriptions, setSubscriptions] = useState<Record<string, Subscription>>({});
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequestWithTenant[]>([]);
+  const [adPaymentRequests, setAdPaymentRequests] = useState<AdPaymentRequestWithTenant[]>([]);
   const [validateTarget, setValidateTarget] = useState<PaymentRequestWithTenant | null>(null);
   const [rejectTarget, setRejectTarget] = useState<PaymentRequestWithTenant | null>(null);
+  const [validateAdTarget, setValidateAdTarget] = useState<AdPaymentRequestWithTenant | null>(null);
+  const [rejectAdTarget, setRejectAdTarget] = useState<AdPaymentRequestWithTenant | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [suspensionModal, setSuspensionModal] = useState<string | null>(null);
   const [suspendReason, setSuspendReason] = useState("");
@@ -173,6 +188,44 @@ export default function SuperAdminPage() {
         setPaymentRequests(enriched as unknown as PaymentRequestWithTenant[]);
       }
 
+      const { data: adReqData } = await supabase
+        .from("advertisement_payment_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+      const { data: adsData } = await supabase
+        .from("advertisements")
+        .select("id, title, image_url, duration_days, amount, status");
+      const adsMap = new Map(
+        (adsData ?? []).map((a) => {
+          const row = a as unknown as Advertisement;
+          return [row.id, { id: row.id, title: row.title, image_url: row.image_url, duration_days: row.duration_days, amount: row.amount, status: row.status }];
+        })
+      );
+      if (adReqData) {
+        const tenantMapAds = new Map<string, PaymentRequestWithTenant["tenants"]>(
+          (tData ?? []).map((t) => {
+            const row = t as unknown as Tenant;
+            return [
+              row.id,
+              {
+                company_name: row.company_name,
+                contact_name: row.contact_name,
+                contact_email: row.contact_email,
+                contact_phone: row.contact_phone,
+                city: row.city,
+              },
+            ];
+          })
+        );
+        setAdPaymentRequests(
+          (adReqData as unknown as AdvertisementPaymentRequest[]).map((r) => ({
+            ...r,
+            tenants: tenantMapAds.get(r.tenant_id) ?? null,
+            advertisement: adsMap.get(r.advertisement_id) ?? null,
+          }))
+        );
+      }
+
       // Suggestions en attente de modération (badge de la Boîte à idées)
       const { count: ideasCount } = await supabase
         .from("feature_requests")
@@ -205,6 +258,56 @@ export default function SuperAdminPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur lors de la validation.";
       toast.error(`La validation a échoué : ${msg} 🔄`, { id: toastId });
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function confirmValidateAd() {
+    if (!validateAdTarget) return;
+    setActioningId(validateAdTarget.id);
+    const toastId = toast.loading("Confirmation du paiement...", { duration: Infinity });
+    try {
+      const res = await fetch("/api/ads/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: validateAdTarget.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur lors de la confirmation.");
+      if (data.published) {
+        toast.success("Paiement confirmé. La publicité est Active et publiée sur Trouvetou.", { id: toastId });
+      } else {
+        toast.success("Paiement confirmé. Publication Trouvetou à relancer.", { id: toastId });
+      }
+      setValidateAdTarget(null);
+      await loadData(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de la confirmation.";
+      toast.error(`La confirmation a échoué : ${msg}`, { id: toastId });
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function confirmRejectAd() {
+    if (!rejectAdTarget) return;
+    setActioningId(rejectAdTarget.id);
+    const toastId = toast.loading("Rejet en cours...", { duration: Infinity });
+    try {
+      const res = await fetch("/api/ads/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: rejectAdTarget.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Erreur lors du rejet.");
+      toast.success("Demande de publicité rejetée. Le gérant a été notifié.", { id: toastId });
+      setRejectAdTarget(null);
+      await loadData(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur lors du rejet.";
+      toast.error(`Le rejet a échoué : ${msg}`, { id: toastId });
     } finally {
       setActioningId(null);
     }
@@ -287,6 +390,8 @@ export default function SuperAdminPage() {
   const pendingRequests = paymentRequests.filter((r) => r.status === "pending");
   const validatedRequests = paymentRequests.filter((r) => r.status === "validated");
   const rejectedRequests = paymentRequests.filter((r) => r.status === "rejected");
+  const pendingAdRequests = adPaymentRequests.filter((r) => r.status === "pending");
+  const totalPendingValidations = pendingRequests.length + pendingAdRequests.length;
 
   const filteredTenants = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -401,9 +506,9 @@ export default function SuperAdminPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {pendingRequests.length > 0 && (
+          {totalPendingValidations > 0 && (
             <Badge variant="warning" className="text-xs">
-              <Clock className="w-3 h-3" /> {pendingRequests.length} validation{pendingRequests.length > 1 ? "s" : ""} en attente
+              <Clock className="w-3 h-3" /> {totalPendingValidations} validation{totalPendingValidations > 1 ? "s" : ""} en attente
             </Badge>
           )}
           <a
@@ -436,15 +541,15 @@ export default function SuperAdminPage() {
       </div>
 
       {/* Alerte visuelle : validations en attente */}
-      {pendingRequests.length > 0 && (
+      {totalPendingValidations > 0 && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 mb-6">
           <Clock className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              {pendingRequests.length} demande{pendingRequests.length > 1 ? "s" : ""} de validation d&apos;abonnement en attente
+              {totalPendingValidations} demande{totalPendingValidations > 1 ? "s" : ""} de paiement en attente
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              Des gérants ont déclaré leur paiement Wave. Validez leurs abonnements pour débloquer leurs fonctionnalités.
+              {pendingRequests.length} abonnement{pendingRequests.length > 1 ? "s" : ""} · {pendingAdRequests.length} publicité{pendingAdRequests.length > 1 ? "s" : ""}. Confirmez les paiements Wave pour activer les services.
             </p>
           </div>
           <a
@@ -470,7 +575,7 @@ export default function SuperAdminPage() {
           <p className="text-xs text-slate-400">Suspendues</p>
         </Card>
         <Card className="p-4">
-          <p className="text-2xl font-bold text-amber-600">{pendingRequests.length}</p>
+          <p className="text-2xl font-bold text-amber-600">{totalPendingValidations}</p>
           <p className="text-xs text-slate-400">Validations en attente</p>
         </Card>
         <Card className="p-4">
@@ -560,6 +665,79 @@ export default function SuperAdminPage() {
           </div>
         </Card>
       )}
+
+      {/* ── Publicités Trouvetou / Validations en attente ───────────────── */}
+      <div id="publicites-en-attente" className="scroll-mt-4 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+            <Megaphone className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Publicités Trouvetou</h2>
+            <p className="text-xs text-slate-500">Paiements manuels à confirmer avant publication automatique</p>
+          </div>
+        </div>
+        <Card className="overflow-hidden mb-6">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600" />
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Paiements publicité en attente</h3>
+              <Badge variant="warning">{pendingAdRequests.length}</Badge>
+            </div>
+          </div>
+          {pendingAdRequests.length === 0 ? (
+            <div className="p-10 text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Aucune publicité en attente</p>
+              <p className="text-xs text-slate-500 mt-1">Les campagnes soumises par les gérants apparaîtront ici.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Campagne</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Établissement</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Durée</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Montant</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">N° Wave</th>
+                    <th className="text-left p-4 text-xs font-medium text-slate-500 uppercase">Demandé le</th>
+                    <th className="text-right p-4 text-xs font-medium text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                  {pendingAdRequests.map((req) => (
+                    <tr key={req.id} className="hover:bg-amber-50/50 dark:hover:bg-amber-900/10">
+                      <td className="p-4">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white">{req.advertisement?.title || "Publicité"}</p>
+                        <p className="text-xs text-slate-400">{req.tenants?.contact_name || "—"}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{req.tenants?.company_name || "—"}</p>
+                        <p className="text-xs text-slate-400">{req.tenants?.city || "—"}</p>
+                      </td>
+                      <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{req.duration_days} jours</td>
+                      <td className="p-4 text-sm font-semibold text-slate-900 dark:text-white">{formatFCFA(req.amount)}</td>
+                      <td className="p-4 text-sm font-medium text-slate-700 dark:text-slate-300">{req.sender_phone || "—"}</td>
+                      <td className="p-4 text-sm text-slate-500">{formatDate(req.created_at)}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setRejectAdTarget(req)}>
+                            <Ban className="w-4 h-4" /> Rejeter
+                          </Button>
+                          <Button size="sm" variant="success" onClick={() => setValidateAdTarget(req)}>
+                            <Check className="w-4 h-4" /> Confirmer le paiement
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* ── Gestion des abonnements / Validations en attente ─────────────── */}
       <div id="validations-en-attente" className="scroll-mt-4">
@@ -906,6 +1084,66 @@ export default function SuperAdminPage() {
               <Button variant="outline" className="flex-1" onClick={() => setValidateTarget(null)}>Annuler</Button>
               <Button variant="success" className="flex-1" loading={actioningId === validateTarget.id} onClick={confirmValidate}>
                 <Check className="w-4 h-4" /> Valider l&apos;abonnement
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!validateAdTarget}
+        onClose={() => setValidateAdTarget(null)}
+        title="Confirmer le paiement"
+        description="La publicité passe à Active et est publiée automatiquement sur Trouvetou"
+      >
+        {validateAdTarget && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-400">Établissement</p>
+                <p className="font-medium text-slate-900 dark:text-white">{validateAdTarget.tenants?.company_name || "—"}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-400">Campagne</p>
+                <p className="font-medium text-slate-900 dark:text-white">{validateAdTarget.advertisement?.title || "—"}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-400">Montant déclaré</p>
+                <p className="font-medium text-slate-900 dark:text-white">{formatFCFA(validateAdTarget.amount)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
+                <p className="text-xs text-slate-400">N° Wave</p>
+                <p className="font-medium text-slate-900 dark:text-white">{validateAdTarget.sender_phone || "—"}</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setValidateAdTarget(null)}>Annuler</Button>
+              <Button variant="success" className="flex-1" loading={actioningId === validateAdTarget.id} onClick={confirmValidateAd}>
+                <Check className="w-4 h-4" /> Confirmer le paiement
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!rejectAdTarget}
+        onClose={() => setRejectAdTarget(null)}
+        title="Rejeter la publicité"
+        description="Le gérant sera notifié et pourra soumettre une nouvelle preuve"
+      >
+        {rejectAdTarget && (
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20">
+              <Ban className="w-6 h-6 text-red-600 shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-300">
+                Rejeter le paiement de la campagne <strong>{rejectAdTarget.advertisement?.title || "publicité"}</strong> ({rejectAdTarget.tenants?.company_name || "—"}) d&apos;un montant de {formatFCFA(rejectAdTarget.amount)} ?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setRejectAdTarget(null)}>Annuler</Button>
+              <Button variant="destructive" className="flex-1" loading={actioningId === rejectAdTarget.id} onClick={confirmRejectAd}>
+                <Ban className="w-4 h-4" /> Rejeter
               </Button>
             </div>
           </div>
