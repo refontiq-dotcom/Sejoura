@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
 import type { Accommodation } from "@/types/database";
+import { normalizePlan } from "@/lib/subscription-plans";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET  /api/v1/trouvetou/listings?tenantId=xxx
@@ -66,10 +67,11 @@ export async function GET(request: Request) {
 
     const plan            = subscription?.plan || "standard";
     const subActive       = subscription?.status === "active";
-    const isEnterprisePlan = plan === "entreprise" || plan === "enterprise";
+    const normalizedPlan  = normalizePlan(plan);
+    const isEnterprisePlan = normalizedPlan === "entreprise";
     // Essentiel et Croissance n'ont pas le Boost Permanent — ils peuvent
     // utiliser le Boost Express ponctuel (payant).
-    const isExpressEligiblePlan = plan === "essentiel" || plan === "croissance";
+    const isExpressEligiblePlan = normalizedPlan === "essentiel" || normalizedPlan === "croissance";
 
     // 2. Récupérer les établissements avec toutes les colonnes boost
     const { data: accommodations, error: accError } = await admin
