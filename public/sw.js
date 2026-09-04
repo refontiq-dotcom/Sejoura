@@ -1,10 +1,13 @@
-const CACHE_VERSION = "sejoura-v6";
+// v7 : purge les caches de l'époque où / renvoyait 404 (redirection cassée
+// vers /login), dont la page d'erreur avait été mise en cache par le shell.
+const CACHE_VERSION = "sejoura-v7";
 const APP_SHELL = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 
 const PRECACHE_URLS = [
   "/",
+  "/login",
   "/employee-login",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
@@ -312,8 +315,12 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(APP_SHELL).then((cache) => cache.put(request, copy));
+          // Ne jamais mettre en cache les pages d'erreur (404/500) : une
+          // erreur serveur temporaire ne doit pas devenir la version hors-ligne.
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(APP_SHELL).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() =>
