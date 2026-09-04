@@ -50,16 +50,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  * Sans secret valide, renvoie l'état de configuration (comportement d'origine).
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const secret = process.env.TROUVETOU_SYNC_SECRET;
+  const syncSecret = process.env.TROUVETOU_SYNC_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
 
   const configured = Boolean(
     process.env.TROUVETOU_SYNC_URL &&
       process.env.TROUVETOU_API_KEY &&
-      process.env.TROUVETOU_SYNC_SECRET
+      (syncSecret || cronSecret)
   );
 
   const provided = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? null;
-  if (!secret || provided !== secret) {
+  const authorized =
+    Boolean(provided) &&
+    ((Boolean(syncSecret) && provided === syncSecret) ||
+      (Boolean(cronSecret) && provided === cronSecret));
+  if (!authorized) {
     return NextResponse.json({ ok: true, configured });
   }
 

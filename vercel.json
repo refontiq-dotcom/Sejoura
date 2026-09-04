@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/ads-expire",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/trouvetou/sync",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

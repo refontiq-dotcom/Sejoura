@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
 
@@ -141,11 +142,10 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
   }
 
   if (tenantsNeedingKeys.size > 0) {
-    const crypto = require("crypto");
     const newKeysData = Array.from(tenantsNeedingKeys).map((tId) => ({
       tenant_id: tId,
       name: "Clé API Trouvetou (Générée automatiquement)",
-      api_key: crypto.randomBytes(24).toString("hex"),
+      api_key: randomBytes(24).toString("hex"),
       scopes: ["availability", "bookings"],
       is_active: true,
     }));
@@ -299,6 +299,15 @@ export async function syncListingsToTrouvetou(): Promise<TrouvetouSyncResult> {
   const { items, error } = await buildPayload();
   if (error) {
     return { ok: false, sent: 0, error };
+  }
+
+  if (items.length === 0) {
+    return {
+      ok: false,
+      sent: 0,
+      error:
+        "Aucune annonce éligible à synchroniser : vérifiez l'abonnement actif, la photo, une chambre physique et la clé API externe du tenant.",
+    };
   }
 
   const res = await fetch(syncUrl, {
