@@ -6,7 +6,7 @@
 
 -- ── 1. Table advertisements ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS advertisements (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id               UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   created_by              UUID REFERENCES users(id) ON DELETE SET NULL,
   title                   TEXT NOT NULL,
@@ -80,7 +80,7 @@ CREATE POLICY "ads_update_super_admin" ON advertisements
 
 -- ── 2. Table advertisement_payment_requests ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS advertisement_payment_requests (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   advertisement_id UUID NOT NULL REFERENCES advertisements(id) ON DELETE CASCADE,
   amount          INTEGER NOT NULL,
