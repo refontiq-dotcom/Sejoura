@@ -42,6 +42,7 @@ import { useCurrency } from "@/hooks/use-currency";
 import { getPlanPrice } from "@/lib/subscription-plans";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { TrouvetouAdsPanel } from "@/components/dashboard/trouvetou-ads-panel";
+import { trackStep } from "@/lib/onboarding";
 
 // ─── Types locaux ──────────────────────────────────────────────────────────────
 
@@ -814,6 +815,8 @@ function TrouvetouDashboardPage() {
             ? `Le type « ${type.name} » est désormais publié sur Trouvetou !`
             : `Le type « ${type.name} » a été masqué sur Trouvetou.`
         );
+        // Onboarding : exploration des fonctions avancées (publication Trouvetou).
+        if (newListed) trackStep("advanced_explored");
         if (data.trouvetouPush && data.trouvetouPush.ok === false) {
           toast.error(data.trouvetouPush.error || "Fiche enregistrée mais le push Trouvetou a échoué.");
         }

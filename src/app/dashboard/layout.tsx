@@ -9,6 +9,9 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
+import { WelcomeOnboardingModal } from "@/components/dashboard/welcome-onboarding-modal";
+import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
+import { useOnboarding } from "@/hooks/use-onboarding";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
 import { LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
@@ -67,6 +70,12 @@ export default function DashboardLayout({
   // Heure locale du navigateur pour le greeting (évite le décalage UTC côté serveur)
   const [localHour, setLocalHour] = useState(() => new Date().getHours());
   const { count: onlineBookingCount, markAsViewed } = useOnlineBookingBadge(user);
+
+  // Onboarding utilisateur (checklist + modal de bienvenue) : activé une fois
+  // le rôle connu — seuls les admins résidence y sont soumis. Les employés
+  // (réceptionnistes / ménagères) n'ont pas de checklist.
+  const isResidenceAdmin = user?.role === "admin_residence";
+  const onboarding = useOnboarding(isResidenceAdmin);
 
   // L'étape 2 (onboarding) est décidée côté serveur via le client admin
   // (service_role) pour être insensible aux politiques RLS du navigateur.
@@ -652,6 +661,30 @@ export default function DashboardLayout({
 
       {needsReauth && (
         <ReauthModal onVerified={() => setNeedsReauth(false)} />
+      )}
+
+      {isResidenceAdmin && (
+        <>
+          <WelcomeOnboardingModal
+            open={onboarding.showWelcomeModal}
+            userName={user?.full_name?.split(/\s+/)[0] || undefined}
+            onComplete={() => {
+              onboarding.closeWelcome();
+              toast.success("Configuration initiale enregistrée 🎉");
+            }}
+            onSkip={onboarding.closeWelcome}
+            completeStep={onboarding.complete}
+          />
+          <OnboardingChecklist
+            open={onboarding.showChecklist}
+            completedSteps={onboarding.status?.completedSteps ?? []}
+            completedCount={onboarding.completedCount}
+            totalCount={onboarding.totalCount}
+            progress={onboarding.progress}
+            onStepClick={onboarding.complete}
+            onDismiss={onboarding.dismiss}
+          />
+        </>
       )}
     </div>
   );

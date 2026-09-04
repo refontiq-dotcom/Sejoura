@@ -13,6 +13,7 @@ import { getRoleLabel, getPlanLimits, canAccessPlanFeature, formatDate, isValidP
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal, IdCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { trackStep } from "@/lib/onboarding";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
 
 // Map userId → affectation temporaire active (si elle existe)
@@ -177,6 +178,9 @@ export default function EmployeesPage() {
         first_login: true,
       });
       if (error) throw error;
+
+      // Onboarding : premier employé invité — non bloquant.
+      trackStep("employee_invited");
 
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const generatedLink = `${origin}/employee-login?phone=${encodeURIComponent(phone)}`;
