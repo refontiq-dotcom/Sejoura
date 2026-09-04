@@ -28,6 +28,7 @@ import {
 import {
   ADMIN_LOGIN_ROUTE,
 } from "@/lib/routes";
+import { SchoolyStatsCard } from "@/components/admin/SchoolyStatsCard";
 
 // Résolution dynamique de l'icône Lucide depuis le registre des projets.
 import {
@@ -185,6 +186,11 @@ export default function SuperAdminHubPage() {
           </Card>
         </div>
       )}
+
+      {/* ── Statistiques Schooly ─────────────────────────────────────────── */}
+      <div className="mb-8">
+        <SchoolyStatsCard />
+      </div>
 
       {/* ── Grille des projets ───────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4">
