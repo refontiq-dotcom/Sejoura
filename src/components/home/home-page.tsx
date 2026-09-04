@@ -218,26 +218,29 @@ type SectionName = "Fonctionnalités" | "Modules" | "Tarifs" | "FAQ" | null;
 export function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  // After Google OAuth signup, open the auth modal in signup mode
-  useEffect(() => {
-    if (searchParams.get("google_signup") === "true") {
-      setMode("signup");
-      setAuthModalMode("signup");
-      // Clean the URL param
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [searchParams]);
   const { theme, toggleTheme } = useTheme();
   const { lang, toggle: toggleLang } = useLanguage();
   const t = messages[lang];
 
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  // After Google OAuth signup (?google_signup=true), open the auth modal in signup mode.
+  // Initialisé au premier rendu (pas de setState dans un effet), puis l'URL est nettoyée.
+  const isGoogleSignup = searchParams.get("google_signup") === "true";
+
+  const [mode, setMode] = useState<"login" | "signup">(isGoogleSignup ? "signup" : "login");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileAuthOpen, setMobileAuthOpen] = useState(false);
   const [mobileAuthMode, setMobileAuthMode] = useState<"login" | "signup">("login");
   const [activeSection, setActiveSection] = useState<SectionName>(null);
-  const [authModalMode, setAuthModalMode] = useState<"login" | "signup" | null>(null);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "signup" | null>(
+    isGoogleSignup ? "signup" : null
+  );
+
+  // Clean the URL param once consumed
+  useEffect(() => {
+    if (searchParams.get("google_signup") === "true") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParams]);
 
   // Hydration-safe detection du montage côté client (SSR)
   const mounted = useSyncExternalStore(
@@ -926,545 +929,846 @@ export function HomePage() {
     ),
   };
 
+  const navItems = [
+    { label: t.navFeatures, section: "Fonctionnalités" as const },
+    { label: t.navModules, section: "Modules" as const },
+    { label: t.navPricing, section: "Tarifs" as const },
+    { label: t.navFaq, section: "FAQ" as const },
+  ];
+
+  const heroSlides: HeroSlide[] = [
+    {
+      image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=400&auto=format&fit=crop",
+      badge: t.car1Badge,
+      title: t.car1Title,
+      desc: t.car1Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=400&auto=format&fit=crop",
+      badge: t.car2Badge,
+      title: t.car2Title,
+      desc: t.car2Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=400&auto=format&fit=crop",
+      badge: t.car3Badge,
+      title: t.car3Title,
+      desc: t.car3Desc,
+    },
+    {
+      image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?q=80&w=400&auto=format&fit=crop",
+      badge: t.car4Badge,
+      title: t.car4Title,
+      desc: t.car4Desc,
+    },
+  ];
+
   return (
-    <div className="font-sans antialiased bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300">
-      
-      {/* Navbar */}
-      <header className="fixed top-0 inset-x-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200/60 dark:border-slate-800/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-18">
-            <button type="button" onClick={handleLogoClick} className="flex items-center gap-2.5 group bg-transparent border-none cursor-pointer">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/25 group-hover:scale-105 transition-transform">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-display font-bold text-xl tracking-tight">Séjoura</span>
+    <div className="relative h-screen w-full overflow-y-auto flex flex-col justify-between py-2 px-4 sm:px-6 md:px-12 text-white">
+      {/* Full-screen panoramic background with dark overlay */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=1920&auto=format&fit=crop)" }}>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/60 backdrop-blur-sm" />
+      </div>
+
+      {/* Skip link for accessibility - rendered after client mount to avoid hydration mismatch */}
+      {mounted && (
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm"
+        >
+          {lang === "fr" ? "Aller au contenu principal" : "Skip to main content"}
+        </a>
+      )}
+
+      {/* Header */}
+      <header className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-1.5 sm:py-2 flex items-center justify-between">
+        {/* Logo */}
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={handleLogoClick}
+            className="cursor-pointer bg-transparent border-0 p-0"
+            aria-label="Séjoura"
+          >
+            <Image
+              src="/logo-sejoura.png"
+              alt="Séjoura"
+              width={200}
+              height={64}
+              className="object-contain h-16 sm:h-20 w-auto brightness-0 invert"
+              priority
+            />
+          </button>
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav
+          className="hidden md:flex items-center space-x-6 text-xs font-semibold text-white/80 bg-white/10 backdrop-blur-md px-5 py-2 rounded-full border border-white/20 shadow-lg"
+          aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}
+        >
+          {navItems.map((item) => (
+            <button
+              key={item.section}
+              onClick={() => openSection(item.section)}
+              className="hover:text-white transition-colors"
+            >
+              {item.label}
             </button>
+          ))}
+        </nav>
 
-            <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
-              <a href="#features" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">{t.navFeatures || "Fonctionnalités"}</a>
-              <a href="#pricing" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">{t.navPricing || "Tarifs"}</a>
-              <a href="#testimonials" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Témoignages</a>
-              <button onClick={() => { setMode("login"); setAuthModalMode("login"); }} className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors bg-transparent border-none cursor-pointer">
-                Démo Dashboard
-              </button>
-            </nav>
+        {/* Right actions */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Language toggle */}
+          <button
+            onClick={toggleLang}
+            className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.langLabel}
+          >
+            {lang === "fr" ? "FR" : "EN"}
+          </button>
 
-            <div className="flex items-center gap-3">
-              <button onClick={toggleTheme} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:bg-slate-800 transition-colors" aria-label="Changer de thème">
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <button onClick={() => { setMode("login"); setAuthModalMode("login"); }} className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-brand-600 transition-colors bg-transparent border-none cursor-pointer">
-                {t.signIn || "Connexion"}
-              </button>
-              <button onClick={() => { setMode("signup"); setAuthModalMode("signup"); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-lg shadow-brand-600/25 hover:shadow-brand-600/40 transition-all border-none cursor-pointer">
-                {t.signUp || "Essayer gratuitement"}
-                <Check className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.themeToggle}
+          >
+            {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-yellow-400" />}
+          </button>
+
+          {/* WhatsApp contact */}
+          <a
+            href="https://wa.me/2250100372900"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex px-3.5 py-2 bg-[#25D366] hover:bg-[#1DA851] text-white text-xs font-bold rounded-xl items-center gap-2 transition-all shadow-lg"
+          >
+            <MessageCircle className="w-4 h-4" />
+            {t.contactTeam}
+          </a>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg bg-white/10 backdrop-blur-md text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
+            aria-label={t.menuToggle}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative pt-28 pb-20 lg:pt-36 lg:pb-28 overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-accent-400/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-950/50 text-brand-700 dark:text-brand-300 text-xs font-semibold mb-6 border border-brand-200/60 dark:border-brand-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
-                SOLUTION TOUT-EN-UN • Côte d'Ivoire & Afrique de l'Ouest
-              </div>
-              <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.25rem] font-extrabold leading-[1.1] tracking-tight text-slate-900 dark:text-white mb-6">
-                La gestion simple de vos
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400"> résidences & hôtels</span>
-              </h1>
-              <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
-                Une seule plateforme pour suivre réservations, ménage, caisse et équipes. 
-                Zéro frais d'installation. 1 mois offert. Paiements Wave intégrés.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={() => { setMode("signup"); setAuthModalMode("signup"); }} className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-xl shadow-brand-600/30 hover:shadow-brand-600/50 transition-all text-base border-none cursor-pointer">
-                  Démarrer gratuitement
-                  <Sparkles className="w-5 h-5" />
-                </button>
-                <a href="#features" className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold text-slate-700 dark:text-slate-200 transition-all">
-                  Voir les fonctionnalités
-                </a>
-              </div>
-              <div className="mt-10 flex items-center gap-6 text-sm text-slate-500 dark:text-slate-400">
-                <div className="flex -space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-brand-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">MK</div>
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">AY</div>
-                  <div className="w-8 h-8 rounded-full bg-violet-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">JD</div>
-                </div>
-                <p><strong className="text-slate-800 dark:text-slate-200">50+</strong> établissements déjà équipés</p>
-              </div>
-            </div>
-
-            <div className="relative hidden md:block">
-              <div className="absolute -inset-4 bg-gradient-to-r from-brand-500/20 to-accent-500/20 rounded-3xl blur-2xl"></div>
-              <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-                  </div>
-                  <div className="flex-1 mx-4 h-6 rounded-md bg-slate-200/70 dark:bg-slate-700/70 flex items-center px-3 text-xs text-slate-500">app.sejoura.com/dashboard</div>
-                </div>
-                <div className="p-5 grid grid-cols-3 gap-3">
-                  <div className="col-span-3 flex items-center justify-between mb-1">
-                    <div className="h-4 w-28 rounded bg-slate-200 dark:bg-slate-700"></div>
-                    <div className="h-8 w-8 rounded-full bg-brand-100 dark:bg-brand-900"></div>
-                  </div>
-                  <div className="rounded-xl bg-brand-50 dark:bg-brand-950/40 p-3 border border-brand-100 dark:border-brand-900">
-                    <div className="text-[10px] text-brand-600 dark:text-brand-400 font-medium mb-1">Occupancy</div>
-                    <div className="text-xl font-bold text-brand-700 dark:text-brand-300">87%</div>
-                  </div>
-                  <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 border border-emerald-100 dark:border-emerald-900">
-                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mb-1">Recettes</div>
-                    <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300">2.4M</div>
-                  </div>
-                  <div className="rounded-xl bg-violet-50 dark:bg-violet-950/40 p-3 border border-violet-100 dark:border-violet-900">
-                    <div className="text-[10px] text-violet-600 dark:text-violet-400 font-medium mb-1">Arrivées</div>
-                    <div className="text-xl font-bold text-violet-700 dark:text-violet-300">12</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust */}
-      <section className="py-10 border-y border-slate-100 dark:border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
-            <div className="flex items-center gap-4">
-              <div className="flex -space-x-2">
-                <div className="w-9 h-9 rounded-full bg-brand-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">MK</div>
-                <div className="w-9 h-9 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">AY</div>
-                <div className="w-9 h-9 rounded-full bg-violet-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">JD</div>
-                <div className="w-9 h-9 rounded-full bg-amber-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">+</div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-200"><strong className="text-brand-600 dark:text-brand-400">50+</strong> établissements</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">hôtels & résidences en Côte d'Ivoire</p>
-              </div>
-            </div>
-            <div className="hidden md:block w-px h-8 bg-slate-200 dark:bg-slate-700" />
-            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 opacity-70 grayscale hover:grayscale-0 transition-all">
-              <span className="font-display font-bold text-base text-slate-700 dark:text-slate-300">Hôtel Riviera</span>
-              <span className="font-display font-bold text-base text-slate-700 dark:text-slate-300">Résidence Palm Beach</span>
-              <span className="font-display font-bold text-base text-slate-700 dark:text-slate-300">Cocody Suites</span>
-              <span className="font-display font-bold text-base text-slate-700 dark:text-slate-300">Abidjan Lodge</span>
-              <span className="font-display font-bold text-base text-slate-700 dark:text-slate-300">Yamoussoukro Inn</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Tout ce dont vous avez besoin</h2>
-            <p className="text-slate-600 dark:text-slate-400 text-lg">De la réservation au check-out, en passant par le ménage et la caisse — une seule interface claire.</p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Calendar className="w-6 h-6 text-brand-600 dark:text-brand-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Réservations intelligentes</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Check-in / check-out, prolongations, no-show, factures détaillées avec historique des nuits.</p>
-            </div>
-
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Ménage automatisé</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Kanban clair, assignation d'équipes, statuts en temps réel. Plus de chambres sales oubliées.</p>
-            </div>
-
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Wallet className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Caisse & Comptabilité</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Suivi des encaissements, factures PDF, export. Visibilité jour après jour sur vos recettes.</p>
-            </div>
-
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Users className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Gestion d'équipes</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Rôles (gérant, réceptionniste, ménage), activation/désactivation, permissions fines.</p>
-            </div>
-
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Building2 className="w-6 h-6 text-rose-600 dark:text-rose-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Multi-établissements</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Gérez plusieurs résidences depuis un seul compte. Limites selon votre forfait.</p>
-            </div>
-
-            <div className="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
-              <div className="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Store className="w-6 h-6 text-sky-600 dark:text-sky-400" />
-              </div>
-              <h3 className="font-display font-bold text-lg mb-2">Paiements Wave</h3>
-              <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Abonnements et encaissements via Wave. Flux semi-automatisé adapté au marché local.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="py-20 lg:py-28 bg-slate-50 dark:bg-slate-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Tarifs simples et transparents</h2>
-            <p className="text-slate-600 dark:text-slate-400 text-lg">1 mois offert. Sans carte bancaire. Annulation à tout moment.</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
-            <div className="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-shadow">
-              <h3 className="font-display font-bold text-lg mb-1">Essentiel</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Pour démarrer</p>
-              <div className="mb-6">
-                <span className="font-display text-4xl font-extrabold">9 900</span>
-                <span className="text-slate-500 text-sm"> FCFA / mois</span>
-              </div>
-              <ul className="space-y-3 text-sm mb-8">
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> 1 établissement</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Jusqu'à 20 chambres</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Réservations & ménage</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Support email</li>
-              </ul>
-              <button onClick={() => { setMode("signup"); setAuthModalMode("signup"); }} className="block w-full text-center py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer bg-transparent">Commencer</button>
-            </div>
-
-            <div className="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border-2 border-brand-500 shadow-xl shadow-brand-500/10 scale-[1.02]">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-brand-600 text-white text-xs font-bold">Populaire</div>
-              <h3 className="font-display font-bold text-lg mb-1">Croissance</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Le plus choisi</p>
-              <div className="mb-6">
-                <span className="font-display text-4xl font-extrabold">24 900</span>
-                <span className="text-slate-500 text-sm"> FCFA / mois</span>
-              </div>
-              <ul className="space-y-3 text-sm mb-8">
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> 3 établissements</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Chambres illimitées</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Comptabilité + exports</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Multi-utilisateurs</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Support prioritaire</li>
-              </ul>
-              <button onClick={() => { setMode("signup"); setAuthModalMode("signup"); }} className="block w-full text-center py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-lg shadow-brand-600/25 transition-colors border-none cursor-pointer">Commencer</button>
-            </div>
-
-            <div className="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-shadow">
-              <h3 className="font-display font-bold text-lg mb-1">Entreprise</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Pour les groupes</p>
-              <div className="mb-6">
-                <span className="font-display text-4xl font-extrabold">54 900</span>
-                <span className="text-slate-500 text-sm"> FCFA / mois</span>
-              </div>
-              <ul className="space-y-3 text-sm mb-8">
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Établissements illimités</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Toutes les fonctionnalités</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> API & intégrations</li>
-                <li className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" /> Account manager dédié</li>
-              </ul>
-              <a href="https://wa.me/2250100372900" target="_blank" className="block w-full text-center py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Nous contacter</a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section id="testimonials" className="py-20 lg:py-28">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Ils en parlent mieux que nous</h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
-            <blockquote className="p-7 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
-              <div className="flex gap-1 mb-4 text-amber-400">
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-              </div>
-              <p className="text-slate-700 dark:text-slate-300 mb-6 leading-relaxed">« Séjoura a transformé notre gestion. Le ménage est automatique, la caisse est claire, et les réservations arrivent sans effort. »</p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-sm">MK</div>
-                <div>
-                  <div className="font-semibold text-sm">M. Kouassi</div>
-                  <div className="text-xs text-slate-500">Gérant, Hôtel Riviera Abidjan</div>
-                </div>
-              </div>
-            </blockquote>
-
-            <blockquote className="p-7 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
-              <div className="flex gap-1 mb-4 text-amber-400">
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-                <Sparkles className="w-4 h-4 fill-current" />
-              </div>
-              <p className="text-slate-700 dark:text-slate-300 mb-6 leading-relaxed">« Avant c'était le chaos. Maintenant je vois en 2 secondes qui arrive, qui part, et combien on a encaissé aujourd'hui. »</p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">AY</div>
-                <div>
-                  <div className="font-semibold text-sm">Mme Aya</div>
-                  <div className="text-xs text-slate-500">Directrice, Résidence Palm Beach</div>
-                </div>
-              </div>
-            </blockquote>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-10 lg:p-14 text-center text-white shadow-2xl shadow-brand-600/30">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-            <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4 relative">Prêt à simplifier votre gestion ?</h2>
-            <p className="text-brand-100 text-lg mb-8 max-w-xl mx-auto relative">Rejoignez les 50+ établissements qui utilisent déjà Séjoura. 1 mois offert, sans engagement.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center relative">
-              <button onClick={() => { setMode("signup"); setAuthModalMode("signup"); }} className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-white text-brand-700 font-bold shadow-lg hover:bg-brand-50 transition-colors cursor-pointer border-none">
-                Essayer la démo
-                <Check className="w-5 h-5" />
-              </button>
-              <a href="https://wa.me/2250100372900" target="_blank" className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl border border-white/30 hover:bg-white/10 font-semibold transition-colors">
-                <MessageCircle className="w-5 h-5" />
-                Contacter sur WhatsApp
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-display font-bold text-lg">Séjoura</span>
-            </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">© 2026 Refontiq. Tous droits réservés.</p>
-            <div className="flex items-center gap-4 text-sm">
-              <a href="https://refontiq.com" target="_blank" rel="noopener noreferrer" className="text-slate-600 dark:text-slate-300 hover:text-brand-600 transition-colors">By Refontiq</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* Auth Modal */}
-      {authModalMode && (
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-          onClick={() => setAuthModalMode(null)}
+          ref={mobileMenuRef}
+          id="mobile-menu"
+          className="md:hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
         >
           <div
-            className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl relative"
-            style={{ maxHeight: '90vh', overflowY: 'auto' }}
+            className="absolute top-0 right-0 w-72 h-full bg-white dark:bg-[#1a1a1a] shadow-2xl p-6 animate-slide-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setAuthModalMode(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-colors z-10 border-0 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center justify-between mb-6">
+              <span className="font-bold text-slate-900 dark:text-[#e8e8e8]">
+                {lang === "fr" ? "Menu" : "Menu"}
+              </span>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-[#2e2e2e]"
+                aria-label="Fermer le menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <nav className="flex flex-col space-y-3" aria-label={lang === "fr" ? "Navigation mobile" : "Mobile navigation"}>
+              {navItems.map((item) => (
+                <button
+                  key={item.section}
+                  onClick={() => openSection(item.section)}
+                  className="text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 dark:text-[#c0c0c0] bg-slate-50 dark:bg-[#262626] hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 transition-colors"
+                >
+                  {item.label}
+                </button>
+              ))}
+              <a
+                href="https://wa.me/2250100372900"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 px-4 py-3 bg-[#25D366] hover:bg-[#1DA851] text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {t.contactTeam}
+              </a>
+            </nav>
+          </div>
+        </div>
+      )}
 
-            <div className="p-8">
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 mb-4 shadow-lg shadow-brand-500/25">
-                  {mode === "login" ? <DoorOpen className="w-6 h-6 text-white" /> : <Sparkles className="w-6 h-6 text-white" />}
-                </div>
-                <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white">
-                  {mode === "login" ? "Bon retour" : "Créer un compte"}
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  {mode === "login"
-                    ? "Connectez-vous pour accéder à votre espace."
-                    : "Rejoignez Séjoura, sans carte bancaire."}
-                </p>
-              </div>
+      {/* Main content */}
+      <main
+        id="main-content"
+        className="relative z-10 w-full max-w-[1200px] mx-auto flex-1 flex items-center justify-center px-4 sm:px-6 py-1 sm:py-3"
+      >
+        <div className="relative w-full flex flex-col lg:flex-row items-center lg:items-stretch gap-4 lg:gap-10 min-h-0 lg:min-h-[500px]">
+          {/* Left side — Hero title + dynamic carousel */}
+          <div className="relative lg:flex-1 flex flex-col justify-center text-white">
+            <div className="flex flex-col gap-4 sm:gap-8 max-w-xl">
+              <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-lg">
+                {t.heroTitle}
+              </h1>
 
-              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-5">
+              <HeroCarousel slides={heroSlides} />
+            </div>
+          </div>
+
+          {/* Right side — Floating auth card (desktop) */}
+          <div className="relative hidden md:flex w-full sm:w-[400px] lg:w-5/12 xl:w-[420px] bg-white dark:bg-[#1a1a1a] rounded-3xl shadow-2xl p-5 sm:p-5 flex-col justify-between border border-slate-200 dark:border-[#333333] max-h-[calc(100vh-100px)] overflow-y-auto">
+            {/* Tab switcher */}
+            <div>
+              <div
+                className="flex bg-slate-100 dark:bg-[#262626] p-1.5 sm:p-1.5 rounded-2xl sm:rounded-xl mb-4 border border-slate-200 dark:border-[#333333]"
+                role="tablist"
+                aria-label={lang === "fr" ? "Authentification" : "Authentication"}
+              >
                 <button
                   onClick={() => setMode("login")}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all border-0 cursor-pointer ${mode === "login" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 bg-transparent hover:text-slate-700 dark:text-slate-400"}`}
+                  className={`flex-1 py-3 sm:py-2 px-3 text-sm sm:text-xs font-bold rounded-xl sm:rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                    mode === "login"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8] hover:bg-white/50 dark:hover:bg-white/5"
+                  }`}
+                  role="tab"
+                  aria-selected={mode === "login"}
+                  aria-controls="form-login"
                 >
+                  <Lock className="w-3.5 h-3.5 sm:hidden" />
                   {t.signIn}
                 </button>
                 <button
                   onClick={() => setMode("signup")}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all border-0 cursor-pointer ${mode === "signup" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 bg-transparent hover:text-slate-700 dark:text-slate-400"}`}
+                  className={`flex-1 py-3 sm:py-2 px-3 text-sm sm:text-xs font-bold rounded-xl sm:rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                    mode === "signup"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30"
+                      : "text-slate-500 dark:text-[#a0a0a0] hover:text-slate-900 dark:hover:text-[#e8e8e8] hover:bg-white/50 dark:hover:bg-white/5"
+                  }`}
+                  role="tab"
+                  aria-selected={mode === "signup"}
+                  aria-controls="form-signup"
                 >
+                  <Sparkles className="w-3.5 h-3.5 sm:hidden" />
                   {t.signUp}
                 </button>
               </div>
 
-              {mode === "login" ? (
-                <form onSubmit={handleLogin} className="space-y-4" noValidate>
-                  <div>
-                    <label htmlFor="m-login-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t.email}</label>
-                    <input
-                      id="m-login-email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(e) => { setEmail(e.target.value); clearErrors(); }}
-                      placeholder="contact@sejoura.com"
-                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 outline-none transition-all ${errors.email ? "border-red-400" : "border-slate-200 dark:border-slate-700"}`}
-                    />
-                    {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
-                  </div>
-                  <div>
-                    <label htmlFor="m-login-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t.password}</label>
-                    <div className="relative">
+              {/* Login form */}
+              {mode === "login" && (
+                <div id="form-login" role="tabpanel" className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                    {t.managerSpace}
+                  </h2>
+                  <form onSubmit={handleLogin} className="space-y-2.5 mt-2" noValidate>
+                    <div>
+                      <label
+                        htmlFor="login-email"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.email}
+                      </label>
                       <input
-                        id="m-login-password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
+                        id="login-email"
+                        name="login-email"
+                        type="email"
+                        autoComplete="off"
                         required
-                        value={password}
-                        onChange={(e) => { setPassword(e.target.value); clearErrors(); }}
-                        placeholder="••••••••"
-                        className={`w-full px-4 py-2.5 pr-10 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 outline-none transition-all ${errors.password ? "border-red-400" : "border-slate-200 dark:border-slate-700"}`}
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="contact@sejoura.com"
+                        className={`w-full px-3.5 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.email
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
                       />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer">
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>
+                      )}
                     </div>
-                    {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+                    <div>
+                      <label
+                        htmlFor="login-password"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.password}
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="login-password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          required
+                          minLength={6}
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            clearErrors();
+                          }}
+                          placeholder="••••••••"
+                          className={`w-full px-3.5 py-3 sm:py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
+                            errors.password
+                              ? "border-red-400 dark:border-red-500"
+                              : "border-slate-200 dark:border-[#404040]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]"
+                          aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>
+                      )}
+                    </div>
+
+                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 text-[11px] pt-1 pb-1">
+                       <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer hover:text-slate-700 dark:hover:text-[#e8e8e8] transition-colors">
+                         <input
+                           type="checkbox"
+                           name="remember"
+                           checked={remember}
+                           onChange={(e) => setRemember(e.target.checked)}
+                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3.5 h-3.5 sm:w-3 sm:h-3 cursor-pointer"
+                         />
+                         {t.rememberMe}
+                       </label>
+                       <Link
+                         href="/auth/forgot-password"
+                         className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                       >
+                         {t.forgotPassword}
+                       </Link>
+                     </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3.5 sm:py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs sm:text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t.signing}
+                        </>
+                      ) : (
+                        t.loginBtn
+                      )}
+                    </button>
+                  </form>
+
+                  {/* Divider */}
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
+                        {t.or}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-slate-600 dark:text-slate-400">{t.rememberMe}</span>
-                    </label>
-                    <Link href="/auth/forgot-password" className="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium">{t.forgotPassword}</Link>
-                  </div>
-                  <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all border-0 cursor-pointer">
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                    {loading ? t.signing : t.loginBtn}
+
+                  {/* Google sign-in */}
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleAuth()}
+                    disabled={loading}
+                    className="w-full py-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs sm:text-xs"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                      </svg>
+                    )}
+                    {t.signInWith}
                   </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSignUp} className="space-y-4" noValidate>
-                  <div>
-                    <label htmlFor="m-signup-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t.email}</label>
-                    <input
-                      id="m-signup-email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(e) => { setEmail(e.target.value); clearErrors(); }}
-                      placeholder="contact@sejoura.com"
-                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 outline-none transition-all ${errors.email ? "border-red-400" : "border-slate-200 dark:border-slate-700"}`}
-                    />
-                    {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
-                  </div>
-                  <div>
-                    <label htmlFor="m-signup-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t.password}</label>
-                    <div className="relative">
+
+                </div>
+              )}
+
+              {/* Signup form */}
+              {mode === "signup" && (
+                <div id="form-signup" role="tabpanel" className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">
+                    {t.createAccount}
+                  </h2>
+                  <form onSubmit={handleSignUp} className="space-y-2 mt-2" noValidate>
+                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0] [@media(max-height:640px)]:hidden">
+                      {lang === "fr"
+                        ? "Étape 1 sur 2 — créez votre compte, puis configurez votre établissement."
+                        : "Step 1 of 2 — create your account, then set up your establishment."}
+                    </p>
+                    <div>
+                      <label
+                        htmlFor="signup-email"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.email}
+                      </label>
                       <input
-                        id="m-signup-password"
+                        id="signup-email"
+                        name="signup-email"
+                        type="email"
+                        autoComplete="off"
+                        required
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearErrors();
+                        }}
+                        placeholder="contact@sejoura.com"
+                        className={`w-full px-3 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.email
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
+                      />
+                      {errors.email && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-password"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.password}
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="signup-password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          required
+                          minLength={6}
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            clearErrors();
+                          }}
+                          placeholder="••••••••"
+                          className={`w-full px-3 py-3 sm:py-2 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
+                            errors.password
+                              ? "border-red-400 dark:border-red-500"
+                              : "border-slate-200 dark:border-[#404040]"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]"
+                          aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>
+                      )}
+                      <PasswordStrength password={password} />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="signup-confirm"
+                        className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1"
+                      >
+                        {t.confirmPassword}
+                      </label>
+                      <input
+                        id="signup-confirm"
+                        name="confirmPassword"
                         type={showPassword ? "text" : "password"}
                         autoComplete="new-password"
                         required
                         minLength={6}
-                        value={password}
-                        onChange={(e) => { setPassword(e.target.value); clearErrors(); }}
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          clearErrors();
+                        }}
                         placeholder="••••••••"
-                        className={`w-full px-4 py-2.5 pr-10 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 outline-none transition-all ${errors.password ? "border-red-400" : "border-slate-200 dark:border-slate-700"}`}
+                        className={`w-full px-3 py-3 sm:py-2 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs sm:text-xs outline-none focus:border-blue-600 transition-all ${
+                          errors.confirmPassword
+                            ? "border-red-400 dark:border-red-500"
+                            : "border-slate-200 dark:border-[#404040]"
+                        }`}
                       />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer">
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                      {errors.confirmPassword && (
+                        <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">
+                          {errors.confirmPassword}
+                        </p>
+                      )}
                     </div>
-                    {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
-                    <PasswordStrength password={password} />
-                  </div>
-                  <div>
-                    <label htmlFor="m-signup-confirm" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t.confirmPassword}</label>
-                    <input
-                      id="m-signup-confirm"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => { setConfirmPassword(e.target.value); clearErrors(); }}
-                      placeholder="••••••••"
-                      className={`w-full px-4 py-2.5 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 outline-none transition-all ${errors.confirmPassword ? "border-red-400" : "border-slate-200 dark:border-slate-700"}`}
-                    />
-                    {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
-                  </div>
-                  <label className="flex items-start gap-2 cursor-pointer text-sm">
-                    <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-1 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
-                    <span className="text-slate-600 dark:text-slate-400">
-                      {t.acceptTerms}{" "}<Link href="/cgu" className="text-brand-600 hover:underline">{t.terms}</Link>
-                    </span>
-                  </label>
-                  <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-lg shadow-brand-600/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all border-0 cursor-pointer">
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                    {loading ? t.creating : t.signUpBtn}
-                  </button>
-                  <p className="text-center text-xs text-slate-500">{t.noCardRequired}</p>
-                </form>
-              )}
 
-              <div className="mt-5">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-700" /></div>
-                  <div className="relative flex justify-center text-sm"><span className="px-2 bg-white dark:bg-slate-900 text-slate-500">{t.or}</span></div>
+                    <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
+                      <input
+                        id="terms"
+                        type="checkbox"
+                        checked={agreeTerms}
+                        onChange={(e) => setAgreeTerms(e.target.checked)}
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]"
+                      />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0] group-hover:text-slate-900 dark:group-hover:text-[#e8e8e8] transition-colors">
+                        {t.acceptTerms}{" "}
+                        <Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
+                          {t.terms}
+                        </Link>
+                      </span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full mt-1 py-3.5 sm:py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs sm:text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {t.creating}
+                        </>
+                      ) : (
+                        t.signUpBtn
+                      )}
+                    </button>
+                    <p className="text-center text-[10px] text-slate-500 dark:text-[#a0a0a0] font-medium">
+                      {t.noCardRequired}
+                    </p>
+                  </form>
+
+                  {/* Divider + Google sign-up */}
+                  <div>
+                    <div className="relative my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-200 dark:border-[#404040]" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">
+                          {t.or}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGoogleAuth(true)}
+                      disabled={loading}
+                      className="w-full py-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs sm:text-xs"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                      )}
+                      {t.signUpWith}
+                    </button>
+
+                  </div>
                 </div>
+              )}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-[#333333] text-center">
+              <p className="text-[10px] text-slate-500 dark:text-[#a0a0a0] font-bold">
+                <Lock className="w-3 h-3 text-slate-300 dark:text-[#666666] inline mr-1" />
+                {t.privateInfo}
+              </p>
+            </div>
+          </div>
+
+          {/* Mobile CTA buttons — below carousel on mobile only */}
+          <div className="md:hidden w-full flex flex-col items-center gap-2 mt-1">
+            <button
+              onClick={() => { setMode("login"); setAuthModalMode("login"); }}
+              className="w-full max-w-xs py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-600/30 text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              {t.signIn}
+            </button>
+            <button
+              onClick={() => { setMode("signup"); setAuthModalMode("signup"); }}
+              className="w-full max-w-xs py-2.5 px-6 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/25 shadow-lg backdrop-blur-md text-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              {t.signUp}
+            </button>
+            <p className="text-[10px] text-white/50 font-medium">{t.noCardRequired}</p>
+          </div>
+        </div>
+      </main>
+
+      {/* Trust / Social proof */}
+      <section className="relative z-20 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight">
+                {t.trustTitle}
+              </h2>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl sm:text-3xl font-black text-white">{t.trustStat}</span>
+                <span className="text-xs sm:text-sm text-white/60">{t.trustStatDesc}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              ))}
+            </div>
+          </div>
+
+          {/* Testimonials */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Testimonial 1 */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+              <p className="text-sm sm:text-base text-white/90 leading-relaxed mb-4">
+                « {t.testimonial1Quote} »
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-300 font-bold text-sm">
+                  {t.testimonial1Name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{t.testimonial1Name}</p>
+                  <p className="text-[11px] text-white/50">{t.testimonial1Role}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Testimonial 2 */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+              <p className="text-sm sm:text-base text-white/90 leading-relaxed mb-4">
+                « {t.testimonial2Quote} »
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-600/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 font-bold text-sm">
+                  {t.testimonial2Name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">{t.testimonial2Name}</p>
+                  <p className="text-[11px] text-white/50">{t.testimonial2Role}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Mobile auth modal */}
+      {authModalMode && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4"
+          onClick={() => setAuthModalMode(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#1a1a1a] w-full sm:max-w-[400px] sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 dark:border-[#333333] max-h-[85vh] sm:max-h-[92vh] overflow-y-auto animate-slide-up" style={{ WebkitOverflowScrolling: "touch" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div />
                 <button
-                  type="button"
-                  onClick={() => handleGoogleAuth(mode === "signup")}
-                  disabled={loading}
-                  className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium disabled:opacity-70 cursor-pointer"
+                  onClick={() => setAuthModalMode(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#2e2e2e] transition-colors"
+                  aria-label="Fermer"
                 >
-                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                    </svg>
-                  )}
-                  {mode === "login" ? t.signInWith : t.signUpWith}
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+              <div className="flex bg-slate-100 dark:bg-[#262626] p-1.5 rounded-2xl mb-5 border border-slate-200 dark:border-[#333333]" role="tablist">
+                <button onClick={() => setAuthModalMode("login")} className={`flex-1 py-3 px-3 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${authModalMode === "login" ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30" : "text-slate-500 dark:text-[#a0a0a0]"}`} role="tab" aria-selected={authModalMode === "login"}>
+                  <Lock className="w-3.5 h-3.5" />{t.signIn}
+                </button>
+                <button onClick={() => setAuthModalMode("signup")} className={`flex-1 py-3 px-3 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${authModalMode === "signup" ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30" : "text-slate-500 dark:text-[#a0a0a0]"}`} role="tab" aria-selected={authModalMode === "signup"}>
+                  <Sparkles className="w-3.5 h-3.5" />{t.signUp}
+                </button>
+              </div>
+              {authModalMode === "login" && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">{t.managerSpace}</h2>
+                  <form onSubmit={handleLogin} className="space-y-2.5 mt-2" noValidate>
+                    <div>
+                      <label htmlFor="m-login-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
+                      <input id="m-login-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="m-login-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
+                      <div className="relative">
+                        <input id="m-login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] pt-1 pb-1">
+                      <label className="flex items-center text-slate-500 dark:text-[#a0a0a0] cursor-pointer">
+                        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-1.5 w-3.5 h-3.5 cursor-pointer" />
+                        {t.rememberMe}
+                      </label>
+                      <Link href="/auth/forgot-password" className="text-blue-500 font-bold hover:text-blue-700 dark:hover:text-blue-300 transition-colors">{t.forgotPassword}</Link>
+                    </div>
+                    <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                      {loading ? (<><Loader2 className="w-4 h-4 animate-spin" />{t.signing}</>) : t.loginBtn}
+                    </button>
+                  </form>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-[#404040]" /></div>
+                    <div className="relative flex justify-center"><span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">{t.or}</span></div>
+                  </div>
+                  <button type="button" onClick={() => handleGoogleAuth()} disabled={loading} className="w-full py-3.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (<svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>)}
+                    {t.signInWith}
+                  </button>
 
-              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-                <p className="text-[10px] text-slate-500 font-bold">
-                  <Lock className="w-3 h-3 text-slate-300 inline mr-1" />{t.privateInfo}
+                </div>
+              )}
+              {authModalMode === "signup" && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-black text-slate-900 dark:text-[#e8e8e8] tracking-tight">{t.createAccount}</h2>
+                  <form onSubmit={handleSignUp} className="space-y-2 mt-2" noValidate>
+                    <p className="text-[11px] text-slate-500 dark:text-[#a0a0a0]">
+                      {lang === "fr" ? "Étape 1 sur 2 — créez votre compte, puis configurez votre établissement." : "Step 1 of 2 — create your account, then set up your establishment."}
+                    </p>
+                    <div>
+                      <label htmlFor="m-signup-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
+                      <input id="m-signup-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="m-signup-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
+                      <div className="relative">
+                        <input id="m-signup-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.password}</p>}
+                      <PasswordStrength password={password} />
+                    </div>
+                    <div>
+                      <label htmlFor="m-signup-confirm" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.confirmPassword}</label>
+                      <input id="m-signup-confirm" name="confirmPassword" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      {errors.confirmPassword && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
+                    </div>
+                    <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
+                      <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]" />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0]">
+                        {t.acceptTerms}{" "}<Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{t.terms}</Link>
+                      </span>
+                    </label>
+                    <button type="submit" disabled={loading} className="w-full mt-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                      {loading ? (<><Loader2 className="w-4 h-4 animate-spin" />{t.creating}</>) : t.signUpBtn}
+                    </button>
+                    <p className="text-center text-[10px] text-slate-500 dark:text-[#a0a0a0] font-medium">{t.noCardRequired}</p>
+                  </form>
+                  <div className="relative my-3">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-[#404040]" /></div>
+                    <div className="relative flex justify-center"><span className="px-3 bg-white dark:bg-[#1a1a1a] text-slate-400 dark:text-[#8a8a8a] text-[10px] font-medium">{t.or}</span></div>
+                  </div>
+                  <button type="button" onClick={() => handleGoogleAuth(true)} disabled={loading} className="w-full py-3.5 rounded-xl border border-slate-200 dark:border-[#404040] bg-white dark:bg-[#262626] text-slate-700 dark:text-[#c0c0c0] font-medium shadow-sm hover:shadow-md hover:bg-slate-50 dark:hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-xs">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (<svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>)}
+                    {t.signUpWith}
+                  </button>
+
+                </div>
+              )}
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-[#333333] text-center">
+                <p className="text-[10px] text-slate-500 dark:text-[#a0a0a0] font-bold">
+                  <Lock className="w-3 h-3 text-slate-300 dark:text-[#666666] inline mr-1" />{t.privateInfo}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="relative z-20 w-full flex flex-col items-center justify-center py-2 text-xs text-white/60 space-y-1 px-4">
+        <div className="flex items-center gap-1.5">
+          <span>{t.footerPowered}</span>
+          <a
+            href="https://refontiq.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-white/90 hover:text-white transition-colors underline underline-offset-2 decoration-white/30 hover:decoration-white/60"
+          >
+            Refontiq
+          </a>
+        </div>
+        <p className="text-white/40">{t.footerRights} {t.footerContact}</p>
+      </footer>
+
+      {/* Modal */}
+      {activeSection && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setActiveSection(null)}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#404040] text-slate-800 dark:text-[#e8e8e8] w-full max-w-3xl rounded-3xl p-6 sm:p-8 shadow-2xl relative max-h-[80vh] sm:max-h-[85vh] overflow-y-auto animate-modal-in" style={{ WebkitOverflowScrolling: "touch" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              ref={modalCloseRef}
+              onClick={() => setActiveSection(null)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-900 dark:hover:text-[#ffffff] p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#2e2e2e] transition-colors"
+              aria-label="Fermer la modale"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 id="modal-title" className="text-2xl font-black text-slate-900 dark:text-[#e8e8e8] mb-4 pr-8">
+              {activeSection} — Séjoura
+            </h3>
+            <div className="text-slate-600 dark:text-[#c0c0c0] text-sm space-y-3 leading-relaxed">
+              {modalContent[activeSection]}
+            </div>
+            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-[#333333] flex justify-end">
+              <button
+                onClick={() => setActiveSection(null)}
+                className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition-colors shadow-md"
+              >
+                {t.closeModal}
+              </button>
             </div>
           </div>
         </div>
@@ -1472,4 +1776,3 @@ export function HomePage() {
     </div>
   );
 }
-
