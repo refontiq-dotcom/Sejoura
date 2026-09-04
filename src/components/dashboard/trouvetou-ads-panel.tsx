@@ -104,17 +104,16 @@ export function TrouvetouAdsPanel() {
   const loadAds = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("advertisements")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setAds((data ?? []) as unknown as Advertisement[]);
+      // Passage par l'API serveur (service_role) au lieu d'un select direct :
+      // même canal que la création de publicité, robuste aux problèmes de JWT
+      // côté navigateur, et le vrai message d'erreur est remonté au toast.
+      const res = await fetch("/api/ads/list");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Impossible de charger les publicités.");
+      setAds((data.advertisements ?? []) as Advertisement[]);
     } catch (err) {
       console.error(err);
-      toast.error("Impossible de charger les publicités.");
+      toast.error(err instanceof Error ? err.message : "Impossible de charger les publicités.");
     } finally {
       setLoading(false);
     }
