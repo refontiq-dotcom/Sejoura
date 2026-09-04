@@ -69,7 +69,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
 import { ClientScoreBadge } from "@/components/client-score-badge";
-
+import { trackStep } from "@/lib/onboarding";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -1027,6 +1027,9 @@ export default function BookingsPage() {
         setSaving(false);
         return;
       }
+
+      // Onboarding : première réservation créée (action clé) — non bloquant.
+      trackStep("first_booking_created");
 
       const totalAmount = negotiatedPrice * nights;
 

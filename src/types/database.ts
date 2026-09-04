@@ -49,6 +49,37 @@ export type BookingSource = "manual" | "external" | "client_request";
 
 export type IdRegistrationStatus = "pending" | "registered" | "not_required";
 
+// ----------------------------------------------------------------------------
+// Onboarding utilisateur (table user_onboarding)
+// ----------------------------------------------------------------------------
+
+/**
+ * Étapes de la checklist d'onboarding. Type strict : une seule source de
+ * vérité partagée entre le hook client, les composants UI et l'API.
+ */
+export type OnboardingStep =
+  | "workspace_configured"     // Configuration initiale de l'établissement (étape 2 d'inscription)
+  | "first_booking_created"    // Première réservation créée (action clé / Aha! moment)
+  | "employee_invited"         // Premier employé invité
+  | "advanced_explored";       // Paramètres avancés / Trouvetou explorés
+
+export const ONBOARDING_STEPS: OnboardingStep[] = [
+  "workspace_configured",
+  "first_booking_created",
+  "employee_invited",
+  "advanced_explored",
+];
+
+export interface UserOnboarding {
+  id: string;
+  user_id: string;
+  is_onboarded: boolean;
+  completed_steps: OnboardingStep[];
+  dismissed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ExpenseCategory =
   | "salaries"
   | "utilities"
@@ -1001,6 +1032,11 @@ export interface Database {
         Row: ClientStayExtensionRequest;
         Insert: Omit<ClientStayExtensionRequest, "id" | "created_at" | "processed_at" | "processed_by" | "processed_note">;
         Update: Partial<Omit<ClientStayExtensionRequest, "id" | "created_at">>;
+      };
+      user_onboarding: {
+        Row: UserOnboarding;
+        Insert: Omit<UserOnboarding, "id" | "created_at" | "updated_at" | "is_onboarded">;
+        Update: Partial<Omit<UserOnboarding, "id" | "created_at" | "updated_at" | "is_onboarded">>;
       };
       whatsapp_messages: {
         Row: WhatsAppMessage;
