@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 const ALLOWED_TYPES = ["cleaning", "linen", "assistance"];
-const requestLimiter = createRateLimiter({ windowMs: 60_000, max: 10 }); // 10 req/min
+const requestLimiter = createRateLimiter({ windowMs: 60_000, max: 10, prefix: "stay-request" });
 
 /**
  * POST /api/stay/request
@@ -15,7 +15,7 @@ const requestLimiter = createRateLimiter({ windowMs: 60_000, max: 10 }); // 10 r
 export async function POST(request: Request) {
   try {
     const rlKey = getRateLimitKey(request);
-    const rl = requestLimiter.check(rlKey);
+    const rl = await requestLimiter.check(rlKey);
     if (!rl.ok) {
       return NextResponse.json(
         { error: `Trop de requêtes. Réessayez dans ${rl.resetIn}s.` },

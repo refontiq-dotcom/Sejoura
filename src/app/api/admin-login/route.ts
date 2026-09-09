@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_HUB_ROUTE, ADMIN_LOGIN_ROUTE } from "@/lib/routes";
+import { loginRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 // ============================================================================
 // POST /api/admin-login
@@ -17,45 +18,9 @@ import { ADMIN_HUB_ROUTE, ADMIN_LOGIN_ROUTE } from "@/lib/routes";
 // champ « Mot de passe », exactement comme le portail employé.
 // ============================================================================
 
-// Rate limiting en mémoire (simple, par IP) pour limiter le brute-force.
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const RATE_LIMIT_MAX_ATTEMPTS = 6;
-const attemptsByIp = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = attemptsByIp.get(ip);
-  if (!entry) return false;
-  if (now > entry.resetAt) {
-    attemptsByIp.delete(ip);
-    return false;
-  }
-  return entry.count >= RATE_LIMIT_MAX_ATTEMPTS;
-}
-
-function recordAttempt(ip: string, success: boolean) {
-  const now = Date.now();
-  if (success) {
-    attemptsByIp.delete(ip);
-    return;
-  }
-  const entry = attemptsByIp.get(ip);
-  if (!entry || now > entry.resetAt) {
-    attemptsByIp.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-  } else {
-    entry.count += 1;
-  }
-}
-
-function getClientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
-}
-
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  if (isRateLimited(ip)) {
+  const rl = await loginRateLimiter.check(getRateLimitKey(req, "admin-login"));
+  if (!rl.ok) {
     return NextResponse.json(
       { error: "Trop de tentatives. Réessayez dans quelques minutes." },
       { status: 429 }
@@ -71,7 +36,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
     }
     if (!password || typeof password !== "string" || password.length < 6) {
-      recordAttempt(ip, false);
       return NextResponse.json({ error: "Mot de passe invalide." }, { status: 400 });
     }
 
@@ -96,7 +60,6 @@ export async function POST(req: Request) {
     }
 
     if (!email) {
-      recordAttempt(ip, false);
       console.error("admin-login: aucun compte Super Admin (email) trouvé.");
       return NextResponse.json(
         { error: "Aucun compte Super Admin configuré." },
@@ -112,7 +75,6 @@ export async function POST(req: Request) {
     });
 
     if (authError || !authData.session) {
-      recordAttempt(ip, false);
       return NextResponse.json({ error: "Mot de passe incorrect." }, { status: 401 });
     }
 
@@ -126,11 +88,8 @@ export async function POST(req: Request) {
 
     if (!profile || profile.role !== "super_admin" || profile.is_active === false) {
       await supabase.auth.signOut();
-      recordAttempt(ip, false);
       return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
     }
-
-    recordAttempt(ip, true);
 
     // ── Deep-link : retour vers la section demandée (ex. /admin/ideas) ─────
     // Avant : next.startsWith(ADMIN_LOGIN_ROUTE) && next.startsWith("/admin/")
@@ -144,7 +103,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, redirectTo });
   } catch (err) {
-    recordAttempt(ip, false);
     console.error("admin-login:", err);
     return NextResponse.json({ error: "Erreur serveur 🖥️. Réessayez." }, { status: 500 });
   }

@@ -10,6 +10,7 @@ import {
   isTelegramConfigured,
   sendTelegramMessage,
 } from "@/lib/telegram";
+import { registerRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 const TRIAL_DURATION_DAYS = 30;
 
@@ -56,6 +57,14 @@ async function notifyNewRegistration(payload: {
 
 export async function POST(request: Request) {
   try {
+    const rl = await registerRateLimiter.check(getRateLimitKey(request, "register"));
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
+    }
+
     const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
 

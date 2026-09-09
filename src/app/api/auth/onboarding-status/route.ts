@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loginRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 export interface OnboardingStatusResponse {
   needsOnboarding: boolean;
@@ -17,8 +18,16 @@ export interface OnboardingStatusResponse {
  * existent n'est JAMAIS renvoyé vers l'étape 2, même si le client navigateur
  * ne peut pas lire la table `accommodations` (politique manquante, etc.).
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const rl = await loginRateLimiter.check(getRateLimitKey(request, "onboarding-status"));
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
+    }
+
     const supabase = await createClient();
     const {
       data: { session },

@@ -1,15 +1,5 @@
-/**
- * Simple in-memory rate limiter for API routes.
- *
- * ⚠️  In serverless environments (Vercel), each instance has its own memory,
- * so this is best-effort. For production-grade rate limiting, use Upstash
- * Redis + @upstash/ratelimit.
- *
- * Usage:
- *   const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
- *   const result = limiter.check(key);
- *   if (!result.ok) return 429;
- */
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 interface RateLimitEntry {
   count: number;
@@ -17,58 +7,92 @@ interface RateLimitEntry {
 }
 
 interface RateLimiterOptions {
-  /** Time window in milliseconds (default: 60 seconds) */
   windowMs: number;
-  /** Max requests per window (default: 5) */
   max: number;
+  prefix?: string;
 }
 
 interface RateLimitResult {
   ok: boolean;
   remaining: number;
-  resetIn: number; // seconds until window resets
+  resetIn: number;
 }
 
-export function createRateLimiter(options: RateLimiterOptions) {
+interface RateLimiter {
+  check(key: string): Promise<RateLimitResult>;
+}
+
+function hasUpstash(): boolean {
+  return Boolean(
+    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  );
+}
+
+function createMemoryLimiter(options: RateLimiterOptions): RateLimiter {
   const { windowMs, max } = options;
   const store = new Map<string, RateLimitEntry>();
+  let ops = 0;
 
-  // Periodic cleanup every 5 minutes to prevent memory leaks
   const cleanup = () => {
     const now = Date.now();
     for (const [key, entry] of store) {
       if (now > entry.resetAt) store.delete(key);
     }
   };
-  setInterval(cleanup, 5 * 60 * 1000).unref?.();
 
   return {
-    check(key: string): RateLimitResult {
+    async check(key: string): Promise<RateLimitResult> {
+      ops += 1;
+      if (ops % 100 === 0) cleanup();
+
       const now = Date.now();
       const entry = store.get(key);
 
       if (!entry || now > entry.resetAt) {
-        // New window
         store.set(key, { count: 1, resetAt: now + windowMs });
         return { ok: true, remaining: max - 1, resetIn: Math.ceil(windowMs / 1000) };
       }
 
       entry.count += 1;
 
+      const resetIn = Math.max(0, Math.ceil((entry.resetAt - now) / 1000));
       if (entry.count > max) {
-        const resetIn = Math.ceil((entry.resetAt - now) / 1000);
         return { ok: false, remaining: 0, resetIn };
       }
 
-      const resetIn = Math.ceil((entry.resetAt - now) / 1000);
       return { ok: true, remaining: max - entry.count, resetIn };
     },
   };
 }
 
-/**
- * Extract a rate-limit key from a request (IP + optional userId).
- */
+function createUpstashLimiter(options: RateLimiterOptions): RateLimiter {
+  const { windowMs, max, prefix = "rl" } = options;
+  const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
+  const limiter = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(max, `${windowSeconds} s`),
+    prefix: `sejoura:${prefix}`,
+    analytics: false,
+  });
+
+  return {
+    async check(key: string): Promise<RateLimitResult> {
+      const result = await limiter.limit(key);
+      const resetIn = Math.max(0, Math.ceil((result.reset - Date.now()) / 1000));
+      return {
+        ok: result.success,
+        remaining: result.remaining,
+        resetIn,
+      };
+    },
+  };
+}
+
+export function createRateLimiter(options: RateLimiterOptions): RateLimiter {
+  if (hasUpstash()) return createUpstashLimiter(options);
+  return createMemoryLimiter(options);
+}
+
 export function getRateLimitKey(request: Request, suffix?: string): string {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
@@ -77,13 +101,26 @@ export function getRateLimitKey(request: Request, suffix?: string): string {
   return suffix ? `${ip}:${suffix}` : ip;
 }
 
-// Pre-built limiters for common use cases
 export const pinRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 min
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  prefix: "pin",
 });
 
 export const loginRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per 15 min
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  prefix: "login",
+});
+
+export const registerRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  prefix: "register",
+});
+
+export const subscriptionRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  prefix: "subscription",
 });

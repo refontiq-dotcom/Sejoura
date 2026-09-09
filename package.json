@@ -9,7 +9,7 @@
     "lint": "eslint",
     "db:push": "node scripts/db-push.mjs",
     "admin:create": "node scripts/create-super-admin.mjs",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.mts"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loginRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * GET /api/employee-verify?phone=0701234567
@@ -9,6 +10,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export async function GET(request: Request) {
   try {
+    const rl = await loginRateLimiter.check(getRateLimitKey(request, "employee-verify"));
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const phone = searchParams.get("phone");
 

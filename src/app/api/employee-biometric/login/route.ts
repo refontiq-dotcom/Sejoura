@@ -7,6 +7,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestOrigin, getRpId, normalizeTransports } from "@/lib/webauthn";
 import { signInEmployeeServerSide } from "@/lib/employee-auth";
+import { loginRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * POST /api/employee-biometric/login
@@ -29,6 +30,14 @@ export async function POST(request: Request) {
     }
     if (action !== "options" && action !== "verify") {
       return NextResponse.json({ error: "Action invalide." }, { status: 400 });
+    }
+
+    const rl = await loginRateLimiter.check(getRateLimitKey(request, userId));
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { status: 429 }
+      );
     }
 
     const admin = createAdminClient();

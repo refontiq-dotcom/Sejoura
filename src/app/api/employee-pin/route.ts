@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     // ── Rate limiting (brute-force PIN) ──────────────────────────────────────
     const rlKey = getRateLimitKey(request, userId);
-    const rl = pinRateLimiter.check(rlKey);
+    const rl = await pinRateLimiter.check(rlKey);
     if (!rl.ok) {
       return NextResponse.json(
         { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },

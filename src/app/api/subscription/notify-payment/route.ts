@@ -9,6 +9,7 @@ import {
   isTelegramConfigured,
   sendTelegramMessage,
 } from "@/lib/telegram";
+import { subscriptionRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
 
 const ALLOWED_PLANS = ["essentiel", "croissance", "entreprise", "standard", "growth", "enterprise"];
 
@@ -26,6 +27,14 @@ const ALLOWED_PLANS = ["essentiel", "croissance", "entreprise", "standard", "gro
 //      TELEGRAM_CHAT_ID sont configurés, cf. src/lib/telegram.ts)
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
+  const rl = await subscriptionRateLimiter.check(getRateLimitKey(request, "subscription"));
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+      { status: 429 }
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
   const plan = typeof body.plan === "string" ? body.plan : "";
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";

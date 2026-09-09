@@ -18,7 +18,7 @@
  *   - Les credentials Supabase Trouvetou dans /home/dukoua/Projets/Trouvetou/trouvetou/.env.local
  */
 
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
@@ -267,22 +267,10 @@ async function main() {
    SEJOURA_API_URL          = https://sejoura-lemon.vercel.app  (par défaut, aucune action)
   `);
 
-  // Sauvegarder dans un fichier pour ne pas perdre la clé
-  const outputPath = resolve(SEJOURA_ROOT, "scripts", "trouvetou-integration-keys.txt");
-  writeFileSync(outputPath, `# CLÉS D'INTÉGRATION TROUVETOU — GÉNÉRÉES LE ${new Date().toISOString()}
-# ⚠️  NE PAS COMMITTER CE FICHIER — il est dans .gitignore
-
-# === Variables pour Vercel SÉJOURA ===
-TROUVETOU_SYNC_URL=${trouvetouSyncUrl}
-TROUVETOU_API_KEY=${apiKey}
-TROUVETOU_SYNC_SECRET=${syncSecret}
-
-# === Provider ID Trouvetou (pour référence) ===
-PROVIDER_ID=${providerId}
-`);
-
-  ok(`Clés sauvegardées dans : scripts/trouvetou-integration-keys.txt`);
-  warn("⚠️  Ne committez JAMAIS ce fichier !");
+  // Afficher les clés uniquement dans le terminal — jamais dans un fichier
+  // versionné. Copiez-les dans Vercel / .env.local (gitignoré).
+  ok("Clés générées. Copiez-les maintenant dans Vercel (elles ne sont pas écrites sur disque).");
+  warn("Ne stockez jamais TROUVETOU_API_KEY / TROUVETOU_SYNC_SECRET dans git.");
 
   // ────────────────────────────────────────────────────────────────────────
   step(5, "Test de la sync (si TROUVETOU_SYNC_SECRET déjà sur Vercel)");

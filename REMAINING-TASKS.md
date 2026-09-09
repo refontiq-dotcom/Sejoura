@@ -18,10 +18,10 @@ de securite, logique metier et UI/UX. Coche chaque tache quand elle est terminee
   - Valider le token dans chaque route API qui recoit un body
   - Fichier : `src/lib/csrf.ts`
 
-- [ ] **Rate limiting Redis** — Remplacer le rate limiter in-memory par Upstash Redis.
+- [x] **Rate limiting Redis** — Remplacer le rate limiter in-memory par Upstash Redis.
   - Installer `@upstash/ratelimit` + `@upstash/redis`
   - Configurer UPSTASH_REDIS_REST_URL et UPSTASH_REDIS_REST_TOKEN
-  - Modifier `src/lib/rate-limit.ts`
+  - Modifier `src/lib/rate-limit.ts` (Upstash si configuré, mémoire en fallback local)
 
 ---
 

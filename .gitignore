@@ -34,6 +34,11 @@ yarn-error.log*
 .env*
 !.env.example
 
+# secrets and generated credentials
+*keys.txt
+*secrets.txt
+scripts/trouvetou-integration-keys.txt
+
 # vercel
 .vercel
 
