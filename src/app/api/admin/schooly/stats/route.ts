@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { schoolyAdminDb } from '@/lib/supabase/schooly-admin';
+import { getSchoolyAdminDb } from '@/lib/supabase/schooly-admin';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -22,6 +22,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Accès réservé au Super Admin.' }, { status: 403 });
     }
 
+    const schoolyAdminDb = getSchoolyAdminDb();
     const [schools, students, subscriptions] = await Promise.all([
       schoolyAdminDb.from('schools').select('id', { count: 'exact', head: true }),
       schoolyAdminDb.from('students').select('id', { count: 'exact', head: true }),
