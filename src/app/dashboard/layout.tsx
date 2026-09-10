@@ -636,7 +636,7 @@ export default function DashboardLayout({
             style={{ backgroundColor: mainBg }}
             className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
           >
-            <div key={pathname} className="animate-page-enter">
+            <div>
               <CurrentUserProvider value={currentUserValue}>
                 {children}
               </CurrentUserProvider>

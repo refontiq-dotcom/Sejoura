@@ -289,17 +289,22 @@ html {
   scrollbar-color: var(--muted-foreground) transparent;
 }
 
-/* Animation pour les transitions de thème */
-.theme-transition * {
-  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease, box-shadow 0.3s ease;
+.theme-transition,
+.theme-transition body,
+.theme-transition .dashboard-bg,
+.theme-transition [data-theme-surface] {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .theme-transition .dashboard-bg {
-  transition: background 0.5s ease;
+  transition: background 0.3s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .theme-transition *, .theme-transition .dashboard-bg {
+  .theme-transition,
+  .theme-transition body,
+  .theme-transition .dashboard-bg,
+  .theme-transition [data-theme-surface] {
     transition: none !important;
   }
 
@@ -404,20 +409,13 @@ html {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Transition de page — apparition douce du contenu principal */
 @keyframes pageEnter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-page-enter {
-  animation: pageEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pageEnter 0.12s ease-out both;
 }
 
 /* Skeleton shimmer — effet de brillance sur les placeholders */

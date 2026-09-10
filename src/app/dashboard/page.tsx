@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { REALTIME_DEBOUNCE_MS, shouldRunBackgroundRefresh } from "@/lib/refresh-policy";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -1221,9 +1222,9 @@ export default function DashboardPage() {
       }
     }, 0);
 
-    // Polling silencieux toutes les 30 s, sans chevauchement de requêtes
     const interval = setInterval(async () => {
       if (cancelled || inFlight) return;
+      if (!shouldRunBackgroundRefresh(document.visibilityState)) return;
       inFlight = true;
       try {
         await loadDashboardData(true, selectedDate);
@@ -1247,9 +1248,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const supabase = createClient();
     const refresh = () => {
-      if (!cancelled) loadDashboardData(true, selectedDate);
+      if (cancelled || !shouldRunBackgroundRefresh(document.visibilityState)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!cancelled) loadDashboardData(true, selectedDate);
+      }, REALTIME_DEBOUNCE_MS);
     };
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -1273,12 +1279,12 @@ export default function DashboardPage() {
         )
         .subscribe();
     } catch {
-      // Realtime est best-effort : un échec ne doit pas casser le dashboard
       console.warn("Realtime channel subscription failed, falling back to polling only");
     }
 
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
       if (channel) supabase.removeChannel(channel);
     };
   }, [tenantId, selectedDate, loadDashboardData]);

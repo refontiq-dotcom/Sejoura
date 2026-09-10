@@ -70,6 +70,14 @@ import { getActiveAssignmentId } from "@/lib/assignments";
 import { canAccessFeature } from "@/lib/subscription-plans";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import { trackStep } from "@/lib/onboarding";
+import {
+  BOOKING_LIST_SELECT,
+  CLIENT_LIST_SELECT,
+  ACCOMMODATION_LIST_SELECT,
+  bookingListDateWindow,
+  bookingListOverlapFilter,
+} from "@/lib/bookings-query";
+import { REALTIME_DEBOUNCE_MS, shouldRunBackgroundRefresh } from "@/lib/refresh-policy";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -362,26 +370,30 @@ export default function BookingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.accommodation_id, formData.check_in_date, formData.check_out_date]);
 
-  // Temps réel : rechargement immédiat dès qu'une réservation change
-  // (création, modification, check-in/out, paiement). Le rechargement est
-  // effectué via une ref pour ne pas se resouscrire à chaque rendu.
   useEffect(() => {
     if (!tenantId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const supabase = createClient();
+    const schedule = (fn: () => void) => {
+      if (!shouldRunBackgroundRefresh(document.visibilityState)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fn, REALTIME_DEBOUNCE_MS);
+    };
     const channel = supabase
       .channel("bookings-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
-        () => loadBookingsRef.current(tenantId, accommodationFilterRef.current)
+        () => schedule(() => loadBookingsRef.current(tenantId, accommodationFilterRef.current))
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "client_stay_extension_requests", filter: `tenant_id=eq.${tenantId}` },
-        () => loadExtensionRequests(tenantId)
+        () => schedule(() => loadExtensionRequests(tenantId))
       )
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [tenantId]);
@@ -428,40 +440,37 @@ export default function BookingsPage() {
       // Résoudre l'affectation active (temporaire ou permanente) pour l'utilisateur
       const activeAccId = await getActiveAssignmentId(supabase, userData.id, userData.accommodation_id);
 
-      // Filtre les résidences visibles selon le rôle
-      let accQuery = supabase.from("accommodations").select("*").eq("tenant_id", userData.tenant_id);
+      let accQuery = supabase.from("accommodations").select(ACCOMMODATION_LIST_SELECT).eq("tenant_id", userData.tenant_id);
       if (userData.role === "receptionniste" && activeAccId) {
         accQuery = accQuery.eq("id", activeAccId);
       }
-      const { data: accData } = await accQuery;
-      if (accData) setAccommodations(accData as unknown as Accommodation[]);
 
-      // Clients : filtrés par résidence active pour les réceptionnistes
-      let clientQuery = supabase.from("clients").select("*").eq("tenant_id", userData.tenant_id).order("full_name");
+      let clientQuery = supabase.from("clients").select(CLIENT_LIST_SELECT).eq("tenant_id", userData.tenant_id).order("full_name");
       if (userData.role === "receptionniste" && activeAccId) {
         clientQuery = clientQuery.eq("accommodation_id", activeAccId);
       }
-      const { data: clientData } = await clientQuery;
-      if (clientData) setClients(clientData as unknown as Client[]);
 
-      // Scores de réputation (vue client_profiles) pour le badge du drawer —
-      // réservé à la formule Entreprise.
       const hasClientProfiles = canAccessFeature("clientSmartProfile", plan);
       setHasClientProfiles(hasClientProfiles);
-      if (hasClientProfiles) {
-        const { data: profileData } = await supabase
-          .from("client_profiles")
-          .select("client_id, score, tier");
-        if (profileData) {
-          const map: Record<string, { score: number; tier: ClientScoreTier }> = {};
-          (profileData as { client_id: string; score: number; tier: ClientScoreTier }[]).forEach((p) => {
-            map[p.client_id] = { score: p.score, tier: p.tier };
-          });
-          setClientProfiles(map);
-        }
+
+      const [accResult, clientResult, profileResult] = await Promise.all([
+        accQuery,
+        clientQuery,
+        hasClientProfiles
+          ? supabase.from("client_profiles").select("client_id, score, tier")
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (accResult.data) setAccommodations(accResult.data as unknown as Accommodation[]);
+      if (clientResult.data) setClients(clientResult.data as unknown as Client[]);
+      if (profileResult.data) {
+        const map: Record<string, { score: number; tier: ClientScoreTier }> = {};
+        (profileResult.data as { client_id: string; score: number; tier: ClientScoreTier }[]).forEach((p) => {
+          map[p.client_id] = { score: p.score, tier: p.tier };
+        });
+        setClientProfiles(map);
       }
 
-      // Pré-sélectionner la résidence si le réceptionniste n'en a qu'une
       if (userData.role === "receptionniste" && activeAccId) {
         setFormData((prev) => ({ ...prev, accommodation_id: activeAccId ?? "" }));
       }
@@ -470,10 +479,12 @@ export default function BookingsPage() {
       setAccomFilter(
         userData.role === "receptionniste" ? (activeAccId ?? "all") : (activeAccommodationId ?? "all")
       );
-      await runOverstayCheck();
-      await loadBookings(tenantId, accommodationFilterRef.current);
-      await loadInvoices(tenantId);
-      await loadExtensionRequests(tenantId);
+      await Promise.all([
+        runOverstayCheck(),
+        loadBookings(tenantId, accommodationFilterRef.current),
+        loadInvoices(tenantId),
+        loadExtensionRequests(tenantId),
+      ]);
     } catch (err) {
       toast.error("Oups, les données n'ont pas pu se charger... Réessayez 🔄");
       console.error(err);
@@ -485,17 +496,14 @@ export default function BookingsPage() {
   async function loadBookings(tId: string, accommodationId?: string) {
     try {
       const supabase = createClient();
+      const { from, to } = bookingListDateWindow();
       let query = supabase
         .from("bookings")
-        .select(`
-          *,
-          client:clients(*),
-          room:rooms(*, room_type:room_types(*))
-        `)
+        .select(BOOKING_LIST_SELECT)
         .eq("tenant_id", tId)
+        .or(bookingListOverlapFilter(from, to))
         .order("created_at", { ascending: false });
 
-      // Filtrer par résidence pour les réceptionnistes
       if (accommodationId) {
         query = query.eq("accommodation_id", accommodationId);
       }
