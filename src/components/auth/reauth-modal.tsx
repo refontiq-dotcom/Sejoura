@@ -8,19 +8,9 @@ import { deriveUltraLightColor } from "@/lib/colors";
 import { createClient } from "@/lib/supabase/client";
 import { startAuthentication } from "@simplewebauthn/browser";
 import { toast } from "sonner";
+import { isEmpVerified, markEmpVerified, clearEmpVerification } from "@/lib/emp-verified";
 
-const STORAGE_KEY = "sejoura-emp-verified";
-
-export function isEmpVerified(): boolean {
-  if (typeof window === "undefined") return true; // SSR: skip guard
-  return sessionStorage.getItem(STORAGE_KEY) === "1";
-}
-
-export function clearEmpVerification(): void {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem(STORAGE_KEY);
-  }
-}
+export { isEmpVerified, clearEmpVerification };
 
 interface ReauthModalProps {
   onVerified: () => void;
@@ -152,7 +142,7 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
         });
       }
 
-      sessionStorage.setItem(STORAGE_KEY, "1");
+      markEmpVerified();
       toast.success("Tout est bon ! ✅");
       onVerified();
     } catch {
@@ -215,7 +205,7 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
         });
       }
 
-      sessionStorage.setItem(STORAGE_KEY, "1");
+      markEmpVerified();
       toast.success("Tout est bon ! ✅");
       onVerified();
     } catch {

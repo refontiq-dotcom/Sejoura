@@ -29,6 +29,14 @@ import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
+import { REALTIME_DEBOUNCE_MS, shouldRunBackgroundRefresh } from "@/lib/refresh-policy";
+import {
+  ACCOUNTING_AUDIT_SELECT,
+  ACCOUNTING_CLIENT_SELECT,
+  ACCOUNTING_EXPENSE_SELECT,
+  ACCOUNTING_INVOICE_SELECT,
+  ACCOUNTING_PAYMENT_SELECT,
+} from "@/lib/accounting-query";
 
 
 // ── Actions d'audit : emojis + labels FR + couleurs + catégories ──
@@ -926,26 +934,33 @@ export default function AccountingPage() {
 
   useEffect(() => {
     if (!tenantId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const supabase = createClient();
+    const schedule = () => {
+      if (!shouldRunBackgroundRefresh(document.visibilityState)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => loadDataRef.current(), REALTIME_DEBOUNCE_MS);
+    };
     const channel = supabase
       .channel("accounting-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings", filter: `tenant_id=eq.${tenantId}` },
-        () => loadDataRef.current()
+        schedule
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "payments", filter: `tenant_id=eq.${tenantId}` },
-        () => loadDataRef.current()
+        schedule
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "invoices", filter: `tenant_id=eq.${tenantId}` },
-        () => loadDataRef.current()
+        schedule
       )
       .subscribe();
     return () => {
+      if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [tenantId]);
@@ -962,80 +977,22 @@ export default function AccountingPage() {
       const [exp, pay, log, inv, acc, usersRes] = await Promise.all([
         (() => {
           const effectiveAccId = accId ?? (expAccFilter === "all" ? undefined : expAccFilter);
-          let q = supabase.from("expenses").select("*").eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300);
+          let q = supabase.from("expenses").select(ACCOUNTING_EXPENSE_SELECT).eq("tenant_id", tid).order("expense_date", { ascending: false }).limit(300);
           if (effectiveAccId) q = q.eq("accommodation_id", effectiveAccId);
           return q;
         })(),
-        supabase.from("payments").select("*").eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
-        supabase.from("audit_logs").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(500),
-        supabase.from("invoices").select("*").eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
+        supabase.from("payments").select(ACCOUNTING_PAYMENT_SELECT).eq("tenant_id", tid).order("payment_date", { ascending: false }).limit(500),
+        supabase.from("audit_logs").select(ACCOUNTING_AUDIT_SELECT).eq("tenant_id", tid).order("created_at", { ascending: false }).limit(500),
+        supabase.from("invoices").select(ACCOUNTING_INVOICE_SELECT).eq("tenant_id", tid).order("created_at", { ascending: false }).limit(250),
         supabase.from("accommodations").select("id, name").eq("tenant_id", tid).order("name"),
         supabase.from("users").select("id, full_name, role").eq("tenant_id", tid),
       ]);
 
       if (exp.data) setExpenses(exp.data as unknown as Expense[]);
-      if (log.data) {
-        const logs = log.data as unknown as AuditLog[];
-        setAuditLogs(logs);
 
-        // Résoudre les identifiants techniques (UUID) des entités en libellés
-        // lisibles (code de réservation, nom du client, numéro de facture…)
-        // pour la modale de détail du journal d'audit.
-        const labels: Record<string, string> = {};
-        const idsByType: Record<string, string[]> = {};
-        logs.forEach((l) => {
-          if (l.entity_type && l.entity_id) {
-            (idsByType[l.entity_type] ||= []).push(l.entity_id);
-          }
-        });
+      const logs = (log.data as AuditLog[] | null) || [];
+      if (log.data) setAuditLogs(logs);
 
-        if (idsByType.booking?.length) {
-          const { data: bks } = await supabase
-            .from("bookings")
-            .select("id, booking_code")
-            .in("id", idsByType.booking);
-          (bks || []).forEach((b: { id: string; booking_code: string }) => {
-            labels[b.id] = b.booking_code;
-          });
-        }
-        if (idsByType.invoice?.length) {
-          const { data: invs } = await supabase
-            .from("invoices")
-            .select("id, invoice_number")
-            .in("id", idsByType.invoice);
-          (invs || []).forEach((i: { id: string; invoice_number: string }) => {
-            labels[i.id] = i.invoice_number;
-          });
-        }
-        if (idsByType.client?.length) {
-          const { data: cls } = await supabase
-            .from("clients")
-            .select("id, full_name")
-            .in("id", idsByType.client);
-          (cls || []).forEach((c: { id: string; full_name: string }) => {
-            labels[c.id] = c.full_name;
-          });
-        }
-        if (idsByType.room?.length) {
-          const { data: rms } = await supabase
-            .from("rooms")
-            .select("id, room_number")
-            .in("id", idsByType.room);
-          (rms || []).forEach((r: { id: string; room_number: string }) => {
-            labels[r.id] = `Ch. ${r.room_number}`;
-          });
-        }
-        if (idsByType.accommodation?.length) {
-          const { data: accs } = await supabase
-            .from("accommodations")
-            .select("id, name")
-            .in("id", idsByType.accommodation);
-          (accs || []).forEach((a: { id: string; name: string }) => {
-            labels[a.id] = a.name;
-          });
-        }
-        setEntityLabelById(labels);
-      }
       if (acc.data) setAccommodations(acc.data as { id: string; name: string }[]);
       if (usersRes.data) {
         const map: Record<string, string> = {};
@@ -1048,75 +1005,136 @@ export default function AccountingPage() {
         setRolesById(roleMap);
       }
 
-      // Enrichir les paiements avec les infos de réservation
-      const payData = (pay.data as Payment[] | null) || [];
-      const enrichedPayments: EnrichedPayment[] = payData.map((p) => ({ ...p }));
-      const bookingIds = [...new Set(payData.filter((p) => p.booking_id).map((p) => p.booking_id as string))];
-      const bookingById: Record<string, { booking_code: string; total_amount: number; payment_status: string; accommodation_id: string; client_name: string; room_number: string }> = {};
-      if (bookingIds.length > 0) {
-        const { data: bk } = await supabase
-          .from("bookings")
-          .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), room:rooms(room_number)")
-          .in("id", bookingIds);
-        if (bk) {
-          (bk as BookingBriefRow[]).forEach((b) => {
-            bookingById[b.id] = {
-              booking_code: b.booking_code,
-              total_amount: b.total_amount,
-              payment_status: b.payment_status,
-              accommodation_id: b.accommodation_id,
-              client_name: b.client?.[0]?.full_name || "—",
-              room_number: b.room?.[0]?.room_number || "—",
-            };
-          });
+      const idsByType: Record<string, string[]> = {};
+      logs.forEach((l) => {
+        if (l.entity_type && l.entity_id) {
+          (idsByType[l.entity_type] ||= []).push(l.entity_id);
         }
+      });
+
+      const payData = (pay.data as Payment[] | null) || [];
+      const invData = (inv.data as Invoice[] | null) || [];
+      const bookingIds = [...new Set(payData.filter((p) => p.booking_id).map((p) => p.booking_id as string))];
+      const invBookingIds = [...new Set(invData.map((i) => i.booking_id))];
+
+      const [
+        auditBks,
+        auditInvs,
+        auditCls,
+        auditRms,
+        auditAccs,
+        payBks,
+        invBks,
+        paidBookingsRes,
+        bkAllRes,
+        clientCountRes,
+        clDataRes,
+        profilesRes,
+      ] = await Promise.all([
+        idsByType.booking?.length
+          ? supabase.from("bookings").select("id, booking_code").in("id", idsByType.booking)
+          : Promise.resolve({ data: null }),
+        idsByType.invoice?.length
+          ? supabase.from("invoices").select("id, invoice_number").in("id", idsByType.invoice)
+          : Promise.resolve({ data: null }),
+        idsByType.client?.length
+          ? supabase.from("clients").select("id, full_name").in("id", idsByType.client)
+          : Promise.resolve({ data: null }),
+        idsByType.room?.length
+          ? supabase.from("rooms").select("id, room_number").in("id", idsByType.room)
+          : Promise.resolve({ data: null }),
+        idsByType.accommodation?.length
+          ? supabase.from("accommodations").select("id, name").in("id", idsByType.accommodation)
+          : Promise.resolve({ data: null }),
+        bookingIds.length > 0
+          ? supabase
+              .from("bookings")
+              .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), room:rooms(room_number)")
+              .in("id", bookingIds)
+          : Promise.resolve({ data: null }),
+        invBookingIds.length > 0
+          ? supabase
+              .from("bookings")
+              .select("id, booking_code, accommodation_id, client:clients(full_name)")
+              .in("id", invBookingIds)
+          : Promise.resolve({ data: null }),
+        supabase
+          .from("bookings")
+          .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), created_at")
+          .eq("tenant_id", tid)
+          .in("payment_status", ["paid", "partial"])
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("bookings")
+          .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date, accommodation_id, tourist_tax_amount")
+          .eq("tenant_id", tid)
+          .order("check_in_date", { ascending: false })
+          .limit(300),
+        supabase.from("clients").select("*", { count: "exact", head: true }).eq("tenant_id", tid),
+        supabase
+          .from("clients")
+          .select(ACCOUNTING_CLIENT_SELECT)
+          .eq("tenant_id", tid)
+          .order("created_at", { ascending: false })
+          .limit(400),
+        supabase.from("client_profiles").select("client_id, score, tier"),
+      ]);
+
+      const labels: Record<string, string> = {};
+      (auditBks.data || []).forEach((b: { id: string; booking_code: string }) => {
+        labels[b.id] = b.booking_code;
+      });
+      (auditInvs.data || []).forEach((i: { id: string; invoice_number: string }) => {
+        labels[i.id] = i.invoice_number;
+      });
+      (auditCls.data || []).forEach((c: { id: string; full_name: string }) => {
+        labels[c.id] = c.full_name;
+      });
+      (auditRms.data || []).forEach((r: { id: string; room_number: string }) => {
+        labels[r.id] = `Ch. ${r.room_number}`;
+      });
+      (auditAccs.data || []).forEach((a: { id: string; name: string }) => {
+        labels[a.id] = a.name;
+      });
+      setEntityLabelById(labels);
+
+      const bookingById: Record<string, { booking_code: string; total_amount: number; payment_status: string; accommodation_id: string; client_name: string; room_number: string }> = {};
+      if (payBks.data) {
+        (payBks.data as BookingBriefRow[]).forEach((b) => {
+          bookingById[b.id] = {
+            booking_code: b.booking_code,
+            total_amount: b.total_amount,
+            payment_status: b.payment_status,
+            accommodation_id: b.accommodation_id,
+            client_name: b.client?.[0]?.full_name || "—",
+            room_number: b.room?.[0]?.room_number || "—",
+          };
+        });
       }
+      const enrichedPayments: EnrichedPayment[] = payData.map((p) => ({ ...p }));
       enrichedPayments.forEach((p) => {
-        // Rattacher le paiement à sa résidence : colonne directe, sinon celle
-        // de la réservation liée (les paiements anciens peuvent avoir un
-        // accommodation_id null alors que leur réservation est rattachée).
         const linked = p.booking_id ? bookingById[p.booking_id] : undefined;
         if (!p.accommodation_id && linked?.accommodation_id) {
           p.accommodation_id = linked.accommodation_id;
         }
-        if (linked) {
-          p.booking = linked;
-        }
+        if (linked) p.booking = linked;
       });
       setPayments(enrichedPayments);
 
-      // Enrichir les factures avec les infos de réservation
-      const invData = (inv.data as Invoice[] | null) || [];
-      const invBookingIds = [...new Set(invData.map((i) => i.booking_id))];
       const invBookingById: Record<string, { booking_code: string; accommodation_id: string; client_name: string }> = {};
-      if (invBookingIds.length > 0) {
-        const { data: ibk } = await supabase
-          .from("bookings")
-          .select("id, booking_code, accommodation_id, client:clients(full_name)")
-          .in("id", invBookingIds);
-        if (ibk) {
-          (ibk as InvoiceBookingRow[]).forEach((b) => {
+      if (invBks.data) {
+        (invBks.data as InvoiceBookingRow[]).forEach((b) => {
           invBookingById[b.id] = {
             booking_code: b.booking_code,
             accommodation_id: b.accommodation_id,
             client_name: b.client?.[0]?.full_name || "—",
           };
-          });
-        }
+        });
       }
       const existingInvoiceBookingIds = new Set(invData.map((i) => i.booking_id));
-
-      // Inclure les réservations payées/partiellement payées sans facture générée
-      const { data: paidBookings } = await supabase
-        .from("bookings")
-        .select("id, booking_code, total_amount, payment_status, accommodation_id, client:clients(full_name), created_at")
-        .eq("tenant_id", tid)
-        .in("payment_status", ["paid", "partial"])
-        .order("created_at", { ascending: false });
-
       const virtualInvoices: EnrichedInvoice[] = [];
-      if (paidBookings) {
-        for (const bk of paidBookings) {
+      if (paidBookingsRes.data) {
+        for (const bk of paidBookingsRes.data) {
           if (existingInvoiceBookingIds.has(bk.id)) continue;
           const clientName = (bk as { client?: { full_name: string }[] | null }).client?.[0]?.full_name || "—";
           virtualInvoices.push({
@@ -1143,7 +1161,6 @@ export default function AccountingPage() {
           });
         }
       }
-
       setInvoices([
         ...invData.map((i) => ({
           ...i,
@@ -1152,39 +1169,15 @@ export default function AccountingPage() {
         ...virtualInvoices,
       ]);
 
-      // Réservations pour les créances
-      const { data: bkAll } = await supabase
-        .from("bookings")
-        .select("id, booking_code, status, total_amount, amount_paid, payment_status, check_in_date, check_out_date, accommodation_id, tourist_tax_amount")
-        .eq("tenant_id", tid)
-        .order("check_in_date", { ascending: false })
-        .limit(300);
-      if (bkAll) setBookings(bkAll as unknown as Booking[]);
+      if (bkAllRes.data) setBookings(bkAllRes.data as unknown as Booking[]);
 
-      // Clients pour le CRM
-      const { count: clientCount } = await supabase
-        .from("clients")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tid);
-      const { data: clData } = await supabase
-        .from("clients")
-        .select(`
-          *,
-          bookings(id, booking_code, check_in_date, check_out_date, status, total_amount, amount_paid, payment_status, nights_count, accommodation_id)
-        `)
-        .eq("tenant_id", tid)
-        .order("created_at", { ascending: false })
-        .limit(400);
-
-      if (clData) {
-        const stats: ClientWithStats[] = (clData as ClientWithBookingsRow[]).map((c) => {
+      if (clDataRes.data) {
+        const stats: ClientWithStats[] = (clDataRes.data as ClientWithBookingsRow[]).map((c) => {
           const bks = (c.bookings || []) as Booking[];
-          // Seules les réservations effectivement réalisées comptent (pas les annulations / no-show)
           const validBks = bks.filter((b) => b.status !== "cancelled" && b.status !== "no_show");
           const nights = validBks.reduce((s, b) => s + (b.nights_count || 0), 0);
           const totalSpent = validBks.reduce((s, b) => s + (b.total_amount || 0), 0);
           const paid = validBks.reduce((s, b) => s + (b.amount_paid || 0), 0);
-          // Solde dû : compté même après le check-out (le client peut partir sans avoir tout payé)
           const balance = validBks.reduce((s, b) => s + (b.total_amount || 0) - (b.amount_paid || 0), 0);
           return {
             ...c,
@@ -1196,13 +1189,8 @@ export default function AccountingPage() {
             balance,
           } as ClientWithStats;
         });
-
-        // Scores de réputation (vue client_profiles) — fusionnés dans les stats
-        const { data: profiles } = await supabase
-          .from("client_profiles")
-          .select("client_id, score, tier");
         const scoreById: Record<string, { score: number; tier: ClientScoreTier }> = {};
-        (profiles || []).forEach((p) => {
+        (profilesRes.data || []).forEach((p: { client_id: string; score: number; tier: ClientScoreTier }) => {
           scoreById[p.client_id] = { score: p.score, tier: p.tier };
         });
         stats.forEach((c) => {
@@ -1212,9 +1200,8 @@ export default function AccountingPage() {
             c.tier = s.tier;
           }
         });
-
         setClients(stats);
-        setTotalClientCount(clientCount ?? stats.length);
+        setTotalClientCount(clientCountRes.count ?? stats.length);
       }
     } catch (err) {
       toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");

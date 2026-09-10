@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { REALTIME_DEBOUNCE_MS, shouldRunBackgroundRefresh } from "@/lib/refresh-policy";
+import { dashboardRoomIds } from "@/lib/dashboard-query";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -866,7 +867,11 @@ export default function DashboardPage() {
           .maybeSingle()
           .then((res) => res.data?.last_viewed_at || "2024-01-01T00:00:00Z");
 
-        const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData, overstayRes, onlineRes] =
+        const roomsPromise = activeAccommodationId
+          ? supabase.from("rooms").select("status").eq("accommodation_id", activeAccommodationId)
+          : Promise.resolve(null);
+
+        const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData, overstayRes, onlineRes, roomsWhenActive] =
           await Promise.all([
             supabase
               .from("subscriptions")
@@ -992,17 +997,15 @@ export default function DashboardPage() {
         const bookings = (bookingsData.data || []) as unknown as (Booking & { client?: Client; room?: Room; room_type?: RoomType })[];
         const accommodations = (accommodationsData.data || []) as { id: string }[];
         const accommodationIds = accommodations.map((a) => a.id);
-        
+
         setHasAccommodations(accommodationIds.length > 0);
 
-        // Pas d'établissement => pas de chambres : on évite la requête avec un UUID factice
         let rooms: { status: string }[] = [];
-        const roomIds = activeAccommodationId ? [activeAccommodationId] : accommodationIds;
+        const roomIds = dashboardRoomIds(activeAccommodationId, accommodationIds);
         if (roomIds.length > 0) {
-          const roomsDataResult = await supabase
-            .from("rooms")
-            .select("status")
-            .in("accommodation_id", roomIds);
+          const roomsDataResult = roomsWhenActive
+            ? roomsWhenActive
+            : await supabase.from("rooms").select("status").in("accommodation_id", roomIds);
           if (roomsDataResult.error) throw new Error(roomsDataResult.error.message || "Erreur lors de la récupération des chambres.");
           rooms = (roomsDataResult.data || []) as unknown as { status: string }[];
         }

@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Sparkles, LogOut, Moon, Sun, UserCircle2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
+import dynamic from "next/dynamic";
 import { EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
-import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
+import { isEmpVerified } from "@/lib/emp-verified";
+
+const ReauthModal = dynamic(() => import("@/components/auth/reauth-modal"));
 
 export default function MenageLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

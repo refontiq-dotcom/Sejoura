@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { OnboardingStatusResponse } from "@/app/api/auth/onboarding-status/route";
@@ -8,9 +9,6 @@ import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
-import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
-import { WelcomeOnboardingModal } from "@/components/dashboard/welcome-onboarding-modal";
-import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
@@ -22,8 +20,19 @@ import { useOnlineBookingBadge } from "@/hooks/use-online-booking-badge";
 import { NotificationsProvider } from "@/contexts/notifications-context";
 import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { getActiveAssignmentId } from "@/lib/assignments";
-import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
+import { isEmpVerified } from "@/lib/emp-verified";
 import type { User, Accommodation } from "@/types/database";
+
+const OnboardingModal = dynamic(
+  () => import("@/components/dashboard/onboarding-modal").then((m) => m.OnboardingModal)
+);
+const WelcomeOnboardingModal = dynamic(
+  () => import("@/components/dashboard/welcome-onboarding-modal").then((m) => m.WelcomeOnboardingModal)
+);
+const OnboardingChecklist = dynamic(
+  () => import("@/components/dashboard/onboarding-checklist").then((m) => m.OnboardingChecklist)
+);
+const ReauthModal = dynamic(() => import("@/components/auth/reauth-modal"));
 
 const ACTIVE_ACCOMMODATION_STORAGE_KEY = "sejoura-active-accommodation";
 const MOBILE_BREAKPOINT = 1024;

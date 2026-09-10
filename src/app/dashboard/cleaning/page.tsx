@@ -11,6 +11,7 @@ import { getActiveAssignmentId } from "@/lib/assignments";
 import { useAccommodation } from "@/hooks/use-accommodation";
 import { CleaningSkeleton } from "@/components/ui/skeletons";
 import { useCleaningRealtime } from "@/hooks/use-cleaning-realtime";
+import { shouldRunBackgroundRefresh } from "@/lib/refresh-policy";
 import { useCleaningActions } from "@/hooks/use-cleaning-actions";
 import { useLanguage } from "@/hooks/use-language";
 import { translations, type Lang } from "@/lib/translations";
@@ -126,7 +127,10 @@ export default function CleaningPage() {
   const [tomorrowCheckouts, setTomorrowCheckouts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 15000);
+    const t = setInterval(() => {
+      if (!shouldRunBackgroundRefresh(document.visibilityState)) return;
+      setNow(new Date());
+    }, 15000);
     return () => clearInterval(t);
   }, []);
 
