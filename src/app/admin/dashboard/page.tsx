@@ -28,20 +28,17 @@ import {
 import {
   ADMIN_LOGIN_ROUTE,
 } from "@/lib/routes";
-import { SchoolyStatsCard } from "@/components/admin/SchoolyStatsCard";
 
 // Résolution dynamique de l'icône Lucide depuis le registre des projets.
 import {
   BedDouble,
   Stethoscope,
-  GraduationCap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   BedDouble,
   Stethoscope,
-  GraduationCap,
 };
 
 const POLL_INTERVAL_MS = 30_000;
@@ -186,11 +183,6 @@ export default function SuperAdminHubPage() {
           </Card>
         </div>
       )}
-
-      {/* ── Statistiques Schooly ─────────────────────────────────────────── */}
-      <div className="mb-8">
-        <SchoolyStatsCard />
-      </div>
 
       {/* ── Grille des projets ───────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4">

@@ -230,7 +230,7 @@ function SuperAdminLoginContent() {
 
         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-5 text-center leading-relaxed">
           Ce portail centralise l&apos;administration de tous les produits Refontiq :
-          Séjoura, Docly, Schooly et les projets à venir.
+          Séjoura, Docly et les projets à venir.
         </p>
       </div>
     </div>

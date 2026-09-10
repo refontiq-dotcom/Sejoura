@@ -48,17 +48,6 @@ export const REFONTIQ_PROJECTS: RefontiqProject[] = [
     status: "coming-soon",
     statusLabel: "En développement",
   },
-  {
-    id: "schooly",
-    name: "Schooly",
-    tagline: "Gestion des écoles",
-    description:
-      "Administration scolaire : inscriptions, classes, emplois du temps, frais de scolarité et suivi des élèves.",
-    icon: "GraduationCap",
-    accent: "#7C3AED",
-    status: "coming-soon",
-    statusLabel: "En développement",
-  },
 ];
 
 // Projets annoncés mais non encore détaillés dans la console.

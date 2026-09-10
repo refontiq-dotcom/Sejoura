@@ -1,6 +1,6 @@
 # 🚀 Guide d'Intégration Standard Multi-Projets (Super Admin REFONTIQ)
 
-Ce document définit la norme pour connecter tout nouveau SaaS de l'écosystème REFONTIQ (Séjoura, Schooly, Trouvetou, Docly, PronoMaster, etc.) au Dashboard Super Admin central.
+Ce document définit la norme pour connecter tout nouveau SaaS de l'écosystème REFONTIQ (Séjoura, Trouvetou, Docly, PronoMaster, etc.) au Dashboard Super Admin central.
 
 ---
 
@@ -81,7 +81,6 @@ Créer la carte d'affichage avec l'identité visuelle du projet (couleur accent,
 ## 📋 Projets actuellement intégrés
 
 - [x] **Séjoura** (Gestion hôtelière)
-- [x] **Schooly** (Gestion scolaire)
 - [x] **Trouvetou** (Portail & synchronisation des offres)
 - [ ] **Docly** (À venir)
 
@@ -89,7 +88,7 @@ Créer la carte d'affichage avec l'identité visuelle du projet (couleur accent,
 
 ## 📢 Configuration Telegram Globale (Bot & Admin uniques)
 
-Toutes les applications de l'écosystème (Séjoura, Schooly, Trouvetou, Docly, PronoMaster, etc.) utilisent les **MÊMES** identifiants Telegram :
+Toutes les applications de l'écosystème (Séjoura, Trouvetou, Docly, PronoMaster, etc.) utilisent les **MÊMES** identifiants Telegram :
 
 - **`TELEGRAM_BOT_TOKEN`** : `8882268453:AAGNSyYytK2Wyo57sKAlw2Vps1HNBg11ZvE`
 - **`TELEGRAM_ADMIN_CHAT_ID`** : `8958821599`
@@ -100,7 +99,6 @@ Toutes les applications de l'écosystème (Séjoura, Schooly, Trouvetou, Docly, 
 
 Pour distinguer la provenance des alertes dans le canal Telegram unique, **TOUS** les messages générés par `lib/telegram.ts` doivent inclure le nom du SaaS en préfixe :
 
-- **Schooly** : `[Schooly] NOUVEL ABONNEMENT ...`
 - **Séjoura** : `[Séjoura] NOUVELLE RÉSERVATION ...`
 - **Trouvetou** : `[Trouvetou] SYNCHRO EFFECTUÉE ...`
 - **Docly** : `[Docly] NOUVEAU PATIENT ...`

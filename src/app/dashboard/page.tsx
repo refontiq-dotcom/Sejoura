@@ -971,6 +971,7 @@ export default function DashboardPage() {
               if (activeAccommodationId) q = q.eq("accommodation_id", activeAccommodationId);
               return q;
             })(),
+            roomsPromise,
           ]);
 
         // Les erreurs sur les requêtes secondaires (bookings, payments, etc.)

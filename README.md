@@ -82,7 +82,7 @@ par la variable `SUPER_ADMIN_EMAIL`, sinon le premier compte `users.role =
 
 Une fois connecté, `/admin/dashboard` est le hub des produits Refontiq :
 - **Séjoura** (`/admin/sejour`) — console de gestion des résidences
-- **Docly** / **Schooly** — projets à venir (cartes « Prochainement »)
+- **Docly** — projet à venir (carte « Prochainement »)
 
 Les alertes Telegram pointent vers `/admin?next=/admin/sejour` (ou
 `/admin/ideas`) : le lien ouvre la page de connexion puis renvoie directement
