@@ -31,6 +31,7 @@ import {
   Info,
   Sparkles,
   Smartphone,
+  Menu,
   X,
 } from "lucide-react";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
@@ -85,6 +86,7 @@ export default function SettingsPage() {
   const [portalGuestInfo, setPortalGuestInfo] = useState<GuestInfo | null>(null);
   const [portalInherited, setPortalInherited] = useState(false);
   const [portalSaving, setPortalSaving] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [companyForm, setCompanyForm] = useState({
     company_name: "",
@@ -641,6 +643,15 @@ export default function SettingsPage() {
   // Note: La couleur primaire est gérée par ThemeProvider (--color-primary / --primary).
   // L'état local primaryColor sert uniquement à l'input color et à la sauvegarde Supabase.
 
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileNavOpen]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -680,6 +691,45 @@ export default function SettingsPage() {
     ? "account"
     : activeSection;
 
+  const activeSectionMeta = sections.find((s) => s.key === effectiveSection) ?? sections[0];
+  const ActiveSectionIcon = activeSectionMeta?.icon;
+
+  const handleSelectSection = (key: string) => {
+    setActiveSection(key);
+    setMobileNavOpen(false);
+  };
+
+  const navContent = (
+    <nav className="space-y-1">
+      {sections.map((section) => {
+        const Icon = section.icon;
+        return (
+          <button
+            key={section.key}
+            onClick={() => handleSelectSection(section.key)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              effectiveSection === section.key
+                ? "bg-[var(--primary-color,#0C1C33)] text-white"
+                : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/30"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {section.label}
+          </button>
+        );
+      })}
+      <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          {(translations[lang] ?? translations["fr"]).sidebar?.logoutTooltip || "Se déconnecter"}
+        </button>
+      </div>
+    </nav>
+  );
+
   return (
     <div className="space-y-3 animate-fade-in">
       <div>
@@ -687,37 +737,66 @@ export default function SettingsPage() {
         <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">{t.pageSubtitle}</p>
       </div>
 
+      {/* Mobile : bouton d'ouverture du drawer des paramètres */}
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen(true)}
+        className="lg:hidden w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-left"
+        aria-haspopup="dialog"
+        aria-expanded={mobileNavOpen}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          {ActiveSectionIcon && (
+            <ActiveSectionIcon className="w-4 h-4 shrink-0 text-[var(--primary-color,#0C1C33)]" />
+          )}
+          <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
+            {activeSectionMeta?.label}
+          </span>
+        </span>
+        <Menu className="w-5 h-5 shrink-0 text-slate-500 dark:text-slate-400" />
+      </button>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <Card className="lg:col-span-3 p-4 h-fit">
-          <nav className="space-y-1">
-            {sections.map((section) => {
-              const Icon = section.icon;
-              return (
-                <button
-                  key={section.key}
-                  onClick={() => setActiveSection(section.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    activeSection === section.key
-                      ? "bg-[var(--primary-color,#0C1C33)] text-white"
-                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/30"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {section.label}
-                </button>
-              );
-            })}
-            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+        <Card className="hidden lg:block lg:col-span-3 p-4 h-fit">
+          {navContent}
+        </Card>
+
+        {/* Mobile : drawer coulissant */}
+        <div
+          className={`lg:hidden fixed inset-0 z-50 ${mobileNavOpen ? "" : "pointer-events-none"}`}
+          aria-hidden={!mobileNavOpen}
+        >
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+              mobileNavOpen ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className={`absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col bg-white dark:bg-slate-900 shadow-xl transition-transform duration-300 ${
+              mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                {t.pageTitle}
+              </span>
               <button
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                aria-label="Fermer"
               >
-                <LogOut className="w-4 h-4" />
-                {(translations[lang] ?? translations["fr"]).sidebar?.logoutTooltip || "Se déconnecter"}
+                <X className="w-5 h-5" />
               </button>
             </div>
-          </nav>
-        </Card>
+            <div className="flex-1 overflow-y-auto p-3">
+              {navContent}
+            </div>
+          </div>
+        </div>
 
         <div className="lg:col-span-9 space-y-3">
           {effectiveSection === "company" && (
