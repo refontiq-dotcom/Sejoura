@@ -488,7 +488,15 @@ export default function ResidencesPage() {
             <Input value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} placeholder={`${formData.phone_code} 07 00 00 00 00`} />
           </div>
 
-          <Input label="URL de l'image (optionnelle)" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />
+          <div>
+            <Input label="URL de l'image (optionnelle)" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://images.unsplash.com/..." />
+            {formData.image_url && (
+              <div className="mt-2 h-32 w-full overflow-hidden rounded-lg border border-[var(--border)] bg-slate-100 dark:bg-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={formData.image_url} alt="Aperçu" loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
 
           {/* Coordonnées GPS (pour le bouton Itinéraire Trouvetou) */}
           <div className="grid grid-cols-2 gap-3">
