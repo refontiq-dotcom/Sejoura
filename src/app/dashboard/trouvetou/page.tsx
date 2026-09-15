@@ -1069,23 +1069,23 @@ function TrouvetouDashboardPage() {
           </div>
         </div>
       ) : (
-        // ─ Bannière standard/free ─
-        <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/50 dark:from-amber-900/20 dark:to-orange-900/15 p-3 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        // ─ Bannière standard/free : publication gratuite pour tous ─
+        <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-teal-900/10 p-3 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1.5 flex-1">
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-base">
-              <Zap className="w-5 h-5 text-amber-600 fill-amber-500" />
-              <span>Passez à la Formule ESSENTIEL pour publier votre vitrine</span>
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-base">
+              <Store className="w-5 h-5 text-emerald-600" />
+              <span>Publication gratuite sur Trouvetou</span>
             </div>
-            <p className="text-sm text-amber-700/90 dark:text-amber-400 max-w-3xl">
-              Créez votre vitrine sur <strong>Trouvetou</strong>, ajoutez vos photos, équipements et numéro WhatsApp.
-              Activez des Boosts Express ponctuels pour apparaître en tête de liste.
+            <p className="text-sm text-emerald-700/90 dark:text-emerald-400 max-w-3xl">
+              Publiez votre vitrine, vos photos, équipements et numéro WhatsApp — <strong>sans surcoût, quel que soit votre forfait</strong>.
+              Pour apparaître en tête de liste, le Boost reste disponible avec les formules payantes (Express à la carte ou Permanent avec Entreprise).
             </p>
           </div>
           <a
             href="/dashboard/subscription"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold text-sm shadow-md shadow-amber-500/20 transition-all shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white/70 dark:bg-emerald-950/30 hover:bg-white dark:hover:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold text-sm transition-all shrink-0"
           >
-              Passer à ESSENTIEL ({fmt(getPlanPrice("essentiel"))}/mois)
+              Voir les formules Boost
             <ArrowUpRight className="w-4 h-4" />
           </a>
         </div>
