@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatFCFA } from "@/lib/utils";
-import { getAdCampaignPrice, getAdAudienceLabel, type AdAudience } from "@/lib/ads";
+import { getValidAdCampaignAmounts, getAdAudienceLabel, type AdAudience } from "@/lib/ads";
 import {
   escapeMarkdown,
   getTelegramAdminUrl,
@@ -64,8 +64,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cette publicité est déjà active." }, { status: 409 });
   }
 
-  const expectedAmount = getAdCampaignPrice(ad.duration_days);
-  if (expectedAmount <= 0 || ad.amount !== expectedAmount) {
+  // Tarif plein et tarif remisé Entreprise acceptés : le forfait a pu changer
+  // entre la création de la campagne et la déclaration du paiement.
+  const validAmounts = getValidAdCampaignAmounts(ad.duration_days);
+  if (validAmounts.length === 0 || !validAmounts.includes(ad.amount)) {
     return NextResponse.json({ error: "Montant de campagne invalide." }, { status: 400 });
   }
 

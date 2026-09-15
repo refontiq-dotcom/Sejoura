@@ -36,6 +36,7 @@ import {
   AD_DURATION_OPTIONS,
   getAdAudienceLabel,
   getAdCampaignPrice,
+  getAdDiscountRate,
   getAdStatusLabel,
   getAdWavePayLink,
   getRemainingAdDays,
@@ -74,7 +75,7 @@ function statusBadgeVariant(status: AdStatus): "default" | "success" | "warning"
 }
 
 export function TrouvetouAdsPanel() {
-  const { tenantId } = useCurrentUser();
+  const { tenantId, plan } = useCurrentUser();
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [ads, setAds] = useState<Advertisement[]>([]);
@@ -99,7 +100,9 @@ export function TrouvetouAdsPanel() {
   const [phoneError, setPhoneError] = useState("");
   const [notifying, setNotifying] = useState(false);
 
-  const price = getAdCampaignPrice(durationDays);
+  const price = getAdCampaignPrice(durationDays, plan);
+  const discountRate = getAdDiscountRate(plan);
+  const hasDiscount = discountRate > 0;
 
   const loadAds = useCallback(async () => {
     if (!tenantId) return;
@@ -292,6 +295,12 @@ export function TrouvetouAdsPanel() {
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Publicités</h2>
           <p className="text-sm text-slate-500">Option de la vitrine Trouvetou : créez une campagne, réglez via Wave, puis la diffusion démarre après confirmation.</p>
+          {hasDiscount && (
+            <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+              <Sparkles className="h-3 w-3" />
+              Remise Entreprise -50 % appliquée sur vos publicités
+            </span>
+          )}
         </div>
         <Button
           onClick={() => {
@@ -408,6 +417,7 @@ export function TrouvetouAdsPanel() {
                 <div className="grid grid-cols-2 gap-2">
                   {AD_DURATION_OPTIONS.map((opt) => {
                     const selected = durationDays === opt.days;
+                    const optionPrice = getAdCampaignPrice(opt.days, plan);
                     return (
                       <button
                         key={opt.days}
@@ -425,7 +435,14 @@ export function TrouvetouAdsPanel() {
                           </span>
                         )}
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{opt.label}</p>
-                        <p className="text-xs text-slate-500">{fmt(opt.priceFcfa)}</p>
+                        <p className="text-xs text-slate-500">
+                          {hasDiscount && (
+                            <span className="mr-1 text-slate-400 line-through">{fmt(opt.priceFcfa)}</span>
+                          )}
+                          <span className={hasDiscount ? "font-semibold text-emerald-600 dark:text-emerald-400" : ""}>
+                            {fmt(optionPrice)}
+                          </span>
+                        </p>
                       </button>
                     );
                   })}
@@ -472,8 +489,22 @@ export function TrouvetouAdsPanel() {
               <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Tarif de la campagne</p>
-                  <p className="text-2xl font-extrabold text-slate-900 dark:text-white">{fmt(price)}</p>
-                  <p className="text-[11px] text-slate-400">{durationDays} jours de diffusion sur Trouvetou</p>
+                  <p className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                    {hasDiscount && (
+                      <span className="mr-2 text-base font-medium text-slate-400 line-through">
+                        {fmt(getAdCampaignPrice(durationDays))}
+                      </span>
+                    )}
+                    {fmt(price)}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {durationDays} jours de diffusion sur Trouvetou
+                    {hasDiscount && (
+                      <span className="ml-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                        · Remise Entreprise -50 %
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <Upload className="w-5 h-5 text-slate-400" />
               </div>
