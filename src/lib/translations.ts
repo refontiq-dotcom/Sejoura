@@ -63,6 +63,8 @@ export const translations = {
       suggestFeature: "Suggérer une fonctionnalité",
       markAllReadError: "Impossible de marquer les notifications comme lues.",
       markAllReadSuccess: "Toutes les notifications ont été marquées comme lues.",
+      soundEnable: "Activer le son des notifications",
+      soundDisable: "Couper le son des notifications",
       logoutError: "La déconnexion a échoué 🔄",
       roleLabels: {
         super_admin: "ADMIN",
@@ -723,6 +725,8 @@ export const translations = {
       suggestFeature: "Suggest a feature",
       markAllReadError: "Unable to mark notifications as read.",
       markAllReadSuccess: "All notifications have been marked as read.",
+      soundEnable: "Enable notification sound",
+      soundDisable: "Mute notification sound",
       logoutError: "Unable to sign out.",
       roleLabels: {
         super_admin: "ADMIN",

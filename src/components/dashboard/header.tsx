@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical, Volume2, VolumeX } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -201,7 +201,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
   const planLabel = getPlanLabel(plan || "free");
   const isAdminRole = userRole === "admin_residence" || userRole === "super_admin";
   const { activeAccommodation } = useAccommodation();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, soundEnabled, setSoundEnabled } = useNotifications();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -451,13 +451,23 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
 
             {notifOpen && (
               <div className="absolute right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-72 max-w-72 bg-[var(--card-bg,var(--surface))] rounded-xl shadow-xl border border-[var(--border)] overflow-hidden animate-fade-in">
-                <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
+                <div className="p-3 border-b border-[var(--border)] flex items-center justify-between gap-2">
                   <h3 className="font-semibold text-sm text-[var(--foreground)]">{t.notifications}</h3>
-                  {unreadCount > 0 && (
-                    <span className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium">
-                      {unreadCount} {t.unread}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <span className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium">
+                        {unreadCount} {t.unread}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                      aria-label={soundEnabled ? t.soundDisable : t.soundEnable}
+                      title={soundEnabled ? t.soundDisable : t.soundEnable}
+                    >
+                      {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {notifications.length === 0 ? (

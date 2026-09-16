@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useNotificationSound } from "@/hooks/use-notification-sound";
 
 export type NotificationItem = {
   id: string;
@@ -24,6 +25,8 @@ type NotificationsContextValue = {
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   refresh: () => Promise<void>;
+  soundEnabled: boolean;
+  setSoundEnabled: (value: boolean) => void;
 };
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
@@ -41,6 +44,7 @@ export function NotificationsProvider({
 }) {
   const supabase = createClient();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { enabled: soundEnabled, setEnabled: setSoundEnabled, play: playNotificationSound } = useNotificationSound();
 
   async function loadNotifications() {
     const { data, error } = await supabase
@@ -89,14 +93,30 @@ export function NotificationsProvider({
           table: "notifications",
           filter: `tenant_id=eq.${tenantId}`,
         },
-        () => loadNotifications()
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const incoming = payload.new as {
+              recipient_role?: string | null;
+              created_by?: string | null;
+            };
+            const matchesRole =
+              !incoming.recipient_role || incoming.recipient_role === userRole;
+            const isOwnNotification =
+              !!incoming.created_by && incoming.created_by === userId;
+
+            if (matchesRole && !isOwnNotification) {
+              playNotificationSound();
+            }
+          }
+          loadNotifications();
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tenantId, userRole, userId]);
+  }, [tenantId, userRole, userId, playNotificationSound]);
 
   async function markAsRead(id: string) {
     try {
@@ -164,6 +184,8 @@ export function NotificationsProvider({
         markAsRead,
         markAllAsRead,
         refresh: loadNotifications,
+        soundEnabled,
+        setSoundEnabled,
       }}
     >
       {children}
