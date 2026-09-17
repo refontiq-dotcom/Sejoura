@@ -300,8 +300,9 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
               onClick={handleLogout}
               disabled={loggingOut}
               style={{ color: themeStyles.mutedTextColor }}
-              className="p-1 rounded-md hover:opacity-75 transition-opacity disabled:opacity-50"
+              className="p-1 rounded-md hover:opacity-75 transition-opacity disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               title={t.logoutTooltip}
+              aria-label={t.logoutTooltip}
             >
               <LogOut className="w-3 h-3" />
             </button>

@@ -368,6 +368,7 @@ function ClientDrawer({
 
 function DonutChart({ data }: { data: RoomStatusData[] }) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   if (total === 0) {
     return (
@@ -381,6 +382,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
   const radius = 70;
   const strokeWidth = 28;
   const circumference = 2 * Math.PI * radius;
+  const hoveredItem = hovered !== null ? data[hovered] : null;
 
   const segments = data.reduce((acc, item, index) => {
     const percentage = item.count / total;
@@ -393,11 +395,14 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
         r={radius}
         fill="none"
         stroke={getRoomStatusChartColor(item.status)}
-        strokeWidth={strokeWidth}
+        strokeWidth={hovered === index ? strokeWidth + 4 : strokeWidth}
         strokeDasharray={`${dashLength} ${circumference - dashLength}`}
         strokeDashoffset={-acc.offset}
         strokeLinecap="round"
-        style={{ transition: "stroke-dashoffset 0.5s ease" }}
+        className="cursor-pointer"
+        onMouseEnter={() => setHovered(index)}
+        onMouseLeave={() => setHovered(null)}
+        style={{ transition: "stroke-dashoffset 0.5s ease, stroke-width 0.2s ease" }}
       />
     );
     return {
@@ -424,9 +429,13 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
           {segments.elements}
         </svg>
         {/* Centre */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-slate-900 dark:text-white">{total}</span>
-          <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">Chambres</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <span className="text-3xl font-bold text-slate-900 dark:text-white">
+            {hoveredItem ? hoveredItem.count : total}
+          </span>
+          <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
+            {hoveredItem ? getRoomStatusLabel(hoveredItem.status) : "Chambres"}
+          </span>
         </div>
       </div>
     </div>
@@ -1464,7 +1473,16 @@ export default function DashboardPage() {
           </Button>
         )}
 
-        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
+         <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
+          <button
+            type="button"
+            onClick={() => { loadRetriesRef.current = 0; loadDashboardData(true, selectedDate); }}
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            title={lang === "en" ? "Refresh" : "Actualiser"}
+            aria-label={lang === "en" ? "Refresh" : "Actualiser"}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           {!isToday && (
             <button
               onClick={() => handleDateChange(toLocalISODate(new Date()))}
@@ -1473,6 +1491,25 @@ export default function DashboardPage() {
               {"Aujourd'hui"}
             </button>
           )}
+          {(["today", "7d", "30d"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => {
+                const d = new Date();
+                if (p === "7d") d.setDate(d.getDate() - 6);
+                if (p === "30d") d.setDate(d.getDate() - 29);
+                handleDateChange(toLocalISODate(d));
+              }}
+              className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                p === "today" && isToday
+                  ? "bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)]"
+                  : "text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)]"
+              }`}
+            >
+              {p === "today" ? (lang === "en" ? "Today" : "Aujourd'hui") : p === "7d" ? "7j" : "30j"}
+            </button>
+          ))}
           <button
             onClick={() => shiftDate(-1)}
             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
@@ -1733,7 +1770,7 @@ export default function DashboardPage() {
         /* ── Vue Réceptionniste : 4 KPIs colorés, compacts et opérationnels ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* KPI: Arrivées prévues */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-emerald-200 dark:ring-emerald-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-emerald-200 dark:ring-emerald-900/40 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/bookings")}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <LogIn className="w-5 h-5" />
@@ -1746,7 +1783,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Départs prévus */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-orange-200 dark:ring-orange-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-orange-200 dark:ring-orange-900/40 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/bookings")}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <LogOut className="w-5 h-5" />
@@ -1759,7 +1796,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Chambres à nettoyer */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-amber-200 dark:ring-amber-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-amber-200 dark:ring-amber-900/40 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/cleaning")}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500 text-white ring-1 ring-amber-600/30 dark:bg-amber-500/25 dark:text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <Clock className="w-5 h-5" />
@@ -1772,7 +1809,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI: Taux d'occupation */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-blue-200 dark:ring-blue-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-sm)] ring-1 ring-blue-200 dark:ring-blue-900/40 cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push("/dashboard/rooms")}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <TrendingUp className="w-5 h-5" />
@@ -1788,7 +1825,7 @@ export default function DashboardPage() {
         /* ── Vue Admin : 4 KPIs colorés, chacun avec son identité visuelle ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1: Taux d'occupation — Bleu */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-200 dark:ring-blue-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-blue-100 to-sky-100 dark:from-blue-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-blue-200 dark:ring-blue-900/40 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push("/dashboard/rooms")} role="link">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-blue-500 text-white ring-1 ring-blue-600/30 dark:bg-blue-500/25 dark:text-blue-300 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1813,7 +1850,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 2: Encaissements du jour — Émeraude */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-200 dark:ring-emerald-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-emerald-200 dark:ring-emerald-900/40 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push("/dashboard/accounting")} role="link">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white ring-1 ring-emerald-600/30 dark:bg-emerald-500/25 dark:text-emerald-300 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1836,7 +1873,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 3: Entrées / Sorties prévues — Orange */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-200 dark:ring-orange-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-orange-200 dark:ring-orange-900/40 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push("/dashboard/bookings")} role="link">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-orange-500 text-white ring-1 ring-orange-600/30 dark:bg-orange-500/25 dark:text-orange-300 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1870,7 +1907,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* KPI 4: État Ménage — Violet */}
-          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-200 dark:ring-violet-900/40">
+          <Card className="p-4 rounded-2xl border-0 bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-950/50 dark:to-slate-900 shadow-[var(--shadow-md)] ring-1 ring-violet-200 dark:ring-violet-900/40 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => router.push("/dashboard/cleaning")} role="link">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300 flex items-center justify-center shadow-sm flex-shrink-0">
@@ -1910,7 +1947,7 @@ export default function DashboardPage() {
           <SectionHeader
             icon={<LogIn className="w-5 h-5" />}
             iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
-             title={isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture}
+             title={`${isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture} (${movements.length})`}
              subtitle={isToday
                ? t.movements.subtitle
                : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
@@ -2055,7 +2092,7 @@ export default function DashboardPage() {
             <SectionHeader
               icon={<LogIn className="w-5 h-5" />}
               iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-blue-500/20"
-              title={isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture}
+              title={`${isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture} (${movements.length})`}
               subtitle={isToday
                 ? t.movements.subtitle
                 : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}

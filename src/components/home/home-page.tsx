@@ -255,6 +255,7 @@ export function HomePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [humanCheck, setHumanCheck] = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
@@ -333,6 +334,21 @@ export function HomePage() {
   const clearErrors = useCallback(() => {
     setErrors({});
   }, []);
+
+  function validateEmailLive(value: string) {
+    if (!value) return;
+    setErrors((prev) => ({ ...prev, email: isValidEmail(value) ? undefined : t.emailInvalid }));
+  }
+
+  function validatePasswordLive(value: string) {
+    if (!value) return;
+    setErrors((prev) => ({ ...prev, password: value.length >= 6 ? undefined : t.passwordShort }));
+  }
+
+  function validateConfirmLive(value: string) {
+    if (!value) return;
+    setErrors((prev) => ({ ...prev, confirmPassword: value === password ? undefined : t.passwordMismatch }));
+  }
 
   function openSection(section: SectionName) {
     setActiveSection(section);
@@ -499,6 +515,10 @@ export function HomePage() {
 
     if (!agreeTerms) {
       toast.error(t.termsError);
+      return;
+    }
+    if (!humanCheck) {
+      toast.error(lang === "fr" ? "Confirmez que vous n'êtes pas un robot." : "Please confirm you are not a robot.");
       return;
     }
 
@@ -1623,13 +1643,13 @@ export function HomePage() {
                   <form onSubmit={handleLogin} className="space-y-2.5 mt-2" noValidate>
                     <div>
                       <label htmlFor="m-login-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
-                      <input id="m-login-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      <input id="m-login-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); validateEmailLive(e.target.value); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
                       {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
                     </div>
                     <div>
                       <label htmlFor="m-login-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
                       <div className="relative">
-                        <input id="m-login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <input id="m-login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); validatePasswordLive(e.target.value); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -1667,13 +1687,13 @@ export function HomePage() {
                     </p>
                     <div>
                       <label htmlFor="m-signup-email" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.email}</label>
-                      <input id="m-signup-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); clearErrors(); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      <input id="m-signup-email" name="email" type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); validateEmailLive(e.target.value); }} placeholder="contact@sejoura.com" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.email ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
                       {errors.email && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.email}</p>}
                     </div>
                     <div>
                       <label htmlFor="m-signup-password" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.password}</label>
                       <div className="relative">
-                        <input id="m-signup-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                        <input id="m-signup-password" name="password" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={password} onChange={(e) => { setPassword(e.target.value); validatePasswordLive(e.target.value); }} placeholder="••••••••" className={`w-full px-3.5 py-3 pr-10 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.password ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-[#e8e8e8]" aria-label="Afficher">
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -1683,13 +1703,19 @@ export function HomePage() {
                     </div>
                     <div>
                       <label htmlFor="m-signup-confirm" className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-[#a0a0a0] mb-1">{t.confirmPassword}</label>
-                      <input id="m-signup-confirm" name="confirmPassword" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); clearErrors(); }} placeholder="••••••••" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
+                      <input id="m-signup-confirm" name="confirmPassword" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={6} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); validateConfirmLive(e.target.value); }} placeholder="••••••••" className={`w-full px-3.5 py-3 rounded-xl border bg-slate-50 dark:bg-[#262626] text-slate-800 dark:text-[#e8e8e8] text-xs outline-none focus:border-blue-600 transition-all ${errors.confirmPassword ? "border-red-400 dark:border-red-500" : "border-slate-200 dark:border-[#404040]"}`} />
                       {errors.confirmPassword && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
                     </div>
                     <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
                       <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]" />
                       <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0]">
                         {t.acceptTerms}{" "}<Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{t.terms}</Link>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input type="checkbox" checked={humanCheck} onChange={(e) => setHumanCheck(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]" />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0]">
+                        {lang === "fr" ? "Je confirme que je ne suis pas un robot." : "I confirm I am not a robot."}
                       </span>
                     </label>
                     <button type="submit" disabled={loading} className="w-full mt-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all text-xs tracking-wide disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">

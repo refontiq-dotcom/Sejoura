@@ -17,9 +17,10 @@ interface OnboardingModalProps {
   fullName: string;
   userRole?: string;
   onComplete: () => void;
+  onSkip?: () => void;
 }
 
-export function OnboardingModal({ userId, email, fullName, userRole, onComplete }: OnboardingModalProps) {
+export function OnboardingModal({ userId, email, fullName, userRole, onComplete, onSkip }: OnboardingModalProps) {
   const { lang } = useLanguage();
   const t = translations[lang].onboarding;
   const router = useRouter();
@@ -170,7 +171,15 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-[-50%] left-[-10%] w-48 h-48 rounded-full bg-white blur-2xl animate-pulse" />
           </div>
-          {/* L'étape 2 est obligatoire — pas de bouton fermer */}
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="absolute top-3 right-3 text-[11px] font-semibold text-white/80 hover:text-white underline underline-offset-2"
+            >
+              {t.skip}
+            </button>
+          )}
           <div className="inline-flex p-3 rounded-full bg-white/10 mb-3 backdrop-blur-md shadow-inner">
             <Home className="w-6 h-6 text-white" />
           </div>
@@ -187,11 +196,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
 
           <div className="space-y-3">
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-full-name" className={labelClass}>
                 <User className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.fullName} <span className="text-red-500">*</span>
               </label>
               <input
+                id="onboarding-full-name"
                 type="text"
                 required
                 autoComplete="off"
@@ -203,11 +213,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-residence-name" className={labelClass}>
                 <Home className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceName} <span className="text-red-500">*</span>
               </label>
               <input
+                id="onboarding-residence-name"
                 type="text"
                 required
                 autoComplete="off"
@@ -219,11 +230,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-residence-type" className={labelClass}>
                 <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceType} <span className="text-red-500">*</span>
               </label>
               <select
+                id="onboarding-residence-type"
                 required
                 autoComplete="off"
                 value={residenceType}
@@ -236,12 +248,13 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-residence-location" className={labelClass}>
                 <MapPin className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.residenceLocation} <span className="text-red-500">*</span>
               </label>
               <div className="relative" ref={cityRef}>
                 <input
+                  id="onboarding-residence-location"
                   type="text"
                   required
                   autoComplete="off"
@@ -288,11 +301,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-country" className={labelClass}>
                 <Globe2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.country} <span className="text-red-500">*</span>
               </label>
               <select
+                id="onboarding-country"
                 required
                 autoComplete="off"
                 value={country}
@@ -308,11 +322,12 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             </div>
 
             <div>
-              <label className={labelClass}>
+              <label htmlFor="onboarding-phone" className={labelClass}>
                 <Phone className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
                 {t.phone}
               </label>
               <input
+                id="onboarding-phone"
                 type="tel"
                 autoComplete="off"
                 value={phone}
@@ -349,8 +364,19 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete 
             )}
           </button>
 
-          {/* L'étape 2 est obligatoire — seul le déconnexion est possible */}
-          <div className="pt-2 pb-1 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-700">
+          <div className="pt-2 pb-1 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-700">
+            {onSkip ? (
+              <button
+                type="button"
+                onClick={onSkip}
+                disabled={loading}
+                className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
+              >
+                {t.skip}
+              </button>
+            ) : (
+              <span />
+            )}
             <button
               type="button"
               onClick={handleSignOut}

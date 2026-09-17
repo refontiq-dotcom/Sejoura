@@ -11,6 +11,8 @@ import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
 import { WelcomeOnboardingModal } from "@/components/dashboard/welcome-onboarding-modal";
 import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
+import { TopLoadingBar } from "@/components/dashboard/top-loading-bar";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
@@ -111,6 +113,64 @@ export default function DashboardLayout({
     window.addEventListener("resize", handleResize, { passive: true });
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Raccourcis clavier globaux : g+d (tableau de bord), g+b (réservations),
+  // Cmd/Ctrl+N (nouvelle réservation). Ils sont ignorés lorsque l'utilisateur
+  // saisit du texte dans un champ afin de ne pas gêner la frappe.
+  useEffect(() => {
+    let pendingG = false;
+    let gTimer = 0;
+
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target.isContentEditable
+      );
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        router.push("/dashboard/bookings?new=1");
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (pendingG) {
+        const key = e.key.toLowerCase();
+        if (key === "d") {
+          e.preventDefault();
+          router.push("/dashboard");
+        } else if (key === "b") {
+          e.preventDefault();
+          router.push("/dashboard/bookings");
+        }
+        pendingG = false;
+        window.clearTimeout(gTimer);
+        return;
+      }
+
+      if (e.key.toLowerCase() === "g") {
+        pendingG = true;
+        gTimer = window.setTimeout(() => {
+          pendingG = false;
+        }, 800);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.clearTimeout(gTimer);
+    };
+  }, [router]);
 
   // En-tête "intelligent" : ombre + masquage sur scroll.
   // - Les setState sont coalescés dans une seule frame d'animation (rAF) pour
@@ -593,6 +653,7 @@ export default function DashboardLayout({
         ["--card-border" as string]: activeTheme.cardBorder,
       } as React.CSSProperties}
     >
+      <TopLoadingBar />
       <Sidebar
         userRole={user.role}
         userName={user.full_name}
@@ -630,8 +691,10 @@ export default function DashboardLayout({
               plan={plan}
               monthlyPrice={monthlyPrice}
               scrolled={headerScrolled}
+              tenantId={user.tenant_id ?? ""}
             />
           </div>
+          <Breadcrumbs />
           <main
             style={{ backgroundColor: mainBg }}
             className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
@@ -656,6 +719,7 @@ export default function DashboardLayout({
           fullName={user?.full_name || ""}
           userRole={user?.role}
           onComplete={handleOnboardingComplete}
+          onSkip={() => setNeedsOnboarding(false)}
         />
       )}
 

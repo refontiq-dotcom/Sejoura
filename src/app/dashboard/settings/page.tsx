@@ -187,6 +187,18 @@ export default function SettingsPage() {
             // JSON corrompu : on ignore et on garde les valeurs par défaut
           }
         }
+
+        if (typeof window !== "undefined") {
+          try {
+            const storedWa = localStorage.getItem("sejoura-whatsapp-config");
+            if (storedWa) {
+              const parsed = JSON.parse(storedWa) as typeof whatsappForm;
+              setWhatsappForm((prev) => ({ ...prev, ...parsed }));
+            }
+          } catch {
+            // JSON corrompu : on ignore
+          }
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕";
@@ -410,7 +422,39 @@ export default function SettingsPage() {
       return;
     }
     localStorage.setItem("sejoura-whatsapp-config", JSON.stringify(whatsappForm));
+    if (tenant && user) {
+      localStorage.setItem(
+        `sejoura-whatsapp-config:${tenant.id}:${user.id}`,
+        JSON.stringify(whatsappForm)
+      );
+    }
     toast.success("Config WhatsApp sauvegardée 💾");
+  }
+
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  async function handleDeleteAccount() {
+    if (deletingAccount) return;
+    const confirmed = window.confirm(
+      lang === "en"
+        ? "Delete your account? You will be signed out. This cannot be undone from this screen."
+        : "Supprimer votre compte ? Vous serez déconnecté. Cette action n'est pas annulable depuis cet écran."
+    );
+    if (!confirmed) return;
+    setDeletingAccount(true);
+    try {
+      const supabase = createClient();
+      if (user?.id) {
+        await supabase.from("users").update({ is_active: false }).eq("id", user.id);
+      }
+      await supabase.auth.signOut();
+      toast.success(lang === "en" ? "Account deactivated" : "Compte désactivé");
+      const isEmployee = user?.role === "receptionniste" || user?.role === "menagere";
+      window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
+    } catch {
+      toast.error(lang === "en" ? "Unable to delete the account" : "Impossible de supprimer le compte");
+      setDeletingAccount(false);
+    }
   }
 
   async function handleSavePassword() {
@@ -1360,6 +1404,19 @@ export default function SettingsPage() {
                   <Input label={t.passwordConfirm} type="password" placeholder="••••••••" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} />
                   <div className="flex justify-end pt-2">
                     <Button onClick={handleSavePassword} loading={saving}>{t.passwordUpdate}</Button>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-red-200 dark:border-red-900/40">
+                    <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
+                      {lang === "en" ? "Danger zone" : "Zone de danger"}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                      {lang === "en"
+                        ? "Deactivate your account and sign out. Contact support to restore access."
+                        : "Désactivez votre compte et déconnectez-vous. Contactez le support pour restaurer l'accès."}
+                    </p>
+                    <Button variant="destructive" onClick={handleDeleteAccount} loading={deletingAccount}>
+                      {lang === "en" ? "Delete my account" : "Supprimer mon compte"}
+                    </Button>
                   </div>
                 </div>
             </Card>

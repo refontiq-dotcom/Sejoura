@@ -388,6 +388,29 @@ html {
   border-radius: var(--radius);
 }
 
+/* Accessibilité : anneau de focus visible uniquement au clavier (WCAG 2.4.7).
+   Les éléments qui gèrent déjà leur propre anneau via `focus-visible:`
+   continuent de fonctionner : cette règle est un filet de sécurité. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary-color, #0C1C33);
+  outline-offset: 2px;
+}
+
+/* Barre de chargement de navigation (top loading bar) */
+@keyframes topLoadingBar {
+  0% { transform: scaleX(0); transform-origin: 0 50%; }
+  60% { transform: scaleX(0.85); transform-origin: 0 50%; }
+  100% { transform: scaleX(1); transform-origin: 0 50%; }
+}
+
+.top-loading-bar {
+  animation: topLoadingBar 0.6s ease-out forwards;
+}
+
 /* Animation fade-in */
 @keyframes fadeIn {
   from {

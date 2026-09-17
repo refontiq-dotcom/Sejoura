@@ -1037,6 +1037,7 @@ export default function AccountingPage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [savingExpense, setSavingExpense] = useState(false);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState<EnrichedPayment | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientWithStats | null>(null);
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
 
@@ -1778,6 +1779,44 @@ export default function AccountingPage() {
     }
   }
 
+  async function handleDeletePayment() {
+    if (!deletingPayment) return;
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("payments").delete().eq("id", deletingPayment.id);
+      if (error) throw error;
+      toast.success("Paiement supprimé");
+      setDeletingPayment(null);
+      loadData();
+    } catch (err) {
+      toast.error("La suppression du paiement a échoué : " + ((err as Error)?.message || "erreur"));
+    }
+  }
+
+  function downloadPaymentReceipt(pay: EnrichedPayment) {
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (!win) {
+      toast.error("Impossible d'ouvrir le reçu. Autorisez les pop-ups.");
+      return;
+    }
+    const method = paymentMethodDisplay(pay);
+    win.document.write(`<!DOCTYPE html><html><head><title>Reçu ${pay.reference || pay.id}</title>
+      <style>body{font-family:system-ui,sans-serif;padding:32px;color:#0f172a}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:6px 0;border-bottom:1px solid #e2e8f0;font-size:13px}.muted{color:#64748b}</style></head><body>
+      <h1>Reçu de paiement</h1>
+      <p class="muted">${formatDate(pay.payment_date)}</p>
+      <table>
+        <tr><td class="muted">Client / opération</td><td>${pay.booking?.client_name || pay.notes || "Opération de caisse"}</td></tr>
+        ${pay.booking?.booking_code ? `<tr><td class="muted">Réservation</td><td>${pay.booking.booking_code}</td></tr>` : ""}
+        <tr><td class="muted">Méthode</td><td>${method}</td></tr>
+        <tr><td class="muted">Référence</td><td>${pay.reference || "—"}</td></tr>
+        <tr><td class="muted">Montant</td><td><strong>${fmt(Math.abs(pay.amount))}</strong></td></tr>
+      </table>
+      <p class="muted" style="margin-top:24px">Séjoura</p>
+      <script>window.onload=function(){window.print()}</script>
+      </body></html>`);
+    win.document.close();
+  }
+
   async function handleDeleteExpense() {
     if (!requireAdvancedAccounting()) return;
     if (!deletingExpense) return;
@@ -2457,10 +2496,16 @@ export default function AccountingPage() {
                           {pay.reference && <span className="text-[11px] text-[var(--foreground-subtle)]">{pay.reference}</span>}
                         </div>
                       </div>
-                      <p className={`text-sm font-bold flex-shrink-0 ${isOut ? "text-red-400" : "text-emerald-400"}`}>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <p className={`text-sm font-bold ${isOut ? "text-red-400" : "text-emerald-400"}`}>
                         {isOut ? "-" : ""}
                         {fmt(Math.abs(pay.amount))}
                       </p>
+                      <div className="flex gap-1">
+                        <button type="button" className="p-1 rounded hover:bg-[var(--surface-muted)]" title="Reçu PDF" onClick={() => downloadPaymentReceipt(pay)}><Receipt className="w-3.5 h-3.5 text-[var(--foreground-muted)]" /></button>
+                        <button type="button" className="p-1 rounded hover:bg-red-500/10" title="Supprimer" onClick={() => setDeletingPayment(pay)}><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                      </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -2497,6 +2542,7 @@ export default function AccountingPage() {
                       >
                         Montant {revenueSort.key === "amount" ? (revenueSort.direction === "asc" ? <ArrowUp className="w-3 h-3 inline-block" /> : <ArrowDown className="w-3 h-3 inline-block" />) : <ArrowUpDown className="w-3 h-3 inline-block opacity-30" />}
                       </th>
+                      <th className="p-2.5" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -2527,6 +2573,10 @@ export default function AccountingPage() {
                             {isOut ? "-" : ""}
                             {fmt(Math.abs(pay.amount))}
                           </td>
+                          <td className="p-2.5 text-right whitespace-nowrap">
+                            <button type="button" className="p-1 rounded hover:bg-[var(--surface-muted)] inline-flex" title="Reçu PDF" onClick={() => downloadPaymentReceipt(pay)}><Receipt className="w-3.5 h-3.5 text-[var(--foreground-muted)]" /></button>
+                            <button type="button" className="p-1 rounded hover:bg-red-500/10 inline-flex" title="Supprimer" onClick={() => setDeletingPayment(pay)}><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -2539,6 +2589,7 @@ export default function AccountingPage() {
                       <td className="p-2.5 text-right text-sm font-bold text-white">
                         {fmt(filteredPayments.reduce((s, p) => s + p.amount, 0))}
                       </td>
+                      <td />
                     </tr>
                   </tfoot>
                 </table>
@@ -3440,6 +3491,30 @@ export default function AccountingPage() {
               Annuler
             </Button>
             <Button variant="destructive" className="flex-1" onClick={handleDeleteExpense}>
+              <Trash2 className="w-4 h-4" /> Supprimer
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!deletingPayment}
+        onClose={() => setDeletingPayment(null)}
+        title="Supprimer ce paiement ?"
+        description="Cette action est irréversible."
+      >
+        <div className="space-y-3">
+          {deletingPayment && (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-300">
+                {deletingPayment.booking?.client_name || deletingPayment.notes || "Opération de caisse"} — {fmt(Math.abs(deletingPayment.amount))} du {formatDate(deletingPayment.payment_date)}
+              </p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeletingPayment(null)}>Annuler</Button>
+            <Button variant="destructive" className="flex-1" onClick={handleDeletePayment}>
               <Trash2 className="w-4 h-4" /> Supprimer
             </Button>
           </div>

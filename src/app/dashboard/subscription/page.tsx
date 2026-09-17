@@ -24,7 +24,7 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
-import type { Subscription } from "@/types/database";
+import type { Subscription, SubscriptionPaymentRequest } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
 // Icône stylisée de l'application Wave (bloc bleu + W)
@@ -53,6 +53,10 @@ export default function SubscriptionPage() {
   const [phoneError, setPhoneError] = useState("");
   const [notifying, setNotifying] = useState(false);
   const [now] = useState(() => Date.now());
+  const [paymentHistory, setPaymentHistory] = useState<SubscriptionPaymentRequest[]>([]);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   async function loadData() {
     try {
@@ -70,11 +74,14 @@ export default function SubscriptionPage() {
 
       const { data: reqData } = await supabase
         .from("subscription_payment_requests")
-        .select("id, plan")
+        .select("id, plan, amount, status, created_at, sender_phone, notes")
         .eq("tenant_id", tenantId)
-        .eq("status", "pending")
-        .maybeSingle();
-      setPendingRequest((reqData as { plan: string } | null) ?? null);
+        .order("created_at", { ascending: false })
+        .limit(20);
+      const allReqs = (reqData || []) as SubscriptionPaymentRequest[];
+      setPaymentHistory(allReqs);
+      const pending = allReqs.find((r) => r.status === "pending");
+      setPendingRequest(pending ? { plan: pending.plan } : null);
     } catch (err) {
       toast.error("Les données sont introuvables 🤔 Veuillez réessayer.");
       console.error(err);
@@ -253,14 +260,24 @@ export default function SubscriptionPage() {
               </p>
             </div>
           </div>
-          {isExpired && !isPending && (
-            <Button variant="primary" onClick={() => {
-              const target = document.getElementById("plans-section");
-              target?.scrollIntoView({ behavior: "smooth" });
-            }}>
-              <CreditCard className="w-4 h-4" /> Renouveler maintenant
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCompareOpen(true)}>
+              Comparer les plans
             </Button>
-          )}
+            {isExpired && !isPending && (
+              <Button variant="primary" onClick={() => {
+                const target = document.getElementById("plans-section");
+                target?.scrollIntoView({ behavior: "smooth" });
+              }}>
+                <CreditCard className="w-4 h-4" /> Renouveler maintenant
+              </Button>
+            )}
+            {!isExpired && !isPending && currentPlan !== "essentiel" && (
+              <Button variant="outline" size="sm" onClick={() => setCancelOpen(true)}>
+                Annuler
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -388,6 +405,38 @@ export default function SubscriptionPage() {
         })}
       </div>
 
+      {paymentHistory.length > 0 && (
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Historique des paiements</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
+                  <th className="pb-2 font-medium">Date</th>
+                  <th className="pb-2 font-medium">Plan</th>
+                  <th className="pb-2 font-medium">Montant</th>
+                  <th className="pb-2 font-medium">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                {paymentHistory.map((req) => (
+                  <tr key={req.id}>
+                    <td className="py-2 text-slate-600 dark:text-slate-300">{formatDate(req.created_at)}</td>
+                    <td className="py-2">{getPlanLabel(req.plan)}</td>
+                    <td className="py-2 font-medium">{fmt(req.amount)}</td>
+                    <td className="py-2">
+                      <Badge variant={req.status === "validated" ? "success" : req.status === "rejected" ? "error" : "warning"}>
+                        {req.status === "validated" ? "Validé" : req.status === "rejected" ? "Rejeté" : "En attente"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       {/* Paiement Wave — Confirmation en 2 étapes */}
       <Modal
         open={!!confirmPlan}
@@ -468,6 +517,89 @@ export default function SubscriptionPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal open={compareOpen} onClose={() => setCompareOpen(false)} title="Comparateur de plans">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="text-left p-2 font-medium text-slate-500">Fonctionnalité</th>
+                {plans.map((p) => (
+                  <th key={p.key} className="p-2 text-center font-semibold">{p.name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {["Établissements", "Unités", "Comptes", "Ménage", "Comptabilité", "Portail client", "API"].map((feat, i) => {
+                const values = [
+                  ["1", "1", "Illimités"],
+                  ["10", "35", "Illimitées"],
+                  ["2", "5", "Illimités"],
+                  ["—", "Complet", "Complet"],
+                  ["Reçus PDF", "Basique", "Complète"],
+                  ["Vitrine", "Consultation", "Complet"],
+                  ["—", "—", "Oui"],
+                ][i];
+                return (
+                  <tr key={feat}>
+                    <td className="p-2 text-slate-600 dark:text-slate-300">{feat}</td>
+                    {values.map((v, j) => (
+                      <td key={j} className="p-2 text-center">{v}</td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
+
+      <Modal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        title="Annuler l'abonnement"
+        description="Votre abonnement restera actif jusqu'à la fin de la période en cours, puis passera au plan Essentiel."
+        onConfirm={async () => {
+          setCancelling(true);
+          try {
+            const supabase = createClient();
+            const { error } = await supabase
+              .from("subscriptions")
+              .update({ plan: "essentiel", monthly_price: getPlanPrice("essentiel") })
+              .eq("tenant_id", tenantId);
+            if (error) throw error;
+            toast.success("Abonnement rétrogradé au plan Essentiel à la fin de la période.");
+            setCancelOpen(false);
+            loadData();
+          } catch {
+            toast.error("L'annulation a échoué.");
+          } finally {
+            setCancelling(false);
+          }
+        }}
+      >
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" className="flex-1" onClick={() => setCancelOpen(false)}>Conserver</Button>
+          <Button className="flex-1 bg-red-600 hover:bg-red-700" loading={cancelling} onClick={async () => {
+            setCancelling(true);
+            try {
+              const supabase = createClient();
+              const { error } = await supabase
+                .from("subscriptions")
+                .update({ plan: "essentiel", monthly_price: getPlanPrice("essentiel") })
+                .eq("tenant_id", tenantId);
+              if (error) throw error;
+              toast.success("Abonnement rétrogradé au plan Essentiel à la fin de la période.");
+              setCancelOpen(false);
+              loadData();
+            } catch {
+              toast.error("L'annulation a échoué.");
+            } finally {
+              setCancelling(false);
+            }
+          }}>Confirmer</Button>
+        </div>
       </Modal>
     </div>
   );

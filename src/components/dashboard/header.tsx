@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical, Volume2, VolumeX } from "lucide-react";
+import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical, Volume2, VolumeX, Wifi, WifiOff, Languages, CalendarCheck, DoorOpen, User, Loader2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -28,7 +28,17 @@ interface HeaderProps {
   plan?: string;
   monthlyPrice?: number;
   scrolled?: boolean;
+  tenantId?: string;
 }
+
+type SearchResult = {
+  id: string;
+  group: string;
+  label: string;
+  sublabel?: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
 
 const ROLE_LABELS = (lang: string): Record<string, string> => (translations[lang as Lang] ?? translations.fr).header.roleLabels as Record<string, string>;
 
@@ -182,9 +192,9 @@ function ResidenceSwitcher() {
   );
 }
 
-function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false }: HeaderProps) {
+function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false, tenantId = "" }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
-  const { lang } = useLanguage();
+  const { lang, setLang } = useLanguage();
   const t = translations[lang].header;
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -194,14 +204,150 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
   const [menuOpen, setMenuOpen] = useState(false);
   const [ideaModalOpen, setIdeaModalOpen] = useState(false);
   const [ideaCategory, setIdeaCategory] = useState<FeatureRequestCategory>("new_feature");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const [online, setOnline] = useState(true);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const planLabel = getPlanLabel(plan || "free");
   const isAdminRole = userRole === "admin_residence" || userRole === "super_admin";
-  const { activeAccommodation } = useAccommodation();
+  const { activeAccommodation, accommodations } = useAccommodation();
   const { notifications, unreadCount, markAsRead, markAllAsRead, soundEnabled, setSoundEnabled } = useNotifications();
+
+  // Indicateur de connexion réseau (online/offline) permanent.
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  // Réinitialiser la recherche quand la palette se ferme.
+  useEffect(() => {
+    if (!searchOpen) {
+      setSearchQuery("");
+      setSearchResults([]);
+      setActiveResultIndex(0);
+      setSearchLoading(false);
+    }
+  }, [searchOpen]);
+
+  // Recherche globale : réservations (code), chambres (numéro), établissements
+  // (nom) et clients (nom/téléphone), avec un debounce de 250 ms.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const q = searchQuery.trim();
+    if (q.length < 2 || !tenantId) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    const handle = window.setTimeout(async () => {
+      try {
+        const supabase = createClient();
+        const pattern = `%${q}%`;
+        const accIds = accommodations.map((a) => a.id);
+        const [accRes, roomRes, bookingRes, clientRes] = await Promise.all([
+          supabase
+            .from("accommodations")
+            .select("id, name, city")
+            .eq("tenant_id", tenantId)
+            .ilike("name", pattern)
+            .limit(5),
+          accIds.length
+            ? supabase
+                .from("rooms")
+                .select("id, room_number, accommodation:accommodations(name)")
+                .in("accommodation_id", accIds)
+                .ilike("room_number", pattern)
+                .limit(5)
+            : Promise.resolve({ data: [] as unknown[] }),
+          supabase
+            .from("bookings")
+            .select("id, booking_code, check_in_date, client:clients(full_name)")
+            .eq("tenant_id", tenantId)
+            .ilike("booking_code", pattern)
+            .limit(5),
+          supabase
+            .from("clients")
+            .select("id, full_name, phone")
+            .eq("tenant_id", tenantId)
+            .or(`full_name.ilike.${pattern},phone.ilike.${pattern}`)
+            .limit(5),
+        ]);
+        if (cancelled) return;
+        const results: SearchResult[] = [];
+        (accRes.data as Array<{ id: string; name: string; city?: string }> | null)?.forEach((a) =>
+          results.push({
+            id: `acc-${a.id}`,
+            group: lang === "en" ? "Residences" : "Établissements",
+            label: a.name,
+            sublabel: a.city || undefined,
+            href: `/dashboard/residences/${a.id}`,
+            icon: Building2,
+          })
+        );
+        (roomRes.data as Array<{ id: string; room_number: string; accommodation?: { name?: string } | null }> | null)?.forEach((r) =>
+          results.push({
+            id: `room-${r.id}`,
+            group: lang === "en" ? "Rooms" : "Chambres",
+            label: r.room_number,
+            sublabel: r.accommodation?.name || undefined,
+            href: "/dashboard/rooms",
+            icon: DoorOpen,
+          })
+        );
+        (bookingRes.data as Array<{ id: string; booking_code: string; check_in_date?: string; client?: { full_name?: string } | null }> | null)?.forEach((b) =>
+          results.push({
+            id: `book-${b.id}`,
+            group: lang === "en" ? "Bookings" : "Réservations",
+            label: b.booking_code,
+            sublabel: b.client?.full_name || b.check_in_date,
+            href: "/dashboard/bookings",
+            icon: CalendarCheck,
+          })
+        );
+        (clientRes.data as Array<{ id: string; full_name: string; phone?: string | null }> | null)?.forEach((c) =>
+          results.push({
+            id: `client-${c.id}`,
+            group: "Clients",
+            label: c.full_name,
+            sublabel: c.phone || undefined,
+            href: `/dashboard/clients/${c.id}`,
+            icon: User,
+          })
+        );
+        setSearchResults(results);
+        setActiveResultIndex(0);
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [searchQuery, searchOpen, tenantId, accommodations, lang]);
+
+  const goToResult = useCallback(
+    (result: SearchResult) => {
+      setSearchOpen(false);
+      router.push(result.href);
+    },
+    [router]
+  );
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -367,6 +513,13 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                   {theme === "light" ? <Moon className="w-3.5 h-3.5 text-[var(--muted-foreground)]" /> : <Sun className="w-3.5 h-3.5 text-yellow-400" />}
                   {t.themeToggle}
                 </button>
+                <button
+                  onClick={() => { setMenuOpen(false); setLang(lang === "fr" ? "en" : "fr"); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                >
+                  <Languages className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                  {lang === "fr" ? "English" : "Français"}
+                </button>
               </div>
             )}
           </div>
@@ -421,6 +574,30 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
               </div>
             )}
           </div>
+
+          {/* Indicateur de connexion réseau — visible dès sm+ */}
+          <span
+            className={`hidden sm:flex w-9 h-9 rounded-full items-center justify-center border shadow-xs transition-colors ${
+              online
+                ? "bg-[var(--muted)]/70 border-[var(--border)]/60 text-emerald-600"
+                : "bg-red-500/10 border-red-500/30 text-red-500"
+            }`}
+            title={online ? (lang === "fr" ? "En ligne" : "Online") : lang === "fr" ? "Hors ligne" : "Offline"}
+            aria-label={online ? (lang === "fr" ? "En ligne" : "Online") : lang === "fr" ? "Hors ligne" : "Offline"}
+            role="status"
+          >
+            {online ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+          </span>
+
+          {/* Sélecteur de langue FR/EN — visible dès sm+ */}
+          <button
+            onClick={() => setLang(lang === "fr" ? "en" : "fr")}
+            className="hidden sm:flex w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 items-center justify-center text-[11px] font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
+            aria-label={lang === "fr" ? "Passer en anglais" : "Switch to French"}
+            title={lang === "fr" ? "Passer en anglais" : "Switch to French"}
+          >
+            {lang === "fr" ? "FR" : "EN"}
+          </button>
 
           {/* Theme toggle — visible uniquement sur sm+ */}
           <button
@@ -622,30 +799,99 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
       {searchOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 sm:px-0">
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setSearchOpen(false)} />
-          <div className="relative w-full max-w-lg bg-[var(--card-bg,var(--surface))] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.searchPlaceholder}
+            className="relative w-full max-w-lg bg-[var(--card-bg,var(--surface))] rounded-xl shadow-2xl overflow-hidden border border-[var(--border)] animate-in fade-in zoom-in-95 duration-200"
+          >
             <div className="flex items-center px-3 py-2.5 border-b border-[var(--border)]">
               <Search className="w-4 h-4 text-[var(--muted-foreground)] mr-2.5 flex-shrink-0" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setActiveResultIndex((i) => Math.min(i + 1, Math.max(searchResults.length - 1, 0)));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActiveResultIndex((i) => Math.max(i - 1, 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (searchResults[activeResultIndex]) goToResult(searchResults[activeResultIndex]);
+                  } else if (e.key === "Escape") {
+                    setSearchOpen(false);
+                  }
+                }}
                 className="flex-1 bg-transparent border-0 focus:ring-0 text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] text-sm outline-none"
                 placeholder={t.searchPlaceholder}
                 autoFocus
+                aria-label={t.searchPlaceholder}
               />
+              {searchLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--muted-foreground)] mr-2" />}
               <kbd className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--muted)] text-[10px] font-medium text-[var(--muted-foreground)] ml-2.5">
                 <span className="text-[10px]">⌘</span>K
               </kbd>
             </div>
             <div className="max-h-72 overflow-y-auto p-1.5">
-              <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">{t.commandPalette}</div>
-              <button onClick={() => { router.push("/dashboard/bookings"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
-                {t.goToBookings}
-              </button>
-              <button onClick={() => { router.push("/dashboard/residences"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
-                {t.goToResidences}
-              </button>
-              <button onClick={() => { router.push("/dashboard/accounting"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
-                {t.goToAccounting}
-              </button>
+              {searchQuery.trim().length >= 2 ? (
+                searchResults.length === 0 && !searchLoading ? (
+                  <p className="px-2.5 py-6 text-center text-xs text-[var(--muted-foreground)]">
+                    {lang === "en" ? "No results" : "Aucun résultat"}
+                  </p>
+                ) : (
+                  searchResults.map((result, index) => {
+                    const Icon = result.icon;
+                    const showGroup = index === 0 || searchResults[index - 1].group !== result.group;
+                    return (
+                      <div key={result.id}>
+                        {showGroup && (
+                          <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                            {result.group}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => goToResult(result)}
+                          onMouseEnter={() => setActiveResultIndex(index)}
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-xs rounded-lg transition-colors ${
+                            index === activeResultIndex
+                              ? "bg-[var(--muted-hover)] text-[var(--foreground)]"
+                              : "text-[var(--foreground)] hover:bg-[var(--muted-hover)]"
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5 text-[var(--muted-foreground)] flex-shrink-0" />
+                          <span className="truncate font-medium">{result.label}</span>
+                          {result.sublabel && (
+                            <span className="ml-auto truncate text-[10px] text-[var(--muted-foreground)] max-w-[40%]">
+                              {result.sublabel}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })
+                )
+              ) : (
+                <>
+                  <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">{t.commandPalette}</div>
+                  <button onClick={() => { router.push("/dashboard/bookings"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
+                    {t.goToBookings}
+                  </button>
+                  <button onClick={() => { router.push("/dashboard/residences"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
+                    {t.goToResidences}
+                  </button>
+                  <button onClick={() => { router.push("/dashboard/accounting"); setSearchOpen(false); }} className="w-full flex items-center px-2.5 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--muted-hover)] rounded-lg transition-colors">
+                    {t.goToAccounting}
+                  </button>
+                  <p className="px-2.5 pt-2 pb-1 text-[10px] text-[var(--muted-foreground)]">
+                    {lang === "en"
+                      ? "Type at least 2 characters to search bookings, rooms, residences and clients."
+                      : "Saisissez au moins 2 caractères pour rechercher réservations, chambres, établissements et clients."}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

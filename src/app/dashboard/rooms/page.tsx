@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
-import { translations } from "@/lib/translations";
-import { Loader2, BedDouble, Filter, Building2, Search, RefreshCw } from "lucide-react";
+import { BedDouble, Filter, Building2, Search, RefreshCw, ChevronDown, Loader2 } from "lucide-react";
+import { RoomsSkeleton } from "@/components/ui/skeletons";
 
 interface RoomWithType {
   id: string;
@@ -37,7 +37,6 @@ const STATUS_LABELS_EN: Record<string, string> = {
 
 export default function RoomsPage() {
   const { lang } = useLanguage();
-  const t = translations[lang];
 
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<RoomWithType[]>([]);
@@ -45,6 +44,8 @@ export default function RoomsPage() {
   const [selectedAccommodation, setSelectedAccommodation] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusMenuRoomId, setStatusMenuRoomId] = useState<string | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
 
   const loadRooms = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -134,12 +135,24 @@ export default function RoomsPage() {
     return STATUS_COLORS[status]?.label || status;
   }
 
+  async function updateRoomStatus(roomId: string, status: string) {
+    setUpdatingStatusId(roomId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from("rooms").update({ status }).eq("id", roomId);
+      if (error) throw error;
+      setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, status } : r)));
+      setStatusMenuRoomId(null);
+      toast.success(lang === "fr" ? "Statut mis à jour" : "Status updated");
+    } catch {
+      toast.error(lang === "fr" ? "Impossible de changer le statut" : "Unable to update status");
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  }
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary-color,#0C1C33)]" />
-      </div>
-    );
+    return <RoomsSkeleton />;
   }
 
   const roomsByAccommodation = filteredRooms.reduce<Record<string, RoomWithType[]>>((acc, room) => {
@@ -255,9 +268,41 @@ export default function RoomsPage() {
                             <p className="text-xs text-slate-500 dark:text-slate-400">{room.room_type_name}</p>
                           </div>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${colors.bg} ${colors.text}`}>
-                          {getStatusLabel(room.status)}
-                        </span>
+                         <div className="relative">
+                           <button
+                             type="button"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setStatusMenuRoomId(statusMenuRoomId === room.id ? null : room.id);
+                             }}
+                             disabled={updatingStatusId === room.id}
+                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${colors.bg} ${colors.text}`}
+                             aria-haspopup="menu"
+                             aria-expanded={statusMenuRoomId === room.id}
+                           >
+                             {updatingStatusId === room.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                             {getStatusLabel(room.status)}
+                             <ChevronDown className="w-3 h-3" />
+                           </button>
+                           {statusMenuRoomId === room.id && (
+                             <div className="absolute right-0 top-full mt-1 z-20 min-w-[140px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg py-1">
+                               {Object.keys(STATUS_COLORS).map((status) => (
+                                 <button
+                                   key={status}
+                                   type="button"
+                                   className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-700 ${room.status === status ? "font-semibold" : ""}`}
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     if (status !== room.status) updateRoomStatus(room.id, status);
+                                     else setStatusMenuRoomId(null);
+                                   }}
+                                 >
+                                   {getStatusLabel(status)}
+                                 </button>
+                               ))}
+                             </div>
+                           )}
+                         </div>
                       </div>
 
                       <div className="space-y-1.5 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/50">

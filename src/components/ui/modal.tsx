@@ -120,6 +120,19 @@ export function Modal({
         return;
       }
 
+      // Entrée : soumet la modal si un onConfirm est fourni, sauf dans un
+      // textarea (saut de ligne) ou un bouton (déjà cliquable).
+      if (e.key === "Enter" && onConfirm && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag === "TEXTAREA" || tag === "BUTTON" || target?.isContentEditable) return;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "DIV") {
+          e.preventDefault();
+          onConfirm();
+          return;
+        }
+      }
+
       // Raccourci de sauvegarde : Cmd+S ou Ctrl+S
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && onConfirm) {
         e.preventDefault();

@@ -208,6 +208,11 @@ export default function BookingsPage() {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selectedBooking, setSelectedBooking] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType }) | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: "cancel" | "no_show" } | null>(null);
   const [error, setError] = useState("");
@@ -2321,31 +2326,77 @@ export default function BookingsPage() {
       {/* Calendrier ou Tableau */}
       {viewMode === "calendar" ? (
         <Card className="p-3">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Vue Calendrier (Réservations en cours)</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              {new Date(calendarMonth.year, calendarMonth.month, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCalendarMonth((m) => m.month === 0 ? { year: m.year - 1, month: 11 } : { year: m.year, month: m.month - 1 })}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                aria-label="Mois précédent"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  setCalendarMonth({ year: d.getFullYear(), month: d.getMonth() });
+                }}
+                className="px-2 py-1 text-xs font-semibold rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Aujourd&apos;hui
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarMonth((m) => m.month === 11 ? { year: m.year + 1, month: 0 } : { year: m.year, month: m.month + 1 })}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                aria-label="Mois suivant"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500 mb-2">
             <div>Lun</div><div>Mar</div><div>Mer</div><div>Jeu</div><div>Ven</div><div>Sam</div><div>Dim</div>
           </div>
           <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 31 }).map((_, idx) => {
-              const dayNum = idx + 1;
-              const dateStr = `2026-07-${dayNum < 10 ? '0' + dayNum : dayNum}`;
-              const dayBookings = sortedBookings.filter(b => b.check_in_date <= dateStr && b.check_out_date >= dateStr);
-              return (
-                <div key={idx} className="min-h-[80px] p-2 border border-slate-100 dark:border-slate-700/50 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between">
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">{dayNum}</span>
-                  <div className="space-y-1">
-                    {dayBookings.slice(0, 2).map(b => (
-                      <div key={b.id} className="text-[10px] p-1 rounded bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] font-medium truncate" title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}>
-                        {b.client?.full_name || "Réservation"}
-                      </div>
-                    ))}
-                    {dayBookings.length > 2 && (
-                      <span className="text-[9px] text-slate-400 dark:text-slate-500">+{dayBookings.length - 2} de plus</span>
-                    )}
+            {(() => {
+              const first = new Date(calendarMonth.year, calendarMonth.month, 1);
+              const daysInMonth = new Date(calendarMonth.year, calendarMonth.month + 1, 0).getDate();
+              const startPad = (first.getDay() + 6) % 7;
+              const cells = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+              const todayStr = new Date().toISOString().slice(0, 10);
+              return cells.map((dayNum, idx) => {
+                if (!dayNum) return <div key={`pad-${idx}`} />;
+                const dateStr = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                const dayBookings = sortedBookings.filter((b) => b.check_in_date <= dateStr && b.check_out_date >= dateStr);
+                const isToday = dateStr === todayStr;
+                return (
+                  <div key={dateStr} className={`min-h-[80px] p-2 border rounded-xl flex flex-col justify-between ${isToday ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)]" : "border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/30"}`}>
+                    <span className={`text-xs font-bold ${isToday ? "text-[var(--primary-color,#0C1C33)]" : "text-slate-500 dark:text-slate-400"}`}>{dayNum}</span>
+                    <div className="space-y-1">
+                      {dayBookings.slice(0, 2).map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => setSelectedBooking(b)}
+                          className="w-full text-left text-[10px] p-1 rounded bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] font-medium truncate"
+                          title={`${b.client?.full_name} - Ch. ${b.room?.room_number}`}
+                        >
+                          {b.client?.full_name || "Réservation"}
+                        </button>
+                      ))}
+                      {dayBookings.length > 2 && (
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500">+{dayBookings.length - 2} de plus</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </Card>
       ) : (
@@ -2625,7 +2676,7 @@ export default function BookingsPage() {
                 {paginatedBookings.map((b) => {
                   const overdue = b.status === "checked_in" && (b.is_overstay || isBookingOverdue(b));
                   return (
-                  <tr key={b.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${overdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
+                  <tr key={b.id} onClick={() => setSelectedBooking(b)} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer ${overdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}>
                     <td className="p-3">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{b.booking_code}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{b.nights_count} nuit{b.nights_count > 1 ? "s" : ""}</p>
@@ -2858,6 +2909,50 @@ export default function BookingsPage() {
         )}
       </Card>
        )}
+
+      <Modal
+        open={!!selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+        title={selectedBooking ? `Réservation ${selectedBooking.booking_code}` : "Réservation"}
+      >
+        {selectedBooking && (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-slate-400">Client</p>
+                <p className="font-medium">{selectedBooking.is_third_party ? (selectedBooking.occupant_full_name || "Occupant") : (selectedBooking.client?.full_name || "—")}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Chambre</p>
+                <p className="font-medium">{selectedBooking.room?.room_number || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Arrivée</p>
+                <p className="font-medium">{formatDate(selectedBooking.check_in_date)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Départ</p>
+                <p className="font-medium">{formatDate(selectedBooking.check_out_date)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Statut</p>
+                <p className="font-medium">{getBookingStatusLabel(selectedBooking.status)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Paiement</p>
+                <p className="font-medium">{getPaymentStatusLabel(selectedBooking.payment_status)} · {fmt(selectedBooking.amount_paid || 0)} / {fmt(selectedBooking.total_amount || 0)}</p>
+              </div>
+            </div>
+            {selectedBooking.client?.phone && (
+              <p className="text-xs text-slate-500">Tél. {selectedBooking.client.phone}</p>
+            )}
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => { if (selectedBooking.client) setSelectedClient(selectedBooking.client); setSelectedBooking(null); }}>Fiche client</Button>
+              <Button className="flex-1" onClick={() => { openEditModal(selectedBooking); setSelectedBooking(null); }}>Modifier</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Drawer — Détails client (panneau latéral droit) */}
       {selectedClient &&

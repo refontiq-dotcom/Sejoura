@@ -44,7 +44,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         type={type}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)] focus:ring-offset-2 focus:ring-offset-[var(--ring-offset)] ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+        className={`inline-flex items-center justify-center font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-color,#0C1C33)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset)] ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
         {...props}
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}

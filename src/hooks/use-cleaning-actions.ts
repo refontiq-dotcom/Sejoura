@@ -79,5 +79,26 @@ export function useCleaningActions(
     }
   }
 
-  return { actionTaskId, claim, complete, reopen };
+  async function reassign(taskId: string, maidId: string) {
+    setActionTaskId(taskId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("cleaning_tasks")
+        .update({ claimed_by: maidId, status: "claimed", claimed_at: new Date().toISOString() })
+        .eq("id", taskId);
+      if (error) {
+        toast.error("Oups : " + error.message);
+        return;
+      }
+      toast.success("Tâche réassignée");
+      callbacks.onClaimDone?.();
+    } catch {
+      toast.error("La réassignation a échoué");
+    } finally {
+      setActionTaskId(null);
+    }
+  }
+
+  return { actionTaskId, claim, complete, reopen, reassign };
 }

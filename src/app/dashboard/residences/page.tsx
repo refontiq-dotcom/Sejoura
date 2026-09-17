@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { formatAmount, getPlanLimits, getPlanLabel } from "@/lib/utils";
 import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
-import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins } from "lucide-react";
+import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins, ArrowUpDown } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -24,6 +24,8 @@ export default function ResidencesPage() {
   const [residences, setResidences] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType[]>>({});
   const [roomsCount, setRoomsCount] = useState<Record<string, number>>({});
+  const [occupiedCount, setOccupiedCount] = useState<Record<string, number>>({});
+  const [sortKey, setSortKey] = useState<"name" | "rooms" | "date">("date");
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function ResidencesPage() {
         const accommodationIds = accData.map((a) => a.id);
         const [typesResult, roomsResult] = await Promise.all([
           supabase.from("room_types").select("*").in("accommodation_id", accommodationIds),
-          supabase.from("rooms").select("accommodation_id").in("accommodation_id", accommodationIds),
+          supabase.from("rooms").select("accommodation_id, status").in("accommodation_id", accommodationIds),
         ]);
 
         const typesMap: Record<string, RoomType[]> = {};
@@ -85,10 +87,15 @@ export default function ResidencesPage() {
         setRoomTypes(typesMap);
 
         const roomsMap: Record<string, number> = {};
-        (roomsResult.data || []).forEach((r: { accommodation_id: string }) => {
+        const occupiedMap: Record<string, number> = {};
+        (roomsResult.data || []).forEach((r: { accommodation_id: string; status: string }) => {
           roomsMap[r.accommodation_id] = (roomsMap[r.accommodation_id] || 0) + 1;
+          if (r.status === "occupied") {
+            occupiedMap[r.accommodation_id] = (occupiedMap[r.accommodation_id] || 0) + 1;
+          }
         });
         setRoomsCount(roomsMap);
+        setOccupiedCount(occupiedMap);
       }
     } catch (err) {
       toast.error("Les établissements ne se chargent pas 🏨");
@@ -251,6 +258,21 @@ export default function ResidencesPage() {
             {limits.maxAccommodations !== null && ` / ${limits.maxAccommodations} max`}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <label className="sr-only" htmlFor="residence-sort">Trier</label>
+          <div className="relative">
+            <ArrowUpDown className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <select
+              id="residence-sort"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as "name" | "rooms" | "date")}
+              className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+            >
+              <option value="date">Date</option>
+              <option value="name">Nom</option>
+              <option value="rooms">Chambres</option>
+            </select>
+          </div>
         <Button 
           onClick={openAddModal}
           disabled={isReadOnly || !!(plan && limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations)}
@@ -265,6 +287,7 @@ export default function ResidencesPage() {
             <><Plus className="w-4 h-4" /> <span className="hidden sm:inline">Ajouter un établissement</span></>
           )}
         </Button>
+        </div>
       </div>
 
       {/* Limite plan */}
@@ -297,7 +320,11 @@ export default function ResidencesPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {residences.map((acc) => (
+          {[...residences].sort((a, b) => {
+            if (sortKey === "name") return a.name.localeCompare(b.name, "fr");
+            if (sortKey === "rooms") return (roomsCount[b.id] || 0) - (roomsCount[a.id] || 0);
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          }).map((acc) => (
             <Card 
               key={acc.id} 
               className="p-3 cursor-pointer hover:shadow-lg overflow-hidden flex flex-col justify-between min-w-0"
@@ -401,6 +428,20 @@ export default function ResidencesPage() {
                   <BedDouble className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>{(roomsCount[acc.id] || 0)} chambre{(roomsCount[acc.id] || 0) > 1 ? "s" : ""}</span>
                 </div>
+                {roomsCount[acc.id] > 0 && (
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">
+                      <span>Occupation</span>
+                      <span className="font-semibold">{Math.round(((occupiedCount[acc.id] || 0) / roomsCount[acc.id]) * 100)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--primary-color,#0C1C33)] rounded-full"
+                        style={{ width: `${Math.round(((occupiedCount[acc.id] || 0) / roomsCount[acc.id]) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
                   {/* Types de chambre */}

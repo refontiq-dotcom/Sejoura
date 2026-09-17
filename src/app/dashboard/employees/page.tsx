@@ -31,6 +31,7 @@ export default function EmployeesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterAcc, setFilterAcc] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [formData, setFormData] = useState({ full_name: "", phone: "", role: "receptionniste", email: "", accommodation_id: "" });
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteData, setInviteData] = useState<{ full_name: string; phone: string; role: string; link: string } | null>(null);
@@ -72,7 +73,7 @@ export default function EmployeesPage() {
           .then((r) => r.data),
         supabase
           .from("users")
-          .select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active, created_at")
+          .select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active, created_at, last_login_at")
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .then((r) => r.data),
@@ -219,6 +220,21 @@ export default function EmployeesPage() {
     const cleanPhone = phone.replace(/[^0-9]/g, "");
     const message = `Bonjour ${name}, votre compte Séjoura (${getRoleLabel(role)}) a été créé avec succès !\n\nPour finaliser votre inscription et définir votre code secret, cliquez sur ce lien :\n${link}`;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
+  }
+
+  async function handleResetPin(emp: User) {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("users")
+        .update({ pin_code: null, first_login: true })
+        .eq("id", emp.id);
+      if (error) throw error;
+      toast.success(`Code d'accès réinitialisé pour ${emp.full_name}. Il devra en définir un nouveau à la prochaine connexion.`);
+    } catch (err) {
+      toast.error("La réinitialisation du code a échoué.");
+      console.error(err);
+    }
   }
 
   async function handleToggleActive(emp: User) {
@@ -394,6 +410,8 @@ export default function EmployeesPage() {
   const filteredEmployees = employees.filter((emp) => {
     if (filterRole !== "all" && emp.role !== filterRole) return false;
     if (filterAcc !== "all" && emp.accommodation_id !== filterAcc) return false;
+    if (filterStatus === "active" && !emp.is_active) return false;
+    if (filterStatus === "inactive" && emp.is_active) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -405,12 +423,13 @@ export default function EmployeesPage() {
     return true;
   });
 
-  const hasActiveFilters = searchQuery !== "" || filterRole !== "all" || filterAcc !== "all";
+  const hasActiveFilters = searchQuery !== "" || filterRole !== "all" || filterAcc !== "all" || filterStatus !== "all";
 
   function resetFilters() {
     setSearchQuery("");
     setFilterRole("all");
     setFilterAcc("all");
+    setFilterStatus("all");
   }
 
   if (loading && employees.length === 0) {
@@ -499,6 +518,15 @@ export default function EmployeesPage() {
           <option value="admin_residence">Administrateur</option>
           <option value="receptionniste">Réceptionniste</option>
           <option value="menagere">Ménagère</option>
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary-color,#0C1C33)]"
+        >
+          <option value="all">Tous les statuts</option>
+          <option value="active">Actifs</option>
+          <option value="inactive">Inactifs</option>
         </select>
       </div>
 
@@ -594,6 +622,9 @@ export default function EmployeesPage() {
                               {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                               {emp.is_active ? "Révoquer l&apos;accès" : "Réactiver l&apos;accès"}
                             </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleResetPin(emp)} className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">
+                              <ShieldCheck className="w-4 h-4" /> Réinitialiser le code d&apos;accès
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>
                             <DropdownMenuItem onSelect={() => setDeleteTarget(emp)} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
@@ -622,6 +653,9 @@ export default function EmployeesPage() {
                     {emp.email && (
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{emp.email}</p>
                     )}
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Dernière connexion : {emp.last_login_at ? formatDate(emp.last_login_at) : "Jamais"}
+                    </p>
                   </div>
                 </div>
               );
@@ -638,7 +672,7 @@ export default function EmployeesPage() {
                   <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Établissement</th>
                   <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Téléphone</th>
                   <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Statut</th>
-                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Créé le</th>
+                  <th className="text-left p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Dernière connexion</th>
                   <th className="text-right p-3 text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -710,7 +744,7 @@ export default function EmployeesPage() {
                           <Badge variant="error"><Ban className="w-3 h-3" /> Accès révoqué</Badge>
                         )}
                       </td>
-                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">{formatDate(emp.created_at)}</td>
+                      <td className="p-4 text-sm text-slate-500 dark:text-slate-400">{emp.last_login_at ? formatDate(emp.last_login_at) : "Jamais"}</td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <DropdownMenu>
@@ -755,6 +789,9 @@ export default function EmployeesPage() {
                                   >
                                     {emp.is_active ? <Ban className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                                     {emp.is_active ? "Révoquer l&apos;accès" : "Réactiver l&apos;accès"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleResetPin(emp)} className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">
+                                    <ShieldCheck className="w-4 h-4" /> Réinitialiser le code d&apos;accès
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuLabel>Zone sensible</DropdownMenuLabel>

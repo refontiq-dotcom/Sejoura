@@ -107,6 +107,8 @@ export default function CleaningPage() {
   const isAdmin = user?.role === "admin_residence";
   const [tasks, setTasks] = useState<TaskWithRelations[]>([]);
   const [maidNames, setMaidNames] = useState<Record<string, string>>({});
+  const [allMaids, setAllMaids] = useState<{ id: string; full_name: string }[]>([]);
+  const [reassignTaskId, setReassignTaskId] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [accFilter, setAccFilter] = useState<string>("all");
@@ -117,7 +119,7 @@ export default function CleaningPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
-  const { actionTaskId, claim, complete, reopen } = useCleaningActions(userId, {
+  const { actionTaskId, claim, complete, reopen, reassign } = useCleaningActions(userId, {
     onClaimDone: loadData,
     onCompleteDone: loadData,
     onReopenDone: loadData,
@@ -189,6 +191,14 @@ export default function CleaningPage() {
           setMaidNames(map);
         }
       }
+
+      const { data: maidsData } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .eq("tenant_id", tenantId)
+        .eq("role", "menagere")
+        .eq("is_active", true);
+      setAllMaids((maidsData || []) as { id: string; full_name: string }[]);
 
       // Prévision de charge : réservations avec départ prévu demain
       const tomorrow = new Date();
@@ -983,6 +993,7 @@ export default function CleaningPage() {
                                   </Button>
                                 )}
                                 {active && (
+                                  <div className="space-y-2">
                                   <Button
                                     variant="success"
                                     className="w-full"
@@ -993,6 +1004,32 @@ export default function CleaningPage() {
                                   >
                                      <CheckCircle2 className="w-4 h-4" /> {t.markCompleted}
                                   </Button>
+                                  {isAdmin && allMaids.length > 0 && (
+                                    <div>
+                                      {reassignTaskId === task.id ? (
+                                        <select
+                                          className="w-full text-xs px-2 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                          defaultValue=""
+                                          onChange={(e) => {
+                                            if (e.target.value) {
+                                              reassign(task.id, e.target.value);
+                                              setReassignTaskId(null);
+                                            }
+                                          }}
+                                        >
+                                          <option value="">Choisir une ménagère…</option>
+                                          {allMaids.filter((m) => m.id !== task.claimed_by).map((m) => (
+                                            <option key={m.id} value={m.id}>{m.full_name}</option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <Button variant="outline" className="w-full" size="sm" onClick={() => setReassignTaskId(task.id)}>
+                                          <Users className="w-4 h-4" /> Réassigner
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                  </div>
                                 )}
                                 {task.status === "done" && (
                                    <div className="text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium py-2">
