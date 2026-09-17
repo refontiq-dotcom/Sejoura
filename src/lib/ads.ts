@@ -1,6 +1,14 @@
+import { normalizePlan } from "@/lib/subscription-plans";
+
 export type AdStatus = "draft" | "pending_payment" | "active" | "expired" | "rejected";
 
 export type AdAudience = "all" | "tourists" | "locals" | "business";
+
+/**
+ * Remise accordée à la formule Entreprise sur les campagnes publicitaires.
+ * 0.5 = -50 %. Les autres forfaits paient le tarif plein.
+ */
+export const AD_ENTERPRISE_DISCOUNT = 0.5;
 
 export interface AdDurationOption {
   days: number;
@@ -29,8 +37,32 @@ export const AD_AUDIENCE_OPTIONS: { value: AdAudience; label: string; hint: stri
   { value: "business", label: "Voyageurs d'affaires", hint: "Déplacements professionnels" },
 ];
 
-export function getAdCampaignPrice(durationDays: number): number {
-  return PRICE_BY_DAYS[durationDays] ?? 0;
+/** Taux de remise publicité appliqué au forfait (0 = tarif plein). */
+export function getAdDiscountRate(plan?: string | null): number {
+  return normalizePlan(plan) === "entreprise" ? AD_ENTERPRISE_DISCOUNT : 0;
+}
+
+/**
+ * Tarif d'une campagne pour une durée donnée, remise Entreprise incluse.
+ * Sans forfait fourni (ou forfait non Entreprise), retourne le tarif plein.
+ */
+export function getAdCampaignPrice(durationDays: number, plan?: string | null): number {
+  const base = PRICE_BY_DAYS[durationDays] ?? 0;
+  if (base === 0) return 0;
+  const rate = getAdDiscountRate(plan);
+  return rate > 0 ? Math.round(base * (1 - rate)) : base;
+}
+
+/**
+ * Montants acceptables pour une durée : tarif plein et tarif remisé.
+ * Sert à valider un paiement déclaré même si le forfait a changé entre la
+ * création de la campagne et la déclaration du règlement.
+ */
+export function getValidAdCampaignAmounts(durationDays: number): number[] {
+  const base = PRICE_BY_DAYS[durationDays];
+  if (!base) return [];
+  const discounted = getAdCampaignPrice(durationDays, "entreprise");
+  return discounted === base ? [base] : [base, discounted];
 }
 
 export function isValidAdDuration(durationDays: number): boolean {

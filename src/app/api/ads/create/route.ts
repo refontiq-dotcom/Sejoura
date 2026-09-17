@@ -31,8 +31,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Durée de diffusion invalide." }, { status: 400 });
   }
 
-  const amount = getAdCampaignPrice(durationDays);
-
   const supabase = await createClient();
   const {
     data: { session },
@@ -54,6 +52,15 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  // Le tarif dépend du forfait (remise Entreprise sur les publicités).
+  const { data: subscription } = await admin
+    .from("subscriptions")
+    .select("plan")
+    .eq("tenant_id", userData.tenant_id)
+    .maybeSingle();
+
+  const amount = getAdCampaignPrice(durationDays, subscription?.plan);
 
   const { data: ad, error } = await admin
     .from("advertisements")
