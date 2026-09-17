@@ -58,7 +58,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
     }
 
-    // 1. Récupérer l'abonnement
+    // 1. Récupérer l'abonnement (uniquement pour le Boost : la publication de
+    //    la vitrine est gratuite et n'est pas conditionnée par le forfait).
     const { data: subscription } = await admin
       .from("subscriptions")
       .select("plan, status")
@@ -66,7 +67,6 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     const plan            = subscription?.plan || "standard";
-    const subActive       = subscription?.status === "active";
     const normalizedPlan  = normalizePlan(plan);
     const isEnterprisePlan = normalizedPlan === "entreprise";
     // Essentiel et Croissance n'ont pas le Boost Permanent — ils peuvent

@@ -7,13 +7,14 @@ import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
  *
  * Construit le payload attendu par l'API d'ingestion Trouvetou
  * (`POST /api/v1/sync`) à partir des données de Séjoura :
- *   room_types (chambres publiables) + accommodations + tenants + subscriptions.
+ *   room_types (chambres publiables) + accommodations + tenants.
  *
- * Seules les chambres des établissements actifs dont l'abonnement est
- * `active` ET dont l'interrupteur Trouvetou est ON (`is_listed_on_trouvetou`)
- * avec au moins une photo sont envoyées. De plus, le tenant doit disposer
- * d'au moins une clé API externe ACTIVE (`external_api_keys.is_active = true`) :
- * une résidence ne diffuse sur Trouvetou que si sa clé API est active.
+ * Seules les chambres des établissements actifs dont l'interrupteur Trouvetou
+ * est ON (`is_listed_on_trouvetou`) avec au moins une photo sont envoyées.
+ * La publication est GRATUITE pour tous les forfaits (y compris `free`) : aucun
+ * statut d'abonnement n'est requis. De plus, le tenant doit disposer d'au moins
+ * une clé API externe ACTIVE (`external_api_keys.is_active = true`) : une
+ * résidence ne diffuse sur Trouvetou que si sa clé API est active.
  * L'UPSERT côté Trouvetou repose sur le couple (provider_id, external_id) —
  * `external_id = "rt:<room_type_id>"` est stable, ce qui rend l'envoi idempotent.
  *
@@ -62,10 +63,6 @@ interface SyncRow {
     tenants: {
       company_name: string | null;
       logo_url: string | null;
-      subscriptions:
-        | { status: string }[]
-        | { status: string }
-        | null;
     } | null;
   };
 }
@@ -111,17 +108,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         is_active,
         tenants!inner (
           company_name,
-          logo_url,
-          subscriptions!inner (
-            status
-          )
+          logo_url
         )
       )
     `
     )
     .eq("is_listed_on_trouvetou", true)
-    .eq("accommodations.is_active", true)
-    .eq("accommodations.tenants.subscriptions.status", "active");
+    .eq("accommodations.is_active", true);
 
   if (error) {
     return { items: [], error: `Lecture de la base Séjoura : ${error.message}` };
@@ -215,18 +208,10 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         !!row.accommodations?.tenant_id &&
         apiKeyByTenant.has(row.accommodations.tenant_id);
 
-      // PostgREST replie un embed à une seule ligne en objet (pas en tableau) ;
-      // on normalise donc `subscriptions` avant d'appeler `.some()`.
-      const subscriptions = row.accommodations?.tenants?.subscriptions ?? null;
-      const subscriptionActive = Array.isArray(subscriptions)
-        ? subscriptions.some((s) => s.status === "active")
-        : subscriptions?.status === "active";
-
       return (
         hasActiveApiKey &&
         isTrouvetouEligible({
           accommodationActive: row.accommodations?.is_active === true,
-          subscriptionActive,
           hasPhoto: (row.featured_images ?? []).length > 0,
           hasRoom: (roomStatusByType.get(row.id) ?? []).length > 0,
         })
@@ -306,7 +291,7 @@ export async function syncListingsToTrouvetou(): Promise<TrouvetouSyncResult> {
       ok: false,
       sent: 0,
       error:
-        "Aucune annonce éligible à synchroniser : vérifiez l'abonnement actif, la photo, une chambre physique et la clé API externe du tenant.",
+        "Aucune annonce éligible à synchroniser : vérifiez la photo, une chambre physique et la clé API externe du tenant.",
     };
   }
 

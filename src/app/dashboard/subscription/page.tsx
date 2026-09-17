@@ -167,7 +167,6 @@ export default function SubscriptionPage() {
         "10 unités maximum (chambres ou appartements)",
         "2 comptes système max (Admin + Réceptionniste / Ménagère)",
         "Réservations, check-in/out et reçus PDF",
-        "Vitrine Trouvetou",
         "Zéro frais d'installation",
       ],
     },

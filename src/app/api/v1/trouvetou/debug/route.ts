@@ -41,8 +41,7 @@ export async function GET(request: Request) {
       accommodations!inner (
         id, tenant_id, name, is_active,
         tenants!inner (
-          company_name,
-          subscriptions!inner ( status )
+          company_name
         )
       )
     `)
@@ -95,15 +94,10 @@ export async function GET(request: Request) {
 
   const result = (data ?? []).map((rt: AnyRow) => {
     const acc = rt.accommodations as AnyRow;
-    const subs = (acc?.tenants as AnyRow)?.subscriptions as AnyRow[] | AnyRow | null;
-    const subscriptionActive = Array.isArray(subs)
-      ? subs.some((s) => s.status === "active")
-      : (subs as AnyRow | null)?.status === "active";
 
     const checks = {
       hasActiveApiKey: !!acc?.tenant_id && apiKeyByTenant.has(acc.tenant_id as string),
       accommodationActive: acc?.is_active === true,
-      subscriptionActive: subscriptionActive ?? false,
       hasPhoto: Array.isArray(rt.featured_images) && (rt.featured_images as string[]).length > 0,
       hasRoom: (roomCountByType.get(rt.id as string) ?? 0) > 0,
     };
@@ -112,7 +106,6 @@ export async function GET(request: Request) {
       checks.hasActiveApiKey &&
       isTrouvetouEligible({
         accommodationActive: checks.accommodationActive,
-        subscriptionActive: checks.subscriptionActive,
         hasPhoto: checks.hasPhoto,
         hasRoom: checks.hasRoom,
       });
