@@ -36,9 +36,9 @@ export async function POST(req: Request) {
 
     const health = tenantCount === 0 ? "warning" : "healthy";
     const payload = {
-      project: "sejoura",
-      name: "Séjoura",
-      health: ALLOWED_HEALTH.has(health) ? health : "unknown",
+      projet: "sejoura",
+      nom: "Séjoura",
+      statut_sante: ALLOWED_HEALTH.has(health) ? health : "unknown",
       mrr,
       comptes_actifs: activeUserCount ?? 0,
       timestamp: new Date().toISOString(),
