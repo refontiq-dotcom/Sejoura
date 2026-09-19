@@ -134,7 +134,7 @@ export default function SubscriptionPage() {
       if (data.alreadyPending) {
         toast.info("Votre demande est déjà en attente ⏳");
       } else {
-        toast.success("Demande envoyée ! L'administrateur va vérifier votre paiement Wave.");
+        toast.success("Demande envoyée ! Le Centre de Contrôle va vérifier votre paiement Wave.");
       }
       setPaymentStep(2);
       loadData();
@@ -290,7 +290,7 @@ export default function SubscriptionPage() {
           <div className="flex-1">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Activation en cours de traitement (Sous 15 minutes)</p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              {"Votre paiement Wave est en cours de vérification. L'administrateur validera votre abonnement sous peu et vos fonctionnalités seront débloquées automatiquement."}
+              {"Votre paiement Wave est en cours de vérification. Le Centre de Contrôle validera votre abonnement sous peu et vos fonctionnalités seront débloquées automatiquement."}
             </p>
           </div>
         </div>
