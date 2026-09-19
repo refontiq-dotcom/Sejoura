@@ -16,7 +16,7 @@ import { TopLoadingBar } from "@/components/dashboard/top-loading-bar";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useLanguage } from "@/hooks/use-language";
 import { translations } from "@/lib/translations";
-import { LOGIN_ROUTE, ADMIN_HUB_ROUTE } from "@/lib/routes";
+import { LOGIN_ROUTE } from "@/lib/routes";
 import { getSidebarThemeStyles, derivePastelColor } from "@/lib/colors";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -336,13 +336,6 @@ export default function DashboardLayout({
           return;
         }
 
-        // Le Super Admin n'utilise pas l'espace résidence : on l'envoie sur
-        // le hub des produits Refontiq (/admin/dashboard)
-        if (userData.role === "super_admin") {
-          router.push(ADMIN_HUB_ROUTE);
-          return;
-        }
-
         // Protection des routes réservées aux Admins pour les Réceptionnistes
         if (userData.role === "receptionniste") {
           const adminOnlyRoutes = [
@@ -376,8 +369,7 @@ export default function DashboardLayout({
         setAuthUserId(session.user.id);
 
         // La vérification reauth (PIN) ne concerne QUE les employés
-        // (réceptionnistes). Les admins et super_admins utilisent email+
-        // mot de passe — ils n'ont pas de code secret.
+        // (réceptionnistes). Les admins utilisent email + mot de passe.
         const isEmployee = userData.role === "receptionniste" || userData.role === "menagere";
         if (isEmployee) {
           setNeedsReauth(!isEmpVerified());
