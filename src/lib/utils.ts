@@ -236,7 +236,6 @@ export function getRoomStatusLabel(status: string, lang: Lang = "fr"): string {
  */
 export function getRoleLabel(role: string, lang: Lang = "fr"): string {
   const labels: Record<string, Record<string, string>> = {
-    super_admin: { fr: "Super Admin", en: "Super Admin" },
     admin_residence: { fr: "Admin Établissement", en: "Property Admin" },
     receptionniste: { fr: "Réceptionniste", en: "Receptionist" },
     menagere: { fr: "Ménagère", en: "Cleaner" },
