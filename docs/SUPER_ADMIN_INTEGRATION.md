@@ -1,106 +1,53 @@
-# 🚀 Guide d'Intégration Standard Multi-Projets (Super Admin REFONTIQ)
+# Intégration Séjoura ↔ Refontiq Control Center
 
-Ce document définit la norme pour connecter tout nouveau SaaS de l'écosystème REFONTIQ (Séjoura, Schooly, Trouvetou, Docly, PronoMaster, etc.) au Dashboard Super Admin central.
+## Architecture d'administration
 
----
+**Refontiq Control Center est l'unique Super Admin de l'écosystème.**
 
-## 🛠️ Architecture en 5 Étapes "Plug & Play"
+Séjoura n'expose plus de console Super Admin locale, de page `/admin`, de rôle Super Admin actif, ni de script de création de Super Admin.
 
-Pour chaque nouveau projet SaaS à intégrer dans le Super Admin, respecter strictement ces 5 étapes :
+Le découpage est désormais :
 
-### 1. Variables d'Environnement (`.env.local` & Vercel)
+- **Séjoura** : gestion opérationnelle des établissements et de leurs utilisateurs.
+- **Refontiq Control Center** : administration globale, supervision, métriques, alertes et opérations centralisées.
+- **Telegram** : canal d'alerte central relié au Control Center.
 
-Nommer systématiquement les variables avec le préfixe du projet en MAJUSCULES :
+## Métriques
 
-- `[PROJET]_SUPABASE_URL`
-- `[PROJET]_SUPABASE_SERVICE_ROLE_KEY`
+Séjoura expose `POST /api/metrics/push`, protégé par :
 
----
+- `METRICS_PUSH_SECRET`
+- `CONTROL_CENTER_URL`
 
-### 2. Client Supabase Dédié (`src/lib/supabase/[projet]-admin.ts`)
+Le endpoint collecte notamment :
 
-Créer un client server-side isolé utilisant la Service Role Key pour contourner le RLS de manière contrôlée :
+- établissements actifs ;
+- utilisateurs actifs hors clients ;
+- MRR des abonnements actifs ;
+- état de santé du produit.
 
-```ts
-import { createClient } from '@supabase/supabase-js';
+Le Control Center reçoit ces données via `/api/metrics/push`.
 
-export const [projet]AdminDb = createClient(
-  process.env.[PROJET]_SUPABASE_URL!,
-  process.env.[PROJET]_SUPABASE_SERVICE_ROLE_KEY!
-);
+## Sécurité
+
+Le rôle historique `super_admin` est conservé uniquement pour compatibilité avec les anciennes migrations. La migration :
+
+`supabase/migrations/20260919_refontiq_control_center_is_sole_super_admin.sql`
+
+- désactive les anciens comptes locaux `super_admin` ;
+- empêche toute création ou modification d'un utilisateur vers `super_admin` ;
+- empêche le trigger Auth de créer un compte local avec ce rôle.
+
+Toute administration globale doit donc passer par Refontiq Control Center.
+
+## Variables d'environnement
+
+```env
+CONTROL_CENTER_URL=https://refontiq-control-center.vercel.app
+METRICS_PUSH_SECRET=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+TELEGRAM_ADMIN_URL=https://refontiq-control-center.vercel.app/admin
 ```
 
----
-
-### 3. Route API Métriques (`src/app/api/admin/[projet]/stats/route.ts`)
-
-Exposer un endpoint GET sécurisé qui interroge la base de données du projet :
-
-```ts
-import { NextResponse } from 'next/server';
-import { [projet]AdminDb } from '@/lib/supabase/[projet]-admin';
-
-export async function GET() {
-  try {
-    const [stat1, stat2, stat3] = await Promise.all([
-      [projet]AdminDb.from('table_1').select('id', { count: 'exact', head: true }),
-      [projet]AdminDb.from('table_2').select('id', { count: 'exact', head: true }),
-      [projet]AdminDb.from('table_3').select('id', { count: 'exact', head: true }),
-    ]);
-
-    return NextResponse.json({
-      total_items_1: stat1.count || 0,
-      total_items_2: stat2.count || 0,
-      total_items_3: stat3.count || 0,
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-```
-
----
-
-### 4. Composant UI Carte KPI (`src/components/admin/[Projet]StatsCard.tsx`)
-
-Créer la carte d'affichage avec l'identité visuelle du projet (couleur accent, icônes Lucide, Skeleton loading) :
-
-- Exécuter un `fetch('/api/admin/[projet]/stats')`
-- Rendre les cartes de statistiques
-- Afficher un état d'erreur et de chargement gracieux
-
----
-
-### 5. Intégration sur la Page Super Admin (`src/app/admin/dashboard/page.tsx`)
-
-- Déclarer le projet dans le registre des projets (`projects.ts`)
-- Importer et placer `<[Projet]StatsCard />` sur le tableau de bord.
-
----
-
-## 📋 Projets actuellement intégrés
-
-- [x] **Séjoura** (Gestion hôtelière)
-- [x] **Schooly** (Gestion scolaire)
-- [x] **Trouvetou** (Portail & synchronisation des offres)
-- [ ] **Docly** (À venir)
-
----
-
-## 📢 Configuration Telegram Globale (Bot & Admin uniques)
-
-Toutes les applications de l'écosystème (Séjoura, Schooly, Trouvetou, Docly, PronoMaster, etc.) utilisent les **MÊMES** identifiants Telegram :
-
-- **`TELEGRAM_BOT_TOKEN`** : `8882268453:AAGNSyYytK2Wyo57sKAlw2Vps1HNBg11ZvE`
-- **`TELEGRAM_ADMIN_CHAT_ID`** : `8958821599`
-
----
-
-### Règle de formatage des messages
-
-Pour distinguer la provenance des alertes dans le canal Telegram unique, **TOUS** les messages générés par `lib/telegram.ts` doivent inclure le nom du SaaS en préfixe :
-
-- **Schooly** : `[Schooly] NOUVEL ABONNEMENT ...`
-- **Séjoura** : `[Séjoura] NOUVELLE RÉSERVATION ...`
-- **Trouvetou** : `[Trouvetou] SYNCHRO EFFECTUÉE ...`
-- **Docly** : `[Docly] NOUVEAU PATIENT ...`
+Aucune variable `SUPER_ADMIN_EMAIL` ou `SUPER_ADMIN_PASSWORD` n'est nécessaire dans Séjoura.
