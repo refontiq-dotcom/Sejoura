@@ -27,7 +27,7 @@ async function mirrorToControlCenter(message: string): Promise<void> {
         Authorization: `Bearer ${secret}`,
       },
       body: JSON.stringify({
-        project: "sejoura",
+        projet: "sejoura",
         level: "info",
         title: "Alerte Séjoura",
         message,
