@@ -131,7 +131,46 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3. Alerte visuelle pour le Super Admin (validation en attente)
+  // 3. Synchronisation avec Refontiq Control Center : le Control Center
+  // devient l'unique autorité de validation globale.
+  const controlCenterUrl = process.env.CONTROL_CENTER_URL?.trim();
+  const metricsSecret = process.env.METRICS_PUSH_SECRET?.trim();
+  if (controlCenterUrl && metricsSecret) {
+    try {
+      const controlResponse = await fetch(
+        `${controlCenterUrl.replace(/\/$/, "")}/api/billing`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${metricsSecret}`,
+          },
+          body: JSON.stringify({
+            produit: "sejoura",
+            produit_ref: requestRow.id,
+            plan,
+            amount,
+            requested_by: userData.id,
+            sender_phone: phone,
+            notes: "Paiement déclaré depuis Séjoura après paiement via Wave",
+          }),
+          signal: AbortSignal.timeout(10_000),
+        }
+      );
+
+      if (!controlResponse.ok) {
+        console.error(
+          "Control Center billing sync failed:",
+          controlResponse.status,
+          await controlResponse.text()
+        );
+      }
+    } catch (error) {
+      console.error("Control Center billing sync error:", error);
+    }
+  }
+
+  // 4. Alerte visuelle locale pour conserver l'historique côté établissement.
   const companyName = tenant?.company_name ?? "Un établissement";
   await admin.from("notifications").insert({
     tenant_id: userData.tenant_id,
@@ -139,17 +178,17 @@ export async function POST(request: Request) {
     title: "Nouvelle demande de validation d'abonnement",
     message: `${companyName} a déclaré un paiement Wave pour la formule ${getPlanLabel(plan)} (${amount} FCFA) depuis le numéro ${phone}. Validez l'abonnement.`,
     type: "warning",
-    link: "/admin/sejour",
+    link: "/dashboard/subscription",
     recipient_role: "admin_residence",
   });
 
-  // 4. Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais
+  // 5. Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais
   //    faire échouer la soumission de la demande côté gérant.
   if (isTelegramConfigured()) {
     try {
       const planLabel = getPlanLabel(plan);
       const contactName = tenant?.contact_name ?? "Gérant de l'établissement";
-      const adminUrl = getTelegramAdminUrl("https://sejoura-lemon.vercel.app/admin/sejour");
+      const adminUrl = getTelegramAdminUrl("https://refontiq-control-center.vercel.app/admin/billing");
 
       const text = [
         "\uD83D\uDD14 *Nouvelle demande d'abonnement Sejoura !*",
@@ -160,7 +199,7 @@ export async function POST(request: Request) {
         `\uD83D\uDCB0 *Montant :* ${formatFCFA(amount)}`,
         `\uD83D\uDCF1 *Numéro Wave :* ${escapeMarkdown(phone)}`,
         "",
-        `\uD83D\uDD17 [Valider sur le Dashboard Admin](${adminUrl})`,
+        `\uD83D\uDD17 [Valider dans Refontiq Control Center](${adminUrl})`,
       ].join("\n");
 
       const sent = await sendTelegramMessage(text);
