@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { pushControlCenterMetrics } from "@/lib/control-center-metrics";
 
 export async function POST(req: Request) {
