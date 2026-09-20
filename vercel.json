@@ -11,6 +11,10 @@
     {
       "path": "/api/trouvetou/sync",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/control-center-metrics",
+      "schedule": "0 * * * *"
     }
   ]
 }
