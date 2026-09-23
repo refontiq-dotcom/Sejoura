@@ -303,6 +303,39 @@ export default function ResidencesPage() {
         </div>
       )}
 
+      {/* Aide contextuelle : P1 si aucun établissement, P2 si l'étape suivante est la configuration des chambres. */}
+      {residences.length > 0 && Object.values(roomsCount).reduce((sum, count) => sum + count, 0) === 0 && (
+        <ContextualHelpGroup
+          items={[
+            {
+              id: "residence-add-rooms",
+              priority: 2,
+              title: "Votre établissement est prêt",
+              description: "Ajoutez maintenant vos chambres pour pouvoir les utiliser dans vos réservations.",
+              href: "/dashboard/rooms",
+              actionLabel: "Configurer les chambres",
+            },
+            {
+              id: "residence-discovery",
+              priority: 3,
+              title: "Explorez la fiche de votre établissement",
+              description: "Vous pourrez y retrouver ses informations et suivre rapidement sa configuration.",
+            },
+          ]}
+        />
+      )}
+
+      {residences.length > 0 && Object.values(roomsCount).reduce((sum, count) => sum + count, 0) > 0 && residences.length === 1 && (
+        <ContextualHelpGroup
+          items={[{
+            id: "residence-first-use",
+            priority: 3,
+            title: "Votre établissement est configuré",
+            description: "Utilisez les raccourcis de la fiche établissement pour retrouver rapidement ses informations.",
+          }]}
+        />
+      )}
+
       {/* Grille des établissements */}
       {residences.length === 0 ? (
         <ContextualHelpGroup
