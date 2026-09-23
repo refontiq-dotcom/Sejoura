@@ -1217,7 +1217,7 @@ export default function BookingsPage() {
         .gt("check_out_date", b.check_in_date);
       if (bookingErr) throw bookingErr;
 
-      const busyRoomIds = new Set((overlaps ?? []).map((o) => o.room_id).filter(Boolean));
+      const busyRoomIds = new Set((overlaps ?? []).map((o: { room_id: string | null }) => o.room_id).filter(Boolean));
       const free = (typeRooms as unknown as (Room & { room_type?: RoomType })[]).filter(
         (r) => !busyRoomIds.has(r.id)
       );
