@@ -684,6 +684,7 @@ export default function DashboardLayout({
               monthlyPrice={monthlyPrice}
               scrolled={headerScrolled}
               tenantId={user.tenant_id ?? ""}
+              onOpenOnboarding={isResidenceAdmin ? onboarding.openChecklist : undefined}
             />
           </div>
           <Breadcrumbs />
