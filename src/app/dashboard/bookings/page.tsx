@@ -2403,11 +2403,15 @@ export default function BookingsPage() {
       ) : (
         <Card className="overflow-hidden">
         {rooms.length === 0 && !loading && (
-          <ContextualHelp
-            title="Il manque encore des chambres"
-            description="Pour créer une réservation, configurez au moins une chambre dans votre établissement."
-            href="/dashboard/rooms"
-            actionLabel="Configurer les chambres"
+          <ContextualHelpGroup
+            items={[{
+              id: "booking-rooms-required",
+              priority: 1,
+              title: "Il manque encore des chambres",
+              description: "Pour créer une réservation, configurez au moins une chambre dans votre établissement.",
+              href: "/dashboard/rooms",
+              actionLabel: "Configurer les chambres",
+            }]}
           />
         )}
 
