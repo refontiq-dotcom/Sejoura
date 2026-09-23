@@ -361,6 +361,7 @@ export default function ResidencesPage() {
             </Button>
           )}
         </Card>
+        </>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...residences].sort((a, b) => {
