@@ -7,7 +7,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyPin } from "@/lib/pin";
 import { getDeviceName, getRequestOrigin, getRpId, normalizeTransports } from "@/lib/webauthn";
-import { pinRateLimiter, getRateLimitKey } from "@/lib/rate-limit";
+import { checkPinRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/employee-biometric/register
@@ -37,11 +37,11 @@ export async function POST(request: Request) {
     }
 
     // ── Rate limiting (brute-force PIN) ──────────────────────────────────────
-    const rlKey = getRateLimitKey(request, userId);
-    const rl = pinRateLimiter.check(rlKey);
-    if (!rl.ok) {
+    const rl = await checkPinRateLimit(request, userId);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
       return NextResponse.json(
-        { error: `Trop de tentatives. Réessayez dans ${rl.resetIn} secondes.` },
+        { error: `Trop de tentatives. Réessayez dans ${retryAfter} secondes.` },
         { status: 429 }
       );
     }
