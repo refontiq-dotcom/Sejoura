@@ -69,20 +69,21 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
     // Utilisateur admin (created_by obligatoire)
     const u = await run(
       client,
-      `INSERT INTO users (id, tenant_id, role, full_name, phone, email, is_active)
-       VALUES (gen_random_uuid(), $1, 'admin_residence', 'Test Badge', $2, $3, true)
-       RETURNING id`,
+      `INSERT INTO users (id, auth_user_id, tenant_id, role, full_name, phone, email, is_active)
+       VALUES (gen_random_uuid(), gen_random_uuid(), $1, 'admin_residence', 'Test Badge', $2, $3, true)
+       RETURNING id, auth_user_id`,
       [tenantId, `${TEST_PREFIX}-phone-${Date.now()}`, `${TEST_PREFIX}-user-${Date.now()}@example.com`]
     );
     userId = u.rows[0].id;
 
-    // Simule une session authentifiée pour les RPC protégées par auth.uid().
+    // Aligne le claim de session sur auth_user_id créé pour le fixture.
     await run(
       client,
       `SELECT set_config('request.jwt.claim.sub', $1, false)`,
-      [userId]
+      [u.rows[0].auth_user_id]
     );
 
+    // Simule une session authentifiée pour les RPC protégées par auth.uid().
     // Résidence + type de chambre + chambre
     const a = await run(
       client,
