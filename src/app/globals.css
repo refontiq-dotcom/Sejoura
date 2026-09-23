@@ -261,7 +261,6 @@ body {
 
 .dashboard-bg {
   background-color: var(--main-bg, var(--background));
-  background-attachment: fixed;
   min-height: 100vh;
 }
 
@@ -290,16 +289,16 @@ html {
 }
 
 /* Animation pour les transitions de thème */
-.theme-transition * {
-  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease, box-shadow 0.3s ease;
+.theme-transition {
+  transition: background-color 0.4s ease, color 0.3s ease;
 }
 
 .theme-transition .dashboard-bg {
-  transition: background 0.5s ease;
+  transition: background-color 0.5s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .theme-transition *, .theme-transition .dashboard-bg {
+  .theme-transition, .theme-transition .dashboard-bg {
     transition: none !important;
   }
 
