@@ -74,26 +74,30 @@ export async function middleware(req: NextRequest) {
     return supabaseResponse;
   }
 
-  const metaRole = user.user_metadata?.role as string | undefined;
+  // Ne jamais utiliser user_metadata pour l'autorisation : ces données sont modifiables
+  // par l'utilisateur. Le rôle autorisé vient de la base via un SECURITY DEFINER
+  // strictement lié à auth.uid().
+  const { data: dbRole } = await supabase.rpc("get_current_user_role");
+  const role = dbRole as string | null;
 
   // Le Super Admin global appartient exclusivement à Refontiq Control Center.
   // Les anciens comptes super_admin Séjoura sont donc privés de tout accès applicatif.
-  if (metaRole === "super_admin") {
+  if (role === "super_admin") {
     return NextResponse.redirect(new URL("/?error=central-admin", req.url));
   }
 
-  const isEmployee = metaRole === "receptionniste" || metaRole === "menagere";
+  const isEmployee = role === "receptionniste" || role === "menagere";
 
   if (isEmployee && isAdminOnlyRoute(pathname)) {
-    const target = metaRole === "menagere" ? "/menage" : "/dashboard";
+    const target = role === "menagere" ? "/menage" : "/dashboard";
     if (pathname !== target) return NextResponse.redirect(new URL(target, req.url));
   }
 
-  if (metaRole === "menagere" && isDashboard && pathname !== "/menage") {
+  if (role === "menagere" && isDashboard && pathname !== "/menage") {
     return NextResponse.redirect(new URL("/menage", req.url));
   }
 
-  if (metaRole === "receptionniste" && isDashboard && !isEmployeeAllowedRoute(pathname)) {
+  if (role === "receptionniste" && isDashboard && !isEmployeeAllowedRoute(pathname)) {
     if (pathname !== "/dashboard") return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
