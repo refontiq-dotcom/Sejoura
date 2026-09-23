@@ -9,6 +9,24 @@ import {
 } from "@/lib/telegram";
 import { formatFCFA, getPlanLabel } from "@/lib/utils";
 
+function rpcErrorStatus(message: string) {
+  if (
+    message.includes("WAVE_EVENT_ID_REQUIRED") ||
+    message.includes("WAVE_SUBSCRIPTION_REQUIRED") ||
+    message.includes("WAVE_AMOUNT_INVALID") ||
+    message.includes("WAVE_CURRENCY_INVALID") ||
+    message.includes("WAVE_AMOUNT_MISMATCH")
+  ) {
+    return 400;
+  }
+
+  if (message.includes("WAVE_SUBSCRIPTION_NOT_FOUND")) {
+    return 404;
+  }
+
+  return 500;
+}
+
 export async function POST(request: Request) {
   const signatureHeader = request.headers.get("Wave-Signature");
   const webhookSecret = process.env.WAVE_WEBHOOK_SECRET;
@@ -21,163 +39,161 @@ export async function POST(request: Request) {
   }
 
   const payload = await request.text();
-  const isValid = verifyWaveSignature(payload, signatureHeader, webhookSecret);
-  if (!isValid) {
-    return NextResponse.json({ error: "Signature Wave invalide." }, { status: 400 });
+
+  if (!verifyWaveSignature(payload, signatureHeader, webhookSecret)) {
+    return NextResponse.json(
+      { error: "Signature Wave invalide." },
+      { status: 400 }
+    );
   }
 
-  let event: any;
+  let event: unknown;
   try {
     event = JSON.parse(payload);
   } catch {
-    return NextResponse.json({ error: "Payload JSON invalide." }, { status: 400 });
-  }
-
-  const eventId = event?.id;
-  if (!eventId) {
-    return NextResponse.json({ error: "Identifiant d'événement manquant." }, { status: 400 });
-  }
-
-  const admin = createAdminClient();
-
-  const { data: existingEvent, error: existingEventError } = await admin
-    .from("wave_webhook_events")
-    .select("id")
-    .eq("id", eventId)
-    .maybeSingle();
-
-  if (existingEventError) {
     return NextResponse.json(
-      { error: "Impossible de vérifier l'événement Wave." },
-      { status: 500 }
+      { error: "Payload JSON invalide." },
+      { status: 400 }
     );
   }
 
-  if (existingEvent) {
-    return NextResponse.json({ received: true });
-  }
+  const eventRecord = event as {
+    id?: unknown;
+    type?: unknown;
+    data?: {
+      object?: {
+        id?: unknown;
+        client_reference?: unknown;
+        amount?: unknown;
+        amount_subtotal?: unknown;
+        currency?: unknown;
+      };
+    };
+  };
 
-  const { error: insertEventError } = await admin
-    .from("wave_webhook_events")
-    .insert({ id: eventId, event_type: event.type });
+  const eventId = typeof eventRecord.id === "string" ? eventRecord.id.trim() : "";
+  const eventType =
+    typeof eventRecord.type === "string" ? eventRecord.type.trim() : "";
 
-  if (insertEventError) {
+  if (!eventId || !eventType) {
     return NextResponse.json(
-      { error: "Impossible de stocker l'événement Wave." },
-      { status: 500 }
+      { error: "Identifiant ou type d'événement manquant." },
+      { status: 400 }
     );
   }
 
-  if (event.type !== "checkout.session.completed") {
-    return NextResponse.json({ received: true });
-  }
+  const checkout = eventRecord.data?.object;
+  const subscriptionId =
+    typeof checkout?.client_reference === "string"
+      ? checkout.client_reference.trim()
+      : "";
 
-  const checkout = event?.data?.object;
-  const subscriptionId = checkout?.client_reference;
+  const rawAmount = checkout?.amount ?? checkout?.amount_subtotal;
+  const amount =
+    typeof rawAmount === "number"
+      ? rawAmount
+      : typeof rawAmount === "string"
+        ? Number(rawAmount)
+        : NaN;
 
-  if (!subscriptionId) {
-    return NextResponse.json({ error: "Référence d'abonnement manquante." }, { status: 400 });
-  }
+  const currency =
+    typeof checkout?.currency === "string"
+      ? checkout.currency.toUpperCase()
+      : "";
 
-  const { data: subscription, error: subscriptionError } = await admin
-    .from("subscriptions")
-    .select("*")
-    .eq("id", subscriptionId)
-    .maybeSingle();
+  const checkoutId =
+    typeof checkout?.id === "string" ? checkout.id.trim() : "";
 
-  if (subscriptionError || !subscription) {
-    return NextResponse.json({ error: "Abonnement introuvable." }, { status: 400 });
-  }
-
-  const amount = Number.parseInt(checkout?.amount ?? checkout?.amount_subtotal ?? subscription.monthly_price?.toString() ?? "0", 10) || subscription.monthly_price;
-
-  const { data: receiverUser, error: receiverError } = await admin
-    .from("users")
-    .select("id")
-    .eq("tenant_id", subscription.tenant_id)
-    .eq("role", "admin_residence")
-    .limit(1)
-    .maybeSingle();
-
-  let receivedBy = receiverUser?.id;
-  if (!receivedBy) {
-    const { data: fallbackUser } = await admin
-      .from("users")
-      .select("id")
-      .eq("tenant_id", subscription.tenant_id)
-      .limit(1)
-      .maybeSingle();
-    receivedBy = fallbackUser?.id ?? null;
-  }
-
-  const now = new Date().toISOString();
-  const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-  const { error: updateError } = await admin
-    .from("subscriptions")
-    .update({
-      status: "active",
-      current_period_start: now,
-      current_period_end: periodEnd,
-      is_soft_locked: false,
-      last_payment_at: now,
-      last_payment_amount: amount,
-      payment_method: "wave",
-    })
-    .eq("id", subscriptionId);
-
-  if (updateError) {
-    return NextResponse.json(
-      { error: "Impossible de mettre à jour l'abonnement." },
-      { status: 500 }
-    );
-  }
-
-  if (receivedBy) {
-    const { error: paymentError } = await admin.from("payments").insert({
-      tenant_id: subscription.tenant_id,
-      booking_id: null,
-      amount,
-      payment_method: "mobile_money",
-      mobile_money_operator: "wave",
-      payment_date: now,
-      reference: checkout?.id ?? eventId,
-      received_by: receivedBy,
-      operation_type: "subscription",
-      notes: `Paiement d'abonnement Wave ${eventId}`,
-    });
-
-    if (paymentError) {
+  if (eventType === "checkout.session.completed") {
+    if (!subscriptionId) {
       return NextResponse.json(
-        { error: "L'action a échoué : enregistrer le paiement." },
-        { status: 500 }
+        { error: "Référence d'abonnement manquante." },
+        { status: 400 }
+      );
+    }
+
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      return NextResponse.json(
+        { error: "Montant Wave invalide." },
+        { status: 400 }
+      );
+    }
+
+    if (currency !== "XOF") {
+      return NextResponse.json(
+        { error: "Devise Wave invalide." },
+        { status: 400 }
       );
     }
   }
 
-  // Alerte Telegram (fire-and-forget) : un échec d'envoi ne doit jamais faire
-  // échouer le traitement du webhook.
+  const admin = createAdminClient();
+
+  const { data, error } = await admin.rpc("process_wave_checkout_webhook", {
+    p_event_id: eventId,
+    p_event_type: eventType,
+    p_subscription_id: subscriptionId || null,
+    p_checkout_id: checkoutId || null,
+    p_amount: Number.isSafeInteger(amount) ? amount : null,
+    p_currency: currency || null,
+  });
+
+  if (error) {
+    console.error("wave webhook processing:", error);
+    return NextResponse.json(
+      { error: "Impossible de traiter l'événement Wave." },
+      { status: rpcErrorStatus(error.message || "") }
+    );
+  }
+
+  if (eventType !== "checkout.session.completed" || data?.ignored) {
+    return NextResponse.json({ received: true });
+  }
+
+  if (data?.duplicate) {
+    return NextResponse.json({ received: true });
+  }
+
   if (isTelegramConfigured()) {
     try {
-      const { data: tenant } = await admin
-        .from("tenants")
-        .select("company_name")
-        .eq("id", subscription.tenant_id)
+      const tenantId = typeof data?.tenant_id === "string" ? data.tenant_id : "";
+      const subscriptionIdResult =
+        typeof data?.subscription_id === "string" ? data.subscription_id : "";
+
+      const { data: subscription } = await admin
+        .from("subscriptions")
+        .select("plan, tenant_id")
+        .eq("id", subscriptionIdResult)
         .maybeSingle();
 
-      const adminUrl = getTelegramAdminUrl("https://app.sejoura.com/admin?next=/admin/sejour");
-      const text = [
-        "\uD83D\uDCB5 *Paiement Wave reçu — Sejoura*",
+      const { data: tenant } = tenantId
+        ? await admin
+            .from("tenants")
+            .select("company_name")
+            .eq("id", tenantId)
+            .maybeSingle()
+        : { data: null };
+
+      const plan = subscription?.plan;
+      const adminUrl = getTelegramAdminUrl(
+        "https://app.sejoura.com/admin?next=/admin/sejour"
+      );
+      const message = [
+        "💵 *Paiement Wave reçu — Sejoura*",
         "",
-        `\uD83C\uDFE2 *Résidence :* ${escapeMarkdown(tenant?.company_name || "Établissement inconnu")}`,
-        `\uD83D\uDCE6 *Formule :* ${escapeMarkdown(getPlanLabel(subscription.plan))}`,
-        `\uD83D\uDCB0 *Montant :* ${formatFCFA(amount)}`,
-        `\u23F3 *Abonnement actif pour 30 jours*`,
+        `🏢 *Résidence :* ${escapeMarkdown(
+          tenant?.company_name || "Établissement inconnu"
+        )}`,
+        `📦 *Formule :* ${escapeMarkdown(
+          plan ? getPlanLabel(plan) : "Abonnement"
+        )}`,
+        `💰 *Montant :* ${formatFCFA(amount)}`,
+        "⏳ *Abonnement actif pour 30 jours*",
         "",
-        `\uD83D\uDD17 [Voir sur le Dashboard Admin](${adminUrl})`,
+        `🔗 [Voir sur le Dashboard Admin](${adminUrl})`,
       ].join("\n");
 
-      const sent = await sendTelegramMessage(text);
+      const sent = await sendTelegramMessage(message);
       if (!sent) console.error("Telegram wave payment alert failed");
     } catch (error) {
       console.error("wave webhook telegram:", error);
