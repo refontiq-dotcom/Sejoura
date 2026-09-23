@@ -160,14 +160,11 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
     "block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 overflow-y-auto overscroll-contain">
-      {/* Backdrop blur & dark overlay */}
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md animate-fade-in" />
-
-      {/* Modal Container */}
-      <div className="relative w-full max-w-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-x-hidden animate-modal-in z-10 border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0" style={{ WebkitOverflowScrolling: "touch" }}>
+    <div className="fixed inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:bottom-4 z-50 flex justify-center sm:justify-end pointer-events-none">
+      {/* Non-blocking setup panel: the dashboard remains fully usable behind it. */}
+      <div className="relative w-full sm:w-[min(100vw-2rem,32rem)] max-h-[calc(100vh-1.5rem)] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl overflow-x-hidden animate-modal-in pointer-events-auto border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] sm:pb-0" style={{ WebkitOverflowScrolling: "touch" }}>
         {/* Beautiful organic header */}
-        <div className="relative bg-[var(--primary-color,#0C1C33)] p-6 text-white text-center">
+        <div className="relative bg-[var(--primary-color,#0C1C33)] p-5 text-white text-center">
           <div className="absolute inset-0 opacity-20 pointer-events-none">
             <div className="absolute top-[-50%] left-[-10%] w-48 h-48 rounded-full bg-white blur-2xl animate-pulse" />
           </div>
@@ -190,7 +187,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
         </div>
 
         {/* Modal Body / Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-3" autoComplete="off">
+        <form onSubmit={handleSubmit} className="p-5 space-y-3" autoComplete="on">
           <input type="text" style={{ display: 'none' }} name="prevent_autofill_username" autoComplete="off" />
           <input type="password" style={{ display: 'none' }} name="prevent_autofill_password" autoComplete="off" />
 
@@ -204,7 +201,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
                 id="onboarding-full-name"
                 type="text"
                 required
-                autoComplete="off"
+                autoComplete="name"
                 value={formFullName}
                 onChange={(e) => setFormFullName(e.target.value)}
                 placeholder="ex: Jean Kouassi"
@@ -221,7 +218,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
                 id="onboarding-residence-name"
                 type="text"
                 required
-                autoComplete="off"
+                autoComplete="organization"
                 value={residenceName}
                 onChange={(e) => setResidenceName(e.target.value)}
                 placeholder="ex: Résidence Riviera Luxe"
@@ -329,7 +326,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
               <input
                 id="onboarding-phone"
                 type="tel"
-                autoComplete="off"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+225 00 00 00 00 00"
