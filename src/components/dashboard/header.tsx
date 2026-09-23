@@ -29,6 +29,7 @@ interface HeaderProps {
   monthlyPrice?: number;
   scrolled?: boolean;
   tenantId?: string;
+  onOpenOnboarding?: () => void;
 }
 
 type SearchResult = {
@@ -769,6 +770,18 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                       <Settings className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                       {t.settings}
                     </button>
+                    {onOpenOnboarding && (
+                      <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          onOpenOnboarding();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                        {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                      </button>
+                    )}
                     <button
                       onClick={() => { setProfileOpen(false); router.push("/dashboard/subscription"); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
