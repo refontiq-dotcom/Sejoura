@@ -169,8 +169,8 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
     await run(
       client,
       `INSERT INTO staff_notification_states (tenant_id, last_viewed_at)
-       VALUES ($1, NOW())
-       ON CONFLICT (tenant_id) DO UPDATE SET last_viewed_at = NOW()`,
+       VALUES ($1, clock_timestamp() + interval '1 second')
+       ON CONFLICT (tenant_id) DO UPDATE SET last_viewed_at = clock_timestamp() + interval '1 second'`,
       [tenantId]
     );
 
