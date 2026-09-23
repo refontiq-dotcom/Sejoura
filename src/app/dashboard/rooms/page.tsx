@@ -47,6 +47,7 @@ export default function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusMenuRoomId, setStatusMenuRoomId] = useState<string | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [roomActionHelp, setRoomActionHelp] = useState(false);
 
   const loadRooms = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -144,8 +145,10 @@ export default function RoomsPage() {
       if (error) throw error;
       setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, status } : r)));
       setStatusMenuRoomId(null);
+      setRoomActionHelp(false);
       toast.success(lang === "fr" ? "Statut mis à jour" : "Status updated");
     } catch {
+      setRoomActionHelp(true);
       toast.error(lang === "fr" ? "Impossible de changer le statut" : "Unable to update status");
     } finally {
       setUpdatingStatusId(null);
@@ -229,6 +232,18 @@ export default function RoomsPage() {
           </select>
         </div>
       </div>
+
+      {/* Aide P0 : action impossible après une tentative de changement de statut */}
+      {roomActionHelp && (
+        <ContextualHelpGroup
+          items={[{
+            id: "room-action-impossible",
+            priority: 0,
+            title: "Cette action n’a pas pu être effectuée",
+            description: "Le statut de cette chambre n’a pas pu être modifié. Vérifiez son état actuel puis réessayez.",
+          }]}
+        />
+      )}
 
       {/* Rooms grid */}
       {filteredRooms.length === 0 ? (
