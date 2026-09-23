@@ -2404,14 +2404,26 @@ export default function BookingsPage() {
         <Card className="overflow-hidden">
         {rooms.length === 0 && !loading && (
           <ContextualHelpGroup
-            items={[{
-              id: "booking-rooms-required",
-              priority: 1,
-              title: "Il manque encore des chambres",
-              description: "Pour créer une réservation, configurez au moins une chambre dans votre établissement.",
-              href: "/dashboard/rooms",
-              actionLabel: "Configurer les chambres",
-            }]}
+            items={[
+              ...(modalOpen && availabilityChecked && !availabilityLoading && availableRooms.length === 0
+                ? [{
+                    id: "booking-no-availability",
+                    priority: 0 as const,
+                    title: "Aucune chambre disponible pour ces dates",
+                    description: "La réservation ne peut pas être créée pour cette période. Choisissez d’autres dates ou un établissement disposant d’une chambre libre.",
+                  }]
+                : []),
+              ...(rooms.length === 0 && !loading
+                ? [{
+                    id: "booking-rooms-required",
+                    priority: 1 as const,
+                    title: "Il manque encore des chambres",
+                    description: "Pour créer une réservation, configurez au moins une chambre dans votre établissement.",
+                    href: "/dashboard/rooms",
+                    actionLabel: "Configurer les chambres",
+                  }]
+                : []),
+            ]}
           />
         )}
 
