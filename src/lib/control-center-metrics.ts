@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logger } from "@/lib/logger";
 
 export async function pushControlCenterMetrics() {
+  const startedAt = Date.now();
   const admin = createAdminClient();
 
   const [
@@ -25,8 +27,24 @@ export async function pushControlCenterMetrics() {
     admin.from("expenses").select("amount").gte("expense_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)),
   ]);
 
-  const errors = [tenantError,userError,subscriptionError,accommodationError,activeBookingError,clientError,paymentError,activeBookingsError,expenseError].filter(Boolean);
-  if (errors.length) throw errors[0];
+  const errors = [
+    tenantError,
+    userError,
+    subscriptionError,
+    accommodationError,
+    activeBookingError,
+    clientError,
+    paymentError,
+    activeBookingsError,
+    expenseError,
+  ].filter(Boolean);
+
+  if (errors.length) {
+    logger.error("metrics.collection.database_failed", errors[0], {
+      duration_ms: Date.now() - startedAt,
+    });
+    throw errors[0];
+  }
 
   const mrr=(subscriptions??[]).reduce((s,r)=>s+(Number(r.monthly_price)||0),0);
   const revenusCollectes=(payments??[]).reduce((s,r)=>s+(Number(r.amount)||0),0);
@@ -47,7 +65,13 @@ export async function pushControlCenterMetrics() {
 
   const controlCenterUrl=process.env.CONTROL_CENTER_URL?.trim();
   const secret=process.env.METRICS_PUSH_SECRET?.trim();
-  if(!controlCenterUrl||!secret) throw new Error("Control Center metrics configuration is missing");
+  if (!controlCenterUrl || !secret) {
+    const error = new Error("Control Center metrics configuration is missing");
+    logger.error("metrics.collection.configuration_missing", error, {
+      duration_ms: Date.now() - startedAt,
+    });
+    throw error;
+  }
 
   const response=await fetch(`${controlCenterUrl.replace(/\/$/,"")}/api/metrics/push`,{
     method:"POST",
@@ -55,6 +79,19 @@ export async function pushControlCenterMetrics() {
     body:JSON.stringify(payload),cache:"no-store",signal:AbortSignal.timeout(10000)
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(`Control Center rejected metrics: ${response.status} ${JSON.stringify(result)}`);
-  return {payload,result};
+  if (!response.ok) {
+    const error = new Error(`Control Center rejected metrics: ${response.status}`);
+    logger.error("metrics.collection.control_center_rejected", error, {
+      duration_ms: Date.now() - startedAt,
+      http_status: response.status,
+    });
+    throw error;
+  }
+
+  logger.info("metrics.collection.completed", {
+    duration_ms: Date.now() - startedAt,
+    http_status: response.status,
+  });
+
+  return { payload, result };
 }
