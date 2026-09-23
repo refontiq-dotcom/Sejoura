@@ -19,10 +19,11 @@ import { runSubscriptionRenewalCron } from "@/lib/payments/subscription-renewal"
 
 export async function POST(req: NextRequest) {
   // Sécurité : vérifier le secret cron
-  const cronSecret = req.headers.get("x-cron-secret");
-  const expectedSecret = process.env.CRON_SECRET;
+  const expectedSecret = process.env.CRON_SECRET?.trim();
+  const bearer = req.headers.get("authorization");
+  const headerSecret = req.headers.get("x-cron-secret");
 
-  if (expectedSecret && cronSecret !== expectedSecret) {
+  if (!expectedSecret || (bearer !== `Bearer ${expectedSecret}` && headerSecret !== expectedSecret)) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
