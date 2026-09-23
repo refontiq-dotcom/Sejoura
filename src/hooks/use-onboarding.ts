@@ -47,6 +47,8 @@ export interface UseOnboardingResult {
   closeWelcome: () => void;
   /** Ouvre la checklist uniquement à la demande de l'utilisateur. */
   openChecklist: () => void;
+  /** Ferme la checklist sans désactiver définitivement l'onboarding. */
+  closeChecklist: () => void;
   /** Recharge le statut depuis le serveur. */
   refresh: () => Promise<void>;
 }
@@ -134,6 +136,10 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
     setChecklistOpen(true);
   }, [enabled]);
 
+  const closeChecklist = useCallback(() => {
+    setChecklistOpen(false);
+  }, []);
+
   const completedSteps = status?.completedSteps ?? [];
   const completedCount = ONBOARDING_REQUIRED_STEPS.filter((s) =>
     completedSteps.includes(s)
@@ -155,7 +161,7 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
     showWelcomeModal: enabled && !loading && !isOnboarded && !isDismissed && !welcomeClosed,
     // La checklist reste visible tant que l'onboarding n'est pas terminé
     // (même après fermeture du modal), sauf si l'utilisateur l'a masquée.
-    showChecklist: enabled && !loading && !isOnboarded && !isDismissed && checklistOpen,
+    showChecklist: enabled && !loading && !isOnboarded && checklistOpen,
     progress,
     completedCount,
     totalCount,
@@ -163,6 +169,7 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
     dismiss,
     closeWelcome,
     openChecklist,
+    closeChecklist,
     refresh,
   };
 }
