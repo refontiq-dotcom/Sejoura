@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
 import { BedDouble, Filter, Building2, Search, RefreshCw, ChevronDown, Loader2 } from "lucide-react";
 import { RoomsSkeleton } from "@/components/ui/skeletons";
+import { ContextualHelp } from "@/components/dashboard/contextual-help";
 
 interface RoomWithType {
   id: string;
@@ -231,6 +232,14 @@ export default function RoomsPage() {
 
       {/* Rooms grid */}
       {filteredRooms.length === 0 ? (
+        {accommodations.length === 0 && (
+          <ContextualHelp
+            title="Ajoutez d’abord un établissement"
+            description="Aucune chambre ne peut être créée tant qu’un établissement n’est pas configuré."
+            href="/dashboard/residences"
+            actionLabel="Configurer un établissement"
+          />
+        )}
         <div className="text-center py-16">
           <BedDouble className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
           <p className="text-slate-500 dark:text-slate-400">
