@@ -2402,38 +2402,69 @@ export default function BookingsPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-        {rooms.length === 0 && !loading && (
-          <ContextualHelpGroup
-            items={[
-              ...(modalOpen && error
-                ? [{
-                    id: "booking-action-impossible",
-                    priority: 0 as const,
-                    title: "Impossible de créer cette réservation",
-                    description: error,
-                  }]
-                : []),
-              ...(modalOpen && availabilityChecked && !availabilityLoading && availableRooms.length === 0
-                ? [{
-                    id: "booking-no-availability",
-                    priority: 0 as const,
-                    title: "Aucune chambre disponible pour ces dates",
-                    description: "La réservation ne peut pas être créée pour cette période. Choisissez d’autres dates ou un établissement disposant d’une chambre libre.",
-                  }]
-                : []),
-              ...(rooms.length === 0 && !loading
-                ? [{
-                    id: "booking-rooms-required",
-                    priority: 1 as const,
-                    title: "Il manque encore des chambres",
-                    description: "Pour créer une réservation, configurez au moins une chambre dans votre établissement.",
-                    href: "/dashboard/rooms",
-                    actionLabel: "Configurer les chambres",
-                  }]
-                : []),
-            ]}
-          />
-        )}
+        <ContextualHelpGroup
+          items={[
+            ...(modalOpen && error
+              ? [{
+                  id: "booking-action-impossible",
+                  priority: 0 as const,
+                  title: "Impossible de créer cette réservation",
+                  description: error,
+                }]
+              : []),
+            ...(modalOpen && availabilityChecked && !availabilityLoading && availableRooms.length === 0
+              ? [{
+                  id: "booking-no-availability",
+                  priority: 0 as const,
+                  title: "Aucune chambre disponible pour ces dates",
+                  description: "La réservation ne peut pas être créée pour cette période. Choisissez d’autres dates ou un établissement disposant d’une chambre libre.",
+                }]
+              : []),
+            ...(rooms.length === 0 && !loading
+              ? [{
+                  id: "booking-rooms-required",
+                  priority: 1 as const,
+                  title: "Il manque encore des chambres",
+                  description: "Pour créer une réservation, configurez au moins une chambre dans votre établissement.",
+                  href: "/dashboard/rooms",
+                  actionLabel: "Configurer les chambres",
+                }]
+              : []),
+            ...(rooms.length > 0 && bookings.length === 0 && !modalOpen && !loading
+              ? [{
+                  id: "booking-first-creation",
+                  priority: 2 as const,
+                  title: "Votre prochaine étape : créer une réservation",
+                  description: "Vos chambres sont prêtes. Créez votre première réservation pour commencer à suivre les séjours.",
+                  actionLabel: "Nouvelle réservation",
+                }]
+              : []),
+            ...(bookings.length === 1 && !modalOpen
+              ? [{
+                  id: "booking-first-use",
+                  priority: 3 as const,
+                  title: "Découvrez le suivi du séjour",
+                  description: "Ouvrez une réservation pour retrouver les informations du client, le séjour et les actions disponibles au même endroit.",
+                }]
+              : []),
+            ...(bookings.length >= 2 && bookings.length < 5 && !modalOpen
+              ? [{
+                  id: "booking-calendar-discovery",
+                  priority: 3 as const,
+                  title: "Visualisez vos séjours sur le calendrier",
+                  description: "Passez en vue calendrier pour repérer rapidement les périodes occupées et les disponibilités.",
+                }]
+              : []),
+            ...(bookings.length >= 5 && !modalOpen && viewMode === "table" && filterStatus === "all" && !searchQuery
+              ? [{
+                  id: "booking-filter-tip",
+                  priority: 4 as const,
+                  title: "Astuce",
+                  description: "Utilisez les filtres et la recherche pour retrouver rapidement une réservation lorsque votre activité augmente.",
+                }]
+              : []),
+          ]}
+        />
 
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center">
