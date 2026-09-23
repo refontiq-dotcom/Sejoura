@@ -64,6 +64,25 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = req.nextUrl.pathname;
+
+  // CSRF defense-in-depth: for browser-originated state-changing requests,
+  // require an Origin/Referer matching the current host. Webhooks/cron use
+  // server-to-server authentication and are intentionally exempt.
+  const unsafeMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+  const csrfExempt =
+    pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/v1/cron/");
+  if (unsafeMethod && pathname.startsWith("/api/") && !csrfExempt) {
+    const origin = req.headers.get("origin");
+    const referer = req.headers.get("referer");
+    const requestOrigin = new URL(req.url).origin;
+    const suppliedOrigin = origin || (referer ? new URL(referer).origin : null);
+    if (suppliedOrigin && suppliedOrigin !== requestOrigin) {
+      return NextResponse.json({ error: "Origine de requête refusée." }, { status: 403 });
+    }
+  }
+
   const isRoot = pathname === "/";
   const isDashboard = pathname.startsWith("/dashboard");
   const isMenage = pathname.startsWith("/menage");
