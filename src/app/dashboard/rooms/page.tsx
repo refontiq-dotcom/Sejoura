@@ -281,32 +281,8 @@ export default function RoomsPage() {
         ]}
       />
 
-      {/* Aide P0 : action impossible après une tentative de changement de statut */
-      {roomActionHelp && (
-        <ContextualHelpGroup
-          items={[{
-            id: "room-action-impossible",
-            priority: 0,
-            title: "Cette action n’a pas pu être effectuée",
-            description: "Le statut de cette chambre n’a pas pu être modifié. Vérifiez son état actuel puis réessayez.",
-          }]}
-        />
-      )}
-
       {/* Rooms grid */}
       {filteredRooms.length === 0 ? (
-        {accommodations.length === 0 && (
-          <ContextualHelpGroup
-            items={[{
-              id: "rooms-residence-required",
-              priority: 1,
-              title: "Ajoutez d’abord un établissement",
-              description: "Aucune chambre ne peut être créée tant qu’un établissement n’est pas configuré.",
-              href: "/dashboard/residences",
-              actionLabel: "Configurer un établissement",
-            }]}
-          />
-        )}
         <div className="text-center py-16">
           <BedDouble className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
           <p className="text-slate-500 dark:text-slate-400">
