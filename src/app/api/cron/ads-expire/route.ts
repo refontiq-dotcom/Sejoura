@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { expireAndUnpublishAdvertisements } from "@/lib/trouvetou/ads";
 
 function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return false;
   const auth = req.headers.get("authorization");
   const headerSecret = req.headers.get("x-cron-secret");
   return auth === `Bearer ${secret}` || headerSecret === secret;
