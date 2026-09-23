@@ -77,7 +77,14 @@ export async function middleware(req: NextRequest) {
     const origin = req.headers.get("origin");
     const referer = req.headers.get("referer");
     const requestOrigin = new URL(req.url).origin;
-    const suppliedOrigin = origin || (referer ? new URL(referer).origin : null);
+    let suppliedOrigin: string | null = origin;
+    if (!suppliedOrigin && referer) {
+      try {
+        suppliedOrigin = new URL(referer).origin;
+      } catch {
+        return NextResponse.json({ error: "Référent de requête invalide." }, { status: 403 });
+      }
+    }
     if (suppliedOrigin && suppliedOrigin !== requestOrigin) {
       return NextResponse.json({ error: "Origine de requête refusée." }, { status: 403 });
     }
@@ -90,6 +97,12 @@ export async function middleware(req: NextRequest) {
   if (!user) {
     if (isDashboard) return NextResponse.redirect(new URL("/", req.url));
     if (isMenage) return NextResponse.redirect(new URL("/employee-login", req.url));
+    return supabaseResponse;
+  }
+
+  // Les API routes gèrent leur propre authentification/autorisation.
+  // Le middleware n'ajoute ici que la protection CSRF ci-dessus.
+  if (pathname.startsWith("/api/")) {
     return supabaseResponse;
   }
 
