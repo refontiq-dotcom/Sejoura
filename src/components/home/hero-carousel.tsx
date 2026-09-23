@@ -128,7 +128,6 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 sizes="160px"
                 className="object-cover"
                 onError={() => handleImgError(index)}
-                unoptimized
               />
             )}
           </div>
