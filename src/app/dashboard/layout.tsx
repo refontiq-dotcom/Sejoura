@@ -694,7 +694,7 @@ export default function DashboardLayout({
           <Breadcrumbs />
           <main
             style={{ backgroundColor: mainBg }}
-            className={`p-3 md:p-4 relative transition-colors duration-200 ${needsOnboarding ? "blur-sm pointer-events-none select-none" : ""}`}
+            className="p-3 md:p-4 relative transition-colors duration-200"
           >
             <div key={pathname} className="animate-page-enter">
               <CurrentUserProvider value={currentUserValue}>
@@ -704,10 +704,6 @@ export default function DashboardLayout({
           </main>
         </div>
       </NotificationsProvider>
-
-      {needsOnboarding && (
-        <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md" />
-      )}
 
       {needsOnboarding && (
         <OnboardingModal
