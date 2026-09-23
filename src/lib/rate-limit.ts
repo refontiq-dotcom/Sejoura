@@ -1,89 +1,60 @@
-/**
- * Simple in-memory rate limiter for API routes.
- *
- * ⚠️  In serverless environments (Vercel), each instance has its own memory,
- * so this is best-effort. For production-grade rate limiting, use Upstash
- * Redis + @upstash/ratelimit.
- *
- * Usage:
- *   const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
- *   const result = limiter.check(key);
- *   if (!result.ok) return 429;
- */
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-interface RateLimiterOptions {
-  /** Time window in milliseconds (default: 60 seconds) */
-  windowMs: number;
-  /** Max requests per window (default: 5) */
-  max: number;
-}
-
-interface RateLimitResult {
-  ok: boolean;
-  remaining: number;
-  resetIn: number; // seconds until window resets
-}
-
-export function createRateLimiter(options: RateLimiterOptions) {
-  const { windowMs, max } = options;
-  const store = new Map<string, RateLimitEntry>();
-
-  // Periodic cleanup every 5 minutes to prevent memory leaks
-  const cleanup = () => {
-    const now = Date.now();
-    for (const [key, entry] of store) {
-      if (now > entry.resetAt) store.delete(key);
-    }
-  };
-  setInterval(cleanup, 5 * 60 * 1000).unref?.();
-
-  return {
-    check(key: string): RateLimitResult {
-      const now = Date.now();
-      const entry = store.get(key);
-
-      if (!entry || now > entry.resetAt) {
-        // New window
-        store.set(key, { count: 1, resetAt: now + windowMs });
-        return { ok: true, remaining: max - 1, resetIn: Math.ceil(windowMs / 1000) };
-      }
-
-      entry.count += 1;
-
-      if (entry.count > max) {
-        const resetIn = Math.ceil((entry.resetAt - now) / 1000);
-        return { ok: false, remaining: 0, resetIn };
-      }
-
-      const resetIn = Math.ceil((entry.resetAt - now) / 1000);
-      return { ok: true, remaining: max - entry.count, resetIn };
-    },
-  };
-}
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 /**
- * Extract a rate-limit key from a request (IP + optional userId).
+ * Distributed rate limiting for Vercel/serverless.
+ * Production must provide UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.
+ * If the backend is unavailable, callers should fail closed for security-sensitive endpoints.
  */
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+
+const limiters = new Map<string, Ratelimit>();
+
+function getLimiter(name: string, requests: number, window: Parameters<typeof Ratelimit.slidingWindow>[1]) {
+  let limiter = limiters.get(name);
+  if (!limiter) {
+    limiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(requests, window),
+      analytics: false,
+      prefix: `sejoura:rl:${name}`,
+    });
+    limiters.set(name, limiter);
+  }
+  return limiter;
+}
+
+export async function checkRateLimit(
+  name: string,
+  key: string,
+  requests: number,
+  window: Parameters<typeof Ratelimit.slidingWindow>[1],
+) {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error("RATE_LIMIT_BACKEND_NOT_CONFIGURED");
+  }
+  return getLimiter(name, requests, window).limit(key);
+}
+
 export function getRateLimitKey(request: Request, suffix?: string): string {
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  const ip = forwarded || realIp || "unknown";
   return suffix ? `${ip}:${suffix}` : ip;
 }
 
-// Pre-built limiters for common use cases
-export const pinRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 min
-});
+// Kept as named helpers for existing callers.
+export async function checkPinRateLimit(request: Request, userId: string) {
+  return checkRateLimit("pin", getRateLimitKey(request, userId), 10, "15 m");
+}
 
-export const loginRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per 15 min
-});
+export async function checkLoginRateLimit(request: Request) {
+  return checkRateLimit("login", getRateLimitKey(request), 5, "15 m");
+}
+
+export async function checkEmployeeVerifyRateLimit(request: Request) {
+  return checkRateLimit("employee-verify", getRateLimitKey(request), 20, "15 m");
+}
