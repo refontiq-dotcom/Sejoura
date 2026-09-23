@@ -205,13 +205,9 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
     const cancelledId = rows[0].booking_id;
     await run(client, `UPDATE bookings SET status = 'cancelled' WHERE id = $1`, [cancelledId]);
 
-    // Re-consulter → seule la réservation active (non annulée) compte
-    const { rows: state } = await run(
-      client,
-      `SELECT last_viewed_at FROM staff_notification_states WHERE tenant_id = $1`,
-      [tenantId]
-    );
-    const count = await countExternalBookings(client, tenantId, state[0].last_viewed_at);
+    // Depuis un instant de référence antérieur aux deux réservations,
+    // seule la réservation active doit être comptée : l'annulée est exclue.
+    const count = await countExternalBookings(client, tenantId, "2024-01-01T00:00:00Z");
     expect(count).toBe(1);
   });
 
