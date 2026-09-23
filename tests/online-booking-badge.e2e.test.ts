@@ -186,7 +186,7 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
 
   it("une réservation en ligne annulée est exclue du compteur", async () => {
     const { rows } = await client.query(
-      `SELECT create_booking(
+      `SELECT (create_booking(
          p_tenant_id := $1,
          p_accommodation_id := $2,
          p_room_id := $3,
@@ -199,7 +199,7 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
          p_total_amount := 50000,
          p_created_by := $5,
          p_booking_source := 'external'
-       ) AS booking_id`,
+       )).id AS booking_id`,
       [tenantId, accommodationId, roomId, clientId, userId]
     );
     const cancelledId = rows[0].booking_id;
