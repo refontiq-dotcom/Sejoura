@@ -189,6 +189,12 @@ export async function runSubscriptionRenewalCron(): Promise<{
 }> {
   console.log("[SubRenewal] Demarrage du cron de renouvellement...");
 
+  const admin = createAdminClient();
+  const { error: transitionError } = await admin.rpc("apply_subscription_period_end_transitions");
+  if (transitionError) {
+    console.error("[SubRenewal] Period-end transition failed:", transitionError.message);
+  }
+
   // 1. Alertes pour les abonnements expirant dans 3 jours
   const expiringIn3Days = await getExpiringSubscriptions(3);
   let expiringAlerts = 0;
