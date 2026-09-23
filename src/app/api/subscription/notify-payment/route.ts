@@ -77,59 +77,25 @@ export async function POST(request: Request) {
     .eq("id", userData.tenant_id)
     .maybeSingle();
 
-  const { data: sub } = await admin
-    .from("subscriptions")
-    .select("id")
-    .eq("tenant_id", userData.tenant_id)
-    .maybeSingle();
+  const { data: requestRow, error: requestError } = await supabase.rpc(
+    "submit_subscription_payment_request",
+    {
+      p_user_id: userData.id,
+      p_plan: plan,
+      p_amount: amount,
+      p_sender_phone: phone,
+    }
+  );
 
-  // Éviter les doublons : une demande déjà en attente ne doit pas être recréée
-  const { data: existing } = await admin
-    .from("subscription_payment_requests")
-    .select("id, plan")
-    .eq("tenant_id", userData.tenant_id)
-    .eq("status", "pending")
-    .maybeSingle();
-
-  if (existing) {
-    return NextResponse.json({ success: true, alreadyPending: true, requestId: existing.id });
-  }
-
-  // 1. Bascule du statut d'abonnement en attente de validation
-  const { error: subUpdateError } = await admin
-    .from("subscriptions")
-    .update({ subscription_status: "pending" })
-    .eq("tenant_id", userData.tenant_id);
-
-  if (subUpdateError) {
+  if (requestError || !requestRow) {
+    console.error("subscription payment request:", requestError);
     return NextResponse.json(
-      { error: "Impossible de mettre à jour l'abonnement." },
+      { error: requestError?.message || "Impossible d'enregistrer la demande de paiement." },
       { status: 500 }
     );
   }
 
-  // 2. Traçabilité : création de la demande de paiement
-  const { data: requestRow, error: reqError } = await admin
-    .from("subscription_payment_requests")
-    .insert({
-      tenant_id: userData.tenant_id,
-      subscription_id: sub?.id ?? null,
-      plan,
-      amount,
-      status: "pending",
-      requested_by: userData.id,
-      sender_phone: phone,
-      notes: "Paiement déclaré par le gérant après paiement via lien Wave",
-    })
-    .select()
-    .single();
-
-  if (reqError || !requestRow) {
-    return NextResponse.json(
-      { error: "L'action a échoué : enregistrer la demande de paiement." },
-      { status: 500 }
-    );
-  }
+  const alreadyPending = false;
 
   // 3. Synchronisation avec Refontiq Control Center : le Control Center
   // devient l'unique autorité de validation globale.
