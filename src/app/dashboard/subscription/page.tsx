@@ -558,21 +558,35 @@ export default function SubscriptionPage() {
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
         title="Annuler l'abonnement"
-        description="Votre abonnement restera actif jusqu'à la fin de la période en cours, puis passera au plan Essentiel."
+        description="Votre abonnement restera actif jusqu'à la fin de la période en cours, puis sera suspendu."
         onConfirm={async () => {
           setCancelling(true);
           try {
-            const supabase = createClient();
-            const { error } = await supabase
-              .from("subscriptions")
-              .update({ plan: "essentiel", monthly_price: getPlanPrice("essentiel") })
-              .eq("tenant_id", tenantId);
-            if (error) throw error;
-            toast.success("Abonnement rétrogradé au plan Essentiel à la fin de la période.");
+            const authClient = createClient();
+            const { data: { user } } = await authClient.auth.getUser();
+            if (!user) throw new Error("Session introuvable");
+
+            const { data: userRow } = await authClient
+              .from("users")
+              .select("id")
+              .eq("auth_user_id", user.id)
+              .maybeSingle();
+
+            if (!userRow?.id) throw new Error("Profil introuvable");
+
+            const response = await fetch("/api/subscription/cancel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: userRow.id }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result?.error || "L'annulation a échoué.");
+
+            toast.success("L'abonnement sera arrêté à la fin de la période en cours.");
             setCancelOpen(false);
             loadData();
-          } catch {
-            toast.error("L'annulation a échoué.");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "L'annulation a échoué.");
           } finally {
             setCancelling(false);
           }
@@ -580,26 +594,45 @@ export default function SubscriptionPage() {
       >
         <div className="flex gap-3 pt-2">
           <Button variant="outline" className="flex-1" onClick={() => setCancelOpen(false)}>Conserver</Button>
-          <Button className="flex-1 bg-red-600 hover:bg-red-700" loading={cancelling} onClick={async () => {
-            setCancelling(true);
-            try {
-              const supabase = createClient();
-              const { error } = await supabase
-                .from("subscriptions")
-                .update({ plan: "essentiel", monthly_price: getPlanPrice("essentiel") })
-                .eq("tenant_id", tenantId);
-              if (error) throw error;
-              toast.success("Abonnement rétrogradé au plan Essentiel à la fin de la période.");
-              setCancelOpen(false);
-              loadData();
-            } catch {
-              toast.error("L'annulation a échoué.");
-            } finally {
-              setCancelling(false);
-            }
-          }}>Confirmer</Button>
+          <Button
+            className="flex-1 bg-red-600 hover:bg-red-700"
+            loading={cancelling}
+            onClick={async () => {
+              setCancelling(true);
+              try {
+                const authClient = createClient();
+                const { data: { user } } = await authClient.auth.getUser();
+                if (!user) throw new Error("Session introuvable");
+
+                const { data: userRow } = await authClient
+                  .from("users")
+                  .select("id")
+                  .eq("auth_user_id", user.id)
+                  .maybeSingle();
+
+                if (!userRow?.id) throw new Error("Profil introuvable");
+
+                const response = await fetch("/api/subscription/cancel", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId: userRow.id }),
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result?.error || "L'annulation a échoué.");
+
+                toast.success("L'abonnement sera arrêté à la fin de la période en cours.");
+                setCancelOpen(false);
+                loadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "L'annulation a échoué.");
+              } finally {
+                setCancelling(false);
+              }
+            }}
+          >
+            Confirmer
+          </Button>
         </div>
-      </Modal>
-    </div>
+      </Modal>    </div>
   );
 }
