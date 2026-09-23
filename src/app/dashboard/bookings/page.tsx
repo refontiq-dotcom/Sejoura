@@ -627,7 +627,7 @@ export default function BookingsPage() {
           throw bookingErr;
         }
         const bookedRoomIds = new Set(
-          (overlaps || []).filter((b) => b.room_id != null).map((b) => b.room_id as string)
+          (overlaps || []).filter((b: { room_id: string | null }) => b.room_id != null).map((b: { room_id: string | null }) => b.room_id as string)
         );
         // 3. Filtrer : seules les chambres sans réservation qui chevauchent sont libres.
         //    On N'utilise PAS le statut de la chambre : une chambre "occupied"
