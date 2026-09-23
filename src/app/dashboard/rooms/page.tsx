@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
 import { BedDouble, Filter, Building2, Search, RefreshCw, ChevronDown, Loader2 } from "lucide-react";
 import { RoomsSkeleton } from "@/components/ui/skeletons";
-import { ContextualHelp } from "@/components/dashboard/contextual-help";
+import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
 
 interface RoomWithType {
   id: string;
