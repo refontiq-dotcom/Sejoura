@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { redis } from "@/lib/redis";
 
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   try {
     const start = Date.now();
     await redis.set("sejoura:redis-test", "ok", { ex: 60 });
