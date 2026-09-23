@@ -77,6 +77,17 @@ export async function POST(request: Request) {
     .eq("id", userData.tenant_id)
     .maybeSingle();
 
+  const { data: existing } = await admin
+    .from("subscription_payment_requests")
+    .select("id")
+    .eq("tenant_id", userData.tenant_id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({ success: true, alreadyPending: true, requestId: existing.id });
+  }
+
   const { data: requestRow, error: requestError } = await supabase.rpc(
     "submit_subscription_payment_request",
     {
