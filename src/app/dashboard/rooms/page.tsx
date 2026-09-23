@@ -233,7 +233,55 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {/* Aide P0 : action impossible après une tentative de changement de statut */}
+      {/* Aides contextuelles : P0 > P1 > P2 > P3 > P4. Aucun calcul réseau supplémentaire. */}
+      <ContextualHelpGroup
+        items={[
+          ...(roomActionHelp
+            ? [{
+                id: "room-action-impossible",
+                priority: 0 as const,
+                title: "Cette action n’a pas pu être effectuée",
+                description: "Le statut de cette chambre n’a pas pu être modifié. Vérifiez son état actuel puis réessayez.",
+              }]
+            : []),
+          ...(rooms.length === 0 && accommodations.length === 0
+            ? [{
+                id: "rooms-residence-required",
+                priority: 1 as const,
+                title: "Ajoutez d’abord un établissement",
+                description: "Aucune chambre ne peut être créée tant qu’un établissement n’est pas configuré.",
+                href: "/dashboard/residences",
+                actionLabel: "Configurer un établissement",
+              }]
+            : []),
+          ...(rooms.length === 0 && accommodations.length > 0
+            ? [{
+                id: "rooms-first-setup",
+                priority: 2 as const,
+                title: "Votre établissement est prêt",
+                description: "Ajoutez votre première chambre pour pouvoir gérer les disponibilités et les réservations.",
+              }]
+            : []),
+          ...(rooms.length > 0 && rooms.length <= 2
+            ? [{
+                id: "rooms-first-use",
+                priority: 3 as const,
+                title: "Les statuts vous donnent la situation en un coup d’œil",
+                description: "Gardez le statut de chaque chambre à jour pour savoir immédiatement lesquelles sont libres, occupées ou en maintenance.",
+              }]
+            : []),
+          ...(rooms.length >= 3 && filteredRooms.length === rooms.length && selectedStatus === "all" && !searchQuery
+            ? [{
+                id: "rooms-status-tip",
+                priority: 4 as const,
+                title: "Astuce",
+                description: "Utilisez les filtres et la recherche pour retrouver rapidement une chambre lorsque votre établissement grandit.",
+              }]
+            : []),
+        ]}
+      />
+
+      {/* Aide P0 : action impossible après une tentative de changement de statut */
       {roomActionHelp && (
         <ContextualHelpGroup
           items={[{
