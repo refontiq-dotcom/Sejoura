@@ -565,10 +565,12 @@ export default function DashboardLayout({
     }
   }, []);
 
-  function handleOnboardingComplete() {
+  async function handleOnboardingComplete() {
     setNeedsOnboarding(false);
     toast.success("Bienvenue ! Votre espace est prêt 🏠");
-    window.location.reload();
+    const refreshed = await fetchOnboardingStatus();
+    setNeedsOnboarding(refreshed);
+    router.refresh();
   }
 
   // Contexte utilisateur mémoïsé : sans useMemo, le CurrentUserProvider
