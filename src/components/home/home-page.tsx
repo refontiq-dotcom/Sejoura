@@ -490,7 +490,7 @@ export function HomePage() {
       }
       setEmail("");
       setPassword("");
-      setTimeout(() => router.push(targetRoute), 800);
+      router.push(targetRoute);
     } catch {
       toast.error(t.generalError);
       setLoading(false);
@@ -575,7 +575,7 @@ export function HomePage() {
         setConfirmPassword("");
         setAgreeTerms(false);
         setLoading(false);
-        setTimeout(() => router.push("/dashboard"), 800);
+        router.push("/dashboard");
         return;
       }
 
@@ -1203,7 +1203,7 @@ export function HomePage() {
                         id="login-email"
                         name="login-email"
                         type="email"
-                        autoComplete="off"
+                        autoComplete="username"
                         required
                         value={email}
                         onChange={(e) => {
@@ -1355,7 +1355,7 @@ export function HomePage() {
                         id="signup-email"
                         name="signup-email"
                         type="email"
-                        autoComplete="off"
+                        autoComplete="email"
                         required
                         value={email}
                         onChange={(e) => {
@@ -1460,6 +1460,20 @@ export function HomePage() {
                         <Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
                           {t.terms}
                         </Link>
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input
+                        id="human-check"
+                        name="humanCheck"
+                        type="checkbox"
+                        checked={humanCheck}
+                        onChange={(e) => setHumanCheck(e.target.checked)}
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]"
+                      />
+                      <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0] group-hover:text-slate-900 dark:group-hover:text-[#e8e8e8] transition-colors">
+                        {lang === "fr" ? "Je confirme que je ne suis pas un robot." : "I confirm that I am not a robot."}
                       </span>
                     </label>
 
