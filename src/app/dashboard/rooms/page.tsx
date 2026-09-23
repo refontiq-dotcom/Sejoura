@@ -233,11 +233,15 @@ export default function RoomsPage() {
       {/* Rooms grid */}
       {filteredRooms.length === 0 ? (
         {accommodations.length === 0 && (
-          <ContextualHelp
-            title="Ajoutez d’abord un établissement"
-            description="Aucune chambre ne peut être créée tant qu’un établissement n’est pas configuré."
-            href="/dashboard/residences"
-            actionLabel="Configurer un établissement"
+          <ContextualHelpGroup
+            items={[{
+              id: "rooms-residence-required",
+              priority: 1,
+              title: "Ajoutez d’abord un établissement",
+              description: "Aucune chambre ne peut être créée tant qu’un établissement n’est pas configuré.",
+              href: "/dashboard/residences",
+              actionLabel: "Configurer un établissement",
+            }]}
           />
         )}
         <div className="text-center py-16">
