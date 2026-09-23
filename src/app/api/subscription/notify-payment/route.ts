@@ -95,8 +95,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const alreadyPending = false;
-
   // 3. Synchronisation avec Refontiq Control Center : le Control Center
   // devient l'unique autorité de validation globale.
   const controlCenterUrl = process.env.CONTROL_CENTER_URL?.trim();
