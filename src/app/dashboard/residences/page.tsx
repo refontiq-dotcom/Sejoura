@@ -14,7 +14,7 @@ import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins, ArrowUpDown } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
-import { ContextualHelp } from "@/components/dashboard/contextual-help";
+import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
 
 export default function ResidencesPage() {
   const router = useRouter();
