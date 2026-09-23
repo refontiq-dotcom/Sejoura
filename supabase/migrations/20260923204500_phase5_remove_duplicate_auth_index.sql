@@ -1,0 +1,2 @@
+-- Phase 5 P1 cleanup: keep the existing unique auth_user_id index and avoid a duplicate constraint index.
+-- The existing users_auth_user_id_key already enforces uniqueness.
