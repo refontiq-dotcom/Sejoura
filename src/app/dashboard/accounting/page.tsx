@@ -1357,7 +1357,7 @@ export default function AccountingPage() {
           .from("client_profiles")
           .select("client_id, score, tier");
         const scoreById: Record<string, { score: number; tier: ClientScoreTier }> = {};
-        (profiles || []).forEach((p) => {
+        (profiles || []).forEach((p: { client_id: string; score: number; tier: ClientScoreTier }) => {
           scoreById[p.client_id] = { score: p.score, tier: p.tier };
         });
         stats.forEach((c) => {
