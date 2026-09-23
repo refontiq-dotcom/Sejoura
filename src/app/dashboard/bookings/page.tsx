@@ -72,6 +72,7 @@ import { ClientScoreBadge } from "@/components/client-score-badge";
 import { trackStep } from "@/lib/onboarding";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
+import { ContextualHelp } from "@/components/dashboard/contextual-help";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -2401,6 +2402,15 @@ export default function BookingsPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
+        {rooms.length === 0 && !loading && (
+          <ContextualHelp
+            title="Il manque encore des chambres"
+            description="Pour créer une réservation, configurez au moins une chambre dans votre établissement."
+            href="/dashboard/rooms"
+            actionLabel="Configurer les chambres"
+          />
+        )}
+
         {filteredBookings.length === 0 ? (
           <div className="p-12 text-center">
             <CalendarCheck className="w-12 h-12 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-4" />
