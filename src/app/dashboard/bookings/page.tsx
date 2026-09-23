@@ -72,7 +72,7 @@ import { ClientScoreBadge } from "@/components/client-score-badge";
 import { trackStep } from "@/lib/onboarding";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
-import { ContextualHelp } from "@/components/dashboard/contextual-help";
+import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
