@@ -723,7 +723,7 @@ export default function DashboardLayout({
       {isResidenceAdmin && (
         <>
           <WelcomeOnboardingModal
-            open={onboarding.showWelcomeModal}
+            open={onboarding.showWelcomeModal && !needsOnboarding}
             userName={user?.full_name?.split(/\s+/)[0] || undefined}
             onComplete={() => {
               onboarding.closeWelcome();
