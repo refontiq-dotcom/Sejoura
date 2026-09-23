@@ -91,6 +91,7 @@ try {
   assert(first.rowCount === 1, "First booking creation failed.");
 
   let doubleBookingRejected = false;
+  await client.query("SAVEPOINT double_booking_check");
   try {
     await client.query(
       `select * from public.create_booking(
@@ -102,7 +103,9 @@ try {
     );
   } catch (error) {
     doubleBookingRejected = String(error?.message ?? error).includes("DOUBLE_BOOKING");
+    await client.query("ROLLBACK TO SAVEPOINT double_booking_check");
   }
+  await client.query("RELEASE SAVEPOINT double_booking_check");
   assert(doubleBookingRejected, "Overlapping booking was not rejected.");
 
   const transitionBooking = await client.query(
@@ -143,6 +146,7 @@ try {
   );
   if (unauthorized.rowCount === 1) {
     let rejected = false;
+    await client.query("SAVEPOINT unauthorized_cancellation_check");
     try {
       await client.query(
         "select * from public.request_subscription_cancellation($1)",
@@ -150,11 +154,14 @@ try {
       );
     } catch {
       rejected = true;
+      await client.query("ROLLBACK TO SAVEPOINT unauthorized_cancellation_check");
     }
+    await client.query("RELEASE SAVEPOINT unauthorized_cancellation_check");
     assert(rejected, "Sensitive cancellation RPC accepted another user's identity.");
   }
 
   let invalidPaymentRejected = false;
+  await client.query("SAVEPOINT invalid_payment_check");
   try {
     await client.query(
       "select * from public.submit_subscription_payment_request($1,$2,$3,$4)",
@@ -162,7 +169,9 @@ try {
     );
   } catch {
     invalidPaymentRejected = true;
+    await client.query("ROLLBACK TO SAVEPOINT invalid_payment_check");
   }
+  await client.query("RELEASE SAVEPOINT invalid_payment_check");
   assert(invalidPaymentRejected, "Sensitive payment RPC accepted an invalid plan/amount.");
 
   await client.query("ROLLBACK");
