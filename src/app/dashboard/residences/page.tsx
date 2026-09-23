@@ -305,11 +305,13 @@ export default function ResidencesPage() {
 
       {/* Grille des établissements */}
       {residences.length === 0 ? (
-        <ContextualHelp
-          title="Première étape : ajoutez votre établissement"
-          description="Séjoura a besoin d’au moins un établissement pour créer vos chambres et gérer vos réservations."
-          href={!isReadOnly ? undefined : undefined}
-          actionLabel={undefined}
+        <ContextualHelpGroup
+          items={[{
+            id: "residence-required",
+            priority: 1,
+            title: "Première étape : ajoutez votre établissement",
+            description: "Séjoura a besoin d’au moins un établissement pour créer vos chambres et gérer vos réservations.",
+          }]}
         />
         <Card className="p-8 text-center">
           <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
