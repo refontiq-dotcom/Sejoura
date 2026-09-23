@@ -619,7 +619,7 @@ export default function BookingsPage() {
           .from("bookings")
           .select("room_id")
           .eq("accommodation_id", accId)
-          .in("status", ["confirmed", "checked_in"])
+          .in("status", ["pending_payment", "confirmed", "checked_in"])
           .lt("check_in_date", checkOut)
           .gt("check_out_date", checkIn);
         if (bookingErr) {
@@ -633,7 +633,7 @@ export default function BookingsPage() {
         //    On N'utilise PAS le statut de la chambre : une chambre "occupied"
         //    dont le client part aujourd'hui est libre pour demain.
         const free = (allRooms as unknown as (Room & { room_type?: RoomType })[]).filter(
-          (r) => !bookedRoomIds.has(r.id)
+          (r) => !["maintenance", "out_of_service"].includes(String(r.status)) && !bookedRoomIds.has(r.id)
         );
         setAvailableRooms(free);
         setAvailabilityChecked(true);
