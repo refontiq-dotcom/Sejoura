@@ -684,7 +684,11 @@ export default function DashboardLayout({
               monthlyPrice={monthlyPrice}
               scrolled={headerScrolled}
               tenantId={user.tenant_id ?? ""}
-              onOpenOnboarding={isResidenceAdmin ? onboarding.openChecklist : undefined}
+              onOpenOnboarding={
+                isResidenceAdmin && !onboarding.status?.isOnboarded
+                  ? onboarding.openChecklist
+                  : undefined
+              }
             />
           </div>
           <Breadcrumbs />
@@ -739,7 +743,7 @@ export default function DashboardLayout({
             totalCount={onboarding.totalCount}
             progress={onboarding.progress}
             onStepClick={onboarding.complete}
-            onDismiss={onboarding.dismiss}
+            onDismiss={onboarding.closeChecklist}
           />
         </>
       )}
