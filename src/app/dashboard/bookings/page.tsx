@@ -2405,6 +2405,14 @@ export default function BookingsPage() {
         {rooms.length === 0 && !loading && (
           <ContextualHelpGroup
             items={[
+              ...(modalOpen && error
+                ? [{
+                    id: "booking-action-impossible",
+                    priority: 0 as const,
+                    title: "Impossible de créer cette réservation",
+                    description: error,
+                  }]
+                : []),
               ...(modalOpen && availabilityChecked && !availabilityLoading && availableRooms.length === 0
                 ? [{
                     id: "booking-no-availability",
