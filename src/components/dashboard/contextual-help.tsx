@@ -4,12 +4,20 @@ import Link from "next/link";
 import { Info, ArrowRight, X } from "lucide-react";
 import { useState } from "react";
 
-interface ContextualHelpProps {
+export type ContextualHelpPriority = 0 | 1 | 2 | 3 | 4;
+
+export interface ContextualHelpItem {
+  id: string;
+  priority: ContextualHelpPriority;
   title: string;
   description: string;
   href?: string;
   actionLabel?: string;
+}
+
+interface ContextualHelpProps extends Omit<ContextualHelpItem, "id" | "priority"> {
   dismissible?: boolean;
+  onDismiss?: () => void;
 }
 
 export function ContextualHelp({
@@ -18,6 +26,7 @@ export function ContextualHelp({
   href,
   actionLabel,
   dismissible = true,
+  onDismiss,
 }: ContextualHelpProps) {
   const [visible, setVisible] = useState(true);
 
@@ -45,7 +54,10 @@ export function ContextualHelp({
         {dismissible && (
           <button
             type="button"
-            onClick={() => setVisible(false)}
+            onClick={() => {
+              setVisible(false);
+              onDismiss?.();
+            }}
             aria-label="Fermer l'aide"
             className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
           >
@@ -54,5 +66,35 @@ export function ContextualHelp({
         )}
       </div>
     </div>
+  );
+}
+
+
+/**
+ * Règle globale d'aide contextuelle Séjoura :
+ * une seule aide peut être visible à la fois. La priorité la plus basse
+ * (P0 > P1 > P2 > P3 > P4) gagne. Aucun calcul réseau n'est effectué ici.
+ */
+export function ContextualHelpGroup({
+  items,
+}: {
+  items: ContextualHelpItem[];
+}) {
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+
+  const selected = items
+    .filter((item) => item.priority >= 0 && item.priority <= 4)
+    .sort((a, b) => a.priority - b.priority)[0];
+
+  if (!selected || selected.id === dismissedId) return null;
+
+  return (
+    <ContextualHelp
+      title={selected.title}
+      description={selected.description}
+      href={selected.href}
+      actionLabel={selected.actionLabel}
+      onDismiss={() => setDismissedId(selected.id)}
+    />
   );
 }
