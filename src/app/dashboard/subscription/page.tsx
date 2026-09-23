@@ -247,7 +247,7 @@ export default function SubscriptionPage() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">Plan {getPlanLabel(currentPlan)}</h2>
-                {isTrial && <Badge variant="info">Essai gratuit</Badge>}
+                {isTrial && <Badge variant="info">Essai gratuit de 30 jours</Badge>}
                 {isPending && <Badge variant="warning"><Clock className="w-3 h-3" /> {getSubscriptionStatusLabel("pending")}</Badge>}
                 {!isPending && isExpired && <Badge variant="error"><AlertCircle className="w-3 h-3" /> {getSubscriptionStatusLabel("expired")}</Badge>}
                 {!isPending && !isExpired && <Badge variant="success"><ShieldCheck className="w-3 h-3" /> {getSubscriptionStatusLabel("active")}</Badge>}
