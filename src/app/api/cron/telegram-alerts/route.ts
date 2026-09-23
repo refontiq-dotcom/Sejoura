@@ -34,8 +34,8 @@ interface TelegramAlert {
 }
 
 function isAuthorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // CRON_SECRET non configuré : toléré en dev
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return false;
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
