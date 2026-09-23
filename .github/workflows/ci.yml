@@ -26,12 +26,17 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Require DATABASE_URL
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL GitHub Secret is required for Release Candidate CI."
+            exit 1
+          fi
       - name: Lint
         run: npm run lint
       - name: Unit tests
         run: npm test
       - name: Database regression tests
-        if: ${{ env.DATABASE_URL != '' }}
         run: npm run test:db
       - name: Production build
         run: npm run build
