@@ -338,6 +338,7 @@ export default function ResidencesPage() {
 
       {/* Grille des établissements */}
       {residences.length === 0 ? (
+        <>
         <ContextualHelpGroup
           items={[{
             id: "residence-required",
