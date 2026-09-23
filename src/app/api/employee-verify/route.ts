@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkEmployeeVerifyRateLimit } from "@/lib/rate-limit";
 
 /**
  * GET /api/employee-verify?phone=0701234567
@@ -19,6 +20,15 @@ export async function GET(request: Request) {
     const digitsOnly = phone.replace(/[^0-9]/g, "");
     if (digitsOnly.length < 8) {
       return NextResponse.json({ error: "Numéro invalide." }, { status: 400 });
+    }
+
+    const rl = await checkEmployeeVerifyRateLimit(request);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "Trop de tentatives. Réessayez plus tard." },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+      );
     }
 
     const admin = createAdminClient();
