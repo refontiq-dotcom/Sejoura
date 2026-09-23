@@ -507,6 +507,15 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                   <HelpCircle className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                   {t.helpTitle}
                 </button>
+                {onOpenOnboarding && (
+                  <button
+                    onClick={() => { setMenuOpen(false); onOpenOnboarding(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                    {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                  </button>
+                )}
                 <button
                   onClick={() => { setMenuOpen(false); toggleTheme(); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
@@ -558,6 +567,15 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                  <p className="px-3 py-1.5 text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
                    {t.helpTitle}
                  </p>
+                {onOpenOnboarding && (
+                  <button
+                    onClick={() => { setHelpOpen(false); onOpenOnboarding(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                  </button>
+                )}
                 <button
                   onClick={() => { setHelpOpen(false); setIdeaCategory("bug_report"); setIdeaModalOpen(true); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
