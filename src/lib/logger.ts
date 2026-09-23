@@ -22,6 +22,14 @@ function write(level: "info" | "warn" | "error", event: string, context: LogCont
   else console.log(entry);
 }
 
+export function getRequestId(req: Request): string {
+  return (
+    req.headers.get("x-request-id") ??
+    req.headers.get("x-vercel-id") ??
+    crypto.randomUUID()
+  );
+}
+
 export const logger = {
   info(event: string, context?: LogContext) {
     write("info", event, context);
