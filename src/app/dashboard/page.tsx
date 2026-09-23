@@ -1256,9 +1256,18 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!tenantId) return;
     let cancelled = false;
+    let refreshTimer: number | null = null;
     const supabase = createClient();
+
+    // Plusieurs écritures peuvent arriver ensemble (réservation + paiement +
+    // tâche de ménage). Regrouper les événements évite de lancer plusieurs
+    // rechargements identiques dans la même fenêtre.
     const refresh = () => {
-      if (!cancelled) loadDashboardData(true, selectedDate);
+      if (cancelled || refreshTimer !== null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        if (!cancelled) void loadDashboardData(true, selectedDate);
+      }, 300);
     };
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -1288,6 +1297,7 @@ export default function DashboardPage() {
 
     return () => {
       cancelled = true;
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
       if (channel) supabase.removeChannel(channel);
     };
   }, [tenantId, selectedDate, loadDashboardData]);
