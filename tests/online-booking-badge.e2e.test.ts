@@ -54,6 +54,9 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
   it("prépare la connexion", async () => {
     client = new pg.Client({ connectionString: DATABASE_URL });
     await client.connect();
+    // Le pooler Supabase utilisé par DATABASE_URL est en mode transaction :
+    // garder la suite dans une transaction conserve le contexte JWT de test.
+    await client.query("BEGIN");
   });
 
   it("crée un environnement de test isolé", async () => {
@@ -223,6 +226,7 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
   });
 
   it("ferme la connexion", async () => {
+    await client.query("ROLLBACK");
     await client.end();
   });
 });
