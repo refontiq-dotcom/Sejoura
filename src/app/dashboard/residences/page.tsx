@@ -14,6 +14,7 @@ import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins, ArrowUpDown } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
+import { ContextualHelp } from "@/components/dashboard/contextual-help";
 
 export default function ResidencesPage() {
   const router = useRouter();
@@ -304,6 +305,12 @@ export default function ResidencesPage() {
 
       {/* Grille des établissements */}
       {residences.length === 0 ? (
+        <ContextualHelp
+          title="Première étape : ajoutez votre établissement"
+          description="Séjoura a besoin d’au moins un établissement pour créer vos chambres et gérer vos réservations."
+          href={!isReadOnly ? undefined : undefined}
+          actionLabel={undefined}
+        />
         <Card className="p-8 text-center">
           <Building2 className="w-10 h-10 text-slate-300 dark:text-slate-600 dark:text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-medium text-slate-900 dark:text-white mb-2">Aucun établissement</h3>
