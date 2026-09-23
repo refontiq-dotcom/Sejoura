@@ -60,9 +60,9 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
     // Tenant
     const t = await run(
       client,
-      `INSERT INTO tenants (id, company_name)
-       VALUES (gen_random_uuid(), $1) RETURNING id`,
-      [TEST_TENANT_NAME]
+      `INSERT INTO tenants (id, company_name, contact_name, contact_email, contact_phone)
+       VALUES (gen_random_uuid(), $1, 'Test Badge', $2, $3) RETURNING id`,
+      [TEST_TENANT_NAME, `${TEST_PREFIX}-contact-${Date.now()}@example.com`, `${TEST_PREFIX}-contact-${Date.now()}`]
     );
     tenantId = t.rows[0].id;
 
@@ -75,6 +75,13 @@ describeDb("Badge réservations en ligne — compteur global (base réelle)", ()
       [tenantId, `${TEST_PREFIX}-phone-${Date.now()}`, `${TEST_PREFIX}-user-${Date.now()}@example.com`]
     );
     userId = u.rows[0].id;
+
+    // Simule une session authentifiée pour les RPC protégées par auth.uid().
+    await run(
+      client,
+      `SELECT set_config('request.jwt.claim.sub', $1, false)`,
+      [userId]
+    );
 
     // Résidence + type de chambre + chambre
     const a = await run(
