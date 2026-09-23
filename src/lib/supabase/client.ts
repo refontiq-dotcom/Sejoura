@@ -1,12 +1,19 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
+import { createBrowserClient, type SupabaseClient } from "@supabase/ssr";
 import { getSupabaseUrl, getSupabasePublicKey } from "./env";
 
 /**
- * Client Supabase pour le navigateur (Client Components)
- * Utilise les variables d'environnement publiques
+ * Client Supabase navigateur singleton.
+ *
+ * Évite de recréer un client et ses listeners de session à chaque rendu/action
+ * d'un Client Component. Toutes les pages partagent la même instance.
  */
-export function createClient() {
-  return createBrowserClient(getSupabaseUrl(), getSupabasePublicKey());
+let browserClient: SupabaseClient | undefined;
+
+export function createClient(): SupabaseClient {
+  if (!browserClient) {
+    browserClient = createBrowserClient(getSupabaseUrl(), getSupabasePublicKey());
+  }
+  return browserClient;
 }
