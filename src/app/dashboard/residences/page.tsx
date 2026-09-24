@@ -176,8 +176,10 @@ export default function ResidencesPage() {
       toast.error("Le nom de l'établissement est requis.");
       return;
     }
-    if (formData.tourist_tax_enabled && !formData.tourist_tax_rate) {
-      toast.error("Indiquez le tarif de la taxe de nuitée, ou désactivez-la.");
+    const trimmedTaxRate = formData.tourist_tax_rate.trim();
+    const parsedTaxRate = trimmedTaxRate === "" ? null : Number(trimmedTaxRate);
+    if (parsedTaxRate !== null && (!Number.isFinite(parsedTaxRate) || parsedTaxRate < 0)) {
+      toast.error("Le montant de la taxe de nuitée doit être un nombre positif.");
       return;
     }
     setSaving(true);
@@ -199,8 +201,8 @@ export default function ResidencesPage() {
         image_url: formData.image_url || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        tourist_tax_enabled: formData.tourist_tax_enabled,
-        tourist_tax_rate: formData.tourist_tax_enabled && formData.tourist_tax_rate ? Number(formData.tourist_tax_rate) : null,
+        tourist_tax_enabled: formData.tourist_tax_enabled && parsedTaxRate !== null,
+        tourist_tax_rate: parsedTaxRate !== null ? Math.round(parsedTaxRate) : null,
       };
 
       const { error } = editingResidence
@@ -212,8 +214,11 @@ export default function ResidencesPage() {
       loadData(true);
       toast.success(editingResidence ? "Établissement modifié ✏️" : "Établissement créé");
     } catch (err) {
-      toast.error("L'action a échoué : enregistrer l'établissement.");
-      console.error(err);
+      const message = err instanceof Error ? err.message : "Erreur inconnue";
+      toast.error("Impossible d'enregistrer l'établissement.", {
+        description: message,
+      });
+      console.error("residence save:", err);
     } finally {
       setSaving(false);
     }
@@ -598,17 +603,17 @@ export default function ResidencesPage() {
                 onChange={(e) => setFormData({ ...formData, tourist_tax_enabled: e.target.checked })}
                 className="w-4 h-4 rounded accent-[var(--primary-color,#0C1C33)]"
               />
-              <span className="text-sm font-semibold text-[var(--foreground)]">Taxe de nuitée (obligatoire depuis janvier 2026)</span>
+              <span className="text-sm font-semibold text-[var(--foreground)]">Taxe de nuitée (optionnelle)</span>
             </label>
             {formData.tourist_tax_enabled && (
               <>
                 <Input
-                  label="Tarif (FCFA par nuitée et par occupant)"
+                  label={`Tarif (${formData.currency_symbol} par nuitée et par occupant)`}
                   type="number"
                   min="0"
                   value={formData.tourist_tax_rate}
                   onChange={(e) => setFormData({ ...formData, tourist_tax_rate: e.target.value })}
-                  placeholder="1000"
+                  placeholder={formData.currency === "XOF" ? "1000" : "Ex. 10"}
                 />
                 <p className="text-[11px] text-[var(--foreground-subtle)] leading-relaxed">
                   Barème légal indicatif — vérifiez le tarif exact de votre commune : résidences meublées, 500 FCFA
