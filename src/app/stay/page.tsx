@@ -26,6 +26,7 @@ import {
   Info,
   Moon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useCurrency } from "@/hooks/use-currency";
 import { Button } from "@/components/ui/button";
 import { getGuestInfoIcon, resolvePrimaryColor } from "@/lib/guest-info";
@@ -236,7 +237,7 @@ function StayPortal() {
       setRequest(null);
     } catch (err) {
       setRequest({ ...request, submitting: false, message: request.message });
-      window.alert(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
+      toast.error("Impossible d’envoyer la demande", { description: err instanceof Error ? err.message : "Un problème technique est survenu. Réessayez dans un instant." });
     }
   };
 
@@ -259,7 +260,7 @@ function StayPortal() {
   const handleExtendSubmit = async () => {
     if (!extendDate || extendSubmitting) return;
     if (nightsBetween(booking.check_in_date, extendDate) <= booking.nights_count) {
-      window.alert("La nouvelle date de départ doit être postérieure au départ actuel.");
+      toast.warning("Date de départ invalide", { description: "Choisissez une date située après votre départ actuel." });
       return;
     }
     setExtendSubmitting(true);
@@ -282,7 +283,7 @@ function StayPortal() {
         loadStay();
       }, 3000);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
+      toast.error("Impossible de prolonger le séjour", { description: err instanceof Error ? err.message : "Un problème technique est survenu. Réessayez dans un instant." });
     } finally {
       setExtendSubmitting(false);
     }
