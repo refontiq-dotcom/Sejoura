@@ -671,8 +671,6 @@ export default function SettingsPage() {
         window.dispatchEvent(new CustomEvent("sejoura-logo-updated", { detail: { logoUrl: result.logoUrl } }));
       }
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Impossible de téléverser le logo.";
       setLogoError(t.logoUploadError);
     } finally {
       setLogoUploading(false);
@@ -960,7 +958,7 @@ export default function SettingsPage() {
                       onClick={async () => {
                         await navigator.clipboard.writeText(employeeLink);
                         setCopiedPortalLink(true);
-                        toast.success("Lien copié dans le presse-papier 📋");
+                        toast.success(t.linkCopied);
                         setTimeout(() => setCopiedPortalLink(false), 2000);
                       }}
                       disabled={copiedPortalLink}
@@ -1148,7 +1146,7 @@ export default function SettingsPage() {
                        <p className="text-xs text-slate-500 dark:text-slate-400">
                          {t.referenceCurrencyHelp}
                          {activeAccommodation && activeAccommodation.currency !== companyForm.default_currency && (
-                           <> {lang === "en" ? "Current display" : "Affichage actuel"} : <strong className="text-[var(--primary-color,#0C1C33)]">{activeAccommodation.currency_symbol}</strong> ({activeAccommodation.currency}) {lang === "en" ? "for" : "pour"} « {activeAccommodation.name} ».</>
+                           <> {t.currentDisplay} : <strong className="text-[var(--primary-color,#0C1C33)]">{activeAccommodation.currency_symbol}</strong> ({activeAccommodation.currency}) {t.forWord} « {activeAccommodation.name} ».</>
                          )}
                        </p>
                     </div>
@@ -1187,10 +1185,10 @@ export default function SettingsPage() {
                           last.primaryColor === primaryColor &&
                           last.themeColor === themeHex(themeColor);
                         if (unchanged) {
-                          toast.success(lang === "en" ? "Appearance already saved ✓" : "L'apparence est déjà enregistrée ✓");
+                          toast.success(t.appearanceAlreadySaved);
                           return;
                         }
-                        persistColors(primaryColor, themeColor, { successMessage: lang === "en" ? "Appearance saved ✓" : "Apparence enregistrée ✓" });
+                        persistColors(primaryColor, themeColor, { successMessage: t.appearanceSaved });
                       }}
                       loading={saving}
                       className="text-white hover:brightness-110"
@@ -1402,7 +1400,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="mt-6 pt-4 border-t border-red-200 dark:border-red-900/40">
                     <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
-                      {lang === "en" ? "Danger zone" : "Zone de danger"}
+                      {t.dangerZone}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                       {lang === "en"
@@ -1410,7 +1408,7 @@ export default function SettingsPage() {
                         : "Désactivez votre compte et déconnectez-vous. Contactez le support pour restaurer l'accès."}
                     </p>
                     <Button variant="destructive" onClick={handleDeleteAccount} loading={deletingAccount}>
-                      {lang === "en" ? "Delete my account" : "Supprimer mon compte"}
+                      {t.deleteAccount}
                     </Button>
                   </div>
                 </div>
