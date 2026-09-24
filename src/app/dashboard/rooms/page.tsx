@@ -100,7 +100,7 @@ export default function RoomsPage() {
       const accMap: Record<string, string> = {};
       accList.forEach((a) => { accMap[a.id] = a.name; });
 
-      const enriched: RoomWithType[] = (roomsResult.data || []).map((r) => ({
+      const enriched: RoomWithType[] = (roomsResult.data || []).map((r: RoomWithType) => ({
         ...r,
         room_type_name: typesMap[r.room_type_id]?.name || "—",
         room_type_price: typesMap[r.room_type_id]?.base_price,
