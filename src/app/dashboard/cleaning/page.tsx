@@ -27,7 +27,6 @@ import { estimateTaskMinutes, formatMinutes, workloadLevel } from "@/lib/cleanin
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
-  Loader2,
   Clock,
   AlertCircle,
   CheckCircle2,
