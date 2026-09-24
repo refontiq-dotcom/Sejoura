@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrency } from "@/hooks/use-currency";
 import { toast } from "sonner";
 import { Suspense } from "react";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -605,7 +606,7 @@ function HrPageContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
-            <Input label="Salaire de base (FCFA)" type="number" placeholder="Informatif — pas de calcul de paie" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
+            <Input label={<SalaryLabel />} type="number" placeholder="Informatif — pas de calcul de paie" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
             <Input label="N° CNPS" value={form.cnps_number} onChange={(e) => setForm({ ...form, cnps_number: e.target.value })} />
           </div>
 
@@ -638,6 +639,11 @@ function HrPageContent() {
       </Modal>
     </div>
   );
+}
+
+function SalaryLabel() {
+  const { symbol } = useCurrency();
+  return <>Salaire de base ({symbol})</>;
 }
 
 export default function HrPage() {
