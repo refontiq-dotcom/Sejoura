@@ -87,7 +87,7 @@ export function NotificationsProvider({
 
   useEffect(() => {
     if (!tenantId) return;
-    loadNotifications();
+    const initialLoad = window.setTimeout(() => { void loadNotifications(); }, 0);
 
     const channel = supabase
       .channel(`notifications-${tenantId}`)
@@ -114,12 +114,13 @@ export function NotificationsProvider({
               playNotificationSound();
             }
           }
-          loadNotifications();
+          void loadNotifications();
         }
       )
       .subscribe();
 
     return () => {
+      window.clearTimeout(initialLoad);
       supabase.removeChannel(channel);
     };
   }, [tenantId, userRole, userId, playNotificationSound]);
@@ -177,7 +178,8 @@ export function NotificationsProvider({
   }
 
   useEffect(() => {
-    autoMarkReadByPath();
+    const timer = window.setTimeout(() => { void autoMarkReadByPath(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [pathname, notifications]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
