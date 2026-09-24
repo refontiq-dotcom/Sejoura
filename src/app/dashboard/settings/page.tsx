@@ -447,11 +447,11 @@ export default function SettingsPage() {
         await supabase.from("users").update({ is_active: false }).eq("id", user.id);
       }
       await supabase.auth.signOut();
-      toast.success(lang === "en" ? "Account deactivated" : "Compte désactivé");
+      toast.success(t.accountDeactivated);
       const isEmployee = user?.role === "receptionniste" || user?.role === "menagere";
       window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
-      toast.error(lang === "en" ? "Unable to delete the account" : "Impossible de supprimer le compte");
+      toast.error(t.accountDeleteError);
       setDeletingAccount(false);
     }
   }
@@ -576,7 +576,7 @@ export default function SettingsPage() {
         .update({ guest_info: {} })
         .eq("id", activeAccommodation.id);
       if (error) {
-        toast.error(error.message || "Impossible de réinitialiser.");
+        toast.error(t.guestInfoResetError);
         return;
       }
       setPortalGuestInfo(tenant?.guest_info ?? null);
@@ -609,13 +609,13 @@ export default function SettingsPage() {
     const maxSize = 2 * 1024 * 1024;
 
     if (!allowedTypes.includes(file.type)) {
-      setLogoError("Le logo doit être une image PNG, JPG, SVG ou WEBP.");
+      setLogoError(t.logoFormatError);
       setLogoFile(null);
       return;
     }
 
     if (file.size > maxSize) {
-      setLogoError("Le logo doit faire au maximum 2 Mo.");
+      setLogoError(t.logoSizeError);
       setLogoFile(null);
       return;
     }
@@ -639,12 +639,12 @@ export default function SettingsPage() {
 
   async function handleUploadLogo() {
     if (!tenant) {
-      setLogoError("Impossible de téléverser le logo : entreprise introuvable.");
+      setLogoError(t.logoTenantMissing);
       return;
     }
 
     if (!logoFile) {
-      setLogoError("Veuillez sélectionner un fichier avant de téléverser.");
+      setLogoError(t.logoSelectError);
       return;
     }
 
@@ -662,7 +662,7 @@ export default function SettingsPage() {
 
       const result = await response.json();
       if (!response.ok) {
-        setLogoError(result.error || "Impossible de téléverser le logo.");
+        setLogoError(result.error || t.logoUploadError);
         return;
       }
 
@@ -670,7 +670,7 @@ export default function SettingsPage() {
       setLogoFile(null);
       setLogoPreviewUrl(result.logoUrl);
       setLogoError("");
-      toast.success("Logo de l'entreprise mis à jour avec succès");
+      toast.success(t.logoUploadSuccess);
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("sejoura-logo-updated", { detail: { logoUrl: result.logoUrl } }));
       }
@@ -709,18 +709,18 @@ export default function SettingsPage() {
     (t?.settingsSections ?? []).map((s: { key: string; label: string }) => [s.key, s.label])
   );
   const allSections = [
-    { key: "company",       label: sectionLabelMap["company"]       || "Entreprise",    icon: Building2 },
-    { key: "account",       label: sectionLabelMap["account"]       || "Compte",         icon: User },
-    { key: "appearance",    label: sectionLabelMap["appearance"]    || "Apparence",      icon: theme === "dark" ? Moon : Sun },
-    { key: "portal",        label: sectionLabelMap["portal"]        || "Espace client",  icon: Smartphone },
-    { key: "notifications", label: sectionLabelMap["notifications"] || "Notifications", icon: Bell },
-    { key: "billing",       label: sectionLabelMap["billing"]       || "Facturation",    icon: CreditCard },
-    { key: "payments",      label: "Paiements en ligne",                                icon: Smartphone },
-    { key: "whatsapp",      label: sectionLabelMap["whatsapp"]      || "WhatsApp",       icon: MessageSquare },
-    { key: "integrations",  label: sectionLabelMap["integrations"]  || "Intégrations",  icon: Globe },
-    { key: "security",      label: sectionLabelMap["security"]      || "Sécurité",      icon: Shield },
-    { key: "ideas",         label: sectionLabelMap["ideas"]         || "Boîte à idées", icon: Lightbulb },
-    { key: "about",         label: sectionLabelMap["about"]         || "À propos",      icon: Info },
+    { key: "company",       label: sectionLabelMap["company"]       || t.companyInfo,    icon: Building2 },
+    { key: "account",       label: sectionLabelMap["account"]       || t.accountInfo,         icon: User },
+    { key: "appearance",    label: sectionLabelMap["appearance"]    || t.appearance,      icon: theme === "dark" ? Moon : Sun },
+    { key: "portal",        label: sectionLabelMap["portal"]        || t.guestPortal,  icon: Smartphone },
+    { key: "notifications", label: sectionLabelMap["notifications"] || t.notificationsTitle, icon: Bell },
+    { key: "billing",       label: sectionLabelMap["billing"]       || t.billingTitle,    icon: CreditCard },
+    { key: "payments",      label: t.onlinePayments,                                icon: Smartphone },
+    { key: "whatsapp",      label: sectionLabelMap["whatsapp"]      || t.whatsappTitle,       icon: MessageSquare },
+    { key: "integrations",  label: sectionLabelMap["integrations"]  || t.integrationsTitle,  icon: Globe },
+    { key: "security",      label: sectionLabelMap["security"]      || t.securityTitle,      icon: Shield },
+    { key: "ideas",         label: sectionLabelMap["ideas"]         || t.ideasTitle, icon: Lightbulb },
+    { key: "about",         label: sectionLabelMap["about"]         || t.aboutTitle,      icon: Info },
   ];
 
   // Sections accessibles aux réceptionnistes / ménagères (profil, apparence, notifications, sécurité, à propos)
@@ -830,7 +830,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                aria-label="Fermer"
+                aria-label={t.close}
               >
                 <X className="w-5 h-5" />
               </button>
