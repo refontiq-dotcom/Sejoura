@@ -1166,7 +1166,7 @@ function TrouvetouDashboardPage() {
                 Boost Express Ponctuel
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
-                Propulsez temporairement un établissement en tête de liste. À partir de 5 000 FCFA / 3 jours.
+                Propulsez temporairement un établissement en tête de liste. À partir de {fmt(5000)} / 3 jours.
               </p>
             </div>
           </div>
