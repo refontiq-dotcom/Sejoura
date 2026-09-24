@@ -99,7 +99,7 @@ function buildAuditSummary(log: AuditLog, fmt: (amount: number) => string): stri
       if (old != null && nw != null) {
         const diff = Number(nw) - Number(old);
         const sign = diff > 0 ? "+" : "";
-        return "Prix modifié : " + fmtNum(old) + " → " + fmtNum(nw) + " FCFA (" + sign + fmtNum(diff) + " FCFA)";
+        return "Prix modifié : " + fmtNum(old) + " → " + fmtNum(nw) + " (" + sign + fmtNum(diff) + ")";
       }
       return "Prix modifié";
     }
@@ -2086,7 +2086,7 @@ export default function AccountingPage() {
       const q = auditSearch.trim().toLowerCase();
       const haystack = [
         getAuditActionInfo(l.action).label,
-        buildAuditSummary(l),
+        buildAuditSummary(l, fmt),
         usersById[l.user_id || ""],
         l.action,
         l.entity_type,
@@ -3089,7 +3089,7 @@ export default function AccountingPage() {
                       <div className="space-y-1.5">
                         {g.items.map((log) => {
                           const info = getAuditActionInfo(log.action);
-                          const summary = buildAuditSummary(log);
+                          const summary = buildAuditSummary(log, fmt);
                           const fullDate = formatDateTime(log.created_at);
                           const actorName = log.user_id
                             ? usersById[log.user_id] || "Utilisateur inconnu"
