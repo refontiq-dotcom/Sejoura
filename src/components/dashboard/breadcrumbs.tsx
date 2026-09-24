@@ -60,7 +60,7 @@ export function Breadcrumbs() {
     settings: t.settings,
     subscription: t.subscription,
     trouvetou: t.trouvetou,
-    ads: t.ads ?? (lang === "en" ? "Ads" : "Publicités"),
+    ads: t.ads,
     suggestions: t.suggestions,
   };
 
