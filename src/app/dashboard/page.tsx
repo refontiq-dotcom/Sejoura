@@ -376,7 +376,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
     return (
       <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500">
         <span className="text-4xl font-bold text-slate-300">0</span>
-        <span className="text-sm mt-1">{t.rooms}</span>
+        <span className="text-sm mt-1">{dt.rooms}</span>
       </div>
     );
   }
