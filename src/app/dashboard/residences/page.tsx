@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
 
 export default function ResidencesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user, tenantId, plan } = useCurrentUser();
@@ -54,6 +55,17 @@ export default function ResidencesPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
+
+  // Depuis le tableau de bord, ?add=1 ouvre directement le modal de création.
+  // Le paramètre est ensuite retiré pour éviter de rouvrir le modal lors d'un refresh.
+  useEffect(() => {
+    if (searchParams.get("add") !== "1" || loading || isReadOnly) return;
+    void openAddModal();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("add");
+    window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, isReadOnly]);
 
   async function loadData(silent = false) {
     if (!silent) setLoading(true);
