@@ -38,6 +38,7 @@ const STATUS_LABELS_EN: Record<string, string> = {
 
 export default function RoomsPage() {
   const { lang } = useLanguage();
+  const { fmt } = useCurrency();
 
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState<RoomWithType[]>([]);
@@ -365,7 +366,7 @@ export default function RoomsPage() {
                         )}
                         {room.room_type_price != null && (
                           <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-2">
-                            {room.room_type_price.toLocaleString()} <span className="text-xs font-normal text-slate-400">{lang === "fr" ? "/ nuit" : "/ night"}</span>
+                            {fmt(room.room_type_price)} <span className="text-xs font-normal text-slate-400">{lang === "fr" ? "/ nuit" : "/ night"}</span>
                           </p>
                         )}
                       </div>
