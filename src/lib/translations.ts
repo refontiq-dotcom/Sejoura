@@ -820,7 +820,7 @@ export const translations = {
       kpis: {
         occupancy: "Occupancy rate",
         dailyRevenue: "Daily revenue",
-        dailyRevenueCopy: "XOF collected today",
+        dailyRevenueCopy: "{currency} collected today",
         checkinsCheckouts: "Check-ins / Check-outs",
         cleaningState: "Cleaning status",
         today: "Today",
@@ -852,7 +852,7 @@ export const translations = {
       },
       charts: {
         monthlyRevenueTitle: "Monthly revenue tracking",
-        monthlyRevenueCopy: "Revenue trend (in XOF)",
+        monthlyRevenueCopy: "Revenue trend (in {currency})",
       },
       error: {
         title: "Loading error",
@@ -1185,7 +1185,7 @@ export const translations = {
       language: "Language",
       languageHelp: "Choose the interface language",
       currency: "Currency",
-      currencyHelp: "All amounts are in XOF",
+      currencyHelp: "All amounts follow the active establishment currency ({currency})",
       showPlanBadge: "Show plan in sidebar",
       showPlanBadgeHelp: "Show current plan badge in the sidebar menu",
       logoUpload: "Company logo",
