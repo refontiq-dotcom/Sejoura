@@ -834,6 +834,84 @@ html {
   --toast-variant-shadow: var(--toast-sync-shadow);
 }
 
+.toaster-group [data-sonner-toast] .sejoura-toast {
+  display: grid;
+  grid-template-columns: var(--toast-icon-size) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--toast-gap);
+  width: 100%;
+  min-height: inherit;
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--toast-accent-width);
+  border-radius: var(--toast-radius) 0 0 var(--toast-radius);
+  background: var(--toast-accent);
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-icon {
+  display: grid;
+  width: var(--toast-icon-size);
+  height: var(--toast-icon-size);
+  place-items: center;
+  border-radius: var(--toast-icon-radius);
+  background: var(--toast-icon-bg);
+  color: var(--toast-icon-color);
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--toast-title-size);
+  line-height: var(--toast-title-line-height);
+  font-weight: var(--toast-title-weight);
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-description {
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: var(--toast-description-size);
+  line-height: var(--toast-description-line-height);
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-close {
+  position: static !important;
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  opacity: 0;
+}
+
+.toaster-group [data-sonner-toast]:hover .sejoura-toast-close,
+.toaster-group [data-sonner-toast]:focus-within .sejoura-toast-close {
+  opacity: 1;
+}
+
+.toaster-group [data-sonner-toast] .sejoura-toast-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toaster-group [data-sonner-toast].sejoura-toast--business .sejoura-toast {
+  min-height: 72px;
+}
+
+.toaster-group [data-sonner-toast].sejoura-toast--loading .sejoura-toast-icon svg,
+.toaster-group [data-sonner-toast].sejoura-toast--sync .sejoura-toast-icon svg {
+  animation: sejouraToastSpin var(--toast-spinner-duration) linear infinite;
+}
+
 .toaster-group [data-sonner-toast] [data-icon] {
   display: grid;
   width: var(--toast-icon-size);
