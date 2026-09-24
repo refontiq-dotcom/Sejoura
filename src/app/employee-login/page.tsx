@@ -77,6 +77,7 @@ function EmployeeLoginContent() {
   // État machine
   const [step, setStep] = useState<Step>("phone");
   const [loading, setLoading] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
 
   // Étape 1 — Téléphone
   const [dialCode, setDialCode] = useState("+225");
