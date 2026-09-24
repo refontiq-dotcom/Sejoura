@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { canAccessFeature } from "@/lib/subscription-plans";
-import { formatAmount, formatDate, formatDateLong, formatNumber } from "@/lib/utils";
+import { formatDate, formatDateLong, formatNumber } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import { ClientScoreBadge } from "@/components/client-score-badge";
 import { StayTimeline } from "@/components/stay-timeline";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ export default function ClientProfilePage() {
   const [payload, setPayload] = useState<ClientProfilePayload | null>(null);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const { tenantId, plan } = useCurrentUser();
+  const { fmt } = useCurrency();
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   // Fiche intelligente réservée à la formule Entreprise
   const [locked, setLocked] = useState(false);
@@ -386,18 +388,18 @@ export default function ClientProfilePage() {
         </div>
         <div className="p-4 rounded-2xl bg-[var(--card-bg,#fff)] border border-[var(--card-border,#e5e7eb)]">
           <p className="inline-flex items-center gap-1 text-[11px] text-zinc-500"><Banknote className="w-3 h-3" /> Chiffre d&apos;affaires</p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{formatAmount(profile.stats.total_revenue)}</p>
-          <p className="text-[11px] text-zinc-400">encaissé {formatAmount(profile.stats.total_paid)}</p>
+          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{fmt(profile.stats.total_revenue)}</p>
+          <p className="text-[11px] text-zinc-400">encaissé {fmt(profile.stats.total_paid)}</p>
         </div>
         <div className="p-4 rounded-2xl bg-[var(--card-bg,#fff)] border border-[var(--card-border,#e5e7eb)]">
           <p className="inline-flex items-center gap-1 text-[11px] text-zinc-500"><Wallet className="w-3 h-3" /> Panier moyen</p>
-          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{formatAmount(profile.stats.avg_stay_amount)}</p>
+          <p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{fmt(profile.stats.avg_stay_amount)}</p>
           <p className="text-[11px] text-zinc-400">par séjour</p>
         </div>
         <div className="p-4 rounded-2xl bg-[var(--card-bg,#fff)] border border-[var(--card-border,#e5e7eb)]">
           <p className="inline-flex items-center gap-1 text-[11px] text-zinc-500"><AlertTriangle className="w-3 h-3" /> Solde dû</p>
           <p className={`mt-1 text-xl font-bold tabular-nums ${profile.stats.balance_due > 0 ? "text-red-600" : "text-green-600"}`}>
-            {profile.stats.balance_due > 0 ? formatAmount(profile.stats.balance_due) : "À jour"}
+            {profile.stats.balance_due > 0 ? fmt(profile.stats.balance_due) : "À jour"}
           </p>
           <p className="text-[11px] text-zinc-400">{profile.stats.preferred_room_type ? `préfère ${profile.stats.preferred_room_type}` : "chambre non déterminée"}</p>
         </div>
@@ -428,7 +430,7 @@ export default function ClientProfilePage() {
                         {formatNumber(b.nights_count)} nuit{b.nights_count > 1 ? "s" : ""}
                         {b.room?.[0]?.room_number ? ` · Chambre ${b.room[0].room_number}` : ""}
                         {" · "}
-                        {formatAmount(b.total_amount)} · payé {formatAmount(b.amount_paid)}
+                        {fmt(b.total_amount)} · payé {fmt(b.amount_paid)}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
