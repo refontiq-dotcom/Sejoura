@@ -879,7 +879,7 @@ export default function DashboardPage() {
           .select("last_viewed_at")
           .eq("tenant_id", tenantId)
           .maybeSingle()
-          .then((res) => res.data?.last_viewed_at || "2024-01-01T00:00:00Z");
+          .then((res: { data: { last_viewed_at?: string | null } | null }) => res.data?.last_viewed_at || "2024-01-01T00:00:00Z");
 
         const [subscriptionsData, bookingsData, paymentsData, cleaningTasksData, accommodationsData, overstayRes, onlineRes] =
           await Promise.all([
