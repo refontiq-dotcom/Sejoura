@@ -1585,8 +1585,6 @@ export default function DashboardPage() {
         const maxDays = Math.max(...overstayBookings.map(b => b.daysOverdue));
         const isCritical = maxDays >= 4;
         const isUrgent = maxDays >= 2;
-        const urgencyLevel = isCritical ? "critical" : isUrgent ? "urgent" : "warning";
-
         const bannerBg = isCritical
           ? "bg-red-100 dark:bg-red-950/50 border-red-400 dark:border-red-700"
           : isUrgent
