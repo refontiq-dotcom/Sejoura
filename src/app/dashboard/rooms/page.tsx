@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useLanguage } from "@/hooks/use-language";
+import { useCurrency } from "@/hooks/use-currency";
 import { BedDouble, Filter, Building2, Search, RefreshCw, ChevronDown, Loader2 } from "lucide-react";
 import { RoomsSkeleton } from "@/components/ui/skeletons";
 import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
