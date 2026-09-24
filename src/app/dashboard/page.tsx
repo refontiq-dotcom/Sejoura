@@ -773,7 +773,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { lang } = useLanguage();
   const t = (translations[lang] ?? translations["fr"]).dashboard;
-  const { currency, fmt } = useCurrency();
+  const { symbol, code, fmt } = useCurrency();
   const { activeAccommodationId } = useAccommodation();
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState("standard");
@@ -1902,17 +1902,17 @@ export default function DashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white leading-none truncate">
-                    {formatAmountOnly(kpis.dailyRevenue, currency.code, lang)}
+                    {formatAmountOnly(kpis.dailyRevenue, code, lang)}
                   </p>
                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 truncate">{t.kpis.dailyRevenue}</p>
                 </div>
               </div>
-              <Badge variant="success">{currency.code}</Badge>
+              <Badge variant="success">{code}</Badge>
             </div>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
               {isToday
-                ? t.kpis.dailyRevenueCopy
-                : `${currency.symbol} ${lang === "en" ? "collected" : "encaissés"} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
+                ? t.kpis.dailyRevenueCopy.replace("{currency}", symbol)
+                : `${symbol} ${lang === "en" ? "collected" : "encaissés"} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
             </p>
           </Card>
 
@@ -2327,7 +2327,7 @@ export default function DashboardPage() {
             icon={<Wallet className="w-5 h-5" />}
             iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-emerald-500/20"
             title={t.revenueTracking}
-            subtitle={t.revenueTrend.replace("{currency}", currency.symbol)}
+            subtitle={t.revenueTrend.replace("{currency}", symbol)}
             action={
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 ring-1 ring-emerald-500/20">
                 <TrendingUp className={`w-4 h-4 ${trendPercentage >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`} />
@@ -2339,7 +2339,7 @@ export default function DashboardPage() {
           />
 
           <div className="p-4 md:p-5">
-            <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={currency.code} lang={lang} />
+            <LineChart data={monthlyRevenue} fmt={fmt} currencyCode={code} lang={lang} />
           </div>
         </SectionCard>
       )}
