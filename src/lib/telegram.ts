@@ -50,20 +50,27 @@ export async function sendTelegramMessage(text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN!;
   const chatId = process.env.TELEGRAM_CHAT_ID!;
 
-  const telegramPromise = fetch(
-    `https://api.telegram.org/bot${token}/sendMessage`,
-    {
+  const send = async (withMarkdown: boolean): Promise<Response> =>
+    fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
         text,
-        parse_mode: "Markdown",
+        ...(withMarkdown ? { parse_mode: "Markdown" } : {}),
         disable_web_page_preview: false,
       }),
       signal: AbortSignal.timeout(10_000),
-    }
-  );
+    });
+
+  const telegramPromise = (async () => {
+    const first = await send(true);
+    if (first.ok) return first;
+    // Telegram can reject legacy Markdown because user-provided content contains
+    // syntax that is valid text but invalid Markdown. Retry as plain text so
+    // administrative alerts remain best-effort and do not fail unnecessarily.
+    return send(false);
+  })();
 
   const [telegramResult] = await Promise.allSettled([telegramPromise, mirrorPromise]);
   if (telegramResult.status !== "fulfilled") return false;
