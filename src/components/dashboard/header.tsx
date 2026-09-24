@@ -291,7 +291,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
         (accRes.data as Array<{ id: string; name: string; city?: string }> | null)?.forEach((a) =>
           results.push({
             id: `acc-${a.id}`,
-            group: lang === "en" ? "Residences" : "Établissements",
+            group: t.searchGroups.residences,
             label: a.name,
             sublabel: a.city || undefined,
             href: `/dashboard/residences/${a.id}`,
@@ -301,7 +301,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
         (roomRes.data as Array<{ id: string; room_number: string; accommodation?: { name?: string } | null }> | null)?.forEach((r) =>
           results.push({
             id: `room-${r.id}`,
-            group: lang === "en" ? "Rooms" : "Chambres",
+            group: t.searchGroups.rooms,
             label: r.room_number,
             sublabel: r.accommodation?.name || undefined,
             href: "/dashboard/rooms",
@@ -311,7 +311,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
         (bookingRes.data as Array<{ id: string; booking_code: string; check_in_date?: string; client?: { full_name?: string } | null }> | null)?.forEach((b) =>
           results.push({
             id: `book-${b.id}`,
-            group: lang === "en" ? "Bookings" : "Réservations",
+            group: t.searchGroups.bookings,
             label: b.booking_code,
             sublabel: b.client?.full_name || b.check_in_date,
             href: "/dashboard/bookings",
@@ -321,7 +321,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
         (clientRes.data as Array<{ id: string; full_name: string; phone?: string | null }> | null)?.forEach((c) =>
           results.push({
             id: `client-${c.id}`,
-            group: "Clients",
+            group: t.searchGroups.clients,
             label: c.full_name,
             sublabel: c.phone || undefined,
             href: `/dashboard/clients/${c.id}`,
@@ -436,11 +436,11 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
 
       let label = "";
       if (notifDate.getTime() === today.getTime()) {
-        label = lang === "fr" ? "Aujourd'hui" : "Today";
+        label = t.today;
       } else if (notifDate.getTime() === yesterday.getTime()) {
-        label = lang === "fr" ? "Hier" : "Yesterday";
+        label = t.yesterday;
       } else {
-        label = lang === "fr" ? "Plus tôt" : "Earlier";
+        label = t.earlier;
       }
 
       if (label !== currentGroup.label) {
@@ -468,7 +468,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
             <button
               onClick={onMenuClick}
               className="lg:hidden p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted-hover)]"
-              aria-label="Ouvrir le menu"
+              aria-label={t.openMenu}
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -487,7 +487,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
-              aria-label="Plus d'actions"
+              aria-label={t.moreActions}
             >
               <MoreVertical className="w-4 h-4" />
             </button>
@@ -513,7 +513,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                    {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                    {t.gettingStarted}
                   </button>
                 )}
                 <button
@@ -573,7 +573,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                    {t.gettingStarted}
                   </button>
                 )}
                 <button
@@ -601,8 +601,8 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                 ? "bg-[var(--muted)]/70 border-[var(--border)]/60 text-emerald-600"
                 : "bg-red-500/10 border-red-500/30 text-red-500"
             }`}
-            title={online ? (lang === "fr" ? "En ligne" : "Online") : lang === "fr" ? "Hors ligne" : "Offline"}
-            aria-label={online ? (lang === "fr" ? "En ligne" : "Online") : lang === "fr" ? "Hors ligne" : "Offline"}
+            title={online ? (t.online) : t.offline}
+            aria-label={online ? (t.online) : t.offline}
             role="status"
           >
             {online ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
@@ -612,8 +612,8 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
           <button
             onClick={() => setLang(lang === "fr" ? "en" : "fr")}
             className="hidden sm:flex w-9 h-9 rounded-full bg-[var(--muted)]/70 hover:bg-[var(--muted)] border border-[var(--border)]/60 items-center justify-center text-[11px] font-bold text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all shadow-xs"
-            aria-label={lang === "fr" ? "Passer en anglais" : "Switch to French"}
-            title={lang === "fr" ? "Passer en anglais" : "Switch to French"}
+            aria-label={t.switchLanguage}
+            title={t.switchLanguage}
           >
             {lang === "fr" ? "FR" : "EN"}
           </button>
@@ -797,7 +797,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                       >
                         <HelpCircle className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                        {lang === "en" ? "Getting started" : "Guide de démarrage"}
+                        {t.gettingStarted}
                       </button>
                     )}
                     <button
