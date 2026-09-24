@@ -1068,10 +1068,24 @@ export default function DashboardPage() {
         // Dépassements de séjour (déjà résolus en parallèle dans le fan-out).
         {
           const todayMs = new Date().getTime();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const overdue = ((overstayRes as any).data || [] as any[]).filter(
-            (b: any) => b.is_overstay || isBookingOverdue({ status: b.status, check_out_date: b.check_out_date, check_out_time: b.check_out_time })
-          ).map((b: any) => {
+          type OverstayRow = {
+            id: string;
+            booking_code: string;
+            status: string;
+            check_out_date: string;
+            check_out_time?: string | null;
+            is_overstay?: boolean | null;
+            room?: { room_number?: string; accommodation?: { name?: string } | null } | null;
+            client?: { full_name?: string } | null;
+          };
+          const overdue = ((overstayRes.data ?? []) as unknown as OverstayRow[])
+            .filter(
+              (b) => b.is_overstay || isBookingOverdue({
+                status: b.status,
+                check_out_date: b.check_out_date,
+                check_out_time: b.check_out_time,
+              })
+            ).map((b) => {
             const checkoutMs = new Date(b.check_out_date).getTime();
             const daysOverdue = Math.max(1, Math.floor((todayMs - checkoutMs) / 86400000));
             const room = b.room as { room_number?: string; accommodation?: { name?: string } } | null;
@@ -1092,8 +1106,18 @@ export default function DashboardPage() {
 
         // Réservations en ligne non consultées (déjà résolues en parallèle).
         {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const onlineList = ((onlineRes as any).data || [] as any[]).map((b: any) => {
+          type OnlineBookingRow = {
+            id: string;
+            booking_code: string;
+            check_in_date: string;
+            check_out_date: string;
+            total_amount: number;
+            number_of_guests: number;
+            created_at: string;
+            room?: { room_number?: string; accommodation?: { name?: string } | null } | null;
+            client?: { full_name?: string } | null;
+          };
+          const onlineList = ((onlineRes.data ?? []) as unknown as OnlineBookingRow[]).map((b) => {
             const room = b.room as { room_number?: string; accommodation?: { name?: string } } | null;
             const client = b.client as { full_name?: string } | null;
             return {
@@ -1383,9 +1407,15 @@ export default function DashboardPage() {
     setBannerActionLoading(bookingId);
     try {
       const supabase = createClient();
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData.user?.id;
+      if (!currentUserId) {
+        toast.error(lang === "en" ? "Session expired" : "Session expirée");
+        return;
+      }
       const { error: rpcErr } = await supabase.rpc("check_out_booking", {
         p_booking_id: bookingId,
-        p_user_id: userId,
+        p_user_id: currentUserId,
       });
       if (rpcErr) {
         toast.error(lang === "en" ? "Check-out failed: " + rpcErr.message : "Échec du check-out : " + rpcErr.message);
