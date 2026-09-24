@@ -96,7 +96,7 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
       const isEmployee = userRole === "receptionniste" || userRole === "menagere";
       window.location.href = isEmployee ? EMPLOYEE_LOGIN_ROUTE : LOGIN_ROUTE;
     } catch {
-      toast.error("La déconnexion a échoué 🔄");
+      toast.error(t.logoutError);
       setLoggingOut(false);
     }
   }
