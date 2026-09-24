@@ -555,8 +555,13 @@ export default function ResidencesPage() {
               <select
                 value={formData.currency}
                 onChange={(e) => {
-                  const sel = SUPPORTED_CURRENCIES.find((curr) => curr.code === e.target.value);
-                  setFormData({ ...formData, currency: e.target.value, currency_symbol: sel ? sel.symbol : e.target.value });
+                  const currency = e.target.value;
+                  const sel = SUPPORTED_CURRENCIES.find((curr) => curr.code === currency);
+                  setFormData((prev) => ({
+                    ...prev,
+                    currency,
+                    currency_symbol: sel?.symbol ?? currency,
+                  }));
                 }}
                 className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-medium"
               >
@@ -608,7 +613,7 @@ export default function ResidencesPage() {
             {formData.tourist_tax_enabled && (
               <>
                 <Input
-                  label={`Tarif (${formData.currency_symbol} par nuitée et par occupant)`}
+                                    label={`Tarif (${SUPPORTED_CURRENCIES.find((curr) => curr.code === formData.currency)?.symbol ?? formData.currency} par nuitée et par occupant)`}
                   type="number"
                   min="0"
                   value={formData.tourist_tax_rate}
