@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Appel de la synchronisation Séjoura vers Trouvetou
         env:
-          SYNC_URL: "https://sejoura-lemon.vercel.app/api/trouvetou/sync"
+          SYNC_URL: "https://sejoura-samuel-25a9.vercel.app/api/trouvetou/sync"
           CRON_SECRET: ${{ secrets.TROUVETOU_SYNC_SECRET }}
         run: |
           code=$(curl -sS -o /tmp/sync.out -w "%{http_code}" \
