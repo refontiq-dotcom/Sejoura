@@ -261,7 +261,7 @@ export default function SettingsPage() {
 
       if (error) {
         if (!opts.silent) {
-          toast.error(error.message || "L'action a échoué : enregistrer.");
+          toast.error(t.saveError);
         }
         return false;
       }
@@ -271,7 +271,7 @@ export default function SettingsPage() {
       return true;
     } catch (err) {
       if (!opts.silent) {
-        toast.error(err instanceof Error ? err.message : "Oups, un petit souci technique ! Réessayez 🤕");
+        toast.error(t.saveError);
       }
       return false;
     } finally {
@@ -313,11 +313,11 @@ export default function SettingsPage() {
   async function handleSaveCompany() {
     if (!tenant) return;
     if (!companyForm.company_name?.trim()) {
-      setFormError("Le nom de l'entreprise est requis.");
+      setFormError(t.companyNameRequired);
       return;
     }
     if (companyForm.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyForm.contact_email)) {
-      setFormError("L'adresse email n'est pas valide ✉️");
+      setFormError(t.invalidEmail);
       return;
     }
     setFormError("");
@@ -343,7 +343,7 @@ export default function SettingsPage() {
       }
     })();
     if (unchanged) {
-      toast.success("Rien à modifier, tout est bon 👌");
+      toast.success(t.nothingToChange);
       return;
     }
 
@@ -361,7 +361,7 @@ export default function SettingsPage() {
       theme_color: themeHex(themeColor),
     };
 
-    const ok = await saveTenant(updatePayload, { successMessage: "Paramètres enregistrés ✓" });
+    const ok = await saveTenant(updatePayload, { successMessage: t.saveSuccess + " ✓" });
     if (ok) {
       companySnapshotRef.current = JSON.stringify(current);
       lastSavedColorsRef.current = { primaryColor, themeColor: themeHex(themeColor) };
@@ -402,14 +402,14 @@ export default function SettingsPage() {
         .eq("auth_user_id", user?.auth_user_id || "");
 
       if (error) {
-        toast.error("La mise à jour du compte a échoué 🔄");
+        toast.error(t.accountSaveError);
         return;
       }
 
       setUser({ ...user!, full_name: accountForm.full_name, phone: accountForm.phone, email: accountForm.email } as unknown as UserType);
-      toast.success("Profil mis à jour 👤");
+      toast.success(t.accountSaved + " 👤");
     } catch {
-      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
+      toast.error(t.saveError);
     } finally {
       setSaving(false);
     }
@@ -417,7 +417,7 @@ export default function SettingsPage() {
 
   function handleSaveWhatsApp() {
     if (!whatsappForm.apiToken || !whatsappForm.phoneId || !whatsappForm.webhookVerifyToken) {
-      toast.error("Tous les champs sont requis 📋");
+      toast.error(t.requiredFields);
       return;
     }
     localStorage.setItem("sejoura-whatsapp-config", JSON.stringify(whatsappForm));
@@ -427,7 +427,7 @@ export default function SettingsPage() {
         JSON.stringify(whatsappForm)
       );
     }
-    toast.success("Config WhatsApp sauvegardée 💾");
+    toast.success(t.whatsappSaved + " 💾");
   }
 
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -458,15 +458,15 @@ export default function SettingsPage() {
 
   async function handleSavePassword() {
     if (!passwordForm.currentPassword || passwordForm.currentPassword.length < 6) {
-      toast.error("Entrez votre mot de passe actuel 🔐");
+      toast.error(t.currentPasswordRequired);
       return;
     }
     if (passwordForm.newPassword.length < 8) {
-      toast.error("Le mot de passe doit faire au moins 8 caractères 🔐");
+      toast.error(t.passwordLength);
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("Les mots de passe ne correspondent pas 🔐");
+      toast.error(t.passwordMismatch);
       return;
     }
     setSaving(true);
@@ -479,19 +479,19 @@ export default function SettingsPage() {
         password: passwordForm.currentPassword,
       });
       if (signInError) {
-        toast.error("Mot de passe actuel incorrect 🔐");
+        toast.error(t.currentPasswordIncorrect);
         return;
       }
       // Modification du mot de passe
       const { error } = await supabase.auth.updateUser({ password: passwordForm.newPassword });
       if (error) {
-        toast.error("Le mot de passe n'a pas pu être changé : " + error.message);
+        toast.error(t.passwordSaveError);
         return;
       }
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      toast.success("Mot de passe changé 🔐");
+      toast.success(t.passwordUpdated + " 🔐");
     } catch {
-      toast.error("Oups, un petit souci technique ! Réessayez 🤕");
+      toast.error(t.saveError);
     } finally {
       setSaving(false);
     }
@@ -542,7 +542,7 @@ export default function SettingsPage() {
           .update({ guest_info: info as unknown as Record<string, unknown> })
           .eq("id", activeAccommodation.id);
         if (error) {
-          toast.error(error.message || "L'action a échoué : enregistrer.");
+          toast.error(t.saveError);
           return false;
         }
         setPortalGuestInfo(info);
@@ -1277,11 +1277,11 @@ export default function SettingsPage() {
 
               <div className="space-y-3">
                 {[
-                  { key: "emailNotifs", label: "Notifications par email", desc: "Recevoir les notifications par email" },
-                  { key: "pushNotifs", label: "Notifications push", desc: "Notifications dans le navigateur" },
-                  { key: "bookingAlerts", label: "Alertes de réservation", desc: "Nouvelles réservations et modifications" },
-                  { key: "paymentAlerts", label: "Alertes de paiement", desc: "Encaissements et impayés" },
-                  { key: "cleaningAlerts", label: "Alertes de ménage", desc: "Tâches en retard et alertes +1h30" },
+                  { key: "emailNotifs", label: t.notifications.emailLabel, desc: t.notifications.emailDesc },
+                  { key: "pushNotifs", label: t.notifications.pushLabel, desc: t.notifications.pushDesc },
+                  { key: "bookingAlerts", label: t.notifications.bookingAlertsLabel, desc: t.notifications.bookingAlertsDesc },
+                  { key: "paymentAlerts", label: t.notifications.paymentAlertsLabel, desc: t.notifications.paymentAlertsDesc },
+                  { key: "cleaningAlerts", label: t.notifications.cleaningAlertsLabel, desc: t.notifications.cleaningAlertsDesc },
                 ].map((item) => (
                   <div key={item.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                     <div>
