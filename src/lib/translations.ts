@@ -175,6 +175,10 @@ export const translations = {
       workspaceReady: "Bienvenue ! Votre espace est prêt 🏠",
       greetingMorning: "Bonjour",
       greetingEvening: "Bonsoir",
+      loadError: {
+        copy: "Une erreur est survenue lors du chargement de votre espace.",
+        retry: "Réessayer",
+      },
       addFirstResidence: "Ajouter un établissement",
       kpis: {
         occupancy: "Taux d'occupation",
@@ -911,6 +915,10 @@ export const translations = {
       workspaceReady: "Welcome! Your workspace is ready 🏠",
       greetingMorning: "Good morning",
       greetingEvening: "Good evening",
+      loadError: {
+        copy: "An error occurred while loading your workspace.",
+        retry: "Retry",
+      },
       addFirstResidence: "Add a residence",
       kpis: {
         occupancy: "Occupancy rate",
