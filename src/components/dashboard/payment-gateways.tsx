@@ -391,7 +391,7 @@ export function PaymentGatewaysSection() {
   };
 
   useEffect(() => {
-    void void loadGateways();
+    void loadGateways();
   }, []);
 
   const getGateway = (provider: string) =>
