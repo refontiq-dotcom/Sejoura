@@ -9,10 +9,7 @@ const NAVY = { r: 12, g: 28, b: 51 };
 
 await mkdir(OUT_DIR, { recursive: true });
 
-const logoSizes = async (logo, width, height) =>
-  logo.resize({ width, height, fit: "inside", withoutEnlargement: true });
-
-async function squareWithLogo(size, scale, bg, flatten = true) {
+async function squareWithLogo(size, scale, bg) {
   const logo = sharp(LOGO);
   const meta = await logo.metadata();
   const aspect = meta.width / meta.height;
