@@ -46,13 +46,6 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     : null;
 
   useEffect(() => {
-    if (activeCurrency && (activeCurrency.code !== currency.code || activeCurrency.symbol !== currency.symbol)) {
-      setCurrencyState(activeCurrency);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCurrency?.code, activeCurrency?.symbol]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(currency));
   }, [currency]);
@@ -66,12 +59,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("sejoura-currency-updated", handleUpdate);
   }, []);
 
+  const displayCurrency = activeCurrency ?? currency;
+
   const setCurrency = (c: CurrencyInfo) => setCurrencyState(c);
 
   function fmt(amountInBase: number): string {
     const converted = convertFromBase(amountInBase);
-    const decimals = getCurrencyDecimals(currency.code);
-    const symbol = currency.symbol;
+    const decimals = getCurrencyDecimals(displayCurrency.code);
+    const symbol = displayCurrency.symbol;
     const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
@@ -85,7 +80,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return `${formatted} ${symbol}`;
   }
 
-  function fmtRaw(amount: number, symbol: string = currency.symbol): string {
+  function fmtRaw(amount: number, symbol: string = displayCurrency.symbol): string {
     const decimals = getCurrencyDecimals(currency.code);
     const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: decimals,
@@ -102,7 +97,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   function convertFromBase(amountInBase: number): number {
     if (currency.code === BASE_CURRENCY) return amountInBase;
-    return convertXofTo(amountInBase, currency.code);
+    return convertXofTo(amountInBase, displayCurrency.code);
   }
 
   return (
