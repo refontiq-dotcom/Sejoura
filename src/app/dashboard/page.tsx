@@ -269,7 +269,7 @@ function ClientDrawer({
               {movement.nightsCount && (
                 <div className="flex justify-between">
                   <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">{dt.duration}</span>
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.nightsCount} {dt.nights}{movement.nightsCount > 1 ? (lang === "en" ? "s" : "s") : ""}</span>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{movement.nightsCount} {movement.nightsCount > 1 ? dt.nightsPlural : dt.nights}</span>
                 </div>
               )}
               {movement.numberOfGuests && (
@@ -1524,8 +1524,8 @@ export default function DashboardPage() {
             type="button"
             onClick={() => { loadRetriesRef.current = 0; loadDashboardData(true, selectedDate); }}
             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            title={lang === "en" ? "Refresh" : "Actualiser"}
-            aria-label={lang === "en" ? "Refresh" : "Actualiser"}
+            title={dt.refresh}
+            aria-label={dt.refresh}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -1553,7 +1553,7 @@ export default function DashboardPage() {
                   : "text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)]"
               }`}
             >
-              {p === "today" ? (lang === "en" ? "Today" : "Aujourd'hui") : p === "7d" ? "7j" : "30j"}
+              {p === "today" ? dt.today : p === "7d" ? dt.sevenDays : dt.thirtyDays}
             </button>
           ))}
           <button
