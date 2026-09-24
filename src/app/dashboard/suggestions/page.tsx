@@ -116,7 +116,7 @@ export default function SuggestionsPage() {
           creator: { full_name: authorNames.get(feature.created_by) || "Membre" },
         };
       }));
-      setVotedIds(new Set((voteData || []).map((v) => v.feature_request_id as string)));
+      setVotedIds(new Set((voteData || []).map((v: { feature_request_id: string }) => v.feature_request_id)));
     } catch (err) {
       console.error(err);
       toast.error("Les suggestions sont introuvables 🤔");
