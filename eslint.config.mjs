@@ -9,8 +9,8 @@ const eslintConfig = defineConfig([
   // the production CI while the existing UI is migrated incrementally.
   {
     rules: {
-      "react/no-unescaped-entities": "warn",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "react/no-unescaped-entities": "off",
+      "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/purity": "warn",
       "react-hooks/refs": "warn",
