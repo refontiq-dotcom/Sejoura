@@ -370,7 +370,7 @@ export function IdeaBoxSection() {
       .on("postgres_changes", { event: "*", schema: "public", table: "feature_requests" }, () => {
         loadIdeas();
       })
-      .subscribe((status) => {
+      .subscribe((status: "SUBSCRIBED" | "TIMED_OUT" | "CLOSED" | "CHANNEL_ERROR") => {
         if (status === "SUBSCRIBED") loadIdeas();
       });
     return () => {
