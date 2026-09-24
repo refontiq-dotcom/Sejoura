@@ -109,7 +109,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const currencyLabel = (label: string) => `${label} (${displayCurrency.symbol})`;
 
   return (
-    <CurrencyContext.Provider value={{ currency: displayCurrency, symbol: displayCurrency.symbol, code: displayCurrency.code, currencyLabel, setCurrency, baseCurrency: BASE_CURRENCY, fmt, fmtRaw, convertFromBase }}>
+    <CurrencyContext.Provider value={{ currency, symbol: displayCurrency.symbol, code: displayCurrency.code, currencyLabel, setCurrency, baseCurrency: BASE_CURRENCY, fmt, fmtRaw, convertFromBase }}>
       {children}
     </CurrencyContext.Provider>
   );
