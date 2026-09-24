@@ -24,6 +24,7 @@ import {
   Lock,
   Banknote,
   Calendar,
+  CalendarCheck,
   User,
   Megaphone,
 } from "lucide-react";
