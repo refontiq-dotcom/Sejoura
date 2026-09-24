@@ -158,7 +158,7 @@ export const translations = {
       kpis: {
         occupancy: "Taux d'occupation",
         dailyRevenue: "Encaissements du jour",
-        dailyRevenueCopy: "FCFA encaissés aujourd'hui",
+        dailyRevenueCopy: "{currency} encaissés aujourd'hui",
         checkinsCheckouts: "Entrées / Sorties",
         cleaningState: "État du ménage",
         today: "Aujourd'hui",
@@ -189,7 +189,7 @@ export const translations = {
       },
       charts: {
         monthlyRevenueTitle: "Suivi des recettes mensuelles",
-        monthlyRevenueCopy: "Évolution des encaissements (en FCFA)",
+        monthlyRevenueCopy: "Évolution des encaissements (en {currency})",
       },
       error: {
         title: "Erreur de chargement",
@@ -522,7 +522,7 @@ export const translations = {
       language: "Langue",
       languageHelp: "Choisissez la langue de l'interface",
       currency: "Devise",
-      currencyHelp: "Tous les montants sont en FCFA (XOF)",
+      currencyHelp: "Tous les montants suivent la devise de l’établissement actif ({currency})",
       showPlanBadge: "Afficher le plan dans la barre latérale",
       showPlanBadgeHelp: "Afficher le badge du plan actuel dans le menu latéral",
       logoUpload: "Logo de l'entreprise",
