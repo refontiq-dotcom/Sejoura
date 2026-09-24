@@ -7,7 +7,7 @@
  * de paiement connectes :
  *
  * 1. Alerte les abonnements expirant dans 3 jours (Telegram)
- * 2. Soft-lock les abonnements expires (is_soft_locked = true)
+ * 2. Soft-lock les abonnements expires (status=suspended, subscription_status=expired)
  * 3. Envoie une alerte quand un abonnement expire aujourd'hui
  */
 
@@ -28,9 +28,6 @@ interface ExpiringSubscription {
   company_name: string | null;
 }
 
-/**
- * Récupère les abonnements qui expirent dans les N prochains jours.
- */
 async function getExpiringSubscriptions(daysAhead: number): Promise<ExpiringSubscription[]> {
   const admin = createAdminClient();
   const futureDate = new Date();
@@ -52,19 +49,13 @@ async function getExpiringSubscriptions(daysAhead: number): Promise<ExpiringSubs
         .select("company_name")
         .eq("id", sub.tenant_id)
         .maybeSingle();
-      return {
-        ...sub,
-        company_name: tenant?.company_name ?? null,
-      };
+      return { ...sub, company_name: tenant?.company_name ?? null };
     })
   );
 
   return enriched;
 }
 
-/**
- * Récupère les abonnements déjà expirés mais pas encore soft-lockés.
- */
 async function getExpiredUnlockedSubscriptions(): Promise<ExpiringSubscription[]> {
   const admin = createAdminClient();
 
@@ -84,19 +75,13 @@ async function getExpiredUnlockedSubscriptions(): Promise<ExpiringSubscription[]
         .select("company_name")
         .eq("id", sub.tenant_id)
         .maybeSingle();
-      return {
-        ...sub,
-        company_name: tenant?.company_name ?? null,
-      };
+      return { ...sub, company_name: tenant?.company_name ?? null };
     })
   );
 
   return enriched;
 }
 
-/**
- * Envoie une alerte Telegram pour un abonnement expirant bientot.
- */
 async function sendExpiryAlert(sub: ExpiringSubscription, daysLeft: number): Promise<void> {
   if (!isTelegramConfigured()) return;
 
@@ -122,14 +107,9 @@ async function sendExpiryAlert(sub: ExpiringSubscription, daysLeft: number): Pro
   ].join("\n");
 
   const sent = await sendTelegramMessage(text);
-  if (!sent) {
-    console.error("[SubRenewal] Telegram alert failed for " + sub.tenant_id);
-  }
+  if (!sent) console.error("[SubRenewal] Telegram alert failed for " + sub.tenant_id);
 }
 
-/**
- * Soft-lock les abonnements expires et notifie.
- */
 async function softLockExpiredSubscriptions(subs: ExpiringSubscription[]): Promise<number> {
   const admin = createAdminClient();
   let lockedCount = 0;
@@ -138,7 +118,7 @@ async function softLockExpiredSubscriptions(subs: ExpiringSubscription[]): Promi
     const { error } = await admin
       .from("subscriptions")
       .update({
-        status: "expired",
+        status: "suspended",
         is_soft_locked: true,
         updated_at: new Date().toISOString(),
       })
@@ -179,9 +159,6 @@ async function softLockExpiredSubscriptions(subs: ExpiringSubscription[]): Promi
   return lockedCount;
 }
 
-/**
- * Fonction principale du cron - executee tous les jours.
- */
 export async function runSubscriptionRenewalCron(): Promise<{
   expiringAlerts: number;
   expiredLocked: number;
@@ -195,7 +172,6 @@ export async function runSubscriptionRenewalCron(): Promise<{
     console.error("[SubRenewal] Period-end transition failed:", transitionError.message);
   }
 
-  // 1. Alertes pour les abonnements expirant dans 3 jours
   const expiringIn3Days = await getExpiringSubscriptions(3);
   let expiringAlerts = 0;
   for (const sub of expiringIn3Days) {
@@ -206,7 +182,6 @@ export async function runSubscriptionRenewalCron(): Promise<{
     expiringAlerts++;
   }
 
-  // 2. Soft-lock les abonnements expires
   const expired = await getExpiredUnlockedSubscriptions();
   const expiredLocked = await softLockExpiredSubscriptions(expired);
 
