@@ -787,7 +787,7 @@ export default function ResidenceDetailPage() {
             </datalist>
             <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
             <div className="grid grid-cols-2 gap-2.5">
-              <Input label="Prix de base (FCFA)" type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
+              <Input label={`Prix de base (${residence.currency_symbol || "FCFA"})`} type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
               <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
             </div>
             <div className="grid grid-cols-2 gap-2.5">
