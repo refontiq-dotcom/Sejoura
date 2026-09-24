@@ -70,13 +70,13 @@ export default function EmployeesPage() {
           .select("id, name, city, tenant_id")
           .eq("tenant_id", tenantId)
           .order("name")
-          .then((r) => r.data),
+          .then((r: { data: unknown }) => r.data),
         supabase
           .from("users")
           .select("id, tenant_id, accommodation_id, role, full_name, phone, email, is_active, created_at, last_login_at")
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
-          .then((r) => r.data),
+          .then((r: { data: unknown }) => r.data),
       ]);
 
       if (accData) setAccommodations(accData as unknown as Accommodation[]);
