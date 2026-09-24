@@ -434,11 +434,7 @@ export default function SettingsPage() {
 
   async function handleDeleteAccount() {
     if (deletingAccount) return;
-    const confirmed = window.confirm(
-      lang === "en"
-        ? "Delete your account? You will be signed out. This cannot be undone from this screen."
-        : "Supprimer votre compte ? Vous serez déconnecté. Cette action n'est pas annulable depuis cet écran."
-    );
+    const confirmed = window.confirm(t.deleteAccountConfirm);
     if (!confirmed) return;
     setDeletingAccount(true);
     try {
@@ -547,13 +543,13 @@ export default function SettingsPage() {
         }
         setPortalGuestInfo(info);
         setPortalInherited(false);
-        toast.success(`Conditions de l'espace client enregistrées pour « ${activeAccommodation.name} » ✓`);
+        toast.success(t.guestInfoSavedFor.replace("{name}", activeAccommodation.name));
         return true;
       }
       // Aucune résidence (onboarding en cours) : repli sur l'entreprise.
       const ok = await saveTenant(
         { guest_info: info as unknown as Record<string, unknown> },
-        { successMessage: "Conditions de l'espace client enregistrées ✓" }
+        { successMessage: t.guestInfoSaved }
       );
       if (ok) {
         setTenant((prev) => (prev ? { ...prev, guest_info: info } : prev));
@@ -581,7 +577,7 @@ export default function SettingsPage() {
       }
       setPortalGuestInfo(tenant?.guest_info ?? null);
       setPortalInherited(true);
-      toast.success(`Réinitialisé : « ${activeAccommodation.name} » hérite des conditions de l'entreprise. ✓`);
+      toast.success(t.guestInfoReset.replace("{name}", activeAccommodation.name));
     } finally {
       setPortalSaving(false);
     }
@@ -677,7 +673,7 @@ export default function SettingsPage() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Impossible de téléverser le logo.";
-      setLogoError(message);
+      setLogoError(t.logoUploadError);
     } finally {
       setLogoUploading(false);
     }
