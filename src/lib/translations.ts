@@ -168,6 +168,9 @@ export const translations = {
       subtitle: "Vue d'ensemble de votre activité",
       welcomeTitle: "Bienvenue sur Séjoura !",
       welcomeCopy: "Pour commencer à utiliser votre tableau de bord, vous devez d'abord créer votre premier établissement et y ajouter des chambres.",
+      workspaceReady: "Bienvenue ! Votre espace est prêt 🏠",
+      greetingMorning: "Bonjour",
+      greetingEvening: "Bonsoir",
       addFirstResidence: "Ajouter un établissement",
       kpis: {
         occupancy: "Taux d'occupation",
@@ -295,6 +298,10 @@ export const translations = {
       revenueTracking: "Suivi des recettes mensuelles",
       revenueTrend: "Évolution des encaissements (en {currency})",
     },
+    hr: { title: "Dossiers RH", subtitle: "Dossiers employés et contrats" },
+    trouvetou: { title: "Vitrine Trouvetou", subtitle: "Publiez vos fiches et publicités sur Trouvetou" },
+    suggestions: { title: "Suggestions", subtitle: "Proposez et votez pour les idées de la communauté" },
+    shift: { title: "Mon Shift / Caisse", subtitle: "Vue d’ensemble du shift" },
     residences: {
       title: "Établissements",
       subtitle: "Gérez vos établissements et leur disponibilité",
@@ -988,6 +995,10 @@ export const translations = {
       revenueTracking: "Monthly revenue tracking",
       revenueTrend: "Revenue trend (in {currency})",
     },
+    hr: { title: "HR Records", subtitle: "Employee files and contracts" },
+    trouvetou: { title: "Trouvetou Showcase", subtitle: "Publish listings and advertisements on Trouvetou" },
+    suggestions: { title: "Community Suggestions", subtitle: "Propose and vote on community ideas" },
+    shift: { title: "My Shift / Cash", subtitle: "Shift overview" },
     residences: {
       title: "Residences",
       subtitle: "Manage your residences and availability",
