@@ -1403,9 +1403,7 @@ export default function SettingsPage() {
                       {t.dangerZone}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                      {lang === "en"
-                        ? "Deactivate your account and sign out. Contact support to restore access."
-                        : "Désactivez votre compte et déconnectez-vous. Contactez le support pour restaurer l'accès."}
+                      {t.dangerCopy}
                     </p>
                     <Button variant="destructive" onClick={handleDeleteAccount} loading={deletingAccount}>
                       {t.deleteAccount}
