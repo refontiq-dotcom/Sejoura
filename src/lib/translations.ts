@@ -908,6 +908,9 @@ export const translations = {
       subtitle: "Overview of your activity",
       welcomeTitle: "Welcome to Séjoura!",
       welcomeCopy: "To start using your dashboard, first create your first residence and add rooms.",
+      workspaceReady: "Welcome! Your workspace is ready 🏠",
+      greetingMorning: "Good morning",
+      greetingEvening: "Good evening",
       addFirstResidence: "Add a residence",
       kpis: {
         occupancy: "Occupancy rate",
