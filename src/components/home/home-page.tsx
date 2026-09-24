@@ -1720,7 +1720,7 @@ export function HomePage() {
                     <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
                       <input type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-slate-300 dark:border-[#505050] text-blue-600 focus:ring-blue-500 bg-white dark:bg-[#262626]" />
                       <span className="text-[11px] text-slate-600 dark:text-[#a0a0a0]">
-                        {t.acceptTerms}{" "}<Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{t.terms}</Link>
+                        {t.acceptTerms}{" "}<Link href="/cgu" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{t.terms}</Link><span className="text-slate-400"> · </span><Link href="/politique-confidentialite" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">{lang === "fr" ? "Confidentialité" : "Privacy"}</Link>
                       </span>
                     </label>
                     <label className="flex items-start gap-2.5 cursor-pointer group">
