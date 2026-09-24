@@ -214,7 +214,7 @@ export default function CleaningPage() {
       }
       const { data: checkoutData } = await checkoutQuery;
       const counts: Record<string, number> = {};
-      (checkoutData || []).forEach((b) => {
+      (checkoutData || []).forEach((b: { accommodation_id: string }) => {
         counts[b.accommodation_id] = (counts[b.accommodation_id] || 0) + 1;
       });
       setTomorrowCheckouts(counts);
