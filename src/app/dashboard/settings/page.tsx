@@ -211,7 +211,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contextUser]);
 
   // Set employee login link after mount to avoid hydration mismatch
