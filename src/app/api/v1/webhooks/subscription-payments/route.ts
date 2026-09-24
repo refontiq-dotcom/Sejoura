@@ -77,13 +77,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
       }
     } else {
-      // Pour les autres providers : secret partagé obligatoire si configuré
-      const webhookSecret = process.env.WEBHOOK_SECRET;
-      if (webhookSecret) {
-        const providedSecret = req.headers.get("x-webhook-secret");
-        if (providedSecret !== webhookSecret) {
-          return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-        }
+      // Pour les autres providers : un secret partagé est obligatoire.
+      const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
+      const providedSecret = req.headers.get("x-webhook-secret");
+      if (!webhookSecret || providedSecret !== webhookSecret) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
       }
     }
 
