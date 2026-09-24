@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { formatAmount, getPlanLimits, getPlanLabel } from "@/lib/utils";
+import { getPlanLimits, getPlanLabel } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES } from "@/lib/countries";
 import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2, Globe, Coins, ArrowUpDown } from "lucide-react";
 import type { Accommodation, RoomType } from "@/types/database";
@@ -21,6 +22,7 @@ export default function ResidencesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user, tenantId, plan } = useCurrentUser();
+  const { fmt } = useCurrency();
   const isReadOnly = user?.role === "receptionniste";
   const [residences, setResidences] = useState<Accommodation[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType[]>>({});
@@ -499,7 +501,7 @@ export default function ResidencesPage() {
                   <div className="flex flex-wrap gap-1.5">
                     {roomTypes[acc.id].map((rt) => (
                         <Badge key={rt.id} variant="theme" className="text-[10px]">
-                          {rt.name} — {formatAmount(rt.base_price, acc.currency_symbol || "FCFA")}
+                          {rt.name} — {fmt(rt.base_price)}
                         </Badge>
                     ))}
                   </div>
