@@ -192,7 +192,7 @@ function ProviderCard({
   data: GatewayRow | null;
   onSave: (provider: string, fields: Record<string, string>) => Promise<void>;
   onToggle: (provider: string, isActive: boolean) => Promise<void>;
-  loading: boolean;
+  loading?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
