@@ -53,15 +53,15 @@ export function Breadcrumbs() {
     rooms: t.rooms,
     bookings: t.bookings,
     cleaning: t.cleaning,
-    shift: "Mon Shift / Caisse",
+    shift: t.shift,
     accounting: t.accounting,
     employees: t.employees,
-    hr: lang === "en" ? "HR Records" : "Dossiers RH",
+    hr: t.hr,
     settings: t.settings,
     subscription: t.subscription,
-    trouvetou: lang === "en" ? "Trouvetou Showcase" : "Vitrine Trouvetou",
+    trouvetou: t.trouvetou,
     ads: t.ads ?? (lang === "en" ? "Ads" : "Publicités"),
-    suggestions: "Suggestions",
+    suggestions: t.suggestions,
   };
 
   return (
