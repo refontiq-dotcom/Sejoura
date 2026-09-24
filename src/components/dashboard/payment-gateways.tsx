@@ -469,7 +469,6 @@ export function PaymentGatewaysSection() {
           data={getGateway(provider.key)}
           onSave={handleSave}
           onToggle={handleToggle}
-          loading={loading}
         />
       ))}
     </div>
