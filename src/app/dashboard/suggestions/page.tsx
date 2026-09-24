@@ -105,8 +105,8 @@ export default function SuggestionsPage() {
           supabase.from("users").select("id, full_name"),
         ]);
 
-      const tenantNames = new Map((tenantData || []).map((t) => [t.id, t.company_name]));
-      const authorNames = new Map((authorData || []).map((u) => [u.id, u.full_name]));
+      const tenantNames = new Map((tenantData || []).map((t: { id: string; company_name: string | null }) => [t.id, t.company_name]));
+      const authorNames = new Map((authorData || []).map((u: { id: string; full_name: string | null }) => [u.id, u.full_name]));
 
       setIdeas((ideaData || []).map((idea) => {
         const feature = idea as unknown as FeatureRequest;
