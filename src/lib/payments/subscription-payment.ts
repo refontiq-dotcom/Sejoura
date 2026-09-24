@@ -86,38 +86,6 @@ export async function initiateSubscriptionPayment(
   plan: "essentiel" | "croissance" | "entreprise",
 ): Promise<SubscriptionPaymentResult> {
   const planConfig = SUBSCRIPTION_PLANS[plan];
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://sejoura-lemon.vercel.app";
-  // Providers à essayer dans l'ordre de priorité
-  for (const provider of ["wave", "orange_money", "mtn", "moov_africa", "pi_spi"] as const) {
-    // TODO : Décommenter quand les clés API seront disponibles
-    /*
-    const service = await getPaymentService(tenantId, provider);
-    if (!service) continue;
-
-    const result = await service.initiatePayment({
-      amount: planConfig.price,
-      reference,
-      description: planConfig.description,
-      returnUrl: `${appUrl}/dashboard/subscription?payment=success`,
-      cancelUrl: `${appUrl}/dashboard/subscription?payment=cancelled`,
-      webhookUrl,
-    });
-
-    if (result.success) {
-      // Enregistrer la tentative dans la table subscription_payment_intents
-      await recordPaymentIntent(tenantId, plan, provider, result.transactionId!, reference);
-
-      return {
-        success: true,
-        method: "automatic",
-        transactionId: result.transactionId,
-        checkoutUrl: result.checkoutUrl,
-      };
-    }
-    */
-    break; // Supprimer ce "break" quand les services seront connectés
-  }
-
   // ✅ FALLBACK ACTUEL : Retourner le lien Wave manuel (comportement inchangé)
   return {
     success: false,
@@ -125,39 +93,6 @@ export async function initiateSubscriptionPayment(
     checkoutUrl: planConfig.wavePayLink,
     error: "Aucun opérateur de paiement automatique configuré. Utiliser le paiement Wave manuel.",
   };
-}
-
-/**
- * Enregistre une tentative de paiement d'abonnement dans la base de données.
- * Utilisé pour le suivi et la réconciliation.
- *
- * TABLE REQUISE (à créer via migration SQL) :
- * subscription_payment_intents (
- *   id, tenant_id, plan, provider, transaction_id,
- *   reference, status, amount, created_at, updated_at
- * )
- */
-async function recordPaymentIntent(
-  tenantId: string,
-  plan: string,
-  provider: string,
-  transactionId: string,
-  reference: string
-): Promise<void> {
-  // TODO : Décommenter quand la migration SQL correspondante est appliquée
-  /*
-  const supabase = createAdminClient();
-  await supabase.from("subscription_payment_intents").insert({
-    tenant_id: tenantId,
-    plan,
-    provider,
-    transaction_id: transactionId,
-    reference,
-    status: "pending",
-    amount: getPlanPrice(plan),
-  });
-  */
-  console.log(`[SubPayment] Intent recorded: ${provider} - ${transactionId} - ${reference}`);
 }
 
 /**
