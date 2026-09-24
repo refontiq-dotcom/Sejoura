@@ -19,7 +19,6 @@
  * Client → Trouvetou → Séjoura API → Wave API → (client paie) → Wave Webhook → Séjoura
  */
 
-import crypto from "crypto";
 import type {
   PaymentProvider,
   InitiatePaymentParams,
@@ -134,7 +133,7 @@ export class WavePaymentService implements PaymentProvider {
    *   "transaction_id": "txn_..."
    * }
    */
-  async checkPaymentStatus(transactionId: string): Promise<PaymentStatusResult> {
+  async checkPaymentStatus(): Promise<PaymentStatusResult> {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     const response = await fetch(`${this.baseUrl}/v1/checkout/sessions/${transactionId}`, {
@@ -167,7 +166,7 @@ export class WavePaymentService implements PaymentProvider {
    *   Webhook URL → https://sejoura-lemon.vercel.app/api/v1/webhooks/payments
    *   Événements → checkout.session.completed, checkout.session.expired
    */
-  validateWebhookSignature(payload: unknown, signature: string): boolean {
+  validateWebhookSignature(): boolean {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     const [tPart, vPart] = signature.split(",");
