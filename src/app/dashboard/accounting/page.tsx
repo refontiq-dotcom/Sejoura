@@ -980,7 +980,7 @@ function PeriodSelector({
 
 export default function AccountingPage() {
   const router = useRouter();
-  const { fmt, currency } = useCurrency();
+  const { fmt, symbol } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -3426,7 +3426,7 @@ export default function AccountingPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label={`Montant (${currency.symbol})`}
+              label={`Montant (${symbol})`}
               type="number"
               min={0}
               value={expenseForm.amount}
