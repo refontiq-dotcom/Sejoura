@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
-import { LOGIN_ROUTE } from "@/lib/routes";
 import {
   FEATURE_REQUEST_CATEGORIES,
   FEATURE_REQUEST_IMPACTS,
