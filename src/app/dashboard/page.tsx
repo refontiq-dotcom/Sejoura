@@ -341,7 +341,7 @@ function ClientDrawer({
               variant={movement.movementType === "check_in" ? "primary" : "secondary"}
               loading={actionLoading === movement.id}
               disabled={actionLoading === movement.id || (movement.movementType === "check_in" && movement.clientIncomplete)}
-              title={movement.movementType === "check_in" && movement.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
+              title={movement.movementType === "check_in" && movement.clientIncomplete ? dt.clientIncompleteHint : undefined}
               onClick={async () => {
                 const success = await onAction(movement.id, movement.movementType);
                 if (success) onClose();
@@ -434,7 +434,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
             {hoveredItem ? hoveredItem.count : total}
           </span>
           <span className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">
-            {hoveredItem ? getRoomStatusLabel(hoveredItem.status) : "Chambres"}
+            {hoveredItem ? getRoomStatusLabel(hoveredItem.status, lang) : dt.rooms}
           </span>
         </div>
       </div>
@@ -737,7 +737,7 @@ function MovementCardList({
                     className="flex-1"
                     loading={actionLoading === m.id}
                     disabled={actionLoading === m.id || (isIn && m.clientIncomplete)}
-                    title={isIn && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
+                    title={isIn && m.clientIncomplete ? t.clientIncompleteHint : undefined}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAction(m.id, m.movementType);
@@ -1018,7 +1018,7 @@ export default function DashboardPage() {
             .from("rooms")
             .select("status")
             .in("accommodation_id", roomIds);
-          if (roomsDataResult.error) throw new Error(roomsDataResult.error.message || "Erreur lors de la récupération des chambres.");
+          if (roomsDataResult.error) throw new Error("Unable to load rooms");
           rooms = (roomsDataResult.data || []) as unknown as { status: string }[];
         }
         const rawPayments = (paymentsData.data || []) as unknown as {
@@ -1359,11 +1359,11 @@ export default function DashboardPage() {
     const then = new Date(dateStr).getTime();
     if (isNaN(then)) return "";
     const diffMs = now - then;
-    if (diffMs < 0) return locale === "en" ? "just now" : "à l'instant";
+    if (diffMs < 0) return t.justNow;
     const minutes = Math.floor(diffMs / 60000);
     const hours = Math.floor(diffMs / 3600000);
     const days = Math.floor(diffMs / 86400000);
-    if (minutes < 1) return locale === "en" ? "just now" : "à l'instant";
+    if (minutes < 1) return t.justNow;
     if (minutes < 60) return locale === "en" ? `${minutes}m ago` : `il y a ${minutes}min`;
     if (hours < 24) return locale === "en" ? `${hours}h ago` : `il y a ${hours}h`;
     return locale === "en" ? `${days}d ago` : `il y a ${days}j`;
@@ -1388,15 +1388,15 @@ export default function DashboardPage() {
       });
 
       if (rpcErr) {
-        toast.error("L'action a échoué : effectuer le check-out : " + rpcErr.message);
+        toast.error(t.actionFailed);
         return false;
       }
 
-      toast.success("Check-out effectué avec succès ✓");
+      toast.success(t.movements.checkOutSuccess + " ✓");
       loadDashboardData(true, selectedDate);
       return true;
     } catch {
-      toast.error("Oups, l'action a échoué : action.");
+      toast.error(t.actionFailed);
       return false;
     } finally {
       setActionLoading("");
@@ -1410,7 +1410,7 @@ export default function DashboardPage() {
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = authData.user?.id;
       if (!currentUserId) {
-        toast.error(lang === "en" ? "Session expired" : "Session expirée");
+        toast.error(t.sessionExpired);
         return;
       }
       const { error: rpcErr } = await supabase.rpc("check_out_booking", {
@@ -1418,13 +1418,13 @@ export default function DashboardPage() {
         p_user_id: currentUserId,
       });
       if (rpcErr) {
-        toast.error(lang === "en" ? "Check-out failed: " + rpcErr.message : "Échec du check-out : " + rpcErr.message);
+        toast.error(t.checkOutFailed);
         return;
       }
-      toast.success(lang === "en" ? "Check-out completed ✓" : "Check-out effectué avec succès ✓");
+      toast.success(t.movements.checkOutSuccess + " ✓");
       loadDashboardData(true, selectedDate);
     } catch {
-      toast.error(lang === "en" ? "Action failed" : "L'action a échoué");
+      toast.error(t.actionFailed);
     } finally {
       setBannerActionLoading("");
     }
@@ -1439,13 +1439,13 @@ export default function DashboardPage() {
         .update({ status: "cancelled" })
         .eq("id", bookingId);
       if (updErr) {
-        toast.error(lang === "en" ? "Cancellation failed: " + updErr.message : "Annulation échouée : " + updErr.message);
+        toast.error(t.cancellationFailed);
         return;
       }
-      toast.success(lang === "en" ? "Booking cancelled" : "Réservation annulée");
+      toast.success(t.bookingCancelled);
       loadDashboardData(true, selectedDate);
     } catch {
-      toast.error(lang === "en" ? "Action failed" : "L'action a échoué");
+      toast.error(t.actionFailed);
     } finally {
       setBannerActionLoading("");
     }
@@ -1559,7 +1559,7 @@ export default function DashboardPage() {
           <button
             onClick={() => shiftDate(-1)}
             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            title="Jour précédent"
+            title={t.previousDay}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -1912,7 +1912,7 @@ export default function DashboardPage() {
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
               {isToday
                 ? t.kpis.dailyRevenueCopy.replace("{currency}", symbol)
-                : `${symbol} ${lang === "en" ? "collected" : "encaissés"} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
+                : `${symbol} ${t.collectedOnDate} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
             </p>
           </Card>
 
@@ -2186,10 +2186,10 @@ export default function DashboardPage() {
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
                         {isToday
-                          ? "Aucun mouvement prévu aujourd'hui"
+                          ? t.noMovementsToday
                           : isPastDate
-                            ? "Aucune activité enregistrée pour cette date"
-                            : "Aucune activité prévue pour cette date"}
+                            ? t.noMovementsPast
+                            : t.noMovementsFuture}
                       </td>
                     </tr>
                   ) : (
