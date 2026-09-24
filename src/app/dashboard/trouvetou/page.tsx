@@ -8,8 +8,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Store,
   Sparkles,
-  Eye,
-  MessageSquare,
   Building2,
   Check,
   X,
