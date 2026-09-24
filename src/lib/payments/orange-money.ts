@@ -33,8 +33,6 @@ import type {
 
 // ─── URLs ────────────────────────────────────────────────────────────────────
 
-const OM_TOKEN_URL = "https://api.orange.com/oauth/v3/token";
-const OM_PAYMENT_URL_CI = "https://api.orange.com/orange-money-webpay/ci/v1/webpayment";
 // Pour le Sénégal : https://api.orange.com/orange-money-webpay/sn/v1/webpayment
 
 // ─── Service Orange Money ─────────────────────────────────────────────────────
@@ -122,7 +120,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   }
    * }
    */
-  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
+  async initiatePayment(): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     try {
@@ -186,7 +184,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   }
    * }
    */
-  async checkPaymentStatus(transactionId: string): Promise<PaymentStatusResult> {
+  async checkPaymentStatus(): Promise<PaymentStatusResult> {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     const token = await this.getAccessToken();
@@ -227,7 +225,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   "orderId": "RES-26-0001"
    * }
    */
-  validateWebhookSignature(payload: unknown, signature: string): boolean {
+  validateWebhookSignature(): boolean {
     // Orange Money ne signe pas avec HMAC, il faut vérifier l'IP source.
     // Whitelist des IPs Orange Money CI : à confirmer avec Orange.
     // Pour l'instant on valide en vérifiant que le notifToken est connu.
