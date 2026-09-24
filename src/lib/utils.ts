@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { canAccessFeature, getPlanLimits as getNormalizedPlanLimits, getPlanPrice as getNormalizedPlanPrice, normalizePlan } from "@/lib/subscription-plans";
-import { formatPrice, getCurrencySymbol } from "@/lib/currencyConverter";
+import { formatPrice } from "@/lib/currencyConverter";
 import { type Lang } from "./translations";
 
 export { formatPrice };
