@@ -338,7 +338,7 @@ export default function ResidencesPage() {
 
       {/* Grille des établissements */}
       {residences.length === 0 ? (
-        <>
+        <div className="contents">
         <ContextualHelpGroup
           items={[{
             id: "residence-required",
@@ -361,7 +361,7 @@ export default function ResidencesPage() {
             </Button>
           )}
         </Card>
-        </>
+        </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...residences].sort((a, b) => {
