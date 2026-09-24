@@ -80,9 +80,9 @@ function getAuditActionInfo(action: string) {
   return { label: guess.charAt(0).toUpperCase() + guess.slice(1), emoji: "📝", color: "text-[var(--foreground-muted)]", bg: "bg-[var(--surface-sunken)]", category: "systeme" };
 }
 
-function buildAuditSummary(log: AuditLog): string {
+function buildAuditSummary(log: AuditLog, fmt: (amount: number) => string): string {
   const vals = log.new_values || log.old_values || {};
-  const fmtNum = (n: unknown) => new Intl.NumberFormat("fr-FR").format(Number(n)).replace(/[\u202F\u00A0]/g, " ");
+  const fmtNum = (n: unknown) => fmt(Number(n));
 
   switch (log.action) {
     case "booking.checked_in":
@@ -108,9 +108,9 @@ function buildAuditSummary(log: AuditLog): string {
     case "auto_checkout":
       return "Check-out automatique effectué" + (vals.room_number ? " (chambre " + vals.room_number + ")" : "");
     case "invoice_generated":
-      return "Facture générée" + (vals.invoice_number ? " " + vals.invoice_number : "") + (vals.total_amount ? " — " + fmtNum(vals.total_amount) + " FCFA" : "");
+      return "Facture générée" + (vals.invoice_number ? " " + vals.invoice_number : "") + (vals.total_amount ? " — " + fmtNum(vals.total_amount) : "");
     case "expense.created":
-      return "Dépense enregistrée" + (vals.amount ? " de " + fmtNum(vals.amount) + " FCFA" : "") + (vals.description ? " : " + vals.description : "");
+      return "Dépense enregistrée" + (vals.amount ? " de " + fmtNum(vals.amount) : "") + (vals.description ? " : " + vals.description : "");
     case "expense.updated":
       return "Dépense modifiée" + (vals.description ? " : " + vals.description : "");
     case "auth.login":
@@ -234,13 +234,13 @@ const UUID_FIELDS = new Set([
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Formate une valeur brute pour l'affichage */
-function auditFieldValue(key: string, value: unknown): string {
+function auditFieldValue(key: string, value: unknown, fmt: (amount: number) => string): string {
   if (value === null || value === undefined) return "—";
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (typeof value === "boolean") return value ? "Oui" : "Non";
   if (typeof value === "number") {
     if (["negotiated_price", "total_amount", "amount", "base_price", "amount_paid"].includes(key)) {
-      return new Intl.NumberFormat("fr-FR").format(value).replace(/[\u202F\u00A0]/g, " ") + " FCFA";
+      return new Intl.NumberFormat("fr-FR").format(value).replace(/[\u202F\u00A0]/g, " ");
     }
     return String(value);
   }
@@ -3722,7 +3722,7 @@ export default function AccountingPage() {
       >
         {selectedLog && (() => {
           const info = getAuditActionInfo(selectedLog.action);
-          const summary = buildAuditSummary(selectedLog);
+          const summary = buildAuditSummary(selectedLog, fmt);
           const time = new Date(selectedLog.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           return (
           <div className="space-y-4">
@@ -3798,10 +3798,10 @@ export default function AccountingPage() {
                             <span className="px-3 py-2 text-[var(--foreground)] font-medium">{auditFieldLabel(key)}</span>
                             <span className="px-3 py-2 flex gap-6">
                               <span className={`w-28 text-right ${oldVal !== undefined ? "text-[var(--foreground-muted)] line-through" : "text-[var(--foreground-muted)]"}`}>
-                                {auditFieldValue(key, oldVal)}
+                                {auditFieldValue(key, oldVal, fmt)}
                               </span>
                               <span className="w-28 text-right text-[var(--foreground)] font-medium">
-                                {auditFieldValue(key, newVal)}
+                                {auditFieldValue(key, newVal, fmt)}
                               </span>
                             </span>
                           </div>
