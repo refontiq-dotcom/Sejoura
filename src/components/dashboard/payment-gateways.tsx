@@ -381,10 +381,6 @@ export function PaymentGatewaysSection() {
   const [gateways, setGateways] = useState<GatewayRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadGateways();
-  }, []);
-
   const loadGateways = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -393,6 +389,10 @@ export function PaymentGatewaysSection() {
     if (!error && data) setGateways(data);
     setLoading(false);
   };
+
+  useEffect(() => {
+    void void loadGateways();
+  }, []);
 
   const getGateway = (provider: string) =>
     gateways.find((g) => g.provider === provider) ?? null;
@@ -416,7 +416,7 @@ export function PaymentGatewaysSection() {
       toast.error("Erreur lors de l'enregistrement des clés API.");
     } else {
       toast.success(`Clés ${provider} enregistrées 🔑`);
-      loadGateways();
+      void loadGateways();
     }
   };
 
@@ -433,7 +433,7 @@ export function PaymentGatewaysSection() {
       toast.error("La mise à jour a échoué... Réessayez 🔄");
     } else {
       toast.success(isActive ? `${provider} activé ✓` : `${provider} désactivé`);
-      loadGateways();
+      void loadGateways();
     }
   };
 
