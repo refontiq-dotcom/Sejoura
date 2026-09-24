@@ -77,7 +77,7 @@ interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
 }
 
 export default function BookingsPage() {
-  const { fmt } = useCurrency();
+  const { fmt, currency } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<(Booking & { client?: Client; room?: Room; room_type?: RoomType })[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -3479,7 +3479,7 @@ export default function BookingsPage() {
             </div>
           )}
 
-          <Input label="Prix négocié par nuit (FCFA)" type="number" value={formData.negotiated_price} onChange={(e) => setFormData({ ...formData, negotiated_price: e.target.value })} placeholder="15000" />
+          <Input label={`Prix négocié par nuit (${currency.symbol})`} type="number" value={formData.negotiated_price} onChange={(e) => setFormData({ ...formData, negotiated_price: e.target.value })} placeholder="15000" />
 
            <div className="grid grid-cols-2 gap-4">
              <Input label="Nombre de clients" type="number" value={formData.number_of_guests} onChange={(e) => setFormData({ ...formData, number_of_guests: e.target.value })} placeholder="1" />
@@ -3713,7 +3713,7 @@ export default function BookingsPage() {
             {extendPaid && (
               <div className="space-y-3 pt-3 border-t border-[var(--border)]">
                 <Input
-                  label="Montant payé (FCFA)"
+                  label={`Montant payé (${currency.symbol})`}
                   type="number"
                   value={extendAmount}
                   onChange={(e) => setExtendAmount(e.target.value)}
@@ -3831,7 +3831,7 @@ export default function BookingsPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Prix par nuit (FCFA)</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Prix par nuit ({currency.symbol})</label>
             <Input
               type="number"
               value={editForm.negotiated_price}
@@ -4116,7 +4116,7 @@ export default function BookingsPage() {
           )}
 
           <Input
-            label="Montant encaissé (FCFA)"
+            label={`Montant encaissé (${currency.symbol})`}
             type="number"
             value={checkoutForm.amount}
             onChange={(e) => setCheckoutForm({ ...checkoutForm, amount: e.target.value })}
@@ -4434,7 +4434,7 @@ export default function BookingsPage() {
             </div>
           )}
           <Input
-            label="Montant reçu (FCFA)"
+            label={`Montant reçu (${currency.symbol})`}
             type="number"
             value={paymentForm.amount}
             onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
