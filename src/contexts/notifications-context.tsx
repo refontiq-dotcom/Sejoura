@@ -69,7 +69,7 @@ export function NotificationsProvider({
     });
 
     setNotifications(
-      filtered.map((n: any) => ({
+      filtered.map((n: NotificationRow) => ({
         id: n.id,
         tenant_id: n.tenant_id,
         recipient_role: n.recipient_role,
@@ -99,7 +99,7 @@ export function NotificationsProvider({
           table: "notifications",
           filter: `tenant_id=eq.${tenantId}`,
         },
-        (payload) => {
+        (payload: { eventType: string; new: unknown }) => {
           if (payload.eventType === "INSERT") {
             const incoming = payload.new as {
               recipient_role?: string | null;
