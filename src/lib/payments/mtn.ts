@@ -30,7 +30,6 @@
  * "En attente de confirmation" côté Trouvetou.
  */
 
-import crypto from "crypto";
 import type {
   PaymentProvider,
   InitiatePaymentParams,
@@ -132,7 +131,7 @@ export class MtnPaymentService implements PaymentProvider {
    *    Le client est notifié par PUSH/USSD sur son téléphone.
    *    Il faut afficher une page "Vérifiez votre téléphone MTN" sur Trouvetou.
    */
-  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
+  async initiatePayment(): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API MTN sont disponibles
     /*
     try {
@@ -201,7 +200,7 @@ export class MtnPaymentService implements PaymentProvider {
    *   "reason": {}
    * }
    */
-  async checkPaymentStatus(transactionId: string): Promise<PaymentStatusResult> {
+  async checkPaymentStatus(): Promise<PaymentStatusResult> {
     // TODO : Décommenter quand les clés API MTN sont disponibles
     /*
     const token = await this.getAccessToken();
@@ -249,7 +248,7 @@ export class MtnPaymentService implements PaymentProvider {
    * Recommandation : vérifier l'IP source ou utiliser un token secret
    * passé dans l'URL du webhook (query param secret).
    */
-  validateWebhookSignature(payload: unknown, signature: string): boolean {
+  validateWebhookSignature(): boolean {
     // TODO : Implémenter validation IP source MTN
     // IPs de production MTN : à demander à MTN lors de l'enrôlement
     console.warn("[MTN] validateWebhookSignature non implémentée.");
