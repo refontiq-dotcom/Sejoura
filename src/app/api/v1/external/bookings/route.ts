@@ -342,7 +342,15 @@ export async function POST(request: Request) {
       }
 
       const { getPaymentService } = await import("@/lib/payments");
-      const service = await getPaymentService(tenantId, payment_provider as any);
+      const supportedProviders = ["wave", "orange_money", "mtn", "moov_africa", "pi_spi"] as const;
+      if (!supportedProviders.includes(payment_provider as (typeof supportedProviders)[number])) {
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json({ error: "Fournisseur de paiement invalide" }, { status: 400 });
+      }
+      const service = await getPaymentService(
+        tenantId,
+        payment_provider as (typeof supportedProviders)[number]
+      );
 
       if (!service) {
         await admin.from("bookings").delete().eq("id", booking.id);
