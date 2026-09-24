@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/hooks/use-currency";
-import { formatAmount, getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
+import { getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
 import { ROOM_AMENITIES } from "@/lib/amenities";
 import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, ImagePlus, Store, Check, X } from "lucide-react";
 import type { Accommodation, RoomType, Room } from "@/types/database";
