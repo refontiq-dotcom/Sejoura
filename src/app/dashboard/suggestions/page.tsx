@@ -108,7 +108,7 @@ export default function SuggestionsPage() {
       const tenantNames = new Map((tenantData || []).map((t: { id: string; company_name: string | null }) => [t.id, t.company_name]));
       const authorNames = new Map((authorData || []).map((u: { id: string; full_name: string | null }) => [u.id, u.full_name]));
 
-      setIdeas((ideaData || []).map((idea) => {
+      setIdeas((ideaData || []).map((idea: unknown) => {
         const feature = idea as unknown as FeatureRequest;
         return {
           ...feature,
