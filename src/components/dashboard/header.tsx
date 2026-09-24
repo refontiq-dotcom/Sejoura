@@ -528,7 +528,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                 >
                   <Languages className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
-                  {lang === "fr" ? "English" : "Français"}
+                  {t.languageEnglish}
                 </button>
               </div>
             )}
@@ -870,7 +870,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
               {searchQuery.trim().length >= 2 ? (
                 searchResults.length === 0 && !searchLoading ? (
                   <p className="px-2.5 py-6 text-center text-xs text-[var(--muted-foreground)]">
-                    {lang === "en" ? "No results" : "Aucun résultat"}
+                    {t.noResults}
                   </p>
                 ) : (
                   searchResults.map((result, index) => {
