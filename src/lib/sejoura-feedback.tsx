@@ -127,7 +127,7 @@ export const feedback = {
     icon?: LucideIcon,
   ) => custom("sync", title, options, icon),
 
-  promise: <T>(
+  promise: <T,>(
     promise: Promise<T>,
     messages: {
       loading: string;
