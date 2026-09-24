@@ -108,16 +108,35 @@ export default function ResidencesPage() {
     }
   }
 
-  function openAddModal() {
+  async function openAddModal() {
     if (isReadOnly) return;
     const limits = plan ? getPlanLimits(plan) : null;
     if (limits?.maxAccommodations != null && residences.length >= limits.maxAccommodations) {
       toast.error(`Votre plan ${getPlanLabel(plan)} est limité à ${limits.maxAccommodations} établissement${limits.maxAccommodations > 1 ? "s" : ""}. Passez au plan Entreprise pour des établissements illimités.`);
       return;
     }
+
+    // Le nom saisi pendant l'inscription est conservé dans les métadonnées
+    // du compte. Il ne sert de préremplissage que pour le premier
+    // établissement créé depuis ce formulaire. Dès qu'un établissement
+    // existe déjà, un nouvel établissement doit commencer avec un nom vide.
+    let initialName = "";
+    if (residences.length === 0) {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const savedResidenceName = data.user?.user_metadata?.residence_name;
+        if (typeof savedResidenceName === "string" && savedResidenceName.trim()) {
+          initialName = savedResidenceName.trim();
+        }
+      } catch (error) {
+        console.error("residence add: registration name lookup failed:", error);
+      }
+    }
+
     setEditingResidence(null);
     setFormData({
-      name: "",
+      name: initialName,
       address: "",
       city: "",
       country: "Côte d'Ivoire",
