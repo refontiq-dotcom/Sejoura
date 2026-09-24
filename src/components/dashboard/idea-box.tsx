@@ -20,7 +20,6 @@ import {
   Gauge,
   TrendingUp,
   Clock,
-  Image as ImageIcon,
   Send,
 } from "lucide-react";
 import type {
