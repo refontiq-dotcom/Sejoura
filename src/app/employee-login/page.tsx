@@ -27,8 +27,6 @@ interface EmployeeProfile {
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const DIAL_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"] as const;
-
 // Indicatifs disponibles
 const COUNTRY_CODES = [
   { code: "+225", label: "🇨🇮 +225" },
@@ -100,7 +98,6 @@ function EmployeeLoginContent() {
   });
 
   // Animation de transition
-  const [transitioning, setTransitioning] = useState(false);
 
   const countryCodes = COUNTRY_CODES;
 
