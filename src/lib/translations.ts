@@ -769,6 +769,7 @@ export const translations = {
         { label: "Settings", href: "/dashboard/settings" },
       ],
       logoutTooltip: "Logout",
+      logoutError: "Unable to sign out.",
       expand: "Expand",
       collapse: "Collapse",
       headerTitle: "Séjoura by Refontiq",
