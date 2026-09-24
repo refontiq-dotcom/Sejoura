@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { useCurrency } from "@/hooks/use-currency";
-import { formatDate, formatFCFA } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import {
   AD_AUDIENCE_OPTIONS,
   AD_DURATION_OPTIONS,
@@ -555,7 +555,7 @@ export function TrouvetouAdsPanel() {
                       <Users className="w-3 h-3" /> {getAdAudienceLabel(targeting.audience ?? "all")}
                     </span>
                     <span className="inline-flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300">
-                      {formatFCFA(ad.amount)}
+                      {fmt(ad.amount)}
                     </span>
                   </div>
                   {ad.status === "active" && ad.ends_at && (
