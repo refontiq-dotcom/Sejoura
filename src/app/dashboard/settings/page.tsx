@@ -1324,7 +1324,7 @@ export default function SettingsPage() {
                 <div className="space-y-3">
                   <div className="p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
                      <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                       ⚠ {lang === "en" ? "WhatsApp Business API requires a Meta Business account and a verified phone number." : "L'API WhatsApp Business nécessite un compte Meta Business et un numéro de téléphone vérifié."}
+                       ⚠ {t.whatsappWarning}
                      </p>
                   </div>
                   <Input label="Token API" placeholder="EAAxxxxxxxxxxxxx" value={whatsappForm.apiToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, apiToken: e.target.value })} />
@@ -1341,9 +1341,9 @@ export default function SettingsPage() {
           {effectiveSection === "payments" && (
             <div className="space-y-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Paiements en ligne</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">{t.onlinePayments}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                  Configurez vos passerelles de paiement pour accepter les réservations payantes depuis Trouvetou.
+                  {t.onlinePaymentsHelp}
                 </p>
               </div>
               <PaymentGatewaysSection />
