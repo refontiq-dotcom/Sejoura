@@ -16,14 +16,12 @@ import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2
 import type { Accommodation, RoomType } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
-import { useCurrency } from "@/hooks/use-currency";
 
 export default function ResidencesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user, tenantId, plan } = useCurrentUser();
-  const { fmt } = useCurrency();
   const { fmt } = useCurrency();
   const isReadOnly = user?.role === "receptionniste";
   const [residences, setResidences] = useState<Accommodation[]>([]);
