@@ -144,7 +144,6 @@ export async function GET(request: Request) {
       };
     });
     const accNameById   = new Map(typedAccommodations.map((a) => [a.id, a.name]));
-    const accActiveById = new Map(typedAccommodations.map((a) => [a.id, a.is_active === true]));
 
     // 4. Récupérer les types de chambre des établissements du tenant
     const { data: roomTypes, error: rtError } = await admin
