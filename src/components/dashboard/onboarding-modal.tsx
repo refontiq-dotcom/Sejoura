@@ -38,6 +38,28 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
   const [cityOpen, setCityOpen] = useState(false);
   const cityRef = useRef<HTMLDivElement>(null);
 
+  // Le nom saisi pendant l'inscription est déjà conservé dans les
+  // métadonnées du compte. Si ce formulaire doit exceptionnellement être
+  // affiché après l'inscription, on le préremplit pour éviter une double
+  // saisie, tout en laissant le champ entièrement modifiable.
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    async function prefillResidenceName() {
+      const { data } = await supabase.auth.getUser();
+      const savedResidenceName = data.user?.user_metadata?.residence_name;
+      if (!cancelled && !residenceName && typeof savedResidenceName === "string" && savedResidenceName.trim()) {
+        setResidenceName(savedResidenceName.trim());
+      }
+    }
+
+    void prefillResidenceName();
+    return () => {
+      cancelled = true;
+    };
+  }, [residenceName]);
+
   // Fermer l'autocomplétion ville lors d'un clic extérieur
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
