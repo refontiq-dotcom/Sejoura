@@ -95,7 +95,7 @@ export function useOnlineBookingBadge(user: User | null) {
           table: "bookings",
           filter: `tenant_id=eq.${user.tenant_id} AND booking_source=eq.external`,
         },
-        (payload) => {
+        (payload: { new: { status?: string | null } }) => {
           if (
             payload.new.status === "cancelled" ||
             payload.new.status === "no_show"
