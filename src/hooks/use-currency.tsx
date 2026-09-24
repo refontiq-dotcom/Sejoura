@@ -15,6 +15,12 @@ const DEFAULT_CURRENCY: CurrencyInfo = { code: "XOF", symbol: "FCFA" };
 
 interface CurrencyContextType {
   currency: CurrencyInfo;
+  /** Symbole de la devise d'affichage active */
+  symbol: string;
+  /** Code ISO de la devise d'affichage active */
+  code: string;
+  /** Libellé monétaire dynamique, ex. "Montant ($)" */
+  currencyLabel: (label: string) => string;
   setCurrency: (c: CurrencyInfo) => void;
   baseCurrency: string;
   /** Formate un montant exprimé en monnaie de base (XOF) vers la devise cible */
@@ -81,7 +87,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }
 
   function fmtRaw(amount: number, symbol: string = displayCurrency.symbol): string {
-    const decimals = getCurrencyDecimals(currency.code);
+    const decimals = getCurrencyDecimals(displayCurrency.code);
     const formatted = new Intl.NumberFormat("fr-FR", {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
@@ -96,12 +102,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }
 
   function convertFromBase(amountInBase: number): number {
-    if (currency.code === BASE_CURRENCY) return amountInBase;
+    if (displayCurrency.code === BASE_CURRENCY) return amountInBase;
     return convertXofTo(amountInBase, displayCurrency.code);
   }
 
+  const currencyLabel = (label: string) => `${label} (${displayCurrency.symbol})`;
+
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, baseCurrency: BASE_CURRENCY, fmt, fmtRaw, convertFromBase }}>
+    <CurrencyContext.Provider value={{ currency: displayCurrency, symbol: displayCurrency.symbol, code: displayCurrency.code, currencyLabel, setCurrency, baseCurrency: BASE_CURRENCY, fmt, fmtRaw, convertFromBase }}>
       {children}
     </CurrencyContext.Provider>
   );
