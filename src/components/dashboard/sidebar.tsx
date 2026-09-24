@@ -39,17 +39,17 @@ interface NavItem {
   badge?: string;
 }
 
-const navItems: NavItem[] = [
-  { label: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Établissements", href: "/dashboard/residences", icon: Building2, roles: ["admin_residence"] },
-  { label: "Chambres", href: "/dashboard/rooms", icon: DoorOpen, roles: ["admin_residence", "receptionniste"] },
-  { label: "Réservations", href: "/dashboard/bookings", icon: CalendarCheck, roles: ["admin_residence", "receptionniste"] },
-  { label: "Suivi ménage", href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste"] },
-  { label: "Mon Shift / Caisse", href: "/dashboard/shift", icon: ClipboardList, roles: ["receptionniste", "menagere"] },
-  { label: "Comptabilité", href: "/dashboard/accounting", icon: Wallet, roles: ["admin_residence"] },
-  { label: "Employés", href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },
-  { label: "Dossiers RH", href: "/dashboard/hr", icon: IdCard, roles: ["admin_residence"] },
-  { label: "Vitrine Trouvetou", href: "/dashboard/trouvetou", icon: Store, roles: ["admin_residence"] },
+const navItems: Array<Omit<NavItem, "label"> & { translationIndex: number }> = [
+  { translationIndex: 0, href: "/dashboard", icon: LayoutDashboard },
+  { translationIndex: 1, href: "/dashboard/residences", icon: Building2, roles: ["admin_residence"] },
+  { translationIndex: 2, href: "/dashboard/rooms", icon: DoorOpen, roles: ["admin_residence", "receptionniste"] },
+  { translationIndex: 3, href: "/dashboard/bookings", icon: CalendarCheck, roles: ["admin_residence", "receptionniste"] },
+  { translationIndex: 4, href: "/dashboard/cleaning", icon: Sparkles, roles: ["admin_residence", "receptionniste"] },
+  { translationIndex: 5, href: "/dashboard/shift", icon: ClipboardList, roles: ["receptionniste", "menagere"] },
+  { translationIndex: 6, href: "/dashboard/accounting", icon: Wallet, roles: ["admin_residence"] },
+  { translationIndex: 7, href: "/dashboard/employees", icon: Users, roles: ["admin_residence"] },
+  { translationIndex: 8, href: "/dashboard/hr", icon: IdCard, roles: ["admin_residence"] },
+  { translationIndex: 9, href: "/dashboard/trouvetou", icon: Store, roles: ["admin_residence"] },
 ];
 
 interface SidebarProps {
@@ -102,8 +102,10 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
   }
 
   const filteredItems = useMemo(
-    () => navItems.filter((item) => !item.roles || item.roles.includes(userRole)),
-    [userRole]
+    () => navItems
+      .filter((item) => !item.roles || item.roles.includes(userRole))
+      .map((item) => ({ ...item, label: t.navItems[item.translationIndex]?.label ?? "" })),
+    [userRole, t.navItems]
   );
 
   return (
@@ -264,12 +266,12 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
               ? "active-sidebar-tab flex items-center gap-2 py-1.5 px-2.5 text-[13px] font-medium transition-all"
               : "flex items-center gap-2 py-1.5 px-2.5 ml-1.5 mr-1.5 rounded-md text-[13px] font-medium transition-all hover:bg-white/10"
           }
-          title={isCollapsed ? (navLabels["/dashboard/settings"] || "Paramètres") : undefined}
+          title={isCollapsed ? (navLabels["/dashboard/settings"] || "") : undefined}
         >
           <Settings className="w-3.5 h-3.5 flex-shrink-0" style={{ color: (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) ? themeStyles.activeTextColor : themeStyles.textColor }} />
           {!isCollapsed && (
             <span className="text-[13px] font-medium truncate" style={{ color: (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings/")) ? themeStyles.activeTextColor : themeStyles.textColor }}>
-              {navLabels["/dashboard/settings"] || "Paramètres"}
+              {navLabels["/dashboard/settings"] || t.navItems.find((item) => item.href === "/dashboard/settings")?.label || ""}
             </span>
           )}
         </Link>
