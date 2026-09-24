@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
-import { Bell, Moon, Sun, Search, Menu, Sparkles, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical, Volume2, VolumeX, Wifi, WifiOff, Languages, CalendarCheck, DoorOpen, User, Loader2 } from "lucide-react";
+import { Bell, Moon, Sun, Search,  Menu, Crown, Lightbulb, LogOut, Settings, CreditCard, Building2, ChevronDown, Check, HelpCircle, Bug, Wand2, MoreVertical, Volume2, VolumeX, Wifi, WifiOff, Languages, CalendarCheck, DoorOpen, User, Loader2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -512,7 +512,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                     onClick={() => { setMenuOpen(false); onOpenOnboarding(); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[var(--foreground)] hover:bg-[var(--muted-hover)] transition-colors"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+                    <Lightbulb className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
                     {t.gettingStarted}
                   </button>
                 )}
@@ -572,7 +572,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                     onClick={() => { setHelpOpen(false); onOpenOnboarding(); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-[var(--primary-color,#0C1C33)] hover:bg-[var(--primary-muted)] transition-colors"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Lightbulb className="w-3.5 h-3.5" />
                     {t.gettingStarted}
                   </button>
                 )}
@@ -774,7 +774,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                   <div className="border-t border-[var(--border)] p-2.5 space-y-1">
                     <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--muted)]">
                       <div className="w-7 h-7 rounded-md bg-[var(--primary-color,#0C1C33)] flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                        <Crown className="w-3.5 h-3.5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-[var(--muted-foreground)]">{t.currentPlan}</p>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Sparkles, LogOut, Moon, Sun, UserCircle2 } from "lucide-react";
+import { Loader2, Building2, SprayCan, LogOut, Moon, Sun, UserCircle2 } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 import { EMPLOYEE_LOGIN_ROUTE } from "@/lib/routes";
 import ReauthModal, { isEmpVerified } from "@/components/auth/reauth-modal";
@@ -100,7 +100,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={tenantLogo} alt={tenantName || "Logo résidence"} className="h-full w-full object-contain" />
               ) : (
-                <Sparkles className="w-4 h-4 text-white" />
+                <Building2 className="w-4 h-4 text-white" />
               )}
             </div>
             <div>
@@ -157,7 +157,7 @@ export default function MenageLayout({ children }: { children: React.ReactNode }
       <nav className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-4">
         <div className="max-w-md mx-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-lg flex items-center justify-around p-1.5">
           <button className="flex flex-col items-center gap-0.5 px-6 py-2 rounded-xl text-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] font-semibold min-w-[64px] active:scale-95 transition-transform">
-            <Sparkles className="w-5 h-5" />
+            <SprayCan className="w-5 h-5" />
             <span className="text-[11px] font-medium">Tâches</span>
           </button>
           <button

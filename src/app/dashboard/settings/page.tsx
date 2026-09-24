@@ -29,7 +29,6 @@ import {
   Palette,
   Lightbulb,
   Info,
-  Sparkles,
   Smartphone,
   Menu,
   X,
@@ -1429,7 +1428,7 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--primary-color,#0C1C33)]">
-                    <Sparkles className="h-5 w-5 text-white" />
+                    <Building2 className="h-5 w-5 text-white" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">{APP_NAME}</p>

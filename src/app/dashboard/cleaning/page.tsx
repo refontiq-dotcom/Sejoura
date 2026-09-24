@@ -26,7 +26,9 @@ import {
 import { estimateTaskMinutes, formatMinutes, workloadLevel } from "@/lib/cleaning-estimates";
 import { useRouter } from "next/navigation";
 import {
-  Sparkles,
+  SprayCan,
+  KeyRound,
+  ClipboardCheck,
   Clock,
   AlertCircle,
   CheckCircle2,
@@ -44,7 +46,6 @@ import {
   PartyPopper,
   CalendarClock,
   Gauge,
-  Sparkle,
 } from "lucide-react";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
@@ -444,7 +445,7 @@ export default function CleaningPage() {
              {t.proRequiredBadge} <strong>Entreprise</strong>.
           </p>
           <Button size="md" onClick={() => router.push("/dashboard/subscription")}>
-             <Sparkles className="w-3.5 h-3.5" /> {t.unlock}
+             <KeyRound className="w-3.5 h-3.5" /> {t.unlock}
           </Button>
         </div>
       )}
@@ -461,7 +462,7 @@ export default function CleaningPage() {
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-5 h-5 text-[#C2944E]" />
+                <SprayCan className="w-5 h-5 text-[#C2944E]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -472,7 +473,7 @@ export default function CleaningPage() {
                     </span>
                   ) : isAdmin ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-white/80 border border-white/20">
-                      <Sparkle className="w-3 h-3" /> Supervision
+                      <ClipboardCheck className="w-3 h-3" /> Supervision
                     </span>
                   ) : null}
                 </div>

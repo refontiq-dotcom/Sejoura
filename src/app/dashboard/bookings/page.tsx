@@ -37,7 +37,7 @@ import {
   UserX,
   Loader2,
   AlertCircle,
-  Sparkles,
+  SprayCan,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -59,6 +59,7 @@ import {
   Info,
   Wallet,
   CheckCircle2,
+  Gem,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getActiveAssignmentId } from "@/lib/assignments";
@@ -2625,7 +2626,7 @@ export default function BookingsPage() {
                             </DropdownMenuItem>
                             {b.status === "checked_in" && (
                               <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
-                                <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                                <SprayCan className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
                               </DropdownMenuItem>
                             )}
                             {b.status === "confirmed" && (
@@ -2872,7 +2873,7 @@ export default function BookingsPage() {
                              </DropdownMenuItem>
                              {b.status === "checked_in" && (
                                <DropdownMenuItem onSelect={() => handleMidStayCleaning(b.id)}>
-                                 <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
+                                 <SprayCan className="w-4 h-4 text-[var(--primary-color,#0C1C33)]" /> Demander un ménage
                                </DropdownMenuItem>
                              )}
                              {b.status === "checked_in" && (
@@ -3069,7 +3070,7 @@ export default function BookingsPage() {
                           href={`/dashboard/clients/${selectedClient.id}`}
                           className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
                         >
-                          <Sparkles className="w-3.5 h-3.5" /> Fiche intelligente
+                          <Zap className="w-3.5 h-3.5" /> Fiche intelligente
                         </Link>
                       </>
                     )}
@@ -3630,7 +3631,7 @@ export default function BookingsPage() {
       >
         <div className="space-y-3">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--primary-muted)] text-[var(--primary-color,#0C1C33)] border border-[var(--primary-color)]/20">
-            <Sparkles className="w-6 h-6 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+            <SprayCan className="w-6 h-6 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-[var(--primary-color,#0C1C33)]">Ménage en cours de séjour</p>
               <p className="text-xs text-[var(--primary-color,#0C1C33)]/80 mt-1">
@@ -3641,7 +3642,7 @@ export default function BookingsPage() {
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1" onClick={() => setCleaningModalOpen(false)}>Annuler</Button>
             <Button className="flex-1" onClick={confirmMidStayCleaning} loading={cleaningLoading}>
-              <Sparkles className="w-4 h-4" /> Confirmer la demande
+              <SprayCan className="w-4 h-4" /> Confirmer la demande
             </Button>
           </div>
         </div>
@@ -4282,7 +4283,7 @@ export default function BookingsPage() {
           <div className="space-y-4 pt-1">
             <div className="flex items-start gap-3 rounded-xl bg-gradient-to-br from-[var(--primary-muted,#E8EDF5)] to-transparent p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-color,#0C1C33)] text-white">
-                <Sparkles className="h-5 w-5" />
+                <Gem className="h-5 w-5" />
               </span>
               <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                 Offrez à chaque client une <strong>page séjour privée</strong>, accessible depuis son
@@ -4293,7 +4294,7 @@ export default function BookingsPage() {
             <div className="flex flex-col gap-2">
               <a href="/dashboard/subscription">
                 <Button className="w-full gap-2" loading={portalLoading}>
-                  <Sparkles className="h-4 w-4" /> Voir les formules
+                  <Gem className="h-4 w-4" /> Voir les formules
                 </Button>
               </a>
               <Button variant="outline" onClick={() => setPortalUpsell(false)}>

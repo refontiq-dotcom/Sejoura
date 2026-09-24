@@ -28,7 +28,8 @@ import {
   Banknote,
   AlertTriangle,
   Info,
-  Sparkles,
+  KeyRound,
+  Medal,
 } from "lucide-react";
 import type { ClientProfilePayload, ClientProfileSignal } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
@@ -58,7 +59,7 @@ const TIER_LABEL: Record<string, string> = {
 const DIMENSION_META: { key: "reliability" | "behavior" | "loyalty" | "value"; label: string; weight: string; icon: typeof ShieldCheck; color: string }[] = [
   { key: "reliability", label: "Fiabilité", weight: "40 %", icon: ShieldCheck, color: "bg-emerald-500" },
   { key: "behavior", label: "Comportement", weight: "30 %", icon: Heart, color: "bg-blue-500" },
-  { key: "loyalty", label: "Fidélité", weight: "20 %", icon: Sparkles, color: "bg-violet-500" },
+  { key: "loyalty", label: "Fidélité", weight: "20 %", icon: Medal, color: "bg-violet-500" },
   { key: "value", label: "Valeur", weight: "10 %", icon: Banknote, color: "bg-amber-500" },
 ];
 
@@ -198,7 +199,7 @@ export default function ClientProfilePage() {
             onClick={() => router.push("/dashboard/subscription")}
             className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors"
           >
-            <Sparkles className="w-4 h-4" /> Débloquer avec le plan Entreprise
+            <KeyRound className="w-4 h-4" /> Débloquer avec le plan Entreprise
           </button>
           <button
             type="button"

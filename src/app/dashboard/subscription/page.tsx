@@ -21,7 +21,7 @@ import {
   Clock,
   ShieldCheck,
   Smartphone,
-  Sparkles,
+  Gem,
   ArrowRight,
 } from "lucide-react";
 import type { Subscription, SubscriptionPaymentRequest } from "@/types/database";
@@ -175,7 +175,7 @@ export default function SubscriptionPage() {
       name: "Croissance",
       tagline: "Pour les résidences en expansion",
       price: getPlanPrice("croissance"),
-      icon: Sparkles,
+      icon: Gem,
       iconClasses: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600",
       features: [
         "1 établissement, 35 unités maximum",
@@ -241,7 +241,7 @@ export default function SubscriptionPage() {
               "bg-blue-100 dark:bg-blue-900/30"
             }`}>
               {currentPlan === "entreprise" ? <Crown className="w-7 h-7 text-purple-600" /> :
-               currentPlan === "croissance" ? <Sparkles className="w-7 h-7 text-emerald-600" /> :
+               currentPlan === "croissance" ? <Gem className="w-7 h-7 text-emerald-600" /> :
                <Zap className="w-7 h-7 text-blue-600" />}
             </div>
             <div>
@@ -478,7 +478,7 @@ export default function SubscriptionPage() {
               disabled={!confirmPlan}
               onClick={handleSubmitPayment}
             >
-              <Sparkles className="w-4 h-4" />
+              <Zap className="w-4 h-4" />
               Soumettre pour activation rapide
               <ArrowRight className="w-4 h-4" />
             </Button>

@@ -17,7 +17,9 @@ import {
   isDoneToday,
 } from "@/lib/cleaning-time";
 import {
-  Sparkles,
+  User,
+  SprayCan,
+  Zap,
   Loader2,
   Clock,
   AlertCircle,
@@ -235,7 +237,7 @@ export default function MenagePage() {
             key: "mine" as FilterKey,
             label: "Mes tâches",
             value: stats.mine,
-            icon: Sparkles,
+            icon: User,
             cls: "border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10",
             accent: "text-blue-600",
           },
@@ -285,7 +287,7 @@ export default function MenagePage() {
       {suggestion && (
         <div className="rounded-2xl border border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] p-3.5">
           <div className="flex items-center gap-2 mb-1.5">
-            <Sparkles className="w-4 h-4 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
+            <Zap className="w-4 h-4 text-[var(--primary-color,#0C1C33)] flex-shrink-0" />
             <p className="text-xs font-bold text-[var(--primary-color,#0C1C33)]">
               Suggestion : commencez par la Chambre {suggestion.room?.room_number || "—"}
             </p>
@@ -408,7 +410,7 @@ export default function MenagePage() {
                     )}
                     {isMine && !late && task.status !== "done" && (
                       <Badge variant="info">
-                        <Sparkles className="w-3 h-3" /> En cours
+                        <SprayCan className="w-3 h-3" /> En cours
                       </Badge>
                     )}
                   </div>

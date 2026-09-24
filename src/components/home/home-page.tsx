@@ -29,7 +29,9 @@ import {
   CreditCard,
   Server,
   MessageCircle,
-  Sparkles,
+  Zap,
+  SprayCan,
+  UserPlus,
   Store,
 } from "lucide-react";
 
@@ -608,7 +610,7 @@ export function HomePage() {
                   : "Prices automatically adjusted based on season, weekends, holidays and occupancy rate. Maximize your revenue effortlessly.",
             },
             {
-              icon: Sparkles,
+              icon: Zap,
               title: lang === "fr" ? "Suggestions IA" : "AI suggestions",
               desc:
                 lang === "fr"
@@ -624,7 +626,7 @@ export function HomePage() {
                   : "Séjoura automatically detects overpayments, underpayments, duplicate payments and price discrepancies — you're alerted before it's too late.",
             },
             {
-              icon: Sparkles,
+              icon: SprayCan,
               title: lang === "fr" ? "Ménage automatique" : "Automatic cleaning",
               desc:
                 lang === "fr"
@@ -1177,7 +1179,7 @@ export function HomePage() {
                   aria-selected={mode === "signup"}
                   aria-controls="form-signup"
                 >
-                  <Sparkles className="w-3.5 h-3.5 sm:hidden" />
+                  <UserPlus className="w-3.5 h-3.5 sm:hidden" />
                   {t.signUp}
                 </button>
               </div>
@@ -1551,7 +1553,7 @@ export function HomePage() {
               onClick={() => { setMode("signup"); setAuthModalMode("signup"); }}
               className="w-full max-w-xs py-2.5 px-6 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/25 shadow-lg backdrop-blur-md text-sm transition-all flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4" />
+              <UserPlus className="w-4 h-4" />
               {t.signUp}
             </button>
             <p className="text-[10px] text-white/50 font-medium">{t.noCardRequired}</p>
@@ -1645,7 +1647,7 @@ export function HomePage() {
                   <Lock className="w-3.5 h-3.5" />{t.signIn}
                 </button>
                 <button onClick={() => setAuthModalMode("signup")} className={`flex-1 py-3 px-3 text-sm font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 ${authModalMode === "signup" ? "bg-blue-600 text-white shadow-md shadow-blue-600/25 ring-1 ring-blue-400/30" : "text-slate-500 dark:text-[#a0a0a0]"}`} role="tab" aria-selected={authModalMode === "signup"}>
-                  <Sparkles className="w-3.5 h-3.5" />{t.signUp}
+                  <UserPlus className="w-3.5 h-3.5" />{t.signUp}
                 </button>
               </div>
               {authModalMode === "login" && (

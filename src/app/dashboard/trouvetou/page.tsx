@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Store,
-  Sparkles,
+  Rocket,
   Building2,
   Check,
   X,
@@ -676,7 +676,7 @@ function HeaderVisibilityBadge({
   if (isEnterprisePlan && anyPermanentBoost) {
     return (
       <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-400/40 text-amber-200">
-        <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+        <Rocket className="w-5 h-5 text-amber-400 animate-pulse" />
         <div>
           <p className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Statut Visibilité</p>
           <p className="text-sm font-bold text-white">⭐ Boosté - À la Une</p>
@@ -1019,7 +1019,7 @@ function TrouvetouDashboardPage() {
         <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-900/10 p-3 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1.5 flex-1">
             <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-base">
-              <Sparkles className="w-5 h-5 text-emerald-600 fill-emerald-500" />
+              <Rocket className="w-5 h-5 text-emerald-600 fill-emerald-500" />
               <span>Vitrine complète débloquée</span>
             </div>
             <p className="text-sm text-emerald-700/90 dark:text-emerald-400 max-w-3xl">
@@ -1049,7 +1049,7 @@ function TrouvetouDashboardPage() {
           <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/50 dark:from-amber-900/20 dark:to-orange-900/15 p-3 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-base">
-                <Sparkles className="w-5 h-5 text-amber-600 fill-amber-500" />
+                <Rocket className="w-5 h-5 text-amber-600 fill-amber-500" />
                 <span>Boostez définitivement avec la Formule ENTREPRISE</span>
               </div>
               <p className="text-sm text-amber-700/90 dark:text-amber-400 max-w-3xl">
@@ -1095,7 +1095,7 @@ function TrouvetouDashboardPage() {
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500" />
+                <Rocket className="w-5 h-5 text-amber-500" />
                 Boost Permanent par Établissement
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">
@@ -1137,7 +1137,7 @@ function TrouvetouDashboardPage() {
                     {boostSavingId === acc.id ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <Rocket className="w-3.5 h-3.5" />
                     )}
                     {acc.is_permanently_boosted ? "Boosté ⭐" : "Activer Boost"}
                   </button>

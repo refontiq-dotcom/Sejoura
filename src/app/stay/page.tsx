@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Sparkles,
+  ConciergeBell,
   Bed,
   Headphones,
   Phone,
@@ -45,7 +45,7 @@ const SERVICE_DEFS = [
     type: "cleaning",
     label: "Ménage",
     description: "Demander un nettoyage de votre chambre",
-    icon: Sparkles,
+    icon: ConciergeBell,
     color: "bg-emerald-500",
   },
   {
@@ -508,7 +508,7 @@ function StayPortal() {
                 className="flex w-full items-center justify-between rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-left dark:border-emerald-900 dark:bg-emerald-900/30"
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white"><Sparkles className="h-5 w-5" /></span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white"><ConciergeBell className="h-5 w-5" /></span>
                   <span>
                     <span className="block text-sm font-bold text-emerald-900 dark:text-emerald-100">Besoin de quelque chose ?</span>
                     <span className="block text-xs text-emerald-700 dark:text-emerald-300">Demandez un service à la réception</span>

@@ -283,7 +283,7 @@ import {
   Receipt,
   Eye,
   Lock,
-  Sparkles,
+  KeyRound,
   RefreshCw,
   Search,
   Users,
@@ -2131,7 +2131,7 @@ export default function AccountingPage() {
               </div>
             </div>
             <Button size="sm" onClick={() => router.push("/dashboard/subscription")} className="w-full sm:w-auto justify-center">
-              <Sparkles className="w-4 h-4" /> Débloquer avec Entreprise
+              <KeyRound className="w-4 h-4" /> Débloquer avec Entreprise
             </Button>
           </div>
         </Card>
@@ -3566,7 +3566,7 @@ export default function AccountingPage() {
               href={`/dashboard/clients/${selectedClient.id}`}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--primary-color,#0C1C33)] hover:underline"
             >
-              <Sparkles className="w-3.5 h-3.5" /> Ouvrir la fiche intelligente
+              <Zap className="w-3.5 h-3.5" /> Ouvrir la fiche intelligente
             </Link>
 
             {/* Chiffres clés */}

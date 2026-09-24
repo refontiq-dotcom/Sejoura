@@ -11,7 +11,8 @@ import {
   X,
   Loader2,
   Smartphone,
-  Sparkles,
+  BadgePercent,
+  Zap,
   ArrowRight,
   ShieldCheck,
   ImagePlus,
@@ -297,7 +298,7 @@ export function TrouvetouAdsPanel() {
           <p className="text-sm text-slate-500">Option de la vitrine Trouvetou : créez une campagne, réglez via Wave, puis la diffusion démarre après confirmation.</p>
           {hasDiscount && (
             <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-              <Sparkles className="h-3 w-3" />
+              <BadgePercent className="h-3 w-3" />
               Remise Entreprise -50 % appliquée sur vos publicités
             </span>
           )}
@@ -651,7 +652,7 @@ export function TrouvetouAdsPanel() {
               />
             </div>
             <Button variant="purple" size="lg" className="w-full" loading={notifying} onClick={handleSubmitPayment}>
-              <Sparkles className="w-4 h-4" />
+              <Zap className="w-4 h-4" />
               Soumettre pour activation rapide
               <ArrowRight className="w-4 h-4" />
             </Button>

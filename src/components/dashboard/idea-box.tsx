@@ -14,7 +14,6 @@ import {
   Loader2,
   Camera,
   X,
-  Sparkles,
   Wand2,
   Bug,
   Gauge,
@@ -45,7 +44,7 @@ export const FEATURE_REQUEST_CATEGORIES: Record<
   FeatureRequestCategory,
   { label: string; icon: React.ComponentType<{ className?: string }> }
 > = {
-  new_feature: { label: "Nouvelle fonctionnalité", icon: Sparkles },
+  new_feature: { label: "Nouvelle fonctionnalité", icon: Lightbulb },
   page_improvement: { label: "Amélioration d’une page", icon: Wand2 },
   bug_report: { label: "Petit bug", icon: Bug },
 };

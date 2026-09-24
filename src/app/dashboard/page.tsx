@@ -12,7 +12,8 @@ import {
   Wallet,
   LogIn,
   LogOut,
-  Sparkles,
+  SprayCan,
+  Gem,
   ArrowRight,
   CheckCircle2,
   Clock,
@@ -1476,7 +1477,7 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-3 animate-fade-in">
         <div className="w-20 h-20 rounded-full bg-[var(--primary-muted)] flex items-center justify-center mb-2">
-          <Sparkles className="w-10 h-10 text-[var(--primary-color,#0C1C33)]" />
+          <Gem className="w-10 h-10 text-[var(--primary-color,#0C1C33)]" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white text-center">{t.welcomeTitle}</h2>
         <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md text-center">
@@ -1957,7 +1958,7 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-violet-500 text-white ring-1 ring-violet-600/30 dark:bg-violet-500/25 dark:text-violet-300 flex items-center justify-center shadow-sm flex-shrink-0">
-                  <Sparkles className="w-5 h-5" />
+                  <SprayCan className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate">État du ménage</p>
@@ -2277,7 +2278,7 @@ export default function DashboardPage() {
           {/* Donut Chart — État du parc (30%) */}
           <SectionCard className="lg:col-span-3">
             <SectionHeader
-              icon={<Sparkles className="w-5 h-5" />}
+              icon={<SprayCan className="w-5 h-5" />}
               iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-violet-500/20"
               title={t.kpis.roomStatus}
               subtitle={t.kpis.roomStatusCopy}
