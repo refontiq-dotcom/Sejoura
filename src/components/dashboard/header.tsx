@@ -917,9 +917,7 @@ function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmai
                     {t.goToAccounting}
                   </button>
                   <p className="px-2.5 pt-2 pb-1 text-[10px] text-[var(--muted-foreground)]">
-                    {lang === "en"
-                      ? "Type at least 2 characters to search bookings, rooms, residences and clients."
-                      : "Saisissez au moins 2 caractères pour rechercher réservations, chambres, établissements et clients."}
+                    {t.searchHint}
                   </p>
                 </>
               )}
