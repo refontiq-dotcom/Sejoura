@@ -154,6 +154,12 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
     }
   }, [userId, pin, submitting, onVerified]);
 
+  useEffect(() => {
+    if (pin.length !== 4 || submitting) return;
+    const timer = window.setTimeout(() => { void verifyPin(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pin, submitting, verifyPin]);
+
   const pressDigit = useCallback((digit: string) => {
     if (submitting || pin.length >= 4) return;
     setPinError(null);
@@ -217,46 +223,6 @@ export default function ReauthModal({ onVerified }: ReauthModalProps) {
     }
   }, [userId, submitting, onVerified]);
 
-
-  const verifyPin = useCallback(async () => {
-    if (!userId || submitting) return;
-    setSubmitting(true);
-    setPinError(null);
-
-    try {
-      const res = await fetch("/api/employee-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", userId, pin }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        setSubmitting(false);
-        setPin("");
-        setPinError(data.error || "Code incorrect.");
-        setShaking(true);
-        setTimeout(() => setShaking(false), 550);
-        return;
-      }
-
-      // Refresh session if returned
-      if (data.session) {
-        const supabase = createClient();
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        });
-      }
-
-      sessionStorage.setItem(STORAGE_KEY, "1");
-      toast.success("Tout est bon ! ✅");
-      onVerified();
-    } catch {
-      setSubmitting(false);
-      setPinError("Erreur serveur 🖥️.");
-    }
-  }, [userId, pin, submitting, onVerified]);
 
   const pressDigit = useCallback((digit: string) => {
     if (submitting || pin.length >= 4) return;
