@@ -1004,20 +1004,11 @@ function TrouvetouDashboardPage() {
                         }`}
                       >
                         {savingTypeId === type.id ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Mise à jour…
-                          </>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : isListed ? (
-                          <>
-                            <X className="w-3.5 h-3.5" />
-                            Retirer de Trouvetou
-                          </>
+                          "Retirer la publication"
                         ) : (
-                          <>
-                            <Rocket className="w-3.5 h-3.5" />
-                            Publier sur Trouvetou
-                          </>
+                          "Publier"
                         )}
                       </button>
 
