@@ -5,16 +5,8 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/cron/ads-expire",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/trouvetou/sync",
+      "path": "/api/cron/daily-tasks",
       "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/control-center-metrics",
-      "schedule": "0 * * * *"
     }
   ]
 }
