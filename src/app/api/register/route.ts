@@ -57,9 +57,9 @@ async function notifyNewRegistration(payload: {
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json(
         { error: "Vous devez être connecté pour finaliser l'inscription." },
         { status: 401 }
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       phone = "",
     } = body;
 
-    const email = session.user.email?.trim();
+    const email = user.email?.trim();
     if (!email || !fullName?.trim() || !residenceName?.trim() || !residenceType?.trim() || !residenceLocation?.trim() || !country?.trim()) {
       return NextResponse.json(
         { error: "Tous les champs requis doivent être renseignés." },
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     const { data: existingUser } = await admin
       .from("users")
       .select("id, tenant_id")
-      .eq("auth_user_id", session.user.id)
+      .eq("auth_user_id", user.id)
       .maybeSingle();
 
     // Espace déjà en cours de création : profil rattaché à un tenant, OU tenant
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
     const profilePayload = {
       tenant_id: tenantId,
-      auth_user_id: session.user.id,
+      auth_user_id: user.id,
       role: "admin_residence" as const,
       full_name: fullName,
       phone,
