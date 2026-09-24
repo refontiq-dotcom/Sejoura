@@ -1912,7 +1912,7 @@ export default function DashboardPage() {
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-3">
               {isToday
                 ? t.kpis.dailyRevenueCopy.replace("{currency}", symbol)
-                : `${symbol} ${t.collectedOnDate} le ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" })}`}
+                : `${symbol} ${t.collectedOnDate.replace("{date}", new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" }))}`}
             </p>
           </Card>
 
@@ -1994,7 +1994,7 @@ export default function DashboardPage() {
              title={`${isToday ? t.movements.title : isPastDate ? t.noMovementsPast : t.noMovementsFuture} (${movements.length})`}
              subtitle={isToday
                ? t.movements.subtitle
-               : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
+               : `${t.movementsForDate.replace("{date}", new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" }))}`}
             action={
               <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
                 {t.movements.viewAll}
