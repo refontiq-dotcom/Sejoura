@@ -185,7 +185,7 @@ export default function CleaningPage() {
             .select("id, full_name")
             .in("id", claimedIds);
           const map: Record<string, string> = {};
-          (usersData || []).forEach((u) => {
+          (usersData || []).forEach((u: { id: string; full_name: string | null }) => {
             map[u.id] = u.full_name || t.maid;
           });
           setMaidNames(map);
