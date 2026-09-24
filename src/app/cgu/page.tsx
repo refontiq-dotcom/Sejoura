@@ -30,7 +30,7 @@ export default function CGUPage() {
         </div>
         <div className="px-6 sm:px-10 py-8 space-y-8 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           <Section title="1. Éditeur et objet">
-            <p><strong>Refontiq</strong>, représentée par <strong>Dukoua N'guessan Samuel junior</strong>, conçoit et exploite le SaaS Séjoura. Contact : <strong>+225 01 00 37 29 00</strong>. Site : <a className="text-blue-600 underline" href="https://refontiq.com" target="_blank" rel="noopener noreferrer">refontiq.com</a>.</p>
+            <p><strong>Refontiq</strong>, représentée par <strong>Dukoua N'guessan Samuel junior</strong>, conçoit et exploite le SaaS Séjoura. Contact : <strong>refontiq@gmail.com</strong> — <strong>+225 01 00 37 29 00</strong>. Site : <a className="text-blue-600 underline" href="https://refontiq.com" target="_blank" rel="noopener noreferrer">refontiq.com</a>.</p>
             <p>Ces CGU encadrent l'accès et l'utilisation de Séjoura par les hôtels, résidences, propriétaires, gestionnaires et membres de leurs équipes.</p>
           </Section>
           <Section title="2. Rôle de Séjoura">
