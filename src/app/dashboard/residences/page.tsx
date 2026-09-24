@@ -74,7 +74,7 @@ export default function ResidencesPage() {
       if (accData) {
         setResidences(accData as unknown as Accommodation[]);
 
-        const accommodationIds = accData.map((a) => a.id);
+        const accommodationIds = accData.map((a: { id: string }) => a.id);
         const [typesResult, roomsResult] = await Promise.all([
           supabase.from("room_types").select("*").in("accommodation_id", accommodationIds),
           supabase.from("rooms").select("accommodation_id, status").in("accommodation_id", accommodationIds),
