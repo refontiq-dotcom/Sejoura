@@ -74,6 +74,7 @@ function HrPageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const { user, tenantId, plan } = useCurrentUser();
+  const { symbol } = useCurrency();
   const currentUserId = user?.id || "";
   const [records, setRecords] = useState<HrEmployee[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
@@ -606,7 +607,7 @@ function HrPageContent() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
-            <Input label={<SalaryLabel />} type="number" placeholder="Informatif — pas de calcul de paie" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
+            <Input label={`Salaire de base (${symbol})`} type="number" placeholder="Informatif — pas de calcul de paie" value={form.base_salary} onChange={(e) => setForm({ ...form, base_salary: e.target.value })} />
             <Input label="N° CNPS" value={form.cnps_number} onChange={(e) => setForm({ ...form, cnps_number: e.target.value })} />
           </div>
 
@@ -641,10 +642,6 @@ function HrPageContent() {
   );
 }
 
-function SalaryLabel() {
-  const { symbol } = useCurrency();
-  return <>Salaire de base ({symbol})</>;
-}
 
 export default function HrPage() {
   return (
