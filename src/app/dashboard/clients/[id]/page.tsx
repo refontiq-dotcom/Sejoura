@@ -107,7 +107,10 @@ export default function ClientProfilePage() {
         }
 
         const [profileRes, bookingsRes] = await Promise.all([
-          supabase.rpc("get_client_profile", { p_client_id: clientId }).then((res) => {
+          supabase.rpc("get_client_profile", { p_client_id: clientId }).then((res: {
+            data: { ok?: boolean | null; client?: unknown; profile?: unknown } | null;
+            error: unknown;
+          }) => {
             // Si le RPC retourne null ou un objet sans ok, construire un payload par défaut
             if (!res.error && (!res.data || res.data.ok === undefined || res.data.ok === null)) {
               return { data: { ok: true, client: null, profile: null }, error: null };
