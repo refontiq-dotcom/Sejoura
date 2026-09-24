@@ -28,7 +28,7 @@ import { OrangeMoneyPaymentService } from "./orange-money";
 import { MtnPaymentService } from "./mtn";
 import { MoovAfricaPaymentService } from "./moov-africa";
 import { PiSpiPaymentService } from "./pi-spi";
-import type { PaymentProvider } from "./types";
+import type { PaymentProvider, WaveApiKeys, OrangeMoneyApiKeys, MtnApiKeys, MoovAfricaApiKeys, PiSpiApiKeys } from "./types";
 
 // ─── Providers supportés ─────────────────────────────────────────────────────
 
@@ -67,15 +67,15 @@ export async function getPaymentService(
 
   switch (provider) {
     case "wave":
-      return new WavePaymentService(keys as any, isSandbox);
+      return new WavePaymentService(keys as WaveApiKeys, isSandbox);
     case "orange_money":
-      return new OrangeMoneyPaymentService(keys as any);
+      return new OrangeMoneyPaymentService(keys as OrangeMoneyApiKeys);
     case "mtn":
-      return new MtnPaymentService(keys as any, isSandbox);
+      return new MtnPaymentService(keys as MtnApiKeys, isSandbox);
     case "moov_africa":
-      return new MoovAfricaPaymentService(keys as any);
+      return new MoovAfricaPaymentService(keys as MoovAfricaApiKeys);
     case "pi_spi":
-      return new PiSpiPaymentService(keys as any);
+      return new PiSpiPaymentService(keys as PiSpiApiKeys);
     default:
       return null;
   }
