@@ -18,17 +18,6 @@ export function LanguageProvider({ children, initialLang = "fr" }: { children: R
   // Initialiser avec la langue fournie par le serveur (via le cookie)
   const [lang, setLangState] = useState<Lang>(initialLang);
 
-  // Lire la préférence stockée uniquement après l'hydratation côté client
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    // Si localStorage contient une langue différente de celle du serveur, on l'applique
-    if (stored === "en" || stored === "fr") {
-      if (stored !== lang) {
-        setLangState(stored);
-      }
-    }
-  }, []); // On ne met volontairement pas `lang` dans les dépendances pour éviter une boucle
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEY, lang);
