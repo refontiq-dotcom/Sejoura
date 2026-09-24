@@ -1055,13 +1055,13 @@ export default function SettingsPage() {
                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">{t.presetColorThemes}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                       {[
-                        { id: "ocean", name: "Océan", main: "#0d9488", dark: "#134e4a" },
-                        { id: "cacao", name: "Cacao", main: "#78350f", dark: "#451a03" },
-                        { id: "nuit", name: "Nuit", main: "#2563eb", dark: "#0f172a" },
-                        { id: "violet", name: "Violet", main: "#9333ea", dark: "#3b0764" },
-                        { id: "bordeaux", name: "Bordeaux", main: "#9d174d", dark: "#701a43" },
-                        { id: "soleil", name: "Soleil", main: "#d97706", dark: "#78350f" },
-                        { id: "slate", name: "Ardoise", main: "#475569", dark: "#111827" },
+                        { id: "ocean", name: t.presetNames.ocean, main: "#0d9488", dark: "#134e4a" },
+                        { id: "cacao", name: t.presetNames.cacao, main: "#78350f", dark: "#451a03" },
+                        { id: "nuit", name: t.presetNames.nuit, main: "#2563eb", dark: "#0f172a" },
+                        { id: "violet", name: t.presetNames.violet, main: "#9333ea", dark: "#3b0764" },
+                        { id: "bordeaux", name: t.presetNames.bordeaux, main: "#9d174d", dark: "#701a43" },
+                        { id: "soleil", name: t.presetNames.soleil, main: "#d97706", dark: "#78350f" },
+                        { id: "slate", name: t.presetNames.slate, main: "#475569", dark: "#111827" },
                       ].map((preset) => {
                         const currentDark = themeHex(themeColor);
                         const isActive = currentDark.toLowerCase() === preset.dark.toLowerCase();
@@ -1128,7 +1128,7 @@ export default function SettingsPage() {
                         setCompanyForm(nextForm);
                         const ok = await saveTenant(
                           { default_language: newLang },
-                          { successMessage: newLang === "en" ? "Language set to English ✓" : "Langue définie sur Français ✓" }
+                          { successMessage: t.languageSaved.replace("{language}", newLang === "en" ? "English" : "Français") }
                         );
                         if (ok) companySnapshotRef.current = JSON.stringify(nextForm);
                       }}
