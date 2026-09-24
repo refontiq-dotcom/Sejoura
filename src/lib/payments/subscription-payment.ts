@@ -105,7 +105,14 @@ export async function initiateSubscriptionPayment(
  * → Enregistre le paiement dans l'historique
  */
 export async function processSubscriptionPaymentWebhook(
+  provider: string,
+  transactionId: string,
+  providerStatus: string
 ): Promise<{ success: boolean; message: string }> {
+  // Paramètres conservés pour le contrat du webhook; traitement automatique encore désactivé.
+  if (provider || transactionId || providerStatus) {
+    // Le webhook reste en attente de la connexion des fournisseurs.
+  }
   // TODO : Décommenter quand les webhooks seront connectés
   /*
   const supabase = createAdminClient();
