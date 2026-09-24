@@ -193,7 +193,7 @@ function ResidenceSwitcher() {
   );
 }
 
-function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false, tenantId = "" }: HeaderProps) {
+function HeaderImpl({ title, subtitle, onMenuClick, userName, userRole, userEmail, avatarUrl, companyName, plan, scrolled = false, tenantId = "", onOpenOnboarding }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { lang, setLang } = useLanguage();
   const t = translations[lang].header;
