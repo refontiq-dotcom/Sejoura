@@ -58,7 +58,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
     return () => {
       cancelled = true;
     };
-  }, [residenceName]);
+  }, []);
 
   // Fermer l'autocomplétion ville lors d'un clic extérieur
   useEffect(() => {
