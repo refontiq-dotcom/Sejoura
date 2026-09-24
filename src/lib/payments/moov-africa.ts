@@ -32,8 +32,6 @@ import type {
 
 // ─── URLs ────────────────────────────────────────────────────────────────────
 
-const MOOV_API_URL = "https://api.flooz.moov-africa.com"; // URL à confirmer avec Moov
-
 // ─── Service Moov Africa ──────────────────────────────────────────────────────
 
 export class MoovAfricaPaymentService implements PaymentProvider {
@@ -69,7 +67,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *    Il n'y a pas de page web de paiement — le client valide depuis son téléphone.
    *    Afficher "Vérifiez votre téléphone Moov" sur Trouvetou.
    */
-  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
+  async initiatePayment(): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API Moov Africa sont disponibles
     /*
     try {
@@ -127,7 +125,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *   "amount": 15000
    * }
    */
-  async checkPaymentStatus(transactionId: string): Promise<PaymentStatusResult> {
+  async checkPaymentStatus(): Promise<PaymentStatusResult> {
     // TODO : Décommenter quand les clés API Moov Africa sont disponibles
     /*
     const response = await fetch(`${MOOV_API_URL}/api/v1/payment/status/${transactionId}`, {
@@ -165,7 +163,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *   "amount": 15000
    * }
    */
-  validateWebhookSignature(payload: unknown, signature: string): boolean {
+  validateWebhookSignature(): boolean {
     // TODO : Implémenter selon la documentation Moov Africa
     // Contacter marchands@moov-africa.ci pour les détails de sécurité
     console.warn("[MoovAfrica] validateWebhookSignature non implémentée.");
