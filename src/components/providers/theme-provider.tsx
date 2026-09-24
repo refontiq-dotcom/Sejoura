@@ -41,7 +41,7 @@ function isValidHex(color: string | null | undefined): color is string {
  * En mode sombre, on utilise la couleur dorée Séjoura (#C2944E) comme couleur primaire
  * pour garantir un contraste suffisant sur fond sombre.
  */
-function getDarkModePrimaryColor(sidebarBg: string): string {
+function getDarkModePrimaryColor(): string {
   // En mode sombre, la couleur primaire doit être claire pour être visible sur fond sombre
   // On utilise la couleur dorée Séjoura par défaut
   return "#C2944E";
@@ -130,7 +130,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
       const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : "#0C1C33";
       const isDark = theme === "dark";
-      const dynamicPrimary = isDark ? getDarkModePrimaryColor(safePrimaryColor) : safePrimaryColor;
+      const dynamicPrimary = isDark ? getDarkModePrimaryColor() : safePrimaryColor;
       const contrast = getContrastColor(dynamicPrimary);
       root.style.setProperty("--color-primary", dynamicPrimary);
       root.style.setProperty("--primary", dynamicPrimary);
@@ -148,7 +148,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         // - --primary-color devient la couleur dorée pour être visible sur fond sombre
         // - --primary-light devient le fond sombre de la page
         const isDark = theme === "dark";
-        const dynamicPrimary = isDark ? getDarkModePrimaryColor(sidebarBg) : sidebarBg;
+        const dynamicPrimary = isDark ? getDarkModePrimaryColor() : sidebarBg;
         const dynamicLight = isDark
           ? "#090D16"
           : isValidHex(primaryColor)
