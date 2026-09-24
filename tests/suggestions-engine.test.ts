@@ -24,7 +24,6 @@ describe("suggestions-engine", () => {
   it("suggère de publier sur Trouvetou les chambres libres demain", () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
     const input: SuggestionInput = {
       ...baseInput,
