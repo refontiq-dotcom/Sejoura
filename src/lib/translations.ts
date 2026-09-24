@@ -97,6 +97,10 @@ export const translations = {
       settings: "Paramètres",
       subscription: "Abonnement",
       ads: "Publicités",
+      shift: "Mon Shift / Caisse",
+      hr: "Dossiers RH",
+      trouvetou: "Vitrine Trouvetou",
+      suggestions: "Suggestions",
       details: "Détails",
     },
     onboarding: {
@@ -786,6 +790,10 @@ export const translations = {
       settings: "Settings",
       subscription: "Subscription",
       ads: "Ads",
+      shift: "My Shift / Cash",
+      hr: "HR Records",
+      trouvetou: "Trouvetou Showcase",
+      suggestions: "Suggestions",
       details: "Details",
     },
     onboarding: {
