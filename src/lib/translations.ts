@@ -76,6 +76,9 @@ export const translations = {
       moreActions: "Plus d’actions",
       switchLanguage: "Passer en anglais",
       searchGroups: { residences: "Établissements", rooms: "Chambres", bookings: "Réservations", clients: "Clients" },
+      languageEnglish: "English",
+      noResults: "Aucun résultat",
+      searchHint: "Saisissez au moins 2 caractères pour rechercher réservations, chambres, établissements et clients.",
       roleLabels: {
         super_admin: "ADMIN",
         admin_residence: "GÉRANT",
@@ -796,6 +799,9 @@ export const translations = {
       moreActions: "More actions",
       switchLanguage: "Switch to French",
       searchGroups: { residences: "Residences", rooms: "Rooms", bookings: "Bookings", clients: "Clients" },
+      languageEnglish: "Français",
+      noResults: "No results",
+      searchHint: "Enter at least 2 characters to search bookings, rooms, residences and clients.",
       roleLabels: {
         super_admin: "ADMIN",
         admin_residence: "MANAGER",
