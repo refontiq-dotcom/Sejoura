@@ -1020,7 +1020,7 @@ export default function AccountingPage() {
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [clientFilter, setClientFilter] = useState<"all" | "unpaid" | "loyal" | "recent" | "vip">("all");
-  const [clientSort, setClientSort] = useState<{ key: "name" | "revenue" | "score" | "stays"; direction: "asc" | "desc" }>({ key: "score", direction: "desc" });
+  const [clientSort] = useState<{ key: "name" | "revenue" | "score" | "stays"; direction: "asc" | "desc" }>({ key: "score", direction: "desc" });
 
   // Tri
   const [expenseSort, setExpenseSort] = useState<{ key: "date" | "amount"; direction: "asc" | "desc" }>({
