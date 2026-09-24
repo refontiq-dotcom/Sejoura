@@ -488,7 +488,7 @@ export default function DashboardLayout({
     if (p === "/dashboard") {
       const hour = localHour;
       const isDay = hour >= 6 && hour < 18;
-      const greeting = lang === "en" ? (isDay ? "Good morning" : "Good evening") : isDay ? "Bonjour" : "Bonsoir";
+      const greeting = isDay ? d.dashboard.greetingMorning : d.dashboard.greetingEvening;
       const todayLabel = new Date().toLocaleDateString(lang === "en" ? "en-US" : "fr-FR", {
         weekday: "long",
         day: "numeric",
@@ -508,33 +508,12 @@ export default function DashboardLayout({
       "/dashboard/cleaning": d.cleaning,
       "/dashboard/accounting": d.accounting,
       "/dashboard/employees": d.employees,
-      "/dashboard/hr": {
-        title: lang === "en" ? "HR Records" : "Dossiers RH",
-        subtitle:
-          lang === "en"
-            ? "Employee files and contracts"
-            : "Dossiers employés et contrats",
-      },
+      "/dashboard/hr": d.hr,
       "/dashboard/subscription": d.subscription,
-      "/dashboard/trouvetou": {
-        title: lang === "en" ? "Trouvetou Showcase" : "Vitrine Trouvetou",
-        subtitle:
-          lang === "en"
-            ? "Publish listings and advertisements on Trouvetou"
-            : "Publiez vos fiches et publicités sur Trouvetou",
-      },
+      "/dashboard/trouvetou": d.trouvetou,
       "/dashboard/settings": { title: d.settings.pageTitle, subtitle: d.settings.pageSubtitle },
-      "/dashboard/suggestions": {
-        title: lang === "en" ? "Community Suggestions" : "Suggestions",
-        subtitle:
-          lang === "en"
-            ? "Propose and vote on community ideas"
-            : "Proposez et votez pour les idées de la communauté",
-      },
-      "/dashboard/shift": {
-        title: lang === "en" ? "My Shift / Cash" : "Mon Shift / Caisse",
-        subtitle: lang === "en" ? "Shift overview" : "Vue d'ensemble du shift",
-      },
+      "/dashboard/suggestions": d.suggestions,
+      "/dashboard/shift": d.shift,
     };
     return map[p] || { title: t.title, subtitle: t.subtitle };
   }, [lang, pathname, user?.full_name, localHour, t.subtitle, t.title]);
@@ -565,7 +544,7 @@ export default function DashboardLayout({
 
   async function handleOnboardingComplete() {
     setNeedsOnboarding(false);
-    toast.success("Bienvenue ! Votre espace est prêt 🏠");
+    toast.success(translations[lang].dashboard.workspaceReady);
     const refreshed = await fetchOnboardingStatus();
     setNeedsOnboarding(refreshed);
     router.refresh();
@@ -610,7 +589,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[var(--main-bg,var(--background))]">
         <p className="text-sm text-muted-foreground text-center max-w-sm">
-          Impossible de charger votre espace. Vérifiez votre connexion puis réessayez.
+          {translations[lang].dashboard.loadError.copy}
         </p>
         <button
           type="button"
@@ -621,7 +600,7 @@ export default function DashboardLayout({
           }}
           className="px-4 py-2 rounded-lg bg-[var(--primary-color,#0C1C33)] text-white text-sm font-medium"
         >
-          Réessayer
+          {translations[lang].dashboard.loadError.retry}
         </button>
       </div>
     );
