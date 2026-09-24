@@ -239,6 +239,7 @@ export const translations = {
       previousDay: "Jour précédent",
       justNow: "à l'instant",
       collectedOnDate: "encaissés le {date}",
+      movementsForDate: "Arrivées et départs du {date}",
       overstay: {
         title: "{count} séjour(s) en dépassement",
         subtitle: "Client(s) encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.",
@@ -910,7 +911,7 @@ export const translations = {
       bookingCancelled: "Booking cancelled.",
       previousDay: "Previous day",
       justNow: "just now",
-      collectedOnDate: "collected on {date}",
+      movementsForDate: "Arrivals and departures on {date}",
       overstay: {
         title: "{count} stay(s) overdue",
         subtitle: "Client(s) still in room after scheduled departure — extend stay or vacate room.",
