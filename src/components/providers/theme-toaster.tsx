@@ -17,7 +17,7 @@ export function ThemeToaster() {
     <Toaster
       position="top-right"
       closeButton
-      duration={4200}
+      duration={3600}
       theme={theme}
       gap={10}
       visibleToasts={4}
