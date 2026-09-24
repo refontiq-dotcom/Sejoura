@@ -54,8 +54,8 @@ function symbolToCode(symbol: string): string {
 }
 
 /**
- * Formate un montant en FCFA (XOF) par défaut
- * Ex: 15000 -> "15 000 FCFA"
+ * Formate un montant avec un symbole de devise explicitement fourni.
+ * Pour l'interface globale, utiliser useCurrency().fmt().
  */
 export function formatFCFA(amount: number): string {
   return formatPrice(amount, "XOF");
