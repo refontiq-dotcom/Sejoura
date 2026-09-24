@@ -9,7 +9,6 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { Header } from "@/components/dashboard/header";
 import { Skeleton, DashboardSkeletons } from "@/components/ui/skeletons";
 import { OnboardingModal } from "@/components/dashboard/onboarding-modal";
-import { WelcomeOnboardingModal } from "@/components/dashboard/welcome-onboarding-modal";
 import { OnboardingChecklist } from "@/components/dashboard/onboarding-checklist";
 import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { TopLoadingBar } from "@/components/dashboard/top-loading-bar";
@@ -73,9 +72,8 @@ export default function DashboardLayout({
   const [localHour, setLocalHour] = useState(() => new Date().getHours());
   const { count: onlineBookingCount, markAsViewed } = useOnlineBookingBadge(user);
 
-  // Onboarding utilisateur (checklist + modal de bienvenue) : activé une fois
-  // le rôle connu — seuls les admins résidence y sont soumis. Les employés
-  // (réceptionnistes / ménagères) n'ont pas de checklist.
+  // Onboarding utilisateur (checklist) : activé une fois le rôle connu —
+  // seuls les admins résidence y sont soumis. Les employés n'ont pas de checklist.
   const isResidenceAdmin = user?.role === "admin_residence";
   const onboarding = useOnboarding(isResidenceAdmin);
 
@@ -724,16 +722,6 @@ export default function DashboardLayout({
 
       {isResidenceAdmin && (
         <>
-          <WelcomeOnboardingModal
-            open={onboarding.showWelcomeModal && !needsOnboarding}
-            userName={user?.full_name?.split(/\s+/)[0] || undefined}
-            onComplete={() => {
-              onboarding.closeWelcome();
-              toast.success("Configuration initiale enregistrée 🎉");
-            }}
-            onSkip={onboarding.closeWelcome}
-            completeStep={onboarding.complete}
-          />
           <OnboardingChecklist
             open={onboarding.showChecklist}
             completedSteps={onboarding.status?.completedSteps ?? []}
