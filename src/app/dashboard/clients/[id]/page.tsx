@@ -157,7 +157,6 @@ export default function ClientProfilePage() {
     }
 
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, tenantId, plan]);
 
   const profile = payload?.profile ?? null;
