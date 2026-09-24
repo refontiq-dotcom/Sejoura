@@ -367,6 +367,8 @@ function ClientDrawer({
 // ============================================================================
 
 function DonutChart({ data }: { data: RoomStatusData[] }) {
+  const { lang } = useLanguage();
+  const dt = (translations[lang] ?? translations["fr"]).dashboard;
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const [hovered, setHovered] = useState<number | null>(null);
 
