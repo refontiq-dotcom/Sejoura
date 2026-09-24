@@ -993,7 +993,7 @@ function TrouvetouDashboardPage() {
                     </div>
 
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
-                      {/* Toggle Publier */}
+                      {/* Bouton intelligent : le libellé indique toujours l'état de publication */}
                       <button
                         onClick={() => handleToggleListed(type)}
                         disabled={savingTypeId === type.id}
@@ -1004,11 +1004,20 @@ function TrouvetouDashboardPage() {
                         }`}
                       >
                         {savingTypeId === type.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Mise à jour…
+                          </>
                         ) : isListed ? (
-                          <><Check className="w-3.5 h-3.5" /> Publié</>
+                          <>
+                            <X className="w-3.5 h-3.5" />
+                            Retirer de Trouvetou
+                          </>
                         ) : (
-                          "Publier sur Trouvetou"
+                          <>
+                            <Rocket className="w-3.5 h-3.5" />
+                            Publier sur Trouvetou
+                          </>
                         )}
                       </button>
 
