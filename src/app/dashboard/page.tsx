@@ -1083,7 +1083,7 @@ export default function DashboardPage() {
               (b) => b.is_overstay || isBookingOverdue({
                 status: b.status,
                 check_out_date: b.check_out_date,
-                check_out_time: b.check_out_time,
+                check_out_time: b.check_out_time ?? undefined,
               })
             ).map((b) => {
             const checkoutMs = new Date(b.check_out_date).getTime();
