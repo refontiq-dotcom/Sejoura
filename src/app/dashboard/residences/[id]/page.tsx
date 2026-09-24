@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { useCurrency } from "@/hooks/use-currency";
 import { formatAmount, getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
 import { ROOM_AMENITIES } from "@/lib/amenities";
 import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, ImagePlus, Store, Check, X } from "lucide-react";
@@ -15,6 +16,7 @@ import type { Accommodation, RoomType, Room } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
 export default function ResidenceDetailPage() {
+  const { fmt, symbol } = useCurrency();
   const params = useParams();
   const router = useRouter();
   const residenceId = params.id as string;
@@ -591,7 +593,7 @@ export default function ResidenceDetailPage() {
                   )}
                 </div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{rt.name}</p>
-                <p className="text-base font-bold text-[var(--primary-color,#0C1C33)] mt-0.5">{formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</p>
+                <p className="text-base font-bold text-[var(--primary-color,#0C1C33)] mt-0.5">{fmt(rt.base_price)}</p>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{rt.capacity} personne{rt.capacity > 1 ? "s" : ""}</p>
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {rt.surface_m2 ? (
@@ -698,7 +700,7 @@ export default function ResidenceDetailPage() {
                         </div>
                       </div>
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{rt?.name || "—"}</p>
-                      {rt && !isReadOnly && <p className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium mt-0.5">{formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</p>}
+                      {rt && !isReadOnly && <p className="text-[11px] text-[var(--primary-color,#0C1C33)] font-medium mt-0.5">{fmt(rt.base_price)}</p>}
                       {room.floor && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Étage {room.floor}</p>}
                     </div>
               );
@@ -751,7 +753,7 @@ export default function ResidenceDetailPage() {
               >
                 <option value="">Sélectionner un type de chambre</option>
                 {currentTypes.map((rt) => (
-                  <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price, residence.currency_symbol || "FCFA")}</option>
+                  <option key={rt.id} value={rt.id}>{rt.name} — {fmt(rt.base_price)}</option>
                 ))}
               </select>
             </div>
@@ -787,7 +789,7 @@ export default function ResidenceDetailPage() {
             </datalist>
             <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
             <div className="grid grid-cols-2 gap-2.5">
-              <Input label={`Prix de base (${residence.currency_symbol || "FCFA"})`} type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
+              <Input label={`Prix de base (${symbol})`} type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
               <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
             </div>
             <div className="grid grid-cols-2 gap-2.5">
