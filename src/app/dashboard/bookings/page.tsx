@@ -22,7 +22,6 @@ import {
   isBookingOverdue,
   translateRpcError,
   MOBILE_MONEY_OPERATORS,
-  formatAmount,
 } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
 import { useAccommodation } from "@/hooks/use-accommodation";
@@ -4337,7 +4336,7 @@ export default function BookingsPage() {
               >
                 <option value="">Sélectionner un type</option>
                 {roomTypes.map((rt) => (
-                  <option key={rt.id} value={rt.id}>{rt.name} — {formatAmount(rt.base_price)}/nuit</option>
+                  <option key={rt.id} value={rt.id}>{rt.name} — {fmt(rt.base_price)}/nuit</option>
                 ))}
               </select>
             </div>
@@ -4370,24 +4369,24 @@ export default function BookingsPage() {
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Récapitulatif</p>
                 <div className="flex justify-between text-slate-700 dark:text-slate-300">
                   <span>Nuits déjà consommées ({oldNights})</span>
-                  <span className="font-medium">{formatAmount(oldNights * oldPricePerNight)}</span>
+                  <span className="font-medium">{fmt(oldNights * oldPricePerNight)}</span>
                 </div>
                 <div className="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Nuits restantes ({remainingNights}) × {formatAmount(newPricePerNight)}</span>
-                  <span className="font-medium">{formatAmount(remainingNights * newPricePerNight)}</span>
+                  <span>Nuits restantes ({remainingNights}) × {fmt(newPricePerNight)}</span>
+                  <span className="font-medium">{fmt(remainingNights * newPricePerNight)}</span>
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-600 pt-2 flex justify-between font-semibold">
                   <span>Nouveau total</span>
-                  <span>{formatAmount(oldNights * oldPricePerNight + remainingNights * newPricePerNight)}</span>
+                  <span>{fmt(oldNights * oldPricePerNight + remainingNights * newPricePerNight)}</span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Déjà payé</span>
-                  <span>- {formatAmount(changeRoomBooking?.amount_paid || 0)}</span>
+                  <span>- {fmt(changeRoomBooking?.amount_paid || 0)}</span>
                 </div>
                 {supplement > 0 && (
                   <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
                     <span>Supplément à payer</span>
-                    <span>{formatAmount(supplement)}</span>
+                    <span>{fmt(supplement)}</span>
                   </div>
                 )}
                 {supplement === 0 && (
