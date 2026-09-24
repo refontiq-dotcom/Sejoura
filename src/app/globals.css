@@ -609,42 +609,215 @@ html {
   animation: biometricPulse 2s ease-in-out infinite;
 }
 /* ============================================
-   Sonner Toaster — Glassmorphism SaaS
+   Sonner Toaster — Feedback Séjoura
+   Une carte de feedback premium, compacte et discrète.
+   Chaque état possède son propre accent visuel sans
+   multiplier les animations.
    ============================================ */
 .toaster-group {
-  --normal-bg: var(--surface);
-  --normal-border: var(--border);
-  --normal-text: var(--foreground);
-  --success-bg: #064e3b;
-  --success-border: #10b981;
-  --success-text: #ecfdf5;
-  --error-bg: #7f1d1d;
-  --error-border: #ef4444;
-  --error-text: #fef2f2;
+  --toast-surface: color-mix(in srgb, var(--surface-elevated), transparent 3%);
+  --toast-border: color-mix(in srgb, var(--border-strong), transparent 30%);
+  --toast-shadow:
+    0 18px 45px rgb(12 28 51 / 0.14),
+    0 4px 12px rgb(12 28 51 / 0.08);
+}
+
+.dark .toaster-group {
+  --toast-surface: color-mix(in srgb, var(--surface-elevated), transparent 2%);
+  --toast-border: color-mix(in srgb, var(--border-strong), transparent 15%);
+  --toast-shadow:
+    0 22px 50px rgb(0 0 0 / 0.34),
+    0 5px 16px rgb(0 0 0 / 0.24);
 }
 
 .toaster-group [data-sonner-toast] {
-  border-radius: 0.75rem;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  border: 1px solid var(--normal-border);
-  backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--normal-bg), transparent 12%);
+  position: relative;
+  width: min(390px, calc(100vw - 32px));
+  min-height: 68px;
+  padding: 13px 42px 13px 14px;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid var(--toast-border);
+  border-radius: 16px;
+  background: var(--toast-surface);
+  color: var(--foreground);
+  box-shadow: var(--toast-shadow);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
-.toaster-group [data-sonner-toast][data-type="success"] {
-  border-color: var(--success-border);
-  background: color-mix(in srgb, var(--success-bg), transparent 18%);
-  color: var(--success-text);
+.toaster-group [data-sonner-toast]:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 22px 52px rgb(12 28 51 / 0.16),
+    0 6px 16px rgb(12 28 51 / 0.08);
 }
 
-.toaster-group [data-sonner-toast][data-type="error"] {
-  border-color: var(--error-border);
-  background: color-mix(in srgb, var(--error-bg), transparent 18%);
-  color: var(--error-text);
+.dark .toaster-group [data-sonner-toast]:hover {
+  box-shadow:
+    0 24px 56px rgb(0 0 0 / 0.38),
+    0 7px 18px rgb(0 0 0 / 0.25);
+}
+
+/* Barre d'accent latérale : la catégorie est identifiable
+   immédiatement, sans transformer le toast en gros bloc coloré. */
+.toaster-group [data-sonner-toast]::before {
+  content: "";
+  position: absolute;
+  inset: 10px auto 10px 0;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--sejoura-gold);
+}
+
+.toaster-group [data-sonner-toast][data-type="success"]::before {
+  background: var(--success);
+}
+
+.toaster-group [data-sonner-toast][data-type="error"]::before {
+  background: var(--destructive);
+}
+
+.toaster-group [data-sonner-toast][data-type="warning"]::before {
+  background: var(--warning);
+}
+
+.toaster-group [data-sonner-toast][data-type="info"]::before {
+  background: var(--info);
+}
+
+.toaster-group [data-sonner-toast][data-type="loading"]::before {
+  background: var(--sejoura-gold);
+}
+
+.toaster-group [data-sonner-toast] [data-icon] {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--primary-muted);
+  color: var(--sejoura-gold);
+}
+
+.toaster-group [data-sonner-toast][data-type="success"] [data-icon] {
+  background: color-mix(in srgb, var(--success), transparent 88%);
+  color: var(--success);
+}
+
+.toaster-group [data-sonner-toast][data-type="error"] [data-icon] {
+  background: color-mix(in srgb, var(--destructive), transparent 88%);
+  color: var(--destructive);
+}
+
+.toaster-group [data-sonner-toast][data-type="warning"] [data-icon] {
+  background: color-mix(in srgb, var(--warning), transparent 86%);
+  color: var(--warning);
+}
+
+.toaster-group [data-sonner-toast][data-type="info"] [data-icon] {
+  background: color-mix(in srgb, var(--info), transparent 88%);
+  color: var(--info);
+}
+
+.toaster-group [data-sonner-toast][data-type="loading"] [data-icon] {
+  background: color-mix(in srgb, var(--sejoura-gold), transparent 86%);
+  color: var(--sejoura-gold);
+}
+
+.toaster-group [data-sonner-toast][data-type="loading"] [data-icon] svg {
+  animation: sejouraToastSpin 0.9s linear infinite;
+}
+
+.sejoura-toast-title {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.sejoura-toast-description {
+  margin-top: 2px;
+  color: var(--foreground-muted);
+  font-size: 0.78rem;
+  line-height: 1.15rem;
+}
+
+.sejoura-toast-close {
+  top: 10px !important;
+  right: 10px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-subtle) !important;
+  background: var(--surface-muted) !important;
+  color: var(--foreground-subtle) !important;
+  opacity: 0;
+  transition:
+    opacity 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.toaster-group [data-sonner-toast]:hover .sejoura-toast-close,
+.sejoura-toast-close:focus-visible {
+  opacity: 1;
+}
+
+.sejoura-toast-close:hover {
+  background: var(--surface-active) !important;
+  color: var(--foreground) !important;
+}
+
+@keyframes sejouraToastIn {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, -4px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
 
 .toaster-group [data-sonner-toast] {
-  animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: sejouraToastIn 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sejouraToastSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .toaster-group {
+    width: 100%;
+  }
+
+  .toaster-group [data-sonner-toast] {
+    width: min(100%, calc(100vw - 20px));
+    min-height: 64px;
+    border-radius: 14px;
+  }
+
+  .sejoura-toast-close {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toaster-group [data-sonner-toast],
+  .toaster-group [data-sonner-toast][data-type="loading"] [data-icon] svg {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 @keyframes marquee {
