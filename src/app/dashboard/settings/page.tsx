@@ -1216,8 +1216,8 @@ export default function SettingsPage() {
                      </p>
                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
                        {activeAccommodation
-                         ? (lang === "en" ? `Applied to residence « {name} ». Each residence can have its own conditions.` : `Configuration appliquée à la résidence « {name} ». Chaque résidence peut avoir ses propres conditions.`).replace("{name}", activeAccommodation.name)
-                         : (lang === "en" ? "Company configuration (applied as long as no residence has its own conditions)." : "Configuration de l'entreprise (appliquée tant qu'aucune résidence n'a ses propres conditions).")}
+                         ? t.residenceConditions.replace("{name}", activeAccommodation.name)
+                         : t.companyConditions}
                      </p>
                    </div>
                 </div>
