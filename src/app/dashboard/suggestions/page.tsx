@@ -133,7 +133,7 @@ export default function SuggestionsPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "feature_requests" }, () => {
         loadData();
       })
-      .subscribe((status) => {
+      .subscribe((status: string) => {
         if (status === "SUBSCRIBED") loadData();
       });
     return () => {
