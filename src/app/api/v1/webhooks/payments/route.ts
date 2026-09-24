@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     // 2. Parser le payload
     const body = JSON.parse(rawBody);
-    const { transaction_id, provider_status, amount } = body;
+    const { transaction_id, provider_status } = body;
 
     if (!transaction_id) {
       return NextResponse.json({ error: "Payload invalide" }, { status: 400 });
