@@ -43,6 +43,12 @@ export function NotificationsProvider({
   children: ReactNode;
 }) {
   const supabase = createClient();
+
+  type NotificationRow = {
+    id: string; tenant_id: string; recipient_role: string | null; title: string; message: string;
+    type: NotificationItem["type"]; link: string | null; is_read: boolean; read_at: string | null;
+    created_by: string | null; created_at: string;
+  };
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const { enabled: soundEnabled, setEnabled: setSoundEnabled, play: playNotificationSound } = useNotificationSound();
 
@@ -57,7 +63,7 @@ export function NotificationsProvider({
 
     if (error) return;
 
-    const filtered = (data || []).filter((n: any) => {
+    const filtered = (data || []).filter((n: NotificationRow) => {
       if (n.created_by && n.created_by === userId) return false;
       return true;
     });
