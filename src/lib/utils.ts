@@ -14,14 +14,14 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 
 /**
  * Formate un montant avec le symbole de devise d'un établissement
- * Ex: (15000, "FCFA") -> "15 000 FCFA"
- * Ex: (15000, "€") -> "converted €"
- * Ex: (15000, "₦") -> "converted ₦"
+ * Formate un montant avec un symbole explicitement fourni.
  *
- * Tous les montants en base de données sont en XOF (devise de référence).
- * Cette fonction convertit automatiquement depuis XOF vers la devise cible.
+ * Cette fonction historique ne connaît pas le contexte de l’établissement actif.
+ * Elle ne doit donc jamais choisir une devise d’affichage par défaut.
+ * Pour l’interface, utiliser `useCurrency().fmt()` afin de suivre
+ * automatiquement la devise globale de l’établissement.
  */
-export function formatAmount(amount: number, symbol: string = "FCFA"): string {
+export function formatAmount(amount: number, symbol: string): string {
   const code = symbolToCode(symbol);
   return formatPrice(amount, code);
 }
