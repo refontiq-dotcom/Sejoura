@@ -33,6 +33,7 @@ export const translations = {
         { label: "Paramètres", href: "/dashboard/settings" },
       ],
       logoutTooltip: "Se déconnecter",
+      logoutError: "La déconnexion a échoué 🔄",
       expand: "Déplier",
       collapse: "Replier",
       headerTitle: "Séjoura by Refontiq",
