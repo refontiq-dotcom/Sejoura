@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EmployeesSkeleton } from "@/components/ui/skeletons";
 import { getRoleLabel, getPlanLimits, canAccessPlanFeature, formatDate, isValidPhone, normalizePhone, getInitials } from "@/lib/utils";
 import { useCurrentUser } from "@/contexts/current-user-context";
-import { Users, Loader2, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal, IdCard } from "lucide-react";
+import { Users, Phone, Trash2, CheckCircle2, UserPlus, Search, Copy, Share2, Check, Ban, ShieldCheck, MessageSquare, Building2, ArrowLeftRight, CalendarDays, History, MoreHorizontal, IdCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { trackStep } from "@/lib/onboarding";
 import type { User, Accommodation, EmployeeAssignment } from "@/types/database";
