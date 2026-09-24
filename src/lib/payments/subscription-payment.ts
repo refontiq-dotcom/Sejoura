@@ -35,9 +35,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getPaymentService } from "@/lib/payments";
-import { getPlanPrice, getWavePayLink, normalizePlan } from "@/lib/subscription-plans";
+import { getPlanPrice, getWavePayLink } from "@/lib/subscription-plans";
 import { getPlanLabel } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -86,22 +84,11 @@ export const SUBSCRIPTION_PLANS = Object.fromEntries(
 export async function initiateSubscriptionPayment(
   tenantId: string,
   plan: "essentiel" | "croissance" | "entreprise",
-  reference: string
 ): Promise<SubscriptionPaymentResult> {
   const planConfig = SUBSCRIPTION_PLANS[plan];
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://sejoura-lemon.vercel.app";
-  const webhookUrl = `${appUrl}/api/v1/webhooks/subscription-payments`;
-
   // Providers à essayer dans l'ordre de priorité
-  const providerPriority = [
-    "wave",
-    "orange_money",
-    "mtn",
-    "moov_africa",
-    "pi_spi",
-  ] as const;
-
-  for (const provider of providerPriority) {
+  for (const provider of ["wave", "orange_money", "mtn", "moov_africa", "pi_spi"] as const) {
     // TODO : Décommenter quand les clés API seront disponibles
     /*
     const service = await getPaymentService(tenantId, provider);
@@ -183,9 +170,6 @@ async function recordPaymentIntent(
  * → Enregistre le paiement dans l'historique
  */
 export async function processSubscriptionPaymentWebhook(
-  provider: string,
-  transactionId: string,
-  providerStatus: string
 ): Promise<{ success: boolean; message: string }> {
   // TODO : Décommenter quand les webhooks seront connectés
   /*
