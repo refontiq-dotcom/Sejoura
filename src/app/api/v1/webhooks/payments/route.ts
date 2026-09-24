@@ -34,6 +34,12 @@ export async function POST(request: Request) {
         console.error("Webhook Payment: Signature Wave invalide");
         return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
       }
+    } else {
+      const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
+      const providedSecret = request.headers.get("x-webhook-secret");
+      if (!webhookSecret || providedSecret !== webhookSecret) {
+        return NextResponse.json({ error: "Webhook non autorisé" }, { status: 401 });
+      }
     }
 
     // 2. Parser le payload
