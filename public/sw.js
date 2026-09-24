@@ -281,7 +281,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => response)
-        .catch(async (err) => {
+        .catch(async () => {
           try {
             await enqueueRequest(clone);
             if ("sync" in self.registration) {
