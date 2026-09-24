@@ -47,13 +47,9 @@ import {
   ArrowDown,
   Calendar,
   List,
-  Eye,
   X,
-  Share2,
   Copy,
-  Check,
   MessageSquare,
-  ExternalLink,
   Receipt,
   MoreHorizontal,
   Pencil,
@@ -351,7 +347,6 @@ export default function BookingsPage() {
     setAccomFilter(target);
     accommodationFilterRef.current = activeAccommodationId ?? undefined;
     if (tenantId) loadBookingsRef.current(tenantId, accommodationFilterRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccommodationId]);
 
   // Auto-vérifier la disponibilité quand les dates ou l'établissement changent
@@ -1396,7 +1391,6 @@ export default function BookingsPage() {
     checkOut.setHours(0, 0, 0, 0);
     const remainingNights = Math.max(1, Math.ceil((checkOut.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
     const oldPricePerNight = changeRoomBooking.negotiated_price || 0;
-    const newRoom = rooms.find((r) => r.id === changeRoomId);
     const newRoomType = roomTypes.find((rt) => rt.id === changeRoomTypeId);
     const newPricePerNight = newRoomType?.base_price || oldPricePerNight;
     const oldNights = (changeRoomBooking.nights_count || 1) - remainingNights;
