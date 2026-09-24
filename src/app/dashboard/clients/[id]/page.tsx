@@ -129,7 +129,14 @@ export default function ClientProfilePage() {
 
         if (profileRes.error) {
           console.error("get_client_profile RPC error:", profileRes.error);
-          toast.error("Le dossier client n'a pas pu charger : " + (profileRes.error.message || "Erreur inconnue"));
+          const errorMessage =
+            profileRes.error &&
+            typeof profileRes.error === "object" &&
+            "message" in profileRes.error &&
+            typeof profileRes.error.message === "string"
+              ? profileRes.error.message
+              : "Erreur inconnue";
+          toast.error("Le dossier client n'a pas pu charger : " + errorMessage);
           setPayload(null);
         } else {
           const data = profileRes.data as ClientProfilePayload;
