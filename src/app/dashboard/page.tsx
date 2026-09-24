@@ -1481,7 +1481,7 @@ export default function DashboardPage() {
           {t.welcomeCopy}
         </p>
         <div className="pt-4">
-          <Button onClick={() => router.push("/dashboard/residences")} className="gap-2" size="lg">
+          <Button onClick={() => router.push("/dashboard/residences?add=1")} className="gap-2" size="lg">
             <PlusCircle className="w-5 h-5" /> {t.addFirstResidence}
           </Button>
         </div>
