@@ -2116,7 +2116,7 @@ export default function BookingsPage() {
 
   const sortedBookings = [...filteredBookings].sort((a, b) => {
     if (!sortConfig) return 0;
-    let aValue: any, bValue: any;
+    let aValue: string | number, bValue: string | number;
     
     switch (sortConfig.key) {
       case 'date':
