@@ -30,8 +30,6 @@ export interface UseOnboardingResult {
   /** Statut persistant courant (null tant que le chargement n'est pas fini). */
   status: OnboardingStatus | null;
   loading: boolean;
-  /** true quand l'utilisateur a un profil mais n'a jamais fini l'onboarding. */
-  showWelcomeModal: boolean;
   /** true quand la checklist est ouverte à la demande (flottante). */
   showChecklist: boolean;
   /** Ratio d'étapes complétées (0 → 1). */
@@ -43,8 +41,6 @@ export interface UseOnboardingResult {
   complete: (step: OnboardingStep) => void;
   /** Masque la checklist et le modal de bienvenue (persistant). */
   dismiss: () => void;
-  /** Ferme le modal de bienvenue pour la session sans marquer dismissed. */
-  closeWelcome: () => void;
   /** Ouvre la checklist uniquement à la demande de l'utilisateur. */
   openChecklist: () => void;
   /** Ferme la checklist sans désactiver définitivement l'onboarding. */
@@ -59,7 +55,6 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
   // false (employés, invités) les drapeaux d'affichage restent simplement
   // désactivés, donc aucun spinner inutile.
   const [loading, setLoading] = useState(true);
-  const [welcomeClosed, setWelcomeClosed] = useState(false);
   // La checklist ne doit jamais suivre l'utilisateur automatiquement : elle
   // est accessible à la demande depuis le menu du profil.
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -113,7 +108,6 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
 
   const dismiss = useCallback(() => {
     if (!enabled) return;
-    setWelcomeClosed(true);
     setChecklistOpen(false);
     // Optimistic UI : on masque immédiatement, la persistance suit.
     setStatus((prev) => ({
@@ -127,9 +121,6 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
     });
   }, [enabled]);
 
-  const closeWelcome = useCallback(() => {
-    setWelcomeClosed(true);
-  }, []);
 
   const openChecklist = useCallback(() => {
     if (!enabled) return;
@@ -147,18 +138,13 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
   const totalCount = ONBOARDING_REQUIRED_STEPS.length;
   const progress = totalCount > 0 ? completedCount / totalCount : 0;
 
-  // Absence de ligne en base = onboarding jamais démarré : on considère
-  // l'état comme "frais" (ni complété, ni masqué) pour que le modal de
-  // bienvenue et la checklist s'affichent dès la première connexion.
+  // Absence de ligne en base = onboarding jamais démarré.
   const isOnboarded = status?.isOnboarded ?? false;
   const isDismissed = status?.dismissed ?? false;
 
   return {
     status,
     loading,
-    // Le modal de bienvenue s'affiche à la première connexion seulement :
-    // jamais onboardé, jamais masqué, jamais fermé pour la session.
-    showWelcomeModal: enabled && !loading && !isOnboarded && !isDismissed && !welcomeClosed,
     // La checklist reste visible tant que l'onboarding n'est pas terminé
     // (même après fermeture du modal), sauf si l'utilisateur l'a masquée.
     showChecklist: enabled && !loading && !isOnboarded && checklistOpen,
@@ -167,7 +153,6 @@ export function useOnboarding(enabled: boolean): UseOnboardingResult {
     totalCount,
     complete,
     dismiss,
-    closeWelcome,
     openChecklist,
     closeChecklist,
     refresh,
