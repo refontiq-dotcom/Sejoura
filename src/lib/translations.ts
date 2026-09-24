@@ -1006,6 +1006,7 @@ export const translations = {
       bookingCancelled: "Booking cancelled.",
       previousDay: "Previous day",
       justNow: "just now",
+      collectedOnDate: "collected on {date}",
       movementsForDate: "Arrivals and departures on {date}",
       refresh: "Refresh",
       sevenDays: "7d",

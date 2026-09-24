@@ -1526,8 +1526,8 @@ export default function DashboardPage() {
             type="button"
             onClick={() => { loadRetriesRef.current = 0; loadDashboardData(true, selectedDate); }}
             className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)] hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-            title={dt.refresh}
-            aria-label={dt.refresh}
+            title={t.refresh}
+            aria-label={t.refresh}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -1555,7 +1555,7 @@ export default function DashboardPage() {
                   : "text-slate-500 dark:text-slate-400 hover:bg-[var(--surface-muted)]"
               }`}
             >
-              {p === "today" ? dt.today : p === "7d" ? dt.sevenDays : dt.thirtyDays}
+              {p === "today" ? t.today : p === "7d" ? t.sevenDays : t.thirtyDays}
             </button>
           ))}
           <button
