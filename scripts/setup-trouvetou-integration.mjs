@@ -35,8 +35,6 @@ const fail = (m) => console.log(`${R}  ❌  ${m}${X}`);
 const warn = (m) => console.log(`${Y}  ⚠️   ${m}${X}`);
 const info = (m) => console.log(`${C}  ℹ️   ${m}${X}`);
 const step = (n, m) => console.log(`\n${B}${C}── Étape ${n} : ${m}${X}`);
-const box  = (m) => console.log(`\n${B}${Y}  📋  ${m}${X}`);
-
 // ── Charger .env.local ────────────────────────────────────────────────────────
 function loadEnv(filePath) {
   if (!existsSync(filePath)) return {};
@@ -113,7 +111,6 @@ async function main() {
   const trouvetouEnv  = loadEnv(resolve(TROUVETOU_ROOT, ".env.local"));
 
   const SEJOURA_SB_URL    = sejouraEnv.NEXT_PUBLIC_SUPABASE_URL   || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const SEJOURA_SB_KEY    = sejouraEnv.SUPABASE_SERVICE_ROLE_KEY  || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const TTV_SB_URL        = trouvetouEnv.TROUVETOU_SUPABASE_URL   || process.env.TROUVETOU_SUPABASE_URL;
   const TTV_SB_KEY        = trouvetouEnv.TROUVETOU_SUPABASE_SERVICE_ROLE_KEY || process.env.TROUVETOU_SUPABASE_SERVICE_ROLE_KEY;
   const TTV_PEPPER        = trouvetouEnv.TROUVETOU_API_KEY_PEPPER || process.env.TROUVETOU_API_KEY_PEPPER;
