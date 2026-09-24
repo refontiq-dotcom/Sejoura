@@ -40,17 +40,25 @@ export async function GET() {
       .maybeSingle();
 
     if (!userData) {
-      // Aucun profil applicatif : c'est un compte qui vient de valider
-      // l'étape 1 (inscription) sans avoir terminé l'étape 2, ou un employé.
+      // Une inscription Sejoura réussie crée déjà le tenant ET le premier
+      // établissement. Juste après l'inscription, le trigger du profil peut
+      // être légèrement en retard ; dans ce cas les métadonnées du compte
+      // constituent la preuve que l'établissement vient d'être renseigné.
+      // On ne doit surtout pas afficher une seconde demande de création.
       const email = (session.user.email || "").toLowerCase();
-      const metaRole = session.user.user_metadata?.role;
+      const metadata = session.user.user_metadata ?? {};
+      const metaRole = metadata.role;
       const isEmployee =
         email.includes("@employe.sejoura.com") ||
         metaRole === "receptionniste" ||
         metaRole === "menagere";
+      const hasCompletedRegistration =
+        metaRole === "admin_residence" &&
+        typeof metadata.residence_name === "string" &&
+        metadata.residence_name.trim().length > 0;
 
       return NextResponse.json({
-        needsOnboarding: !isEmployee,
+        needsOnboarding: !isEmployee && !hasCompletedRegistration,
         tenantId: null,
         accommodationId: null,
       } satisfies OnboardingStatusResponse);
@@ -91,8 +99,17 @@ export async function GET() {
       } satisfies OnboardingStatusResponse);
     }
 
+    // Si l'inscription vient juste de se terminer et que la lecture de
+    // l'établissement est momentanément en retard, les métadonnées
+    // d'inscription évitent de demander à nouveau de le créer.
+    const metadata = session.user.user_metadata ?? {};
+    const hasCompletedRegistration =
+      metadata.role === "admin_residence" &&
+      typeof metadata.residence_name === "string" &&
+      metadata.residence_name.trim().length > 0;
+
     return NextResponse.json({
-      needsOnboarding: !accommodation,
+      needsOnboarding: !accommodation && !hasCompletedRegistration,
       tenantId: userData.tenant_id,
       accommodationId: accommodation?.id ?? null,
     } satisfies OnboardingStatusResponse);
