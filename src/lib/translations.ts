@@ -230,6 +230,7 @@ export const translations = {
       duration: "Durée",
       nights: "nuit",
       guests: "Voyageurs",
+      clientIncompleteHint: "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in",
       overstay: {
         title: "{count} séjour(s) en dépassement",
         subtitle: "Client(s) encore en chambre après le départ prévu — prolonger le séjour ou faire libérer la chambre.",
@@ -893,6 +894,7 @@ export const translations = {
       duration: "Duration",
       nights: "night",
       guests: "Guests",
+      clientIncompleteHint: "Complete the client profile (ID/Passport) before checking in",
       overstay: {
         title: "{count} stay(s) overdue",
         subtitle: "Client(s) still in room after scheduled departure — extend stay or vacate room.",
