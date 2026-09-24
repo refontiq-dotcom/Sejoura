@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,7 +92,6 @@ function fmtSigned(amount: number, fmt: (n: number) => string) {
 }
 
 export default function ShiftPage() {
-  const router = useRouter();
   const { fmt } = useCurrency();
   const [loading, setLoading] = useState(true);
   const { user, tenantId } = useCurrentUser();
