@@ -813,6 +813,13 @@ export default function DashboardPage() {
   const [bannerActionLoading, setBannerActionLoading] = useState<string>("");
   const [drawerMovement, setDrawerMovement] = useState<Movement | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
+  const [tenantRetry, setTenantRetry] = useState(0);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 60000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const loadDashboardData = useCallback(async (isSilent = false, date?: string) => {
     if (!isSilent) setLoading(true);
@@ -828,7 +835,7 @@ export default function DashboardPage() {
           if (!isSilent && loadRetriesRef.current < 10) {
             loadRetriesRef.current += 1;
             const delay = 1000 + loadRetriesRef.current * 500;
-            setTimeout(() => loadDashboardData(false, date), delay);
+            setTimeout(() => setTenantRetry((value) => value + 1), delay);
             return;
           }
           console.warn("loadDashboardData: tenantId not available after retries, showing empty dashboard");
@@ -1246,7 +1253,7 @@ export default function DashboardPage() {
       clearTimeout(initialLoad);
       clearInterval(interval);
     };
-  }, [loadDashboardData, selectedDate]);
+  }, [loadDashboardData, selectedDate, tenantRetry]);
 
   // Temps réel : rechargement immédiat dès qu'une donnée change.
   // - bookings : création, check-in/out, paiement
@@ -1324,8 +1331,7 @@ export default function DashboardPage() {
   });
 
   // Formate une date en "il y a Xh" / "il y a Xjour(s)" / "il y a Xmin"
-  function formatTimeAgo(dateStr: string, locale: string): string {
-    const now = Date.now();
+  function formatTimeAgo(dateStr: string, locale: string, now: number = currentTime): string {
     const then = new Date(dateStr).getTime();
     if (isNaN(then)) return "";
     const diffMs = now - then;
@@ -1711,7 +1717,7 @@ export default function DashboardPage() {
             <div className="px-4 pb-2.5 pt-0">
               <div className="flex flex-wrap gap-1.5">
                 {onlineBookingsList.slice(0, 3).map((b) => {
-                  const elapsed = formatTimeAgo(b.createdAt, lang);
+                  const elapsed = formatTimeAgo(b.createdAt, lang, currentTime);
                   return (
                     <span key={b.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/70 dark:bg-white/10 text-[11px] font-medium text-slate-700 dark:text-slate-300">
                       <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
@@ -1735,7 +1741,7 @@ export default function DashboardPage() {
           {onlineExpanded && (
             <div className="border-t border-indigo-200 dark:border-indigo-800 divide-y divide-indigo-200/50 dark:divide-indigo-800/50">
               {onlineBookingsList.map((b) => {
-                const elapsed = formatTimeAgo(b.createdAt, lang);
+                const elapsed = formatTimeAgo(b.createdAt, lang, currentTime);
                 return (
                   <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 bg-white/50 dark:bg-indigo-950/20">
                     <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-xs font-bold flex-shrink-0">
