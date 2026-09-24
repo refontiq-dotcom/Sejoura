@@ -374,7 +374,7 @@ function DonutChart({ data }: { data: RoomStatusData[] }) {
     return (
       <div className="flex flex-col items-center justify-center h-48 text-slate-400 dark:text-slate-500">
         <span className="text-4xl font-bold text-slate-300">0</span>
-        <span className="text-sm mt-1">Chambres</span>
+        <span className="text-sm mt-1">{t.rooms}</span>
       </div>
     );
   }
@@ -1997,7 +1997,7 @@ export default function DashboardPage() {
                : `Arrivées et départs du ${new Date(selectedDate + "T00:00:00").toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" })}`}
             action={
               <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/bookings")}>
-                Voir tout
+                {t.movements.viewAll}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             }
@@ -2041,10 +2041,10 @@ export default function DashboardPage() {
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-slate-600 dark:text-slate-300 text-sm font-medium">
                       {isToday
-                        ? "Aucun mouvement prévu aujourd'hui"
+                        ? t.noMovementsToday
                         : isPastDate
-                          ? "Aucune activité enregistrée pour cette date"
-                          : "Aucune activité prévue pour cette date"}
+                          ? t.noMovementsPast
+                          : t.noMovementsFuture}
                     </td>
                   </tr>
                 ) : (
@@ -2104,7 +2104,7 @@ export default function DashboardPage() {
                             size="sm"
                             loading={actionLoading === m.id}
                             disabled={actionLoading === m.id || (m.movementType === "check_in" && m.clientIncomplete)}
-                            title={m.movementType === "check_in" && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
+                            title={m.movementType === "check_in" && m.clientIncomplete ? t.clientIncompleteHint : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMovementAction(m.id, m.movementType);
@@ -2165,19 +2165,19 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="border-b border-[var(--border-subtle)] bg-[var(--surface-muted)]">
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                      Client
+                      {t.movements.client}
                     </th>
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                      Logement
+                      {t.movements.accommodation}
                     </th>
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                      Heure
+                      {t.movements.time}
                     </th>
                     <th className="text-left p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                      Paiement
+                      {t.movements.payment}
                     </th>
                     <th className="text-right p-4 text-xs font-semibold text-[var(--foreground-muted)] uppercase tracking-wider">
-                      Action
+                      {t.movements.action}
                     </th>
                   </tr>
                 </thead>
@@ -2255,7 +2255,7 @@ export default function DashboardPage() {
                             size="sm"
                             loading={actionLoading === m.id}
                             disabled={actionLoading === m.id || (m.movementType === "check_in" && m.clientIncomplete)}
-                            title={m.movementType === "check_in" && m.clientIncomplete ? "Complétez la fiche client (CNI/Passeport) avant de procéder au check-in" : undefined}
+                            title={m.movementType === "check_in" && m.clientIncomplete ? t.clientIncompleteHint : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleMovementAction(m.id, m.movementType);
