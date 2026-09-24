@@ -739,7 +739,7 @@ function MovementCardList({
                     className="flex-1"
                     loading={actionLoading === m.id}
                     disabled={actionLoading === m.id || (isIn && m.clientIncomplete)}
-                    title={isIn && m.clientIncomplete ? t.clientIncompleteHint : undefined}
+                    title={isIn && m.clientIncomplete ? dt.clientIncompleteHint : undefined}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAction(m.id, m.movementType);
