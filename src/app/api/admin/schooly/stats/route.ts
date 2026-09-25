@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
-import { schoolyAdminDb } from '@/lib/supabase/schooly-admin';
+import { NextResponse } from "next/server";
+import { getSchoolyAdminDb } from "@/lib/supabase/schooly-admin";
 
 export async function GET() {
   try {
+    // Création paresseuse : le module ne touche plus l'environnement au build.
+    const schoolyAdminDb = getSchoolyAdminDb();
+
     const [schools, students, subscriptions] = await Promise.all([
-      schoolyAdminDb.from('schools').select('id', { count: 'exact', head: true }),
-      schoolyAdminDb.from('students').select('id', { count: 'exact', head: true }),
-      schoolyAdminDb.from('subscriptions').select('id', { count: 'exact', head: true }),
+      schoolyAdminDb.from("schools").select("id", { count: "exact", head: true }),
+      schoolyAdminDb.from("students").select("id", { count: "exact", head: true }),
+      schoolyAdminDb.from("subscriptions").select("id", { count: "exact", head: true }),
     ]);
 
     return NextResponse.json({
@@ -14,7 +17,8 @@ export async function GET() {
       total_students: students.count || 0,
       total_subscriptions: subscriptions.count || 0,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
