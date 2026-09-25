@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import { fetchWithRetry } from "@/lib/trouvetou/fetch-with-retry";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -295,7 +296,7 @@ export async function syncListingsToTrouvetou(): Promise<TrouvetouSyncResult> {
     };
   }
 
-  const res = await fetch(syncUrl, {
+  const { response: res, attempts, lastError } = await fetchWithRetry(syncUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -305,6 +306,15 @@ export async function syncListingsToTrouvetou(): Promise<TrouvetouSyncResult> {
     cache: "no-store",
   });
 
+  // Échec réseau persistant après tous les essais (Trouvetou injoignable).
+  if (!res) {
+    return {
+      ok: false,
+      sent: items.length,
+      error: `Trouvetou injoignable après ${attempts} tentative(s) : ${lastError?.message ?? "erreur inconnue"}.`,
+    };
+  }
+
   const body = (await res.json().catch(() => null)) as TrouvetouSyncResult["response"] & {
     error?: string;
   } | null;
@@ -313,7 +323,9 @@ export async function syncListingsToTrouvetou(): Promise<TrouvetouSyncResult> {
     return {
       ok: false,
       sent: items.length,
-      error: body?.error ?? `Trouvetou a répondu HTTP ${res.status}.`,
+      error:
+        (body?.error ?? `Trouvetou a répondu HTTP ${res.status}.`) +
+        (attempts > 1 ? ` (après ${attempts} tentatives)` : ""),
     };
   }
 
