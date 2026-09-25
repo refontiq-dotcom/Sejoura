@@ -16,6 +16,7 @@ import { Building2, Plus, MapPin, Phone, BedDouble, Loader2, Lock, Trash2, Edit2
 import type { Accommodation, RoomType } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
+import { InitialSetupFlow } from "@/components/dashboard/initial-setup-flow";
 
 export default function ResidencesPage() {
   const router = useRouter();
@@ -30,6 +31,8 @@ export default function ResidencesPage() {
   const [roomsCount, setRoomsCount] = useState<Record<string, number>>({});
   const [occupiedCount, setOccupiedCount] = useState<Record<string, number>>({});
   const [sortKey, setSortKey] = useState<"name" | "rooms" | "date">("date");
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupResidenceId, setSetupResidenceId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -66,6 +69,18 @@ export default function ResidencesPage() {
     window.history.replaceState({}, "", url.toString());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, loading, isReadOnly]);
+
+  useEffect(() => {
+    const setupId = searchParams.get("setup");
+    if (!setupId || loading || isReadOnly || residences.length === 0) return;
+    const residence = residences.find((item) => item.id === setupId);
+    if (!residence) return;
+    setSetupResidenceId(setupId);
+    setSetupOpen(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("setup");
+    window.history.replaceState({}, "", url.toString());
+  }, [searchParams, loading, isReadOnly, residences]);
 
   async function loadData(silent = false) {
     if (!silent) setLoading(true);
@@ -238,13 +253,26 @@ export default function ResidencesPage() {
         tourist_tax_rate: parsedTaxRate !== null ? Math.round(parsedTaxRate) : null,
       };
 
-      const { error } = editingResidence
-        ? await supabase.from("accommodations").update(payload).eq("id", editingResidence.id)
-        : await supabase.from("accommodations").insert({ ...payload, tenant_id: tenantId });
+      let createdResidenceId: string | null = null;
+      if (editingResidence) {
+        const { error } = await supabase.from("accommodations").update(payload).eq("id", editingResidence.id);
+        if (error) throw error;
+      } else {
+        const { data: created, error } = await supabase
+          .from("accommodations")
+          .insert({ ...payload, tenant_id: tenantId })
+          .select("id")
+          .single();
+        if (error) throw error;
+        createdResidenceId = created?.id ?? null;
+      }
       if (error) throw error;
 
       setModalOpen(false);
       loadData(true);
+      if (!editingResidence && createdResidenceId) {
+        router.push(`/dashboard/residences?setup=${createdResidenceId}`);
+      }
       toast.success(editingResidence ? "Établissement modifié ✏️" : "Établissement créé");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur inconnue";
@@ -350,8 +378,8 @@ export default function ResidencesPage() {
               priority: 2,
               title: "Votre établissement est prêt",
               description: "Ajoutez maintenant vos chambres pour pouvoir les utiliser dans vos réservations.",
-              href: "/dashboard/rooms",
-              actionLabel: "Configurer les chambres",
+              href: setupResidenceId ? `/dashboard/residences?setup=${setupResidenceId}` : "/dashboard/residences",
+              actionLabel: "Continuer la configuration",
             },
             {
               id: "residence-discovery",
@@ -543,6 +571,17 @@ export default function ResidencesPage() {
           ))}
         </div>
       )}
+
+      <InitialSetupFlow
+        open={setupOpen}
+        accommodationId={setupResidenceId}
+        accommodationName={residences.find((residence) => residence.id === setupResidenceId)?.name}
+        onClose={() => setSetupOpen(false)}
+        onCompleted={() => {
+          void loadData(true);
+          router.push("/dashboard");
+        }}
+      />
 
       {/* Modal Add/Edit */}
       <Modal
