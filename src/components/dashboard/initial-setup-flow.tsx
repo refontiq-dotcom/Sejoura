@@ -92,8 +92,11 @@ export function InitialSetupFlow({
         if (loadedTypes.length > 0) {
           setSelectedType(loadedTypes[0]);
           setStep("rooms");
-          const firstNumber = loadedRooms.length > 0
-            ? Math.max(...loadedRooms.map((room) => Number.parseInt(room.room_number, 10)).filter(Number.isFinite)) + 1
+          const numericRoomNumbers = loadedRooms
+            .map((room) => Number.parseInt(room.room_number, 10))
+            .filter((value) => Number.isFinite(value));
+          const firstNumber = numericRoomNumbers.length > 0
+            ? Math.max(...numericRoomNumbers) + 1
             : 101;
           setRoomNumbers([String(Number.isFinite(firstNumber) ? firstNumber : 101)]);
           return;
