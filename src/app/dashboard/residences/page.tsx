@@ -266,8 +266,6 @@ export default function ResidencesPage() {
         if (error) throw error;
         createdResidenceId = created?.id ?? null;
       }
-      if (error) throw error;
-
       setModalOpen(false);
       loadData(true);
       if (!editingResidence && createdResidenceId) {
