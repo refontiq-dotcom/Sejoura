@@ -313,6 +313,8 @@ export default function ResidencesPage() {
   }
 
   const limits = getPlanLimits(plan);
+  const setupCandidateId =
+    residences.find((residence) => (roomsCount[residence.id] || 0) === 0)?.id ?? null;
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -378,7 +380,7 @@ export default function ResidencesPage() {
               priority: 2,
               title: "Votre établissement est prêt",
               description: "Ajoutez maintenant vos chambres pour pouvoir les utiliser dans vos réservations.",
-              href: setupResidenceId ? `/dashboard/residences?setup=${setupResidenceId}` : "/dashboard/residences",
+              href: setupCandidateId ? `/dashboard/residences?setup=${setupCandidateId}` : "/dashboard/residences",
               actionLabel: "Continuer la configuration",
             },
             {
