@@ -86,7 +86,7 @@ export function createR2S3Client(config: R2S3Config) {
     const response = await fetch(signed.url, {
       method,
       headers: signed.headers,
-      body: method === "PUT" ? payload : undefined,
+      body: method === "PUT" ? Buffer.from(payload) : undefined,
       cache: "no-store",
     });
     if (!response.ok) {
