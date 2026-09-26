@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ChevronLeft,
-  ChevronRight,
   Compass,
   DoorOpen,
   Fullscreen,
@@ -27,6 +26,9 @@ export interface PanoramaViewerProps {
   className?: string;
   tour?: PanoramaTour | null;
   initialSceneId?: string | null;
+  editorMode?: boolean;
+  editorTargets?: PanoramaScene[];
+  onCreateLink?: (link: { targetSceneId: string; yaw: number; pitch: number }) => void;
 }
 
 function normalizeAngle(value: number) {
@@ -43,6 +45,9 @@ export function PanoramaViewer({
   className = "",
   tour,
   initialSceneId,
+  editorMode = false,
+  editorTargets = [],
+  onCreateLink,
 }: PanoramaViewerProps) {
   const normalizedTour = useMemo(() => normalizePanoramaTour(tour), [tour]);
   const hasTour = normalizedTour.scenes.length > 0;
@@ -85,6 +90,7 @@ export function PanoramaViewer({
   const [unsupported, setUnsupported] = useState(false);
   const [gyroscope, setGyroscope] = useState(false);
   const [showScenes, setShowScenes] = useState(false);
+  const [placementOpen, setPlacementOpen] = useState(false);
   const [, setViewTick] = useState(0);
 
   const render = useCallback(() => {
@@ -442,12 +448,28 @@ export function PanoramaViewer({
             )}
 
             <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-2xl bg-black/55 p-1.5 text-white backdrop-blur-md">
+              {editorMode && onCreateLink && editorTargets.length > 0 && (
+                <button type="button" onClick={() => setPlacementOpen((value) => !value)} className="flex h-10 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-[10px] font-semibold hover:bg-indigo-500" aria-label="Ajouter un passage ici"><DoorOpen className="h-4 w-4" />Passage</button>
+              )}
               <button type="button" onClick={() => setZoom(zoomRef.current + 5)} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Zoomer"><Plus className="h-4 w-4" /></button>
               <button type="button" onClick={() => setZoom(zoomRef.current - 5)} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Dézoomer"><Minus className="h-4 w-4" /></button>
               <button type="button" onClick={resetView} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Réinitialiser la vue"><RotateCcw className="h-4 w-4" /></button>
               <button type="button" onClick={requestGyroscope} className={`flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10 ${gyroscope ? "bg-white/15" : ""}`} aria-label="Activer le mouvement du téléphone"><Move3D className="h-4 w-4" /></button>
               <button type="button" onClick={enterFullscreen} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Plein écran"><Fullscreen className="h-4 w-4" /></button>
             </div>
+
+            {editorMode && placementOpen && onCreateLink && editorTargets.length > 0 && (
+              <div className="absolute bottom-20 left-1/2 z-40 w-[min(90vw,360px)] -translate-x-1/2 rounded-2xl border border-white/10 bg-black/80 p-3 text-white shadow-2xl backdrop-blur-xl">
+                <p className="mb-2 text-xs font-bold">Vers quelle pièce voulez-vous créer le passage ?</p>
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {editorTargets.filter((scene) => scene.id !== activeSceneId).map((scene) => (
+                    <button key={scene.id} type="button" onClick={() => { onCreateLink({ targetSceneId: scene.id, yaw: rotationRef.current.y, pitch: rotationRef.current.x }); setPlacementOpen(false); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs hover:bg-white/10">
+                      <DoorOpen className="h-4 w-4 shrink-0" />{scene.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {hasTour && links.length > 0 && ready && (
               <div className="absolute bottom-20 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/40 px-3 py-1.5 text-[10px] text-white/80 backdrop-blur">
