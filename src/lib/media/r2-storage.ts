@@ -53,7 +53,7 @@ export function createR2MediaStorage(): MediaStorageAdapter {
       const r2Bucket = process.env.R2_BUCKET_MEDIA;
       if (!client || !r2Bucket || bucket !== r2Bucket) return;
       try {
-        await client.send(new DeleteObjectCommand({ Bucket: r2Bucket, Key: key }));
+        await client.deleteObject(key);
       } catch {
         // La suppression d'un objet orphelin ne doit jamais faire échouer une
         // requête utilisateur : journalisée côté appelant si nécessaire.
