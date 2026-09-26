@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
+import { randomBytes } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 function jsonError(error: string, status = 400, code?: string) {
   return NextResponse.json({ success: false, error, ...(code ? { code } : {}) }, { status });
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       const sixHours = new Date(now.getTime() + 6 * 60 * 60 * 1000);
       const checkoutLimit = new Date(booking.check_out_date + "T23:59:59Z");
       const expiresAt = sixHours < checkoutLimit ? sixHours : checkoutLimit;
-      const token = crypto.randomBytes(32).toString("hex");
+      const token = randomBytes(32).toString("hex");
       await admin.from("arrival_tracking_sessions").update({ status: "expired", ended_at: now.toISOString() }).eq("booking_id", booking.id).eq("tenant_id", tenantId).eq("status", "active");
       const { data: session, error } = await admin.from("arrival_tracking_sessions").insert({ tenant_id: tenantId, booking_id: booking.id, public_token: token, status: "active", expires_at: expiresAt.toISOString() }).select("public_token, status, started_at, expires_at").single();
       if (error || !session) { console.error("arrival tracking start", error); return jsonError("Impossible d’activer le suivi.", 500, "TRACKING_START_FAILED"); }
