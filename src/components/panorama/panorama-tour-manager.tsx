@@ -152,6 +152,15 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
       const { error } = await supabase.from("accommodations").update({ panorama_tour: cleaned }).eq("id", accommodationId);
       if (error) throw error;
       setTour(cleaned);
+      const listedType = roomTypes.find((room) => room.is_listed_on_trouvetou);
+      if (listedType) {
+        const syncResponse = await fetch("/api/v1/trouvetou/sync-type", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ roomTypeId: listedType.id }),
+        });
+        if (!syncResponse.ok) console.warn("Visite 360 enregistrée, mais la synchronisation Trouvetou a échoué.");
+      }
       toast.success("Visite 360° enregistrée.");
     } catch (error) {
       console.error(error);
