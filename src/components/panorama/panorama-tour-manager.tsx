@@ -6,7 +6,7 @@ import { DoorOpen, Loader2, Plus, Save, Star, Trash2, Upload, Waypoints } from "
 import { createClient } from "@/lib/supabase/client";
 import type { RoomType } from "@/types/database";
 import type { PanoramaInfoHotspot, PanoramaScene, PanoramaSceneKind, PanoramaTour } from "@/types/panorama";
-import { EMPTY_PANORAMA_TOUR, normalizePanoramaTour } from "@/types/panorama";
+import { EMPTY_PANORAMA_TOUR, normalizePanoramaTour, validatePanoramaTour } from "@/types/panorama";
 import { PanoramaViewer } from "@/components/panorama/panorama-viewer";
 
 interface PanoramaTourManagerProps {
@@ -145,6 +145,14 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
     setSaving(true);
     try {
       const supabase = createClient();
+      const validationIssues = validatePanoramaTour(tour);
+      if (validationIssues.length > 0) {
+        const blocking = validationIssues.filter((issue) => issue.code !== "isolated_scene");
+        if (blocking.length > 0) {
+          toast.error(blocking[0].message);
+          return;
+        }
+      }
       const cleaned: PanoramaTour = {
         version: 1,
         startSceneId: tour.startSceneId,
@@ -163,7 +171,8 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
         });
         if (!syncResponse.ok) console.warn("Visite 360 enregistrée, mais la synchronisation Trouvetou a échoué.");
       }
-      toast.success("Visite 360° enregistrée.");
+      const isolatedCount = validationIssues.filter((issue) => issue.code === "isolated_scene").length;
+      toast.success(isolatedCount > 0 ? `Visite enregistrée avec ${isolatedCount} scène(s) isolée(s) à relier.` : "Visite 360° enregistrée.");
     } catch (error) {
       console.error(error);
       toast.error("Impossible d'enregistrer la visite 360°.");
