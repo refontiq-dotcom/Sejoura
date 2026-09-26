@@ -15,8 +15,9 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import type { PanoramaLink, PanoramaScene, PanoramaTour } from "@/types/panorama";
+import type { PanoramaInfoHotspot, PanoramaLink, PanoramaScene, PanoramaTour } from "@/types/panorama";
 import { normalizePanoramaTour } from "@/types/panorama";
+import { getPanoramaDeviceProfile, getNeighborScenes, preloadPanoramaPreviews } from "@/lib/panorama/runtime";
 
 export interface PanoramaViewerProps {
   src: string;
@@ -28,6 +29,7 @@ export interface PanoramaViewerProps {
   editorMode?: boolean;
   editorTargets?: PanoramaScene[];
   onCreateLink?: (link: { targetSceneId: string; yaw: number; pitch: number }) => void;
+  onCreateInfoHotspot?: (hotspot: { yaw: number; pitch: number }) => void;
 }
 
 function normalizeAngle(value: number) {
@@ -47,6 +49,7 @@ export function PanoramaViewer({
   editorMode = false,
   editorTargets = [],
   onCreateLink,
+  onCreateInfoHotspot,
 }: PanoramaViewerProps) {
   const normalizedTour = useMemo(() => normalizePanoramaTour(tour), [tour]);
   const hasTour = normalizedTour.scenes.length > 0;
@@ -90,6 +93,7 @@ export function PanoramaViewer({
   const [gyroscope, setGyroscope] = useState(false);
   const [showScenes, setShowScenes] = useState(false);
   const [placementOpen, setPlacementOpen] = useState(false);
+  const [selectedInfoHotspot, setSelectedInfoHotspot] = useState<PanoramaInfoHotspot | null>(null);
   const [, setViewTick] = useState(0);
 
   const render = useCallback(() => {
@@ -163,7 +167,8 @@ export function PanoramaViewer({
           return;
         }
 
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        const deviceProfile = getPanoramaDeviceProfile();
+        renderer.setPixelRatio(deviceProfile.pixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setClearColor(0x05070b, 1);
 
@@ -171,7 +176,7 @@ export function PanoramaViewer({
         const camera = new THREE.PerspectiveCamera(zoomRef.current, 1, 0.01, 100);
         camera.position.set(0, 0, 0.01);
 
-        const geometry = new THREE.SphereGeometry(10, 64, 32);
+        const geometry = new THREE.SphereGeometry(10, deviceProfile.sphereWidthSegments, deviceProfile.sphereHeightSegments);
         geometry.scale(-1, 1, 1);
         const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.FrontSide });
         const mesh = new THREE.Mesh(geometry, material);
@@ -262,6 +267,13 @@ export function PanoramaViewer({
   }, [open, activeSrc, activeTitle, render]);
 
   useEffect(() => {
+    if (!open || !hasTour || !activeSceneId) return;
+    const profile = getPanoramaDeviceProfile();
+    const neighbors = getNeighborScenes(normalizedTour, activeSceneId);
+    preloadPanoramaPreviews(neighbors, profile.neighborPreviewLimit);
+  }, [open, hasTour, activeSceneId, normalizedTour]);
+
+  useEffect(() => {
     if (!open || !gyroscope) return;
     let active = true;
     const onOrientation = (event: DeviceOrientationEvent) => {
@@ -334,6 +346,7 @@ export function PanoramaViewer({
   };
 
   const links = normalizedTour.links.filter((link) => link.fromSceneId === activeSceneId);
+  const infoHotspots = activeScene?.infoHotspots ?? [];
   const visibleHotspots = links
     .map((link) => {
       const target = scenes.find((scene) => scene.id === link.toSceneId);
@@ -352,6 +365,21 @@ export function PanoramaViewer({
       return visible ? { link, target, x, y } : null;
     })
     .filter((item): item is { link: PanoramaLink; target: PanoramaScene; x: number; y: number } => Boolean(item));
+
+  const visibleInfoHotspots = infoHotspots
+    .map((hotspot) => {
+      if (!hostRef.current) return null;
+      const aspect = Math.max(0.5, hostRef.current.clientWidth / Math.max(1, hostRef.current.clientHeight));
+      const verticalFov = THREE_DEG_TO_RAD(zoomRef.current);
+      const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+      const relativeYaw = normalizeAngle(hotspot.yaw - rotationRef.current.y);
+      const relativePitch = hotspot.pitch - rotationRef.current.x;
+      const x = 50 + (Math.tan(relativeYaw) / Math.tan(horizontalFov / 2)) * 50;
+      const y = 50 - (Math.tan(relativePitch) / Math.tan(verticalFov / 2)) * 50;
+      const visible = Math.abs(relativeYaw) <= horizontalFov / 2 && Math.abs(relativePitch) <= verticalFov / 2 && x > 3 && x < 97 && y > 5 && y < 92;
+      return visible ? { hotspot, x, y } : null;
+    })
+    .filter((item): item is { hotspot: PanoramaInfoHotspot; x: number; y: number } => Boolean(item));
 
   return (
     <>
@@ -393,6 +421,19 @@ export function PanoramaViewer({
               {activePreview && !ready && <div className="absolute inset-0 bg-cover bg-center opacity-55" style={{ backgroundImage: `url("${activePreview}")` }} />}
               <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/55 pointer-events-none" />
 
+              {ready && visibleInfoHotspots.map(({ hotspot, x, y }) => (
+                <button
+                  key={hotspot.id}
+                  type="button"
+                  onClick={(event) => { event.stopPropagation(); setSelectedInfoHotspot(hotspot); }}
+                  className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-amber-400/90 text-slate-950 shadow-xl backdrop-blur transition hover:scale-110"
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                  aria-label={hotspot.title}
+                >
+                  <span className="text-sm font-black">i</span>
+                </button>
+              ))}
+
               {ready && visibleHotspots.map(({ link, target, x, y }) => (
                 <button
                   key={link.id}
@@ -406,6 +447,18 @@ export function PanoramaViewer({
                 </button>
               ))}
             </div>
+
+            {selectedInfoHotspot && (
+              <div className="absolute left-4 right-4 top-20 z-50 mx-auto max-w-md rounded-2xl border border-white/10 bg-black/75 p-4 text-white shadow-2xl backdrop-blur-xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold">{selectedInfoHotspot.title}</p>
+                    {selectedInfoHotspot.description && <p className="mt-1 text-xs leading-5 text-white/75">{selectedInfoHotspot.description}</p>}
+                  </div>
+                  <button type="button" onClick={() => setSelectedInfoHotspot(null)} className="rounded-lg p-1 text-white/70 hover:bg-white/10" aria-label="Fermer"><X className="h-4 w-4" /></button>
+                </div>
+              </div>
+            )}
 
             <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4 sm:p-5">
               <div className="rounded-2xl bg-black/50 px-4 py-2.5 text-white backdrop-blur-md">
