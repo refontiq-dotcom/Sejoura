@@ -37,9 +37,10 @@ export default function ResidenceDetailPage() {
 
   const [residenceForm, setResidenceForm] = useState({ name: "", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
-  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[], check_out_time: "11:00" });
+  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[], cover_image_url: "", panorama_360_url: "", check_out_time: "11:00" });
   const [newTypeImageUrl, setNewTypeImageUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingPanorama, setUploadingPanorama] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
   const [roomNumberError, setRoomNumberError] = useState("");
@@ -273,7 +274,7 @@ export default function ResidenceDetailPage() {
   function openAddTypeModal() {
     setEditingType(null);
     setNewTypeImageUrl("");
-    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [], check_out_time: "11:00" });
+    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [], cover_image_url: "", panorama_360_url: "", check_out_time: "11:00" });
     setTypeModalOpen(true);
   }
 
@@ -290,6 +291,8 @@ export default function ResidenceDetailPage() {
       surface_m2: rt.surface_m2 ? rt.surface_m2.toString() : "",
       is_listed_on_trouvetou: rt.is_listed_on_trouvetou,
       featured_images: rt.featured_images || [],
+      cover_image_url: rt.cover_image_url || "",
+      panorama_360_url: rt.panorama_360_url || "",
       check_out_time: rt.check_out_time || "11:00",
     });
     setTypeModalOpen(true);
@@ -347,6 +350,42 @@ export default function ResidenceDetailPage() {
       toast.error("Erreur lors de l'upload de la photo.");
     } finally {
       setUploadingImage(false);
+    }
+  }
+
+  async function uploadTypePanorama(file: File) {
+    if (!file) return;
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error("Le panorama 360° dépasse 30 Mo. Choisissez une image plus légère.");
+      return;
+    }
+    setUploadingPanorama(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Session expirée. Reconnectez-vous 🔐");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("photo", file);
+      formData.append("kind", "panorama_360");
+      const res = await fetch("/api/v1/trouvetou/upload-photo", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Impossible d'uploader le panorama 360°.");
+        return;
+      }
+      setTypeForm((prev) => ({ ...prev, panorama_360_url: data.url }));
+      toast.success("Panorama 360° ajouté.");
+    } catch {
+      toast.error("Erreur lors de l'upload du panorama 360°.");
+    } finally {
+      setUploadingPanorama(false);
     }
   }
 
@@ -829,52 +868,58 @@ export default function ResidenceDetailPage() {
               </div>
             </div>
 
-            {/* Photos pour Trouvetou */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Photos de la chambre (requises pour la diffusion)</label>
-              {typeForm.featured_images.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {typeForm.featured_images.map((img, index) => (
-                    <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 dark:border-slate-600">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeTypeImage(index)}
-                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white"
-                        title="Retirer cette photo"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
-                <Button type="button" variant="outline" size="sm" onClick={addTypeImage}>
-                  <ImagePlus className="w-4 h-4" /> Ajouter
-                </Button>
-              </div>
-              <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
-                {uploadingImage ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ImagePlus className="w-4 h-4" />
+            {/* Médias du type de chambre */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-900 dark:text-white mb-1">Photos du type de chambre</label>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">Ajoutez plusieurs photos. La photo de couverture sera utilisée en premier sur Trouvetou.</p>
+                {typeForm.featured_images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
+                    {typeForm.featured_images.map((img, index) => (
+                      <div key={img + index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                        {typeForm.cover_image_url === img && <span className="absolute left-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">Couverture</span>}
+                        <div className="absolute inset-x-1 bottom-1 flex gap-1">
+                          <button type="button" onClick={() => setTypeForm(prev => ({ ...prev, cover_image_url: img }))} className="flex-1 rounded bg-white/90 px-1 py-1 text-[9px] font-semibold text-slate-700">Couverture</button>
+                          <button type="button" onClick={() => { const wasCover = typeForm.cover_image_url === img; removeTypeImage(index); if (wasCover) setTypeForm(prev => ({ ...prev, cover_image_url: prev.featured_images.find(x => x !== img) ?? "" })); }} className="rounded bg-black/70 p-1 text-white" title="Retirer cette photo"><X className="w-3 h-3" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {uploadingImage ? "Traitement en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP, AVIF — max 12 Mo, optimisée automatiquement)"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-                  className="hidden"
-                  disabled={uploadingImage}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadTypeImage(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+                <div className="flex gap-2">
+                  <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
+                  <Button type="button" variant="outline" size="sm" onClick={addTypeImage}><ImagePlus className="w-4 h-4" /> Ajouter</Button>
+                </div>
+                <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+                  {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  {uploadingImage ? "Traitement en cours…" : "Téléverser des photos (JPEG, PNG, WebP, AVIF — max 12 Mo)"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" className="hidden" disabled={uploadingImage} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadTypeImage(file); e.target.value = ""; }} />
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/20 p-3">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900 dark:text-white">🌐 Photo 360° / visite virtuelle</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Ajoutez une image panoramique équirectangulaire 360°. Elle sera proposée séparément des photos classiques.</p>
+                  </div>
+                  {typeForm.panorama_360_url && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-semibold text-emerald-700">Ajoutée</span>}
+                </div>
+                {typeForm.panorama_360_url && (
+                  <div className="relative h-32 overflow-hidden rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-slate-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={typeForm.panorama_360_url} alt="Aperçu du panorama 360°" className="h-full w-full object-cover" />
+                    <button type="button" onClick={() => setTypeForm(prev => ({ ...prev, panorama_360_url: "" }))} className="absolute right-2 top-2 rounded-lg bg-black/70 p-1.5 text-white" title="Supprimer le panorama 360°"><X className="w-4 h-4" /></button>
+                  </div>
+                )}
+                <label className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-dashed border-indigo-300 dark:border-indigo-800 px-3 py-2.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 cursor-pointer hover:bg-indigo-100/60 dark:hover:bg-indigo-900/30">
+                  {uploadingPanorama ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  {uploadingPanorama ? "Traitement du panorama…" : typeForm.panorama_360_url ? "Remplacer le panorama 360°" : "Téléverser une photo 360° (max 30 Mo)"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" disabled={uploadingPanorama} onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadTypePanorama(file); e.target.value = ""; }} />
+                </label>
+              </div>
             </div>
 
             {/* Visibilité Trouvetou */}
