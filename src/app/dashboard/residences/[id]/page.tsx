@@ -914,7 +914,7 @@ export default function ResidenceDetailPage() {
                 </div>
                 {typeForm.panorama_360_url && (
                   <div className="space-y-2">
-                    <PanoramaViewer src={typeForm.panorama_360_url} previewSrc={typeForm.panorama_360_url} title={`${typeForm.name || "Chambre"} — aperçu 360°`} />
+                    <PanoramaViewer src={typeForm.panorama_360_url} previewSrc={typeForm.cover_image_url || typeForm.featured_images[0]} title={`${typeForm.name || "Chambre"} — aperçu 360°`} />
                     <button type="button" onClick={() => setTypeForm(prev => ({ ...prev, panorama_360_url: "" }))} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-[11px] font-medium text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/30" title="Supprimer le panorama 360°"><X className="w-3.5 h-3.5" /> Supprimer la visite 360°</button>
                   </div>
                 )}
