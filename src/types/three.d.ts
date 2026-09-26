@@ -15,4 +15,5 @@ declare module "three" {
   export const Mesh: any;
   export const TextureLoader: any;
   export const SRGBColorSpace: any;
+  export const FrontSide: any;
 }
