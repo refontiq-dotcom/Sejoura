@@ -8,6 +8,7 @@ export interface PanoramaScene {
   previewSrc?: string | null;
   roomTypeId?: string | null;
   isStart?: boolean;
+  isPublished?: boolean;
 }
 
 export interface PanoramaLink {
