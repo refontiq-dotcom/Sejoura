@@ -15,6 +15,7 @@ import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag,
 import type { Accommodation, RoomType, Room } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { PanoramaViewer } from "@/components/panorama/panorama-viewer";
+import { PanoramaTourManager } from "@/components/panorama/panorama-tour-manager";
 
 export default function ResidenceDetailPage() {
   const { fmt, symbol } = useCurrency();
@@ -596,6 +597,13 @@ export default function ResidenceDetailPage() {
           </div>
         )}
       </div>
+
+      <PanoramaTourManager
+        accommodationId={residence.id}
+        roomTypes={currentTypes}
+        initialTour={residence.panorama_tour}
+        readOnly={isReadOnly}
+      />
 
       {/* Types de chambre */}
       <Card className="p-3">
