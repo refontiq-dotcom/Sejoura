@@ -140,6 +140,43 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
     });
   }
 
+  function addInfoHotspot(yaw: number, pitch: number) {
+    if (!selectedSceneId || !infoTitle.trim()) {
+      toast.error("Saisissez un titre pour le hotspot d'information.");
+      return;
+    }
+    const hotspot: PanoramaInfoHotspot = {
+      id: uid(),
+      sceneId: selectedSceneId,
+      yaw,
+      pitch,
+      title: infoTitle.trim().slice(0, 100),
+      description: infoDescription.trim().slice(0, 500) || null,
+    };
+    setTour({
+      ...tour,
+      scenes: tour.scenes.map((scene) =>
+        scene.id === selectedSceneId
+          ? { ...scene, infoHotspots: [...(scene.infoHotspots ?? []), hotspot] }
+          : scene
+      ),
+    });
+    setInfoTitle("");
+    setInfoDescription("");
+    toast.success("Hotspot d'information ajouté.");
+  }
+
+  function removeInfoHotspot(hotspotId: string) {
+    setTour({
+      ...tour,
+      scenes: tour.scenes.map((scene) =>
+        scene.id === selectedSceneId
+          ? { ...scene, infoHotspots: (scene.infoHotspots ?? []).filter((hotspot) => hotspot.id !== hotspotId) }
+          : scene
+      ),
+    });
+  }
+
   async function save() {
     if (readOnly) return;
     setSaving(true);
