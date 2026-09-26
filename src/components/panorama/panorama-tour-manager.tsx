@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { DoorOpen, Loader2, Plus, Save, Star, Trash2, Upload, Waypoints } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { RoomType } from "@/types/database";
-import type { PanoramaScene, PanoramaSceneKind, PanoramaTour } from "@/types/panorama";
+import type { PanoramaInfoHotspot, PanoramaScene, PanoramaSceneKind, PanoramaTour } from "@/types/panorama";
 import { EMPTY_PANORAMA_TOUR, normalizePanoramaTour } from "@/types/panorama";
 import { PanoramaViewer } from "@/components/panorama/panorama-viewer";
 
@@ -35,6 +35,8 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
   const [roomTypeId, setRoomTypeId] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [infoTitle, setInfoTitle] = useState("");
+  const [infoDescription, setInfoDescription] = useState("");
 
   const selectedScene = tour.scenes.find((scene) => scene.id === selectedSceneId) ?? null;
   const targets = useMemo(() => tour.scenes.filter((scene) => scene.id !== selectedSceneId), [tour.scenes, selectedSceneId]);
@@ -236,7 +238,29 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
                 editorMode={!readOnly}
                 editorTargets={targets}
                 onCreateLink={({ targetSceneId, yaw, pitch }) => addLink(targetSceneId, yaw, pitch)}
+                onCreateInfoHotspot={({ yaw, pitch }) => addInfoHotspot(yaw, pitch)}
               />
+
+              {!readOnly && (
+                <div className="mb-3 grid gap-2 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20 sm:grid-cols-2">
+                  <input value={infoTitle} onChange={(e) => setInfoTitle(e.target.value)} maxLength={100} placeholder="Titre du hotspot : Salle de bain…" className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs outline-none focus:border-amber-400" />
+                  <input value={infoDescription} onChange={(e) => setInfoDescription(e.target.value)} maxLength={500} placeholder="Description courte (facultatif)" className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs outline-none focus:border-amber-400" />
+                  <p className="text-[10px] text-amber-800 sm:col-span-2">Placez la vue face à l'élément puis cliquez sur « + Info ici » dans le viewer.</p>
+                </div>
+              )}
+              {(selectedScene.infoHotspots ?? []).length > 0 && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="mb-2 text-[11px] font-bold text-slate-800">Hotspots d'information</p>
+                  <div className="space-y-1.5">
+                    {(selectedScene.infoHotspots ?? []).map((hotspot) => (
+                      <div key={hotspot.id} className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-[10px]">
+                        <span className="min-w-0 truncate"><b>{hotspot.title}</b>{hotspot.description ? ` · ${hotspot.description}` : ""}</span>
+                        {!readOnly && <button type="button" onClick={() => removeInfoHotspot(hotspot.id)} className="shrink-0 text-red-500 hover:text-red-700">Retirer</button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/70">
                 <div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-bold text-slate-800 dark:text-white">Passages depuis cet espace</p><span className="text-[10px] text-slate-400">{tour.links.filter((link) => link.fromSceneId === selectedScene.id).length}</span></div>
