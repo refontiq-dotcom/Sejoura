@@ -12,6 +12,7 @@
     "test:db": "node scripts/db-regression-tests.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "@supabase/ssr": "^0.12.4",

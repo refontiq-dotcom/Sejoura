@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import { getMediaStorageDriver, joinMediaKey, uploadToR2Media } from "@/lib/storage/r2";
 
 const BUCKET = "feature-screenshots";
 const MAX_SIZE = 8 * 1024 * 1024; // 8 Mo
@@ -41,37 +42,49 @@ export async function POST(req: Request) {
 
     const adminSupabase = createAdminClient();
 
-    // S'assurer que le bucket existe (idempotent)
-    try {
-      await adminSupabase.storage.createBucket(BUCKET, { public: true });
-    } catch {
-      // Le bucket existe déjà : on continue
-    }
-
     const extension = file.name.split(".").pop() || "png";
-    const filePath = `uploads/${crypto.randomUUID()}.${extension}`;
+    const filePath = joinMediaKey("uploads", `${crypto.randomUUID()}.${extension}`);
 
-    const { error: uploadError } = await adminSupabase.storage
-      .from(BUCKET)
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type,
-      });
+    let publicUrl: string;
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    if (getMediaStorageDriver() === "r2") {
+      // ── Pilote R2 : le bucket média doit exister côté Cloudflare (créé une fois)
+      const r2Result = await uploadToR2Media({ key: filePath, file });
+      if (!r2Result.ok) {
+        return NextResponse.json({ error: r2Result.error }, { status: 500 });
+      }
+      publicUrl = r2Result.url;
+    } else {
+      // ── Pilote Supabase Storage (historique) : bucket créé à la volée (idempotent)
+      try {
+        await adminSupabase.storage.createBucket(BUCKET, { public: true });
+      } catch {
+        // Le bucket existe déjà : on continue
+      }
+
+      const { error: uploadError } = await adminSupabase.storage
+        .from(BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      }
+
+      const { data: publicUrlData } = await adminSupabase.storage
+        .from(BUCKET)
+        .getPublicUrl(filePath);
+
+      if (!publicUrlData?.publicUrl) {
+        return NextResponse.json({ error: "Impossible de récupérer l'URL de l'image." }, { status: 500 });
+      }
+      publicUrl = publicUrlData.publicUrl;
     }
 
-    const { data: publicUrlData } = await adminSupabase.storage
-      .from(BUCKET)
-      .getPublicUrl(filePath);
-
-    if (!publicUrlData?.publicUrl) {
-      return NextResponse.json({ error: "Impossible de récupérer l'URL de l'image." }, { status: 500 });
-    }
-
-    return NextResponse.json({ url: publicUrlData.publicUrl });
+    return NextResponse.json({ url: publicUrl });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue lors de l'upload.";
     return NextResponse.json({ error: message }, { status: 500 });

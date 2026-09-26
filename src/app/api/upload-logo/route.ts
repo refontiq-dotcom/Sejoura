@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
+import {
+  extensionFromMime,
+  getMediaStorageDriver,
+  joinMediaKey,
+  uploadToR2Media,
+} from "@/lib/storage/r2";
 
 const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
 const MAX_LOGO_SIZE = 2 * 1024 * 1024; // 2 Mo
@@ -52,44 +58,51 @@ export async function POST(req: Request) {
       );
     }
 
-    const safeExtensions: Record<string, string> = {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/webp": "webp",
-      "image/svg+xml": "svg",
-    };
-    const extension = safeExtensions[file.type] || "png";
-    const filePath = `${tenantId}/logo.${extension}`;
+    const extension = extensionFromMime(file.type, "png");
+    const filePath = joinMediaKey(tenantId, `logo.${extension}`);
 
-    const { error: uploadError } = await adminSupabase.storage
-      .from("logos")
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+    let publicUrl: string;
 
-    if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
-    }
+    if (getMediaStorageDriver() === "r2") {
+      // ── Pilote R2 : upload direct sur le bucket média Cloudflare ──────────
+      const r2Result = await uploadToR2Media({ key: filePath, file });
+      if (!r2Result.ok) {
+        return NextResponse.json({ error: r2Result.error }, { status: 500 });
+      }
+      publicUrl = r2Result.url;
+    } else {
+      // ── Pilote Supabase Storage (historique) ──────────────────────────────
+      const { error: uploadError } = await adminSupabase.storage
+        .from("logos")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
 
-    const { data: publicUrlData } = await adminSupabase.storage
-      .from("logos")
-      .getPublicUrl(filePath);
+      if (uploadError) {
+        return NextResponse.json({ error: uploadError.message }, { status: 500 });
+      }
 
-    if (!publicUrlData?.publicUrl) {
-      return NextResponse.json({ error: "Impossible de récupérer l'URL du logo." }, { status: 500 });
+      const { data: publicUrlData } = await adminSupabase.storage
+        .from("logos")
+        .getPublicUrl(filePath);
+
+      if (!publicUrlData?.publicUrl) {
+        return NextResponse.json({ error: "Impossible de récupérer l'URL du logo." }, { status: 500 });
+      }
+      publicUrl = publicUrlData.publicUrl;
     }
 
     const { error: updateError } = await adminSupabase
       .from("tenants")
-      .update({ logo_url: publicUrlData.publicUrl })
+      .update({ logo_url: publicUrl })
       .eq("id", tenantId);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ logoUrl: publicUrlData.publicUrl });
+    return NextResponse.json({ logoUrl: publicUrl });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue lors de l'upload du logo.";
     return NextResponse.json({ error: message }, { status: 500 });
