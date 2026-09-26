@@ -355,6 +355,8 @@ export interface RoomType {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[];
+  cover_image_url: string | null;
+  panorama_360_url: string | null;
   check_out_time: string;
   created_at: string;
   updated_at: string;
