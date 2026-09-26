@@ -276,6 +276,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           ...(coverImage ? { cover_image_url: coverImage } : {}),
           ...(panorama360Url ? { panorama_360_url: panorama360Url } : {}),
           ...(tourForListing && tourForListing.scenes.length > 0 ? { panorama_tour: tourForListing } : {}),
+          ...(tourForListing ? { panorama_start_scene_id: tourForListing.scenes.find((scene) => scene.roomTypeId === row.id)?.id ?? tourForListing.startSceneId } : {}),
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
