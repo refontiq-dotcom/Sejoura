@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import { normalizePanoramaTour, type PanoramaTour } from "@/types/panorama";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -56,6 +57,7 @@ interface SyncRow {
   featured_images: string[] | null;
   cover_image_url: string | null;
   panorama_360_url: string | null;
+  panorama_tour: PanoramaTour | null;
   accommodations: {
     tenant_id: string;
     name: string;
@@ -104,6 +106,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       featured_images,
       cover_image_url,
       panorama_360_url,
+      panorama_tour,
       accommodations!inner (
         tenant_id,
         name,
@@ -227,6 +230,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const logoUrl = tenant?.logo_url;
       const coverImage = typeof row.cover_image_url === "string" ? row.cover_image_url.trim() : "";
       const panorama360Url = typeof row.panorama_360_url === "string" ? row.panorama_360_url.trim() : "";
+      const panoramaTour = normalizePanoramaTour(row.panorama_tour);
+      const publishedTour = panoramaTour.scenes.filter((scene) => scene.isPublished !== false);
+      const tourForListing = publishedTour.length > 0
+        ? { ...panoramaTour, scenes: publishedTour, links: panoramaTour.links.filter((link) => publishedTour.some((scene) => scene.id === link.fromSceneId) && publishedTour.some((scene) => scene.id === link.toSceneId)) }
+        : null;
       const featuredImages = Array.isArray(row.featured_images)
         ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
         : [];
@@ -267,6 +275,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           available_rooms_now: availableNow,
           ...(coverImage ? { cover_image_url: coverImage } : {}),
           ...(panorama360Url ? { panorama_360_url: panorama360Url } : {}),
+          ...(tourForListing && tourForListing.scenes.length > 0 ? { panorama_tour: tourForListing } : {}),
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
