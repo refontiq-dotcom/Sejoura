@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
-import { normalizePanoramaTour, type PanoramaTour } from "@/types/panorama";
+import { normalizePanoramaTour, validatePanoramaTour, type PanoramaTour } from "@/types/panorama";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -231,10 +231,24 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const coverImage = typeof row.cover_image_url === "string" ? row.cover_image_url.trim() : "";
       const panorama360Url = typeof row.panorama_360_url === "string" ? row.panorama_360_url.trim() : "";
       const panoramaTour = normalizePanoramaTour(accommodation.panorama_tour);
+      const validationIssues = validatePanoramaTour(panoramaTour);
       const publishedTour = panoramaTour.scenes.filter((scene) => scene.isPublished !== false);
-      const tourForListing = publishedTour.length > 0
-        ? { ...panoramaTour, scenes: publishedTour, links: panoramaTour.links.filter((link) => publishedTour.some((scene) => scene.id === link.fromSceneId) && publishedTour.some((scene) => scene.id === link.toSceneId)) }
-        : null;
+      const publishedStartSceneId =
+        publishedTour.some((scene) => scene.id === panoramaTour.startSceneId)
+          ? panoramaTour.startSceneId
+          : publishedTour[0]?.id ?? null;
+      const tourForListing =
+        validationIssues.some((issue) => issue.code !== "isolated_scene") || publishedTour.length === 0
+          ? null
+          : {
+              ...panoramaTour,
+              startSceneId: publishedStartSceneId,
+              scenes: publishedTour.map((scene) => ({ ...scene, isStart: scene.id === publishedStartSceneId })),
+              links: panoramaTour.links.filter((link) =>
+                publishedTour.some((scene) => scene.id === link.fromSceneId) &&
+                publishedTour.some((scene) => scene.id === link.toSceneId)
+              ),
+            };
       const featuredImages = Array.isArray(row.featured_images)
         ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
         : [];
