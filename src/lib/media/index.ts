@@ -95,6 +95,16 @@ export async function handleMediaUpload(params: {
   const input = Buffer.from(await file.arrayBuffer());
   const optimized = await optimizeImage(input, policy);
 
+  // Un panorama 360° doit rester équirectangulaire. On accepte une petite
+  // tolérance pour les exports qui subissent un arrondi de dimensions, mais
+  // on refuse les images ordinaires qui ne peuvent pas être projetées proprement.
+  if (params.kind === "panorama_360") {
+    const ratio = optimized.height > 0 ? optimized.width / optimized.height : 0;
+    if (ratio < 1.8 || ratio > 2.2 || optimized.width < 1600 || optimized.height < 800) {
+      throw new MediaError("invalid_image", "Le fichier doit être une vraie image panoramique 360° au format proche de 2:1 (minimum recommandé : 1600 × 800 px).");
+    }
+  }
+
   // 3. Clé sûre : UUID côté serveur, nom utilisateur jamais utilisé.
   const extension = optimized.extension;
   let key: string;
