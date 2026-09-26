@@ -196,6 +196,7 @@ CREATE TABLE tenants (
   suspended_reason TEXT,
   suspended_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  panorama_tour   JSONB,
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
