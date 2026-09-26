@@ -1,28 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
-import {
-  extensionFromMime,
-  getMediaStorageDriver,
-  joinMediaKey,
-  uploadToR2Media,
-} from "@/lib/storage/r2";
+import { handleMediaUpload, mediaErrorJson } from "@/lib/media";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/trouvetou/upload-photo
-// Upload d'une photo de chambre sur le bucket 'room-photos'.
-// Vérifie la session utilisateur, la taille et le type MIME du fichier.
-// Le fichier est stocké sous {tenantId}/room-types/{uuid}.{ext} pour éviter
-// les collisions et faciliter un éventuel nettoyage. Retourne l'URL publique.
+// Upload d'une photo de chambre (photos de type, Trouvetou).
+// Vérifie la session utilisateur, puis délègue au pipeline média centralisé :
+// validation du contenu réel, optimisation (WebP responsive), stockage R2
+// (ou Supabase en repli), clé sûre {tenantId}/room-types/{uuid}.webp.
+// Retourne l'URL publique.
 // ──────────────────────────────────────────────────────────────────────────────
-
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-]);
 
 export async function POST(req: Request) {
   try {
@@ -46,64 +33,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Compte utilisateur introuvable." }, { status: 404 });
     }
 
-    // Validation taille + type MIME
-    if (file.size > MAX_SIZE_BYTES) {
-      return NextResponse.json(
-        { error: "La photo fait plus de 5 Mo. Réduisez-la 📸" },
-        { status: 400 }
-      );
-    }
-    const mime = file.type || "";
-    if (!ALLOWED_TYPES.has(mime)) {
-      return NextResponse.json(
-        { error: "Format d'image non supporté (JPEG, PNG, WebP, AVIF, GIF)." },
-        { status: 400 }
-      );
-    }
+    // Pipeline média centralisé (taille, format réel, dimensions, WebP, clé UUID)
+    const handled = await handleMediaUpload({ file, kind: "photo", tenantId });
 
-    // Upload du média (pilote choisi via MEDIA_STORAGE_DRIVER)
-    const filePath = joinMediaKey(
-      tenantId,
-      "room-types",
-      `${crypto.randomUUID()}.${extensionFromMime(mime, "jpg")}`
-    );
-
-    let publicUrl: string;
-
-    if (getMediaStorageDriver() === "r2") {
-      // ── Pilote R2 : upload direct sur le bucket média Cloudflare ──────────
-      const r2Result = await uploadToR2Media({ key: filePath, file });
-      if (!r2Result.ok) {
-        return NextResponse.json({ error: r2Result.error }, { status: 500 });
-      }
-      publicUrl = r2Result.url;
-    } else {
-      // ── Pilote Supabase Storage (historique) ──────────────────────────────
-      const { error: uploadError } = await admin.storage
-        .from("room-photos")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: mime,
-        });
-
-      if (uploadError) {
-        return NextResponse.json({ error: uploadError.message }, { status: 500 });
-      }
-
-      const { data: publicUrlData } = await admin.storage
-        .from("room-photos")
-        .getPublicUrl(filePath);
-
-      if (!publicUrlData?.publicUrl) {
-        return NextResponse.json({ error: "Impossible de récupérer l'URL de la photo." }, { status: 500 });
-      }
-      publicUrl = publicUrlData.publicUrl;
-    }
-
-    return NextResponse.json({ url: publicUrl });
+    return NextResponse.json({ url: handled.stored.url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue lors de l'upload.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return mediaErrorJson(error);
   }
 }

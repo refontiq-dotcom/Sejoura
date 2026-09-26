@@ -1286,6 +1286,7 @@ function TrouvetouDashboardPage() {
                         src={images[0]}
                         alt={title}
                         loading="lazy"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (

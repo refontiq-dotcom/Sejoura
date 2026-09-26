@@ -167,8 +167,8 @@ export function TrouvetouAdsPanel() {
 
   async function handleImageChange(file: File | null) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("L'affiche fait plus de 5 Mo.");
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("L'affiche dépasse 12 Mo.");
       return;
     }
     setUploading(true);
@@ -538,7 +538,7 @@ export function TrouvetouAdsPanel() {
               <Card key={ad.id} className="overflow-hidden" hover={false}>
                 <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-800">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={ad.image_url} alt="" className="w-full h-full object-cover" />
+                  <img src={ad.image_url} alt="" loading="lazy" sizes="(max-width: 768px) 100vw, 33vw" className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">

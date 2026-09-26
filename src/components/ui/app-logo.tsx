@@ -51,7 +51,7 @@ export function AppLogo({
       className={className}
       onError={handleImageError}
       priority={priority}
-      unoptimized={imgSrc.startsWith("http") || imgSrc.startsWith("blob:")}
+      unoptimized={imgSrc.startsWith("blob:")}
     />
   );
 }

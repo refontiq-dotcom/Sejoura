@@ -1,15 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
-import {
-  extensionFromMime,
-  getMediaStorageDriver,
-  joinMediaKey,
-  uploadToR2Media,
-} from "@/lib/storage/r2";
-
-const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
-const MAX_LOGO_SIZE = 2 * 1024 * 1024; // 2 Mo
+import { handleMediaUpload, mediaErrorJson } from "@/lib/media";
 
 export async function POST(req: Request) {
   try {
@@ -44,67 +36,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Accès non autorisé." }, { status: 403 });
     }
 
-    // ── Validation du fichier ────────────────────────────────────────────────
-    if (!ALLOWED_LOGO_TYPES.has(file.type)) {
-      return NextResponse.json(
-        { error: "Format non supporté. Utilisez PNG, JPEG, WebP ou SVG." },
-        { status: 400 }
-      );
-    }
-    if (file.size > MAX_LOGO_SIZE) {
-      return NextResponse.json(
-        { error: "Fichier trop volumineux (2 Mo maximum)." },
-        { status: 400 }
-      );
-    }
-
-    const extension = extensionFromMime(file.type, "png");
-    const filePath = joinMediaKey(tenantId, `logo.${extension}`);
-
-    let publicUrl: string;
-
-    if (getMediaStorageDriver() === "r2") {
-      // ── Pilote R2 : upload direct sur le bucket média Cloudflare ──────────
-      const r2Result = await uploadToR2Media({ key: filePath, file });
-      if (!r2Result.ok) {
-        return NextResponse.json({ error: r2Result.error }, { status: 500 });
-      }
-      publicUrl = r2Result.url;
-    } else {
-      // ── Pilote Supabase Storage (historique) ──────────────────────────────
-      const { error: uploadError } = await adminSupabase.storage
-        .from("logos")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        return NextResponse.json({ error: uploadError.message }, { status: 500 });
-      }
-
-      const { data: publicUrlData } = await adminSupabase.storage
-        .from("logos")
-        .getPublicUrl(filePath);
-
-      if (!publicUrlData?.publicUrl) {
-        return NextResponse.json({ error: "Impossible de récupérer l'URL du logo." }, { status: 500 });
-      }
-      publicUrl = publicUrlData.publicUrl;
-    }
+    // ── Pipeline média : validation contenu réel + optimisation + stockage ───
+    // (taille max, formats, dimensions, compression et clé sûre centralisés ;
+    //  le tenant vient de la vérification ci-dessus, jamais du client)
+    const handled = await handleMediaUpload({ file, kind: "logo", tenantId });
 
     const { error: updateError } = await adminSupabase
       .from("tenants")
-      .update({ logo_url: publicUrl })
+      .update({ logo_url: handled.stored.url })
       .eq("id", tenantId);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ logoUrl: publicUrl });
+    return NextResponse.json({ logoUrl: handled.stored.url });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue lors de l'upload du logo.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return mediaErrorJson(error);
   }
 }

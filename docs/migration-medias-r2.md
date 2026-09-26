@@ -54,10 +54,19 @@ Points notables :
    - `R2_PUBLIC_BASE_URL` (URL publique du bucket/domaine R2)
 4. ✅ **Feature flag** `MEDIA_STORAGE_DRIVER` (`supabase` par défaut, `r2` pour basculer) : chaque route d'upload choisit le driver au runtime. Rien ne change tant que le flag n'est pas positionné → zéro risque de déploiement.
 
-### Phase 2 — Bascule des 4 routes d'upload — ✅ FAIT (code branché, en attente de credentials pour tester en réel)
+### Phase 2 — Bascule des 4 routes d'upload — ✅ FAIT
 - ✅ `upload-logo`, `trouvetou/upload-photo`, `ads/upload`, `feature-requests/upload` : même validation (types MIME, tailles), même forme de clé (`{tenantId}/.../{uuid}.{ext}`), seule la destination change.
 - ✅ Réponses HTTP **identiques** (`{ logoUrl }`, `{ url }`) → aucun changement côté client, aucun changement d'UI.
 - Les nouveaux objets R2 reprennent `Cache-Control: 3600`, fidèle au comportement Supabase historique. (Un cache long `immutable` serait possible pour les clés UUID, mais dangereux pour `logo.{ext}` qui est réécrit en upsert — optimisation à reconsidérer en Phase 4 si besoin.)
+
+### Phase 2bis — Pipeline média professionnel — ✅ FAIT
+- ✅ `src/lib/media/` : `policy.ts` (politique par type : formats, dimensions max, qualité, taille d'entrée), `format.ts` (détection magic bytes), `optimize.ts` (sharp : redimensionnement inside/withoutEnlargement + WebP, passthrough SVG/GIF), `keys.ts` (clés UUID sûres, isolation tenant), `supabase-storage.ts` + `r2-storage.ts` (adapters), `index.ts` (`handleMediaUpload` + `mediaErrorJson`).
+- ✅ Driver résolu au runtime : **R2 si configuré, sinon Supabase automatiquement** (le flag `MEDIA_STORAGE_DRIVER=supabase` force le repli). Vercel ayant les variables R2 → la bascule est effective au déploiement, réversible via le flag.
+- ✅ Cache R2 : `public, max-age=31536000, immutable` sur les clés UUID ; TTL 3600 pour le logo (écrasé à chemin fixe).
+- ✅ Formats de sortie : WebP q80-85 selon usage (photos 1920 px q80, affiches 1600 px q82, logos 512 px q85, captures 1280 px q80) ; SVG et GIF animés conservés tels quels.
+- ✅ Taille d'entrée max : 12 Mo (photos/affiches/captures), 2 Mo (logos) — validation serveur par magic bytes, jamais par le MIME déclaré.
+- ✅ `next/image` : domaine R2 ajouté à `remotePatterns` (dérivé de `R2_PUBLIC_BASE_URL`), logos optimisés via `next/image`, `sizes` responsives sur les galeries.
+- ✅ Tests : `tests/media-pipeline.test.ts` — 21 tests sur les 12 cas exigés (fixtures sharp réels).
 
 ### Phase 3 — Migration des objets existants (script one-shot)
 1. `scripts/migrate-storage-to-r2.mjs` : parcourt chaque bucket Supabase, copie chaque objet vers R2 (lecture admin → `PutObject`), journal ligne par ligne, **ne supprime rien**.

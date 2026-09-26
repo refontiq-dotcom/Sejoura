@@ -86,8 +86,13 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0] || null;
     if (!selected) return;
-    if (!selected.type.startsWith("image/")) {
-      toast.error("Choisissez une image 📸");
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!allowed.includes(selected.type)) {
+      toast.error("Format non supporté. Utilisez PNG, JPEG, WebP ou GIF 📸");
+      return;
+    }
+    if (selected.size > 12 * 1024 * 1024) {
+      toast.error("L'image dépasse 12 Mo 📸");
       return;
     }
     setFile(selected);
@@ -269,7 +274,7 @@ export function IdeaSubmissionModal({ open, onClose, initialCategory = "new_feat
         {/* Capture d'écran */}
         <div>
           <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Capture d’écran (optionnel)</label>
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={handleFileSelect} />
           {previewUrl ? (
             <div className="relative inline-block">
               {/* eslint-disable-next-line @next/next/no-img-element */}

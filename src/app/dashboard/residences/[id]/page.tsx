@@ -317,8 +317,8 @@ export default function ResidenceDetailPage() {
 
   async function uploadTypeImage(file: File) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("La photo fait plus de 5 Mo. Réduisez-la 📸");
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("La photo dépasse 12 Mo. Réduisez-la 📸");
       return;
     }
     setUploadingImage(true);
@@ -862,7 +862,7 @@ export default function ResidenceDetailPage() {
                 ) : (
                   <ImagePlus className="w-4 h-4" />
                 )}
-                {uploadingImage ? "Upload en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP — max 5 Mo)"}
+                {uploadingImage ? "Traitement en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP, AVIF — max 12 Mo, optimisée automatiquement)"}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif,image/gif"

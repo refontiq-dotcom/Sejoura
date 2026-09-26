@@ -27,6 +27,7 @@ import {
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 import { useCurrency } from "@/hooks/use-currency";
 import { Button } from "@/components/ui/button";
 import { getGuestInfoIcon, resolvePrimaryColor } from "@/lib/guest-info";
@@ -309,8 +310,7 @@ function StayPortal() {
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
             {tenant.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={tenant.logo_url} alt={tenant.company_name} className="h-10 w-10 rounded-xl bg-white/90 object-contain p-1" />
+              <Image src={tenant.logo_url} alt={tenant.company_name} width={40} height={40} className="h-10 w-10 rounded-xl bg-white/90 object-contain p-1" />
             ) : (
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 font-bold text-lg">
                 {(tenant.company_name || "S").charAt(0)}

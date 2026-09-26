@@ -1,5 +1,20 @@
 import type { NextConfig } from "next";
 
+// Autorise next/image à optimiser les médias servis depuis le domaine public
+// du bucket Cloudflare R2 (dérivé de l'URL publique, aucune donnée secrète).
+const r2PublicBaseUrl = (process.env.R2_PUBLIC_BASE_URL || "").trim();
+const r2ImagePatterns: Array<{ protocol: "https"; hostname: string; pathname: string }> = [];
+try {
+  if (r2PublicBaseUrl) {
+    const url = new URL(r2PublicBaseUrl);
+    if (url.protocol === "https:") {
+      r2ImagePatterns.push({ protocol: "https", hostname: url.hostname, pathname: "/**" });
+    }
+  }
+} catch {
+  // URL publique invalide : next/image restera limité aux patterns ci-dessous.
+}
+
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.monkeycode-ai.live"],
   images: {
@@ -14,7 +29,11 @@ const nextConfig: NextConfig = {
         hostname: "*.supabase.co",
         pathname: "/**",
       },
+      ...r2ImagePatterns,
     ],
+    // TTL minimal des versions optimisées en cache (les objets média R2 sont
+    // immuables : clé UUID ; le logo reste court côté objet lui-même).
+    minimumCacheTTL: 86400,
   },
   serverExternalPackages: ["pdfkit"],
   async headers() {
