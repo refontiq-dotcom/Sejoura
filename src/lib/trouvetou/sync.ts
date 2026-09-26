@@ -57,13 +57,13 @@ interface SyncRow {
   featured_images: string[] | null;
   cover_image_url: string | null;
   panorama_360_url: string | null;
-  panorama_tour: PanoramaTour | null;
   accommodations: {
     tenant_id: string;
     name: string;
     description: string | null;
     city: string | null;
     is_active: boolean;
+    panorama_tour: PanoramaTour | null;
     tenants: {
       company_name: string | null;
       logo_url: string | null;
@@ -106,7 +106,6 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       featured_images,
       cover_image_url,
       panorama_360_url,
-      panorama_tour,
       accommodations!inner (
         tenant_id,
         name,
@@ -230,7 +229,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const logoUrl = tenant?.logo_url;
       const coverImage = typeof row.cover_image_url === "string" ? row.cover_image_url.trim() : "";
       const panorama360Url = typeof row.panorama_360_url === "string" ? row.panorama_360_url.trim() : "";
-      const panoramaTour = normalizePanoramaTour(row.panorama_tour);
+      const panoramaTour = normalizePanoramaTour(accommodation.panorama_tour);
       const publishedTour = panoramaTour.scenes.filter((scene) => scene.isPublished !== false);
       const tourForListing = publishedTour.length > 0
         ? { ...panoramaTour, scenes: publishedTour, links: panoramaTour.links.filter((link) => publishedTour.some((scene) => scene.id === link.fromSceneId) && publishedTour.some((scene) => scene.id === link.toSceneId)) }
