@@ -15,6 +15,8 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("photo") as File | null;
+    const requestedKind = formData.get("kind");
+    const kind = requestedKind === "panorama_360" ? "panorama_360" : "photo";
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "Aucune photo fournie." }, { status: 400 });
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     // Pipeline média centralisé (taille, format réel, dimensions, WebP, clé UUID)
-    const handled = await handleMediaUpload({ file, kind: "photo", tenantId });
+    const handled = await handleMediaUpload({ file, kind, tenantId });
 
     return NextResponse.json({ url: handled.stored.url });
   } catch (error) {
