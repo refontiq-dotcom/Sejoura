@@ -208,7 +208,7 @@ export function PanoramaViewer({
         loader.setCrossOrigin("anonymous");
         loader.load(
           activeSrc,
-          (texture) => {
+          (texture: import("three").Texture) => {
             if (disposed) {
               texture.dispose();
               return;
