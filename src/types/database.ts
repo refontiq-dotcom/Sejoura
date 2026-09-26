@@ -324,6 +324,7 @@ export interface Accommodation {
   logo_url?: string | null;
   theme_color?: string | null;
   image_url?: string | null;
+  panorama_tour?: import("@/types/panorama").PanoramaTour | null;
   guest_info?: GuestInfo | null;
   tourist_tax_enabled?: boolean;
   tourist_tax_rate?: number | null;
