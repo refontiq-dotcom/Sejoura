@@ -9,6 +9,7 @@ import {
   buildAdKey,
   buildLogoKey,
   buildRoomPhotoKey,
+  buildRoomPanoramaKey,
   buildScreenshotKey,
 } from "./keys";
 import {
@@ -23,6 +24,7 @@ export {
   buildAdKey,
   buildLogoKey,
   buildRoomPhotoKey,
+  buildRoomPanoramaKey,
   buildScreenshotKey,
   isSafeTenantSegment,
 } from "./keys";
@@ -48,6 +50,7 @@ export interface HandledMediaUpload {
 /** Table de correspondance kind → bucket Supabase historique. */
 export const SUPABASE_BUCKETS: Record<MediaKind, string> = {
   photo: "room-photos",
+  panorama_360: "room-photos",
   logo: "logos",
   ad: "room-photos",
   screenshot: "feature-screenshots",
@@ -98,6 +101,9 @@ export async function handleMediaUpload(params: {
   switch (params.kind) {
     case "photo":
       key = buildRoomPhotoKey(params.tenantId ?? "", extension);
+      break;
+    case "panorama_360":
+      key = buildRoomPanoramaKey(params.tenantId ?? "", extension);
       break;
     case "ad":
       key = buildAdKey(params.tenantId ?? "", extension);
