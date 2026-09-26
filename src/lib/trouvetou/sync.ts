@@ -112,6 +112,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         description,
         city,
         is_active,
+        panorama_tour,
         tenants!inner (
           company_name,
           logo_url
