@@ -69,6 +69,7 @@ import { trackStep } from "@/lib/onboarding";
 import type { Accommodation, RoomType, Room, Client, Booking, Invoice, PaymentMethod, ClientStayExtensionRequest, ClientScoreTier } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 import { ContextualHelpGroup } from "@/components/dashboard/contextual-help";
+import { ArrivalTrackingPanel } from "@/components/dashboard/arrival-tracking-panel";
 
 interface ExtensionRequestWithRelations extends ClientStayExtensionRequest {
   client?: Client;
@@ -2164,6 +2165,8 @@ export default function BookingsPage() {
           <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Nouvelle réservation</span>
         </Button>
       </div>
+
+      <ArrivalTrackingPanel accommodationId={activeAccommodationId} />
 
       {/* Demandes de prolongation envoyées depuis l'espace client */}
       {extensionRequests.length > 0 && (
