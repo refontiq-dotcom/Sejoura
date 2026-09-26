@@ -503,6 +503,9 @@ export function PanoramaViewer({
               {editorMode && onCreateLink && editorTargets.length > 0 && (
                 <button type="button" onClick={() => setPlacementOpen((value) => !value)} className="flex h-10 items-center gap-1.5 rounded-xl bg-indigo-600 px-3 text-[10px] font-semibold hover:bg-indigo-500" aria-label="Ajouter un passage ici"><DoorOpen className="h-4 w-4" />Passage</button>
               )}
+              {editorMode && onCreateInfoHotspot && (
+                <button type="button" onClick={() => onCreateInfoHotspot({ yaw: normalizeAngle(rotationRef.current.y), pitch: Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationRef.current.x)) })} className="flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-3 text-[10px] font-semibold text-slate-950 hover:bg-amber-300" aria-label="Ajouter une information ici">i Info</button>
+              )}
               <button type="button" onClick={() => setZoom(zoomRef.current + 5)} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Zoomer"><Plus className="h-4 w-4" /></button>
               <button type="button" onClick={() => setZoom(zoomRef.current - 5)} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Dézoomer"><Minus className="h-4 w-4" /></button>
               <button type="button" onClick={resetView} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Réinitialiser la vue"><RotateCcw className="h-4 w-4" /></button>
