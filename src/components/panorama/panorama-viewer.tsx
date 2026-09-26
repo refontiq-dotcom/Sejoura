@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   Compass,
   DoorOpen,
-  Fullscreen,
   Loader2,
   Map,
   Maximize2,
@@ -455,7 +454,7 @@ export function PanoramaViewer({
               <button type="button" onClick={() => setZoom(zoomRef.current - 5)} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Dézoomer"><Minus className="h-4 w-4" /></button>
               <button type="button" onClick={resetView} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Réinitialiser la vue"><RotateCcw className="h-4 w-4" /></button>
               <button type="button" onClick={requestGyroscope} className={`flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10 ${gyroscope ? "bg-white/15" : ""}`} aria-label="Activer le mouvement du téléphone"><Move3D className="h-4 w-4" /></button>
-              <button type="button" onClick={enterFullscreen} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Plein écran"><Fullscreen className="h-4 w-4" /></button>
+              <button type="button" onClick={enterFullscreen} className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10" aria-label="Plein écran"><Maximize2 className="h-4 w-4" /></button>
             </div>
 
             {editorMode && placementOpen && onCreateLink && editorTargets.length > 0 && (
