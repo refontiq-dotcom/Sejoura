@@ -210,7 +210,7 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
           <div className="space-y-2">
             {tour.scenes.map((scene) => (
               <button key={scene.id} type="button" onClick={() => setSelectedSceneId(scene.id)} className={`flex w-full items-center gap-3 rounded-xl border p-2 text-left transition ${scene.id === selectedSceneId ? "border-indigo-400 bg-white shadow-sm dark:bg-slate-900" : "border-slate-200 bg-white/60 hover:bg-white dark:border-slate-700 dark:bg-slate-900/50"}`}>
-                {scene.previewSrc ? <img src={scene.previewSrc} alt="" className="h-14 w-20 rounded-lg object-cover" /> : <span className="h-14 w-20 rounded-lg bg-slate-200" />}
+                {scene.previewSrc ? <span aria-hidden="true" className="h-14 w-20 rounded-lg bg-cover bg-center" style={{ backgroundImage: `url("${scene.previewSrc}")` }} /> : <span className="h-14 w-20 rounded-lg bg-slate-200" />}
                 <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-slate-900 dark:text-white">{scene.name}</span><span className="block text-[10px] text-slate-500">{KIND_LABELS[scene.kind]}{scene.isStart ? " · Départ" : ""}</span></span>
               </button>
             ))}
