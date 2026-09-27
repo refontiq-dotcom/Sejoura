@@ -19,7 +19,7 @@
 // de basculer silencieusement sur Supabase (fail-safe).
 // ──────────────────────────────────────────────────────────────────────────────
 
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { createR2S3Client } from "@/lib/storage/r2-s3";
 
 export type MediaStorageDriver = "supabase" | "r2";
 
@@ -91,20 +91,21 @@ export function publicMediaUrl(key: string): string | null {
   return buildPublicMediaUrl(base, key);
 }
 
-let cachedClient: S3Client | null = null;
+let cachedClient: ReturnType<typeof createR2S3Client> | null = null;
 
 /** Client S3 pointant sur l'endpoint R2 du compte (région "auto"), ou null si non configuré. */
-export function getR2Client(): S3Client | null {
+export function getR2Client(): ReturnType<typeof createR2S3Client> | null {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
   if (!accountId || !accessKeyId || !secretAccessKey) return null;
 
   if (!cachedClient) {
-    cachedClient = new S3Client({
+    cachedClient = createR2S3Client({
       region: "auto",
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId, secretAccessKey },
+      accountId,
+      accessKeyId,
+      secretAccessKey,
     });
   }
   return cachedClient;
@@ -137,14 +138,11 @@ export async function uploadToR2Media(params: {
 
   try {
     const body = new Uint8Array(await params.file.arrayBuffer());
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: params.key,
-        Body: body,
-        ContentType: normalizeMime(params.file.type) || "application/octet-stream",
-        CacheControl: params.cacheControl ?? "3600",
-      })
+    await client.putObject(
+      params.key,
+      body,
+      normalizeMime(params.file.type) || "application/octet-stream",
+      params.cacheControl ?? "3600",
     );
     return { ok: true, url: buildPublicMediaUrl(publicBaseUrl, params.key) };
   } catch (error) {

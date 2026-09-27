@@ -35,6 +35,15 @@ export function buildRoomPhotoKey(tenantId: string, extension: string): string {
   return `${assertSafeTenant(tenantId)}/room-types/${randomUUID()}.${extension}`;
 }
 
+/** Clé d’un panorama 360° : isolée du reste des photos du type de chambre. */
+export function buildRoomPanoramaKey(tenantId: string, extension: string): string {
+  return `${assertSafeTenant(tenantId)}/room-types/panoramas/${randomUUID()}.${extension}`;
+}
+
+export function buildRoomPanoramaVariantKey(tenantId: string, variant: "preview" | "mobile" | "hd"): string {
+  return `${assertSafeTenant(tenantId)}/room-types/panoramas/${variant}/${randomUUID()}.webp`;
+}
+
 /** Clé d'une affiche : {tenantId}/ads/{uuid}.{ext} */
 export function buildAdKey(tenantId: string, extension: string): string {
   return `${assertSafeTenant(tenantId)}/ads/${randomUUID()}.${extension}`;

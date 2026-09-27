@@ -3,7 +3,7 @@
 // Cache long possible : les clés contiennent un UUID (contenu immuable),
 // sauf le logo qui est écrasé à chemin fixe (TTL court sur celui-là).
 
-import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
 import { getR2Client, isR2Configured } from "@/lib/storage/r2";
 import { createSupabaseMediaStorage } from "./supabase-storage";
 import { MediaError } from "./errors";
@@ -28,14 +28,11 @@ export function createR2MediaStorage(): MediaStorageAdapter {
       }
 
       try {
-        await client.send(
-          new PutObjectCommand({
-            Bucket: bucket,
-            Key: params.key,
-            Body: params.body,
-            ContentType: params.contentType,
-            CacheControl: params.cacheControl ?? R2_IMMUTABLE_CACHE_CONTROL,
-          })
+        await client.putObject(
+          params.key,
+          params.body,
+          params.contentType,
+          params.cacheControl ?? R2_IMMUTABLE_CACHE_CONTROL,
         );
       } catch (error) {
         const detail = error instanceof Error ? error.message : undefined;
@@ -56,7 +53,7 @@ export function createR2MediaStorage(): MediaStorageAdapter {
       const r2Bucket = process.env.R2_BUCKET_MEDIA;
       if (!client || !r2Bucket || bucket !== r2Bucket) return;
       try {
-        await client.send(new DeleteObjectCommand({ Bucket: r2Bucket, Key: key }));
+        await client.deleteObject(key);
       } catch {
         // La suppression d'un objet orphelin ne doit jamais faire échouer une
         // requête utilisateur : journalisée côté appelant si nécessaire.

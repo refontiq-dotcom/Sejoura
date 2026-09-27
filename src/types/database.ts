@@ -324,6 +324,7 @@ export interface Accommodation {
   logo_url?: string | null;
   theme_color?: string | null;
   image_url?: string | null;
+  panorama_tour?: import("@/types/panorama").PanoramaTour | null;
   guest_info?: GuestInfo | null;
   tourist_tax_enabled?: boolean;
   tourist_tax_rate?: number | null;
@@ -355,6 +356,11 @@ export interface RoomType {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[];
+  cover_image_url: string | null;
+  panorama_360_url: string | null;
+  panorama_360_preview_url: string | null;
+  panorama_360_mobile_url: string | null;
+  panorama_360_hd_url: string | null;
   check_out_time: string;
   created_at: string;
   updated_at: string;

@@ -171,7 +171,7 @@ export async function POST(request: Request) {
 
     const { data: accCheck } = await admin
       .from("accommodations")
-      .select("tenant_id")
+      .select("tenant_id, id, name, latitude, longitude")
       .eq("id", roomType.accommodation_id)
       .maybeSingle();
 
@@ -422,6 +422,10 @@ export async function POST(request: Request) {
           number_of_guests: booking.number_of_guests,
           room_id: booking.room_id,
           client_id: booking.client_id,
+          accommodation_id: roomType.accommodation_id,
+          accommodation_name: accCheck.name,
+          accommodation_latitude: accCheck.latitude,
+          accommodation_longitude: accCheck.longitude,
         },
         payment: {
           provider: payment_provider,

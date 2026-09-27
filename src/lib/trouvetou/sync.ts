@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import { normalizePanoramaTour, validatePanoramaTour, type PanoramaTour } from "@/types/panorama";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -54,12 +55,18 @@ interface SyncRow {
   capacity: number;
   amenities: string[] | null;
   featured_images: string[] | null;
+  cover_image_url: string | null;
+  panorama_360_url: string | null;
+  panorama_360_preview_url: string | null;
+  panorama_360_mobile_url: string | null;
+  panorama_360_hd_url: string | null;
   accommodations: {
     tenant_id: string;
     name: string;
     description: string | null;
     city: string | null;
     is_active: boolean;
+    panorama_tour: PanoramaTour | null;
     tenants: {
       company_name: string | null;
       logo_url: string | null;
@@ -100,12 +107,18 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       capacity,
       amenities,
       featured_images,
+      cover_image_url,
+      panorama_360_url,
+      panorama_360_preview_url,
+      panorama_360_mobile_url,
+      panorama_360_hd_url,
       accommodations!inner (
         tenant_id,
         name,
         description,
         city,
         is_active,
+        panorama_tour,
         tenants!inner (
           company_name,
           logo_url
@@ -221,15 +234,41 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const accommodation = row.accommodations;
       const tenant = accommodation.tenants;
       const logoUrl = tenant?.logo_url;
+      const coverImage = typeof row.cover_image_url === "string" ? row.cover_image_url.trim() : "";
+      const panorama360Url = typeof row.panorama_360_url === "string" ? row.panorama_360_url.trim() : "";
+      const panorama360PreviewUrl = typeof row.panorama_360_preview_url === "string" ? row.panorama_360_preview_url.trim() : "";
+      const panorama360MobileUrl = typeof row.panorama_360_mobile_url === "string" ? row.panorama_360_mobile_url.trim() : "";
+      const panorama360HdUrl = typeof row.panorama_360_hd_url === "string" ? row.panorama_360_hd_url.trim() : "";
+      const panoramaTour = normalizePanoramaTour(accommodation.panorama_tour);
+      const validationIssues = validatePanoramaTour(panoramaTour);
+      const publishedTour = panoramaTour.scenes.filter((scene) => scene.isPublished !== false);
+      const publishedStartSceneId =
+        publishedTour.some((scene) => scene.id === panoramaTour.startSceneId)
+          ? panoramaTour.startSceneId
+          : publishedTour[0]?.id ?? null;
+      const tourForListing =
+        validationIssues.some((issue) => issue.code !== "isolated_scene") || publishedTour.length === 0
+          ? null
+          : {
+              ...panoramaTour,
+              startSceneId: publishedStartSceneId,
+              scenes: publishedTour.map((scene) => ({ ...scene, isStart: scene.id === publishedStartSceneId })),
+              links: panoramaTour.links.filter((link) =>
+                publishedTour.some((scene) => scene.id === link.fromSceneId) &&
+                publishedTour.some((scene) => scene.id === link.toSceneId)
+              ),
+            };
       const featuredImages = Array.isArray(row.featured_images)
         ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
         : [];
       const images =
         featuredImages.length > 0
           ? featuredImages
-          : logoUrl && logoUrl.length > 0
-            ? [logoUrl]
-            : [];
+          : coverImage
+            ? [coverImage]
+            : logoUrl && logoUrl.length > 0
+              ? [logoUrl]
+              : [];
       const typeRooms = roomStatusByType.get(row.id) ?? [];
       // `is_available` = le type possède au moins une chambre physique.
       // Que ces chambres soient toutes occupées *maintenant* n'a pas d'importance :
@@ -257,6 +296,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
           total_rooms: typeRooms.length,
           available_rooms_now: availableNow,
+          ...(coverImage ? { cover_image_url: coverImage } : {}),
+          ...(panorama360Url ? { panorama_360_url: panorama360Url } : {}),
+          ...(panorama360PreviewUrl ? { panorama_360_preview_url: panorama360PreviewUrl } : {}),
+          ...(panorama360MobileUrl ? { panorama_360_mobile_url: panorama360MobileUrl } : {}),
+          ...(panorama360HdUrl ? { panorama_360_hd_url: panorama360HdUrl } : {}),
+          ...(tourForListing && tourForListing.scenes.length > 0 ? { panorama_tour: tourForListing } : {}),
+          ...(tourForListing ? { panorama_start_scene_id: tourForListing.scenes.find((scene) => scene.roomTypeId === row.id)?.id ?? tourForListing.startSceneId } : {}),
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,

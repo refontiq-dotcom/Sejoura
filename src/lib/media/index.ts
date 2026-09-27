@@ -3,12 +3,14 @@
 
 import { NextResponse } from "next/server";
 import { MediaError } from "./errors";
-import { optimizeImage, type OptimizedImage } from "./optimize";
+import { optimizeImage, optimizePanorama360Variants, type OptimizedImage } from "./optimize";
 import { MEDIA_POLICIES, humanizeBytes, type MediaKind, type MediaPolicy } from "./policy";
 import {
   buildAdKey,
   buildLogoKey,
   buildRoomPhotoKey,
+  buildRoomPanoramaKey,
+  buildRoomPanoramaVariantKey,
   buildScreenshotKey,
 } from "./keys";
 import {
@@ -23,10 +25,12 @@ export {
   buildAdKey,
   buildLogoKey,
   buildRoomPhotoKey,
+  buildRoomPanoramaKey,
+  buildRoomPanoramaVariantKey,
   buildScreenshotKey,
   isSafeTenantSegment,
 } from "./keys";
-export { MEDIA_POLICIES, humanizeBytes } from "./policy";
+export { MEDIA_POLICIES, PANORAMA_360_VARIANTS, humanizeBytes } from "./policy";
 export type { MediaKind, MediaPolicy } from "./policy";
 export type { StoredMedia, MediaStorageAdapter } from "./supabase-storage";
 export { R2_IMMUTABLE_CACHE_CONTROL } from "./r2-storage";
@@ -48,6 +52,7 @@ export interface HandledMediaUpload {
 /** Table de correspondance kind → bucket Supabase historique. */
 export const SUPABASE_BUCKETS: Record<MediaKind, string> = {
   photo: "room-photos",
+  panorama_360: "room-photos",
   logo: "logos",
   ad: "room-photos",
   screenshot: "feature-screenshots",
@@ -92,12 +97,25 @@ export async function handleMediaUpload(params: {
   const input = Buffer.from(await file.arrayBuffer());
   const optimized = await optimizeImage(input, policy);
 
+  // Un panorama 360° doit rester équirectangulaire. On accepte une petite
+  // tolérance pour les exports qui subissent un arrondi de dimensions, mais
+  // on refuse les images ordinaires qui ne peuvent pas être projetées proprement.
+  if (params.kind === "panorama_360") {
+    const ratio = optimized.height > 0 ? optimized.width / optimized.height : 0;
+    if (ratio < 1.8 || ratio > 2.2 || optimized.width < 1600 || optimized.height < 800) {
+      throw new MediaError("invalid_image", "Le fichier doit être une vraie image panoramique 360° au format proche de 2:1 (minimum recommandé : 1600 × 800 px).");
+    }
+  }
+
   // 3. Clé sûre : UUID côté serveur, nom utilisateur jamais utilisé.
   const extension = optimized.extension;
   let key: string;
   switch (params.kind) {
     case "photo":
       key = buildRoomPhotoKey(params.tenantId ?? "", extension);
+      break;
+    case "panorama_360":
+      key = buildRoomPanoramaKey(params.tenantId ?? "", extension);
       break;
     case "ad":
       key = buildAdKey(params.tenantId ?? "", extension);
@@ -139,6 +157,69 @@ export async function handleMediaUpload(params: {
     optimized,
     storagePath: `${bucket}/${key}`,
     storageKey: key,
+    driver: resolved.driver,
+  };
+}
+
+export interface Panorama360UploadResult {
+  preview: StoredMedia;
+  mobile: StoredMedia;
+  hd: StoredMedia;
+  variants: { preview: OptimizedImage; mobile: OptimizedImage; hd: OptimizedImage };
+  driver: "r2" | "supabase";
+}
+
+export async function handlePanorama360Upload(params: {
+  file: File;
+  tenantId: string;
+  adapter?: MediaStorageAdapter;
+}): Promise<Panorama360UploadResult> {
+  const policy = MEDIA_POLICIES.panorama_360;
+  if (params.file.size > policy.maxInputBytes) throw new MediaError("too_large", `>${humanizeBytes(policy.maxInputBytes)}`);
+  if (params.file.size < 64) throw new MediaError("invalid_image", "fichier vide ou tronqué");
+
+  const input = Buffer.from(await params.file.arrayBuffer());
+  const optimized = await optimizePanorama360Variants(input, policy);
+  const byVariant = Object.fromEntries(optimized.map((item) => [item.variant, item])) as Panorama360UploadResult["variants"];
+
+  const resolved = params.adapter !== undefined
+    ? { driver: "r2" as const, adapter: params.adapter }
+    : resolveMediaStorage();
+  const bucket = SUPABASE_BUCKETS.panorama_360;
+  const storedEntries: Partial<Record<"preview" | "mobile" | "hd", StoredMedia>> = {};
+
+  try {
+    for (const variant of ["preview", "mobile", "hd"] as const) {
+      storedEntries[variant] = await resolved.adapter.put({
+        bucket,
+        key: buildRoomPanoramaVariantKey(params.tenantId, variant),
+        body: byVariant[variant].buffer,
+        contentType: byVariant[variant].contentType,
+        cacheControl: resolved.driver === "r2" ? R2_IMMUTABLE_CACHE_CONTROL : "3600",
+        upsert: false,
+      });
+    }
+  } catch (error) {
+    await Promise.all(
+      (Object.entries(storedEntries) as Array<["preview" | "mobile" | "hd", StoredMedia | undefined]>)
+        .filter(([, stored]) => Boolean(stored))
+        .map(async ([variant, stored]) => {
+          try {
+            const key = stored!.path.split("/").slice(1).join("/");
+            await resolved.adapter.remove(bucket, key);
+          } catch {
+            console.warn(`Impossible de nettoyer la variante 360° ${variant} après un échec d'upload.`);
+          }
+        }),
+    );
+    throw error instanceof MediaError ? error : new MediaError("storage_error");
+  }
+
+  return {
+    preview: storedEntries.preview!,
+    mobile: storedEntries.mobile!,
+    hd: storedEntries.hd!,
+    variants: byVariant,
     driver: resolved.driver,
   };
 }

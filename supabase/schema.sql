@@ -196,6 +196,7 @@ CREATE TABLE tenants (
   suspended_reason TEXT,
   suspended_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  panorama_tour   JSONB,
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -311,6 +312,8 @@ CREATE TABLE room_types (
   surface_m2      DOUBLE PRECISION,        -- Superficie en m² (optionnel)
   is_listed_on_trouvetou BOOLEAN NOT NULL DEFAULT FALSE, -- Interrupteur Visibilité Trouvetou
   featured_images TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[], -- Photos diffusées sur Trouvetou
+  cover_image_url TEXT, -- Photo principale explicite du type de chambre
+  panorama_360_url TEXT, -- Panorama 360° équirectangulaire
   check_out_time  TIME NOT NULL DEFAULT '11:00', -- Heure de sortie du type de chambre
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

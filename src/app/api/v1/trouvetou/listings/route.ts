@@ -25,6 +25,8 @@ type RoomTypeRow = {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[] | null;
+  cover_image_url: string | null;
+  panorama_360_url: string | null;
   accommodation_id: string;
 };
 
@@ -150,7 +152,7 @@ export async function GET(request: Request) {
       .from("room_types")
       .select(
         "id, name, description, base_price, capacity, amenities, surface_m2, " +
-        "is_listed_on_trouvetou, featured_images, accommodation_id"
+        "is_listed_on_trouvetou, featured_images, cover_image_url, panorama_360_url, accommodation_id"
       )
       .in("accommodation_id", accIds);
 
@@ -256,6 +258,8 @@ export async function GET(request: Request) {
         amenities: Array.isArray(rt.amenities) ? rt.amenities : [],
         surface_m2: rt.surface_m2,
         featured_images: featuredImages,
+        cover_image_url: rt.cover_image_url,
+        panorama_360_url: rt.panorama_360_url,
         is_listed_on_trouvetou: rt.is_listed_on_trouvetou === true,
         room_count: typeRooms.length,
         available_room_count: availableRooms.length,

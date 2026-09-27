@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAdmin, getServerUser } from "@/lib/supabase/server-auth";
-import { handleMediaUpload, mediaErrorJson } from "@/lib/media";
+import { handleMediaUpload, handlePanorama360Upload, mediaErrorJson } from "@/lib/media";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/trouvetou/upload-photo
@@ -15,6 +15,8 @@ export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get("photo") as File | null;
+    const requestedKind = formData.get("kind");
+    const kind = requestedKind === "panorama_360" ? "panorama_360" : "photo";
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "Aucune photo fournie." }, { status: 400 });
@@ -33,9 +35,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Compte utilisateur introuvable." }, { status: 404 });
     }
 
-    // Pipeline média centralisé (taille, format réel, dimensions, WebP, clé UUID)
-    const handled = await handleMediaUpload({ file, kind: "photo", tenantId });
+    if (kind === "panorama_360") {
+      const handled = await handlePanorama360Upload({ file, tenantId });
+      return NextResponse.json({
+        url: handled.hd.url,
+        hdUrl: handled.hd.url,
+        mobileUrl: handled.mobile.url,
+        previewUrl: handled.preview.url,
+      });
+    }
 
+    // Pipeline média centralisé pour les photos classiques.
+    const handled = await handleMediaUpload({ file, kind, tenantId });
     return NextResponse.json({ url: handled.stored.url });
   } catch (error) {
     return mediaErrorJson(error);
