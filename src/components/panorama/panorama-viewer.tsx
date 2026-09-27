@@ -71,6 +71,8 @@ export function PanoramaViewer({
   const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? scenes[0];
   const activeSrc = activeScene?.src ?? src;
   const activePreview = activeScene?.previewSrc ?? previewSrc;
+  const activeMobile = activeScene?.mobileSrc ?? activeSrc;
+  const activeHd = activeScene?.hdSrc ?? activeSrc;
   const activeTitle = activeScene?.name ?? title;
 
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -168,6 +170,7 @@ export function PanoramaViewer({
         }
 
         const deviceProfile = getPanoramaDeviceProfile();
+        const sourceUrl = deviceProfile.tier === "weak" ? activeMobile : activeHd;
         renderer.setPixelRatio(deviceProfile.pixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setClearColor(0x05070b, 1);
@@ -207,7 +210,7 @@ export function PanoramaViewer({
         const loader = new THREE.TextureLoader();
         loader.setCrossOrigin("anonymous");
         loader.load(
-          activeSrc,
+          sourceUrl,
           (texture: import("three").Texture) => {
             if (disposed) {
               texture.dispose();
@@ -264,7 +267,7 @@ export function PanoramaViewer({
       materialRef.current = null;
       textureRef.current = null;
     };
-  }, [open, activeSrc, activeTitle, render]);
+  }, [open, activeSrc, activeMobile, activeHd, activeTitle, render]);
 
   useEffect(() => {
     if (!open || !hasTour || !activeSceneId) return;
