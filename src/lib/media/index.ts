@@ -30,7 +30,7 @@ export {
   buildScreenshotKey,
   isSafeTenantSegment,
 } from "./keys";
-export { MEDIA_POLICIES, humanizeBytes } from "./policy";
+export { MEDIA_POLICIES, PANORAMA_360_VARIANTS, humanizeBytes } from "./policy";
 export type { MediaKind, MediaPolicy } from "./policy";
 export type { StoredMedia, MediaStorageAdapter } from "./supabase-storage";
 export { R2_IMMUTABLE_CACHE_CONTROL } from "./r2-storage";
