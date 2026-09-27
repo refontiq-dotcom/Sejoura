@@ -68,3 +68,15 @@ export function preloadPanoramaPreviews(scenes: PanoramaScene[], limit: number):
     image.src = url;
   });
 }
+
+export function getPanoramaQualityCandidates(
+  tier: PanoramaDeviceTier,
+  variants: { preview?: string | null; mobile?: string | null; hd?: string | null },
+): string[] {
+  const ordered = tier === "weak"
+    ? [variants.preview, variants.mobile, variants.hd]
+    : tier === "medium"
+      ? [variants.mobile, variants.hd, variants.preview]
+      : [variants.hd, variants.mobile, variants.preview];
+  return [...new Set(ordered.filter((url): url is string => Boolean(url)))];
+}
