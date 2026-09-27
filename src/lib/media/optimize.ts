@@ -33,6 +33,39 @@ export function looksSuspiciouslySmall(bytesOut: number): boolean {
   return bytesOut < 32;
 }
 
+export async function optimizePanorama360Variants(input: Buffer, policy: MediaPolicy): Promise<(OptimizedImage & { variant: "preview" | "mobile" | "hd" })[]> {
+  const detectedKind = detectImageKind(input);
+  if (!["jpeg", "png", "webp", "avif"].includes(detectedKind)) throw new MediaError("unsupported_format");
+  try {
+    const metadata = await sharp(input, { failOn: "error" }).rotate().metadata();
+    const sourceWidth = metadata.width ?? 0;
+    const sourceHeight = metadata.height ?? 0;
+    const ratio = sourceHeight > 0 ? sourceWidth / sourceHeight : 0;
+    if (ratio < 1.8 || ratio > 2.2 || sourceWidth < 1600 || sourceHeight < 800) {
+      throw new MediaError("invalid_image", "Le fichier doit être une vraie image panoramique 360° au format proche de 2:1 (minimum : 1600 × 800 px).");
+    }
+    const variants = [
+      { variant: "preview" as const, width: 1280, height: 640, quality: 72 },
+      { variant: "mobile" as const, width: 2048, height: 1024, quality: 80 },
+      { variant: "hd" as const, width: 4096, height: 2048, quality: 84 },
+    ];
+    return await Promise.all(variants.map(async ({ variant, width, height, quality }) => {
+      const { data, info } = await sharp(input, { failOn: "error" })
+        .rotate()
+        .resize({ width, height, fit: "inside", withoutEnlargement: true })
+        .webp({ quality, effort: 4 })
+        .toBuffer({ resolveWithObject: true });
+      if (looksSuspiciouslySmall(info.size) || info.size > 4 * 1024 * 1024) {
+        throw new MediaError("processing_failed", "Une version optimisée du panorama reste trop lourde.");
+      }
+      return { buffer: data, contentType: policy.outputMime, extension: "webp", width: info.width, height: info.height, detectedKind, transformed: true, bytesIn: input.length, bytesOut: info.size, variant };
+    }));
+  } catch (error) {
+    if (error instanceof MediaError) throw error;
+    throw new MediaError("invalid_image");
+  }
+}
+
 export async function optimizeImage(
   input: Buffer,
   policy: MediaPolicy
