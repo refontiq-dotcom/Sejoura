@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { PanoramaInfoHotspot, PanoramaLink, PanoramaScene, PanoramaTour } from "@/types/panorama";
 import { normalizePanoramaTour } from "@/types/panorama";
-import { getPanoramaDeviceProfile, getNeighborScenes, preloadPanoramaPreviews } from "@/lib/panorama/runtime";
+import { getPanoramaDeviceProfile, getPanoramaQualityCandidates, getNeighborScenes, preloadPanoramaPreviews } from "@/lib/panorama/runtime";
 
 export interface PanoramaViewerProps {
   src: string;
@@ -170,12 +170,11 @@ export function PanoramaViewer({
         }
 
         const deviceProfile = getPanoramaDeviceProfile();
-        const sourceUrls = deviceProfile.tier === "weak"
-          ? [activePreview, activeMobile, activeHd]
-          : deviceProfile.tier === "medium"
-            ? [activeMobile, activeHd, activePreview]
-            : [activeHd, activeMobile, activePreview];
-        const urls = [...new Set(sourceUrls.filter((url): url is string => Boolean(url)))];
+        const urls = getPanoramaQualityCandidates(deviceProfile.tier, {
+          preview: activePreview,
+          mobile: activeMobile,
+          hd: activeHd,
+        });
         renderer.setPixelRatio(deviceProfile.pixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setClearColor(0x05070b, 1);
