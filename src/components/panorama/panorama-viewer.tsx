@@ -170,7 +170,12 @@ export function PanoramaViewer({
         }
 
         const deviceProfile = getPanoramaDeviceProfile();
-        const sourceUrl = deviceProfile.tier === "weak" ? activeMobile : activeHd;
+        const sourceUrls = deviceProfile.tier === "weak"
+          ? [activePreview, activeMobile, activeHd]
+          : deviceProfile.tier === "medium"
+            ? [activeMobile, activeHd, activePreview]
+            : [activeHd, activeMobile, activePreview];
+        const urls = [...new Set(sourceUrls.filter((url): url is string => Boolean(url)))];
         renderer.setPixelRatio(deviceProfile.pixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.setClearColor(0x05070b, 1);
@@ -209,31 +214,39 @@ export function PanoramaViewer({
 
         const loader = new THREE.TextureLoader();
         loader.setCrossOrigin("anonymous");
-        loader.load(
-          sourceUrl,
-          (texture: import("three").Texture) => {
-            if (disposed) {
-              texture.dispose();
-              return;
-            }
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-            renderer.initTexture(texture);
-            material.map = texture;
-            material.needsUpdate = true;
-            textureRef.current = texture;
+
+        const loadTextureWithFallback = (index: number) => {
+          if (disposed) return;
+          const candidate = urls[index];
+          if (!candidate) {
             setLoading(false);
-            setReady(true);
-            render();
-          },
-          undefined,
-          () => {
-            if (!disposed) {
+            setUnsupported(true);
+            return;
+          }
+          loader.load(
+            candidate,
+            (texture: import("three").Texture) => {
+              if (disposed) {
+                texture.dispose();
+                return;
+              }
+              texture.colorSpace = THREE.SRGBColorSpace;
+              texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+              renderer.initTexture(texture);
+              material.map = texture;
+              material.needsUpdate = true;
+              textureRef.current = texture;
               setLoading(false);
-              setUnsupported(true);
-            }
-          },
-        );
+              setUnsupported(false);
+              setReady(true);
+              render();
+            },
+            undefined,
+            () => loadTextureWithFallback(index + 1),
+          );
+        };
+
+        loadTextureWithFallback(0);
 
         const onContextLost = (event: Event) => {
           event.preventDefault();
@@ -267,7 +280,7 @@ export function PanoramaViewer({
       materialRef.current = null;
       textureRef.current = null;
     };
-  }, [open, activeSrc, activeMobile, activeHd, activeTitle, render]);
+  }, [open, activeSrc, activePreview, activeMobile, activeHd, activeTitle, render]);
 
   useEffect(() => {
     if (!open || !hasTour || !activeSceneId) return;
