@@ -11,7 +11,6 @@ import {
   buildRoomPhotoKey,
   buildRoomPanoramaKey,
   buildRoomPanoramaVariantKey,
-  buildRoomPanoramaVariantKey,
   buildScreenshotKey,
 } from "./keys";
 import {
@@ -27,6 +26,7 @@ export {
   buildLogoKey,
   buildRoomPhotoKey,
   buildRoomPanoramaKey,
+  buildRoomPanoramaVariantKey,
   buildScreenshotKey,
   isSafeTenantSegment,
 } from "./keys";
