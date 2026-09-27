@@ -42,8 +42,8 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
   const targets = useMemo(() => tour.scenes.filter((scene) => scene.id !== selectedSceneId), [tour.scenes, selectedSceneId]);
 
   async function uploadScene(file: File) {
-    if (file.size > 30 * 1024 * 1024) {
-      toast.error("Le panorama dépasse 30 Mo.");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Le panorama dépasse 10 Mo.");
       return;
     }
     if (!name.trim()) {
@@ -64,8 +64,10 @@ export function PanoramaTourManager({ accommodationId, roomTypes, initialTour, r
         id: uid(),
         name: name.trim(),
         kind,
-        src: data.url,
-        previewSrc: data.url,
+        src: typeof data.hdUrl === "string" ? data.hdUrl : data.url,
+        previewSrc: typeof data.previewUrl === "string" ? data.previewUrl : data.url,
+        mobileSrc: typeof data.mobileUrl === "string" ? data.mobileUrl : data.url,
+        hdSrc: typeof data.hdUrl === "string" ? data.hdUrl : data.url,
         roomTypeId: roomTypeId || null,
         isStart: tour.scenes.length === 0,
         isPublished: true,
