@@ -200,6 +200,18 @@ export async function handlePanorama360Upload(params: {
       });
     }
   } catch (error) {
+    await Promise.all(
+      (Object.entries(storedEntries) as Array<["preview" | "mobile" | "hd", StoredMedia | undefined]>)
+        .filter(([, stored]) => Boolean(stored))
+        .map(async ([variant, stored]) => {
+          try {
+            const key = stored!.path.split("/").slice(1).join("/");
+            await resolved.adapter.remove(bucket, key);
+          } catch {
+            console.warn(`Impossible de nettoyer la variante 360° ${variant} après un échec d'upload.`);
+          }
+        }),
+    );
     throw error instanceof MediaError ? error : new MediaError("storage_error");
   }
 
