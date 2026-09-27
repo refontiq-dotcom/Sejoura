@@ -289,7 +289,7 @@ export default function ResidenceDetailPage() {
       amenities: rt.amenities || [],
       surface_m2: rt.surface_m2 ? rt.surface_m2.toString() : "",
       is_listed_on_trouvetou: rt.is_listed_on_trouvetou,
-      featured_images: rt.featured_images || [],
+      featured_images: (rt.featured_images || []).slice(0, 4),
       check_out_time: rt.check_out_time || "11:00",
     });
     setTypeModalOpen(true);
@@ -307,7 +307,16 @@ export default function ResidenceDetailPage() {
   function addTypeImage() {
     const url = newTypeImageUrl.trim();
     if (!url) return;
-    setTypeForm((prev) => ({ ...prev, featured_images: [...prev.featured_images, url] }));
+    if (typeForm.featured_images.length >= 4) {
+      toast.error("Maximum 4 photos classiques pour Trouvetou 📸");
+      return;
+    }
+    setTypeForm((prev) => ({
+      ...prev,
+      featured_images: prev.featured_images.length < 4
+        ? [...prev.featured_images, url].slice(0, 4)
+        : prev.featured_images,
+    }));
     setNewTypeImageUrl("");
   }
 
@@ -341,7 +350,12 @@ export default function ResidenceDetailPage() {
         toast.error(data.error || "L'action a échoué : uploader la photo.");
         return;
       }
-      setTypeForm((prev) => ({ ...prev, featured_images: [...prev.featured_images, data.url] }));
+      setTypeForm((prev) => ({
+        ...prev,
+        featured_images: prev.featured_images.length < 4
+          ? [...prev.featured_images, data.url].slice(0, 4)
+          : prev.featured_images,
+      }));
       toast.success("Photo ajoutée avec succès 📸");
     } catch {
       toast.error("Erreur lors de l'upload de la photo.");
@@ -391,7 +405,7 @@ export default function ResidenceDetailPage() {
           amenities: typeForm.amenities,
           surface_m2,
           is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
-          featured_images: typeForm.featured_images,
+          featured_images: typeForm.featured_images.slice(0, 4),
           check_out_time: typeForm.check_out_time,
         }).eq("id", editingType.id);
         if (error) throw error;
@@ -405,7 +419,7 @@ export default function ResidenceDetailPage() {
           amenities: typeForm.amenities,
           surface_m2,
           is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
-          featured_images: typeForm.featured_images,
+          featured_images: typeForm.featured_images.slice(0, 4),
           check_out_time: typeForm.check_out_time,
         }).select("id").single();
         if (insertError) throw insertError;
@@ -831,7 +845,9 @@ export default function ResidenceDetailPage() {
 
             {/* Photos pour Trouvetou */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Photos de la chambre (requises pour la diffusion)</label>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Photos de la chambre <span className="text-slate-400 font-normal">(4 maximum)</span>
+              </label>
               {typeForm.featured_images.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {typeForm.featured_images.map((img, index) => (
@@ -852,22 +868,23 @@ export default function ResidenceDetailPage() {
               )}
               <div className="flex gap-2">
                 <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
-                <Button type="button" variant="outline" size="sm" onClick={addTypeImage}>
+                <Button type="button" variant="outline" size="sm" onClick={addTypeImage} disabled={typeForm.featured_images.length >= 4}>
                   <ImagePlus className="w-4 h-4" /> Ajouter
                 </Button>
               </div>
-              <label className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+              <label className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+ border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
                 {uploadingImage ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <ImagePlus className="w-4 h-4" />
                 )}
-                {uploadingImage ? "Traitement en cours…" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP, AVIF — max 12 Mo, optimisée automatiquement)"}
+                {uploadingImage ? "Traitement en cours…" : typeForm.featured_images.length >= 4 ? "Limite atteinte : 4 photos maximum" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP, AVIF — max 12 Mo, optimisée automatiquement)"}
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
                   className="hidden"
-                  disabled={uploadingImage}
+                  disabled={uploadingImage || typeForm.featured_images.length >= 4}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) uploadTypeImage(file);
