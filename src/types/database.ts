@@ -358,6 +358,9 @@ export interface RoomType {
   featured_images: string[];
   cover_image_url: string | null;
   panorama_360_url: string | null;
+  panorama_360_preview_url: string | null;
+  panorama_360_mobile_url: string | null;
+  panorama_360_hd_url: string | null;
   check_out_time: string;
   created_at: string;
   updated_at: string;
