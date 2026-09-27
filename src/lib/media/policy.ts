@@ -64,6 +64,14 @@ export const PHOTO_POLICY: MediaPolicy = {
  * Panorama 360° de chambre : image équirectangulaire destinée au lecteur 360°.
  * On conserve une résolution élevée et le ratio original 2:1 sans recadrage.
  */
+export interface Panorama360VariantPolicy { label: "preview" | "mobile" | "hd"; width: number; height: number; quality: number; }
+
+export const PANORAMA_360_VARIANTS: readonly Panorama360VariantPolicy[] = [
+  { label: "preview", width: 1280, height: 640, quality: 72 },
+  { label: "mobile", width: 2048, height: 1024, quality: 80 },
+  { label: "hd", width: 4096, height: 2048, quality: 84 },
+];
+
 export const PANORAMA_360_POLICY: MediaPolicy = {
   kind: "panorama_360",
   inputMimes: ["image/jpeg", "image/png", "image/webp", "image/avif"],
