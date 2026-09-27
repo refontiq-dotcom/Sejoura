@@ -72,8 +72,8 @@ export const PANORAMA_360_POLICY: MediaPolicy = {
   outputExtension: "webp",
   maxWidth: 8192,
   maxHeight: 4096,
-  quality: 86,
-  maxInputBytes: 30 * MB,
+  quality: 84,
+  maxInputBytes: 10 * MB,
   svgAllowed: false,
   gifPassthrough: false,
 };
