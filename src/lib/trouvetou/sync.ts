@@ -54,6 +54,11 @@ interface SyncRow {
   capacity: number;
   amenities: string[] | null;
   featured_images: string[] | null;
+  panorama_360_url: string | null;
+  panorama_360_preview_url: string | null;
+  panorama_360_mobile_url: string | null;
+  panorama_360_hd_url: string | null;
+  panorama_tour: Record<string, unknown> | null;
   accommodations: {
     tenant_id: string;
     name: string;
@@ -100,6 +105,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       capacity,
       amenities,
       featured_images,
+      panorama_360_url,
+      panorama_360_preview_url,
+      panorama_360_mobile_url,
+      panorama_360_hd_url,
+      panorama_tour,
       accommodations!inner (
         tenant_id,
         name,
@@ -222,7 +232,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const tenant = accommodation.tenants;
       const logoUrl = tenant?.logo_url;
       const featuredImages = Array.isArray(row.featured_images)
-        ? row.featured_images.filter((url) => typeof url === "string" && url.length > 0)
+        ? Array.from(
+            new Set(
+              row.featured_images.filter(
+                (url) => typeof url === "string" && url.trim().length > 0
+              )
+            )
+          ).slice(0, 4)
         : [];
       const images =
         featuredImages.length > 0
@@ -256,6 +272,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
           total_rooms: typeRooms.length,
+          ...(row.panorama_360_url ? { panorama_360_url: row.panorama_360_url } : {}),
+          ...(row.panorama_360_preview_url ? { panorama_360_preview_url: row.panorama_360_preview_url } : {}),
+          ...(row.panorama_360_mobile_url ? { panorama_360_mobile_url: row.panorama_360_mobile_url } : {}),
+          ...(row.panorama_360_hd_url ? { panorama_360_hd_url: row.panorama_360_hd_url } : {}),
+          ...(row.panorama_tour ? { panorama_tour: row.panorama_tour } : {}),
           available_rooms_now: availableNow,
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
