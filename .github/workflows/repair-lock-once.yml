@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   repair:
-    if: contains(github.event.head_commit.message, 'feat(media):')
+    if: github.event.head_commit.message == 'chore(build): repair package lock helper' || contains(github.event.head_commit.message, 'feat(media):')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
