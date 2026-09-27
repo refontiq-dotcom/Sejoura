@@ -85,6 +85,15 @@ export async function optimizeImage(
       throw new MediaError("processing_failed");
     }
 
+    // Un panorama 360° est un média lourd : on refuse un résultat
+    // disproportionné après optimisation afin de protéger le stockage.
+    if (policy.kind === "panorama_360" && info.size > 4 * 1024 * 1024) {
+      throw new MediaError(
+        "processing_failed",
+        "Le panorama 360° reste trop lourd après optimisation. Réduisez sa résolution avant de réessayer.",
+      );
+    }
+
     return {
       buffer: data,
       contentType: policy.outputMime,
