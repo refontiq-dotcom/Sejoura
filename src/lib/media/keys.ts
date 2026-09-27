@@ -40,6 +40,10 @@ export function buildRoomPanoramaKey(tenantId: string, extension: string): strin
   return `${assertSafeTenant(tenantId)}/room-types/panoramas/${randomUUID()}.${extension}`;
 }
 
+export function buildRoomPanoramaVariantKey(tenantId: string, variant: "preview" | "mobile" | "hd"): string {
+  return `${assertSafeTenant(tenantId)}/room-types/panoramas/${variant}/${randomUUID()}.webp`;
+}
+
 /** Clé d'une affiche : {tenantId}/ads/{uuid}.{ext} */
 export function buildAdKey(tenantId: string, extension: string): string {
   return `${assertSafeTenant(tenantId)}/ads/${randomUUID()}.${extension}`;
