@@ -355,13 +355,11 @@ export interface RoomType {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[];
-  // Colonnes 360° supprimées de ce type : `panorama_360_url`,
-  // `panorama_360_preview_url`, `panorama_360_mobile_url` et
-  // `panorama_360_hd_url` n'ont JAMAIS été créées en base (aucune migration ne
-  // les définit). Leur présence ici faisait passer une fiction pour une
-  // réalité et faisait échouer la synchronisation Trouvetou (PostgREST 42703).
-  // Les visites 360° sont des enregistrements à part entière : voir
-  // `RoomTypePanorama`.
+  // Colonnes 360° non utilisées par le code. Elles EXISTENT bien en base
+  // (ajoutées hors migration) mais y sont NULL sur toutes les lignes ; la
+  // source de vérité des visites 360° est désormais la table
+  // `room_type_panoramas` (voir `RoomTypePanorama`), qui porte en plus un
+  // identifiant stable, un statut de validation et des dimensions vérifiées.
   panorama_tour: Record<string, unknown> | null;
   check_out_time: string;
   created_at: string;

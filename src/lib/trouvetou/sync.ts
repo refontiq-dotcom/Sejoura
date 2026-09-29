@@ -61,13 +61,13 @@ interface SyncRow {
   capacity: number;
   amenities: string[] | null;
   featured_images: string[] | null;
-  // ATTENTION : `panorama_360_url`, `panorama_360_preview_url`,
-  // `panorama_360_mobile_url` et `panorama_360_hd_url` étaient déclarés ici et
-  // sélectionnés depuis `room_types`, mais AUCUNE migration ne les a jamais
-  // créées. PostgREST répondait 42703 (« column does not exist ») et la
-  // synchronisation Trouvetou échouait en entier, sans rien envoyer.
-  // Les visites 360° vivent désormais dans `room_type_panoramas` et sont
-  // envoyées via `attributes.panoramas[]` — voir `loadPublishedPanoramas`.
+  // Les colonnes `panorama_360_url`, `panorama_360_preview_url`,
+  // `panorama_360_mobile_url` et `panorama_360_hd_url` EXISTENT en base (créées
+  // hors migration, donc absentes du dépôt) mais sont NULL sur l'intégralité des
+  // lignes : aucune donnée n'est perdue en ne les stimulant plus. Elles sont
+  // remplacées par `room_type_panoramas`, qui apporte en plus un identifiant
+  // stable, un statut de validation et des dimensions vérifiées.
+  // Voir `loadPublishedPanoramas`.
   panorama_tour: Record<string, unknown> | null;
   accommodations: {
     tenant_id: string;

@@ -250,19 +250,28 @@ d'attaque.
 
 `src/lib/trouvetou/sync.ts`
 
-### Bug corrigé
+### Dérive de schéma corrigée
 
-Le code sélectionnait quatre colonnes **qui n'existaient dans aucune migration** :
+`room_types` porte quatre colonnes 360° — `panorama_360_url`,
+`panorama_360_preview_url`, `panorama_360_mobile_url`, `panorama_360_hd_url` —
+qui **existent bien en base** mais qu'**aucune migration ne crée** : elles ont
+été ajoutées directement depuis l'interface Supabase, hors dépôt.
 
-```ts
-panorama_360_url, panorama_360_preview_url,
-panorama_360_mobile_url, panorama_360_hd_url
-```
+Vérification faite sur la base réelle (2026-10-06) : les quatre colonnes sont
+**NULL sur les 10 lignes** de `room_types`, de même que `panorama_tour`. Aucune
+donnée n'est donc perdue à ne plus les lire.
 
-PostgREST répondait `42703 column does not exist` et **toute la synchronisation
-Trouvetou échouait**, sans rien envoyer. Ces colonnes ont été retirées du SELECT,
-du type `SyncRow`, des attributs du payload et de `src/types/database.ts`.
-Un test de non-régression (`tests/panorama-media.test.ts`) empêche leur retour.
+Elles sont retirées du `SELECT`, du type `SyncRow`, des attributs du payload et
+de `src/types/database.ts` : la source de vérité devient
+`room_type_panoramas`, qui apporte en plus un identifiant stable, un statut de
+validation et des dimensions mesurées sur les octets réels.
+
+> **Correction d'un rapport antérieur** : une version précédente de ce document
+> affirmait que ces colonnes n'existaient pas et que la synchronisation
+> Trouvetou échouait en entier sur une erreur PostgREST `42703`. C'était faux :
+> l'absence dans les migrations ne prouve pas l'absence en base. Le bon
+> raisonnement est « non reproductible depuis le dépôt » — une dérive de schéma
+> réelle, qui est précisément ce que couvre désormais le test de non-régression.
 
 ### Payload généré
 

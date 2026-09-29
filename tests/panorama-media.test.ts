@@ -490,13 +490,19 @@ describe("splitTrouvetouMedia — un panorama n'est JAMAIS une photo", () => {
 });
 
 
-// ── Garde-fou : les colonnes fantômes ne doivent pas revenir ──────────────────
+// ── Garde-fou : les colonnes 360° hors migration ne doivent pas revenir ───────
 //
+// PRÉMISSE À ÉCLARIR (vérifié sur la base réelle le 2026-10-06) :
 // `panorama_360_url`, `panorama_360_preview_url`, `panorama_360_mobile_url` et
-// `panorama_360_hd_url` n'ont jamais été créées en base. Les sélectionner
-// provoquait PostgREST 42703 et faisait échouer TOUTE la synchronisation
-// Trouvetou. Ces tests empêchent la régression de revenir, que ce soit dans le
-// code ou dans les migrations.
+// `panorama_360_hd_url` EXISTENT dans `room_types`. Elles ont été créées
+// directement depuis l'interface Supabase, hors dépôt : aucune migration ne les
+// définit, ce qui les rend non reproductibles (dérive de schéma) et invisible à
+// quiconque ne lit que le dépôt.
+//
+// Elles sont NULL sur l'intégralité des lignes, donc le code ne perd rien en
+// cessant de les lire. Ce test ne vérifie donc PAS qu'elles n'existent pas : il
+// garantit qu'une future migration ne les recrée pas, et que le code ne
+// reparte pas sur ces colonnes au lieu d'utiliser `room_type_panoramas`.
 
 const PHANTOM_COLUMNS = [
   "panorama_360_url",
@@ -506,21 +512,21 @@ const PHANTOM_COLUMNS = [
 ];
 
 /**
- * Retire les commentaires (`//`, `/* *\/`, `--`) d'un fichier SQL ou TS.
+ * Retire les commentaires (`//`, `/* … *\/`, `--`) d'un fichier SQL ou TS.
  *
- * Indispensable ici : les colonnes fantômes sont NOMMÉES dans les commentaires
- * qui documentent précisément le bug. On ne veut vérifier que le CODE exécutable,
- * pas la documentation du correctif.
+ * Indispensable ici : les colonnes sont NOMMÉES dans les commentaires qui
+ * documentent leur dérive. On ne veut vérifier que le CODE exécutable, pas la
+ * documentation.
  */
 function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, " ") // /* … */
-    .replace(/--[^\n]*/g, " ") // SQL ligne
-    .replace(/^[ \t]*\/\/.*$/gm, " "); // TS ligne
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/^[ \t]*\/\/.*$/gm, " ");
 }
 
-describe("non-régression — colonnes panorama_360_* inexistantes", () => {
-  it("sync.ts ne sélectionne plus aucune colonne fantôme", async () => {
+describe("dérive de schéma — colonnes panorama_360_* hors migration", () => {
+  it("sync.ts ne relit plus ces colonnes", async () => {
     const { readFile } = await import("node:fs/promises");
     const code = stripComments(await readFile("src/lib/trouvetou/sync.ts", "utf8"));
     for (const column of PHANTOM_COLUMNS) {
@@ -528,7 +534,7 @@ describe("non-régression — colonnes panorama_360_* inexistantes", () => {
     }
   });
 
-  it("aucune migration ne crée ces colonnes", async () => {
+  it("aucune migration ne les recrée (elles restent non reproductibles)", async () => {
     const { readdir, readFile } = await import("node:fs/promises");
     const dir = "supabase/migrations";
     const files = await readdir(dir);
