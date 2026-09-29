@@ -64,6 +64,17 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 --    (id) est déjà clé primaire : ajouter (id, tenant_id) / (id, accommodation_id)
 --    crée une unicité plus large, donc toujours satisfaite par les lignes
 --    existantes. Aucun UPDATE, aucune réécriture de table.
+-- -----------------------------------------------------------------------------
+ALTER TABLE public.accommodations
+  DROP CONSTRAINT IF EXISTS accommodations_id_tenant_key;
+ALTER TABLE public.accommodations
+  ADD CONSTRAINT accommodations_id_tenant_key UNIQUE (id, tenant_id);
+
+ALTER TABLE public.room_types
+  DROP CONSTRAINT IF EXISTS room_types_id_accommodation_key;
+ALTER TABLE public.room_types
+  ADD CONSTRAINT room_types_id_accommodation_key UNIQUE (id, accommodation_id);
+
 
 -- -----------------------------------------------------------------------------
 -- 2. Table des panoramas
@@ -171,17 +182,6 @@ CREATE TABLE IF NOT EXISTS public.room_type_panoramas (
   CONSTRAINT chk_room_type_panoramas_seam_delta
     CHECK (seam_delta IS NULL OR (seam_delta >= 0 AND seam_delta <= 255))
 );
-
--- -----------------------------------------------------------------------------
-ALTER TABLE public.accommodations
-  DROP CONSTRAINT IF EXISTS accommodations_id_tenant_key;
-ALTER TABLE public.accommodations
-  ADD CONSTRAINT accommodations_id_tenant_key UNIQUE (id, tenant_id);
-
-ALTER TABLE public.room_types
-  DROP CONSTRAINT IF EXISTS room_types_id_accommodation_key;
-ALTER TABLE public.room_types
-  ADD CONSTRAINT room_types_id_accommodation_key UNIQUE (id, accommodation_id);
 
 COMMENT ON TABLE public.room_type_panoramas IS
   'Visites 360° (panoramas équirectangulaires 2:1) des types de chambre. '
