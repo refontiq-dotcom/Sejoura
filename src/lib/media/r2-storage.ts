@@ -81,3 +81,29 @@ export function resolveMediaStorage(): { driver: "r2" | "supabase"; adapter: Med
   }
   return { driver: "supabase", adapter: createSupabaseMediaStorage() };
 }
+
+/**
+ * Retrouve l'adapter d'un driver PRÉCISÉMENT, sans réévaluation de la
+ * configuration courante.
+ *
+ * Indispensable pour supprimer un objet existant : la configuration de stockage
+ * peut avoir changé entre l'écriture et la suppression (activation des
+ * variables R2, bascule du flag `MEDIA_STORAGE_DRIVER`). Résoudre le driver au
+ * moment de la suppression enverrait la suppression vers le mauvais backend, et
+ * l'ancien fichier resterait indéfiniment.
+ *
+ * Repli sur le driver courant si celui demandé n'est plus configuré : sans
+ * cela, un objet R2 deviendrait intraitable le jour où les variables R2 sont
+ * retirées de l'environnement.
+ */
+export function getMediaStorageForDriver(
+  driver: "r2" | "supabase" | null | undefined
+): MediaStorageAdapter {
+  if (driver === "r2" && isR2MediaConfigured()) {
+    return createR2MediaStorage();
+  }
+  if (driver === "supabase") {
+    return createSupabaseMediaStorage();
+  }
+  return resolveMediaStorage().adapter;
+}

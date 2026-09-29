@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { PanoramaManager } from "@/components/dashboard/panorama-manager";
 import { createClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/hooks/use-currency";
 import { getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
@@ -872,8 +873,7 @@ export default function ResidenceDetailPage() {
                   <ImagePlus className="w-4 h-4" /> Ajouter
                 </Button>
               </div>
-              <label className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
- border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+              <label className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors`}>
                 {uploadingImage ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -893,6 +893,14 @@ export default function ResidenceDetailPage() {
                 />
               </label>
             </div>
+
+            {/* Visite 360° — panorama équirectangulaire, jamais une photo de plus.
+                Réservé au type déjà enregistré : une visite se rattache à un
+                type de chambre existant, elle ne peut donc pas être créée depuis
+                le formulaire de création. */}
+            {editingType && (
+              <PanoramaManager roomTypeId={editingType.id} isReadOnly={isReadOnly} />
+            )}
 
             {/* Visibilité Trouvetou */}
             <div className={`rounded-lg border p-3 space-y-2.5 ${typeForm.is_listed_on_trouvetou ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-600"}`}>

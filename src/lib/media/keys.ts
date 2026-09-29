@@ -40,6 +40,21 @@ export function buildAdKey(tenantId: string, extension: string): string {
   return `${assertSafeTenant(tenantId)}/ads/${randomUUID()}.${extension}`;
 }
 
+/**
+ * Clé d'une visite 360° : {tenantId}/panoramas/{uuid}.{ext}
+ *
+ * L'extension provient du format RÉEL détecté (magic bytes), jamais du nom de
+ * fichier fourni par l'utilisateur. Le préfixe `panoramas/` sépare ces objets
+ * des photos classiques dans le bucket `room-photos` partagé : même bucket,
+ * espaces de noms disjoints, donc aucune migration de stockage nécessaire.
+ *
+ * La clé contient un UUID : deux propriétaires ne peuvent pas s'écraser, et
+ * remplacer un panorama ne touche jamais l'ancien objet.
+ */
+export function buildPanoramaKey(tenantId: string, extension: string): string {
+  return `${assertSafeTenant(tenantId)}/panoramas/${randomUUID()}.${extension}`;
+}
+
 /** Clé d'une capture de suggestion : uploads/{uuid}.{ext} (périmètre plateforme). */
 export function buildScreenshotKey(extension: string): string {
   return `uploads/${randomUUID()}.${extension}`;

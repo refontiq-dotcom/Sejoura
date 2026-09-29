@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import {
+  splitTrouvetouMedia,
+  type PanoramaRecord,
+} from "@/lib/media/panorama";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -34,6 +38,9 @@ export interface TrouvetouSyncItem {
   category_slug?: string | null;
 }
 
+/** Client Supabase service_role utilisé côté serveur (contourne les RLS). */
+type AdminClient = ReturnType<typeof createAdminClient>;
+
 export interface TrouvetouSyncResult {
   ok: boolean;
   sent: number;
@@ -54,10 +61,13 @@ interface SyncRow {
   capacity: number;
   amenities: string[] | null;
   featured_images: string[] | null;
-  panorama_360_url: string | null;
-  panorama_360_preview_url: string | null;
-  panorama_360_mobile_url: string | null;
-  panorama_360_hd_url: string | null;
+  // ATTENTION : `panorama_360_url`, `panorama_360_preview_url`,
+  // `panorama_360_mobile_url` et `panorama_360_hd_url` étaient déclarés ici et
+  // sélectionnés depuis `room_types`, mais AUCUNE migration ne les a jamais
+  // créées. PostgREST répondait 42703 (« column does not exist ») et la
+  // synchronisation Trouvetou échouait en entier, sans rien envoyer.
+  // Les visites 360° vivent désormais dans `room_type_panoramas` et sont
+  // envoyées via `attributes.panoramas[]` — voir `loadPublishedPanoramas`.
   panorama_tour: Record<string, unknown> | null;
   accommodations: {
     tenant_id: string;
@@ -70,6 +80,51 @@ interface SyncRow {
       logo_url: string | null;
     } | null;
   };
+}
+
+/**
+ * Charge les visites 360° PUBLIÉES des types de chambres du lot courant.
+ *
+ * Seuls les panoramas au statut `published` sont retenus : un fichier uploadé,
+ * validé, rejeté ou remplacé ne doit JAMAIS partir vers Trouvetou. Un panorama
+ * rejeté n'est d'ailleurs jamais stocké (la validation précède l'écriture), mais
+ * le filtre reste une barrière explicite plutôt qu'une supposition.
+ *
+ * L'échec de cette lecture ne doit pas faire perdre les photos classiques :
+ * on renvoie une liste vide et la synchronisation continue.
+ */
+async function loadPublishedPanoramas(
+  admin: AdminClient,
+  roomTypeIds: string[]
+): Promise<Map<string, PanoramaRecord[]>> {
+  const byRoomType = new Map<string, PanoramaRecord[]>();
+  if (roomTypeIds.length === 0) return byRoomType;
+
+  // Note : une table absente (migration pas encore appliquée) ne lève pas une
+  // exception — Supabase renvoie `{ data: null, error }`. On traite donc les
+  // deux cas : les photos classiques sont toujours diffusées, et le problème
+  // est journalisé pour être diagnosticable.
+  const { data, error } = await admin
+    .from("room_type_panoramas")
+    .select("id, room_type_id, public_url, width, height, content_type, validated_at")
+    .in("room_type_id", roomTypeIds)
+    .eq("status", "published");
+
+  if (error) {
+    console.error(
+      "Lecture des panoramas 360° impossible (les photos classiques restent diffusées) :",
+      error.message
+    );
+    return byRoomType;
+  }
+
+  for (const row of (data ?? []) as PanoramaRecord[]) {
+    const list = byRoomType.get(row.room_type_id) ?? [];
+    list.push(row);
+    byRoomType.set(row.room_type_id, list);
+  }
+
+  return byRoomType;
 }
 
 /** Construit la liste d'annonces à publier sur Trouvetou. */
@@ -105,10 +160,6 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       capacity,
       amenities,
       featured_images,
-      panorama_360_url,
-      panorama_360_preview_url,
-      panorama_360_mobile_url,
-      panorama_360_hd_url,
       panorama_tour,
       accommodations!inner (
         tenant_id,
@@ -168,6 +219,12 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
   }
 
   const roomTypeIds = rows.map((row) => row.id);
+
+  // ── Visites 360° publiées ──────────────────────────────────────────────────
+  // Chargées une seule fois pour tout le lot. Un échec de lecture ne bloque pas
+  // la diffusion des photos classiques : `loadPublishedPanoramas` renvoie une
+  // liste vide plutôt que de lever.
+  const panoramasByRoomType = await loadPublishedPanoramas(admin, roomTypeIds);
 
   // ── Disponibilité ──────────────────────────────────────────────────────────
   // `is_available` envoyé à Trouvetou = "ce type possède au moins une chambre
@@ -231,6 +288,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       const accommodation = row.accommodations;
       const tenant = accommodation.tenants;
       const logoUrl = tenant?.logo_url;
+      // La limitation à 4 photos est appliquée par `splitTrouvetouMedia`.
       const featuredImages = Array.isArray(row.featured_images)
         ? Array.from(
             new Set(
@@ -238,14 +296,19 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
                 (url) => typeof url === "string" && url.trim().length > 0
               )
             )
-          ).slice(0, 4)
+          )
         : [];
-      const images =
-        featuredImages.length > 0
-          ? featuredImages
-          : logoUrl && logoUrl.length > 0
-            ? [logoUrl]
-            : [];
+      const panoramaRecords = panoramasByRoomType.get(row.id) ?? [];
+
+      // Séparation des deux flux en une seule opération testable : la galerie
+      // classique ne peut structurellement pas contenir un panorama, et le logo
+      // ne sert de repli que s'il n'y a aucune photo de chambre.
+      const { images, panoramas } = splitTrouvetouMedia({
+        featuredImages,
+        logoUrl,
+        panoramaRecords,
+      });
+
       const typeRooms = roomStatusByType.get(row.id) ?? [];
       // `is_available` = le type possède au moins une chambre physique.
       // Que ces chambres soient toutes occupées *maintenant* n'a pas d'importance :
@@ -272,11 +335,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           capacity: row.capacity,
           amenities: Array.isArray(row.amenities) ? row.amenities : [],
           total_rooms: typeRooms.length,
-          ...(row.panorama_360_url ? { panorama_360_url: row.panorama_360_url } : {}),
-          ...(row.panorama_360_preview_url ? { panorama_360_preview_url: row.panorama_360_preview_url } : {}),
-          ...(row.panorama_360_mobile_url ? { panorama_360_mobile_url: row.panorama_360_mobile_url } : {}),
-          ...(row.panorama_360_hd_url ? { panorama_360_hd_url: row.panorama_360_hd_url } : {}),
+          // Colonnes `panorama_360_*` retirées : elles n'existent pas en base.
+          // Les visites 360° passent désormais par `attributes.panoramas`.
           ...(row.panorama_tour ? { panorama_tour: row.panorama_tour } : {}),
+          // Visites 360° : champ DÉDIÉ. Jamais fusionné avec `images`.
+          ...(panoramas.length > 0 ? { panoramas } : {}),
           available_rooms_now: availableNow,
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },

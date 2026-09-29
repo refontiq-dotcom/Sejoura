@@ -34,6 +34,29 @@ export { isMediaFromR2 } from "./url-classify";
 export { resolveMediaStorage, isR2MediaConfigured } from "./r2-storage";
 export { optimizeImage } from "./optimize";
 export type { OptimizedImage } from "./optimize";
+export { buildPanoramaKey } from "./keys";
+export {
+  validatePanoramaBytes,
+  computeSeamDelta,
+  buildTrouvetouPanoramas,
+  splitTrouvetouMedia,
+  safeHttpUrl,
+  PANORAMA_POLICY,
+  PANORAMA_MEDIA_TYPE,
+  PANORAMA_PROJECTION,
+} from "./panorama";
+export type {
+  PanoramaValidation,
+  PanoramaAccepted,
+  PanoramaRejected,
+  PanoramaRejectionCode,
+  PanoramaPolicy,
+  PanoramaRecord,
+  TrouvetouMediaSplit,
+  TrouvetouPanorama,
+} from "./panorama";
+export { storePanorama, PANORAMA_BUCKET } from "./panorama-store";
+export type { StoredPanoramaDraft, PanoramaStoreResult } from "./panorama-store";
 
 export interface HandledMediaUpload {
   stored: StoredMedia;
