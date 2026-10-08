@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Séjoura — Gestion simple de vos résidences & hôtels</title>
+  <meta name="description" content="Plateforme tout-en-un pour hôtels et résidences meublées en Afrique de l'Ouest. Réservations, ménage, caisse, employés. 1 mois offert." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#b9dffd',
+              300: '#7cc5fb',
+              400: '#36a7f6',
+              500: '#0c8ce9',
+              600: '#006fc7',
+              700: '#0159a1',
+              800: '#064b85',
+              900: '#0b3f6e',
+              950: '#072849',
+            },
+            accent: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="font-sans antialiased bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300">
+
+  <!-- Navbar -->
+  <header class="fixed top-0 inset-x-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-lg border-b border-slate-200/60 dark:border-slate-800/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16 lg:h-18">
+        <a href="index.html" class="flex items-center gap-2.5 group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-500/25 group-hover:scale-105 transition-transform">
+            <i data-lucide="building-2" class="w-5 h-5 text-white"></i>
+          </div>
+          <span class="font-display font-bold text-xl tracking-tight">Séjoura</span>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600 dark:text-slate-300">
+          <a href="#features" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Fonctionnalités</a>
+          <a href="#pricing" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Tarifs</a>
+          <a href="#testimonials" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Témoignages</a>
+          <a href="dashboard.html" class="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Démo Dashboard</a>
+        </nav>
+
+        <div class="flex items-center gap-3">
+          <button id="theme-toggle" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Changer de thème">
+            <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+          </button>
+          <a href="dashboard.html" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-brand-600 transition-colors">
+            Connexion
+          </a>
+          <a href="dashboard.html" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-lg shadow-brand-600/25 hover:shadow-brand-600/40 transition-all">
+            Essayer gratuitement
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="relative pt-28 pb-20 lg:pt-36 lg:pb-28 overflow-hidden">
+    <div class="absolute inset-0 -z-10">
+      <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+      <div class="absolute bottom-0 left-0 w-[400px] h-[400px] bg-accent-400/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4"></div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div class="max-w-xl">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-50 dark:bg-brand-950/50 text-brand-700 dark:text-brand-300 text-xs font-semibold mb-6 border border-brand-200/60 dark:border-brand-800">
+            <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+            SOLUTION TOUT-EN-UN • Côte d'Ivoire & Afrique de l'Ouest
+          </div>
+          <h1 class="font-display text-4xl sm:text-5xl lg:text-[3.25rem] font-extrabold leading-[1.1] tracking-tight text-slate-900 dark:text-white mb-6">
+            La gestion simple de vos
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-brand-400">résidences & hôtels</span>
+          </h1>
+          <p class="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
+            Une seule plateforme pour suivre réservations, ménage, caisse et équipes. 
+            Zéro frais d'installation. 1 mois offert. Paiements Wave intégrés.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <a href="dashboard.html" class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-xl shadow-brand-600/30 hover:shadow-brand-600/50 transition-all text-base">
+              Démarrer gratuitement
+              <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </a>
+            <a href="#features" class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold text-slate-700 dark:text-slate-200 transition-all">
+              Voir les fonctionnalités
+            </a>
+          </div>
+          <div class="mt-10 flex items-center gap-6 text-sm text-slate-500 dark:text-slate-400">
+            <div class="flex -space-x-2">
+              <div class="w-8 h-8 rounded-full bg-brand-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">MK</div>
+              <div class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">AY</div>
+              <div class="w-8 h-8 rounded-full bg-violet-500 border-2 border-white dark:border-slate-950 flex items-center justify-center text-white text-xs font-bold">JD</div>
+            </div>
+            <p><strong class="text-slate-800 dark:text-slate-200">50+</strong> établissements déjà équipés</p>
+          </div>
+        </div>
+
+        <!-- Hero visual / mockup -->
+        <div class="relative">
+          <div class="absolute -inset-4 bg-gradient-to-r from-brand-500/20 to-accent-500/20 rounded-3xl blur-2xl"></div>
+          <div class="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+            <!-- Fake browser bar -->
+            <div class="flex items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+              <div class="flex gap-1.5">
+                <div class="w-3 h-3 rounded-full bg-red-400"></div>
+                <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+                <div class="w-3 h-3 rounded-full bg-emerald-400"></div>
+              </div>
+              <div class="flex-1 mx-4 h-6 rounded-md bg-slate-200/70 dark:bg-slate-700/70 flex items-center px-3 text-xs text-slate-500">app.sejoura.com/dashboard</div>
+            </div>
+            <!-- Mini dashboard preview -->
+            <div class="p-5 grid grid-cols-3 gap-3">
+              <div class="col-span-3 flex items-center justify-between mb-1">
+                <div class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-700"></div>
+                <div class="h-8 w-8 rounded-full bg-brand-100 dark:bg-brand-900"></div>
+              </div>
+              <div class="rounded-xl bg-brand-50 dark:bg-brand-950/40 p-3 border border-brand-100 dark:border-brand-900">
+                <div class="text-[10px] text-brand-600 dark:text-brand-400 font-medium mb-1">Occupancy</div>
+                <div class="text-xl font-bold text-brand-700 dark:text-brand-300">87%</div>
+              </div>
+              <div class="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 border border-emerald-100 dark:border-emerald-900">
+                <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mb-1">Recettes</div>
+                <div class="text-xl font-bold text-emerald-700 dark:text-emerald-300">2.4M</div>
+              </div>
+              <div class="rounded-xl bg-violet-50 dark:bg-violet-950/40 p-3 border border-violet-100 dark:border-violet-900">
+                <div class="text-[10px] text-violet-600 dark:text-violet-400 font-medium mb-1">Arrivées</div>
+                <div class="text-xl font-bold text-violet-700 dark:text-violet-300">12</div>
+              </div>
+              <div class="col-span-3 mt-2 h-24 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-end gap-1 px-3 pb-3">
+                <div class="flex-1 bg-brand-400/80 rounded-t" style="height:40%"></div>
+                <div class="flex-1 bg-brand-500 rounded-t" style="height:65%"></div>
+                <div class="flex-1 bg-brand-400/80 rounded-t" style="height:50%"></div>
+                <div class="flex-1 bg-brand-600 rounded-t" style="height:85%"></div>
+                <div class="flex-1 bg-brand-500 rounded-t" style="height:70%"></div>
+                <div class="flex-1 bg-brand-400/80 rounded-t" style="height:45%"></div>
+                <div class="flex-1 bg-brand-500 rounded-t" style="height:90%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Logos / Trust -->
+  <section class="py-10 border-y border-slate-100 dark:border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <p class="text-center text-sm font-medium text-slate-500 dark:text-slate-400 mb-6">Ils nous font confiance</p>
+      <div class="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-60 grayscale hover:grayscale-0 transition-all">
+        <span class="font-display font-bold text-lg text-slate-700 dark:text-slate-300">Hôtel Riviera</span>
+        <span class="font-display font-bold text-lg text-slate-700 dark:text-slate-300">Résidence Palm Beach</span>
+        <span class="font-display font-bold text-lg text-slate-700 dark:text-slate-300">Cocody Suites</span>
+        <span class="font-display font-bold text-lg text-slate-700 dark:text-slate-300">Abidjan Lodge</span>
+        <span class="font-display font-bold text-lg text-slate-700 dark:text-slate-300">Yamoussoukro Inn</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="py-20 lg:py-28">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-16">
+        <h2 class="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Tout ce dont vous avez besoin</h2>
+        <p class="text-slate-600 dark:text-slate-400 text-lg">De la réservation au check-out, en passant par le ménage et la caisse — une seule interface claire.</p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        <!-- Feature cards -->
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-brand-100 dark:bg-brand-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="calendar-check" class="w-6 h-6 text-brand-600 dark:text-brand-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Réservations intelligentes</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Check-in / check-out, prolongations, no-show, factures détaillées avec historique des nuits.</p>
+        </div>
+
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="sparkles" class="w-6 h-6 text-emerald-600 dark:text-emerald-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Ménage automatisé</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Kanban clair, assignation d'équipes, statuts en temps réel. Plus de chambres sales oubliées.</p>
+        </div>
+
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="wallet" class="w-6 h-6 text-violet-600 dark:text-violet-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Caisse & Comptabilité</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Suivi des encaissements, factures PDF, export. Visibilité jour après jour sur vos recettes.</p>
+        </div>
+
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="users" class="w-6 h-6 text-amber-600 dark:text-amber-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Gestion d'équipes</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Rôles (gérant, réceptionniste, ménage), activation/désactivation, permissions fines.</p>
+        </div>
+
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="building-2" class="w-6 h-6 text-rose-600 dark:text-rose-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Multi-établissements</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Gérez plusieurs résidences depuis un seul compte. Limites selon votre forfait.</p>
+        </div>
+
+        <div class="group p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-xl hover:shadow-brand-500/5 transition-all">
+          <div class="w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+            <i data-lucide="smartphone" class="w-6 h-6 text-sky-600 dark:text-sky-400"></i>
+          </div>
+          <h3 class="font-display font-bold text-lg mb-2">Paiements Wave</h3>
+          <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">Abonnements et encaissements via Wave. Flux semi-automatisé adapté au marché local.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="py-20 lg:py-28 bg-slate-50 dark:bg-slate-900/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-16">
+        <h2 class="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Tarifs simples et transparents</h2>
+        <p class="text-slate-600 dark:text-slate-400 text-lg">1 mois offert. Sans carte bancaire. Annulation à tout moment.</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+        <!-- Essentiel -->
+        <div class="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-shadow">
+          <h3 class="font-display font-bold text-lg mb-1">Essentiel</h3>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">Pour démarrer</p>
+          <div class="mb-6">
+            <span class="font-display text-4xl font-extrabold">9 900</span>
+            <span class="text-slate-500 text-sm"> FCFA / mois</span>
+          </div>
+          <ul class="space-y-3 text-sm mb-8">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> 1 établissement</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Jusqu'à 20 chambres</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Réservations & ménage</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Support email</li>
+          </ul>
+          <a href="dashboard.html" class="block w-full text-center py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Commencer</a>
+        </div>
+
+        <!-- Croissance - popular -->
+        <div class="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border-2 border-brand-500 shadow-xl shadow-brand-500/10 scale-[1.02]">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-brand-600 text-white text-xs font-bold">Populaire</div>
+          <h3 class="font-display font-bold text-lg mb-1">Croissance</h3>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">Le plus choisi</p>
+          <div class="mb-6">
+            <span class="font-display text-4xl font-extrabold">24 900</span>
+            <span class="text-slate-500 text-sm"> FCFA / mois</span>
+          </div>
+          <ul class="space-y-3 text-sm mb-8">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> 3 établissements</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Chambres illimitées</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Comptabilité + exports</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Multi-utilisateurs</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Support prioritaire</li>
+          </ul>
+          <a href="dashboard.html" class="block w-full text-center py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-lg shadow-brand-600/25 transition-colors">Commencer</a>
+        </div>
+
+        <!-- Entreprise -->
+        <div class="relative p-7 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-shadow">
+          <h3 class="font-display font-bold text-lg mb-1">Entreprise</h3>
+          <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">Pour les groupes</p>
+          <div class="mb-6">
+            <span class="font-display text-4xl font-extrabold">54 900</span>
+            <span class="text-slate-500 text-sm"> FCFA / mois</span>
+          </div>
+          <ul class="space-y-3 text-sm mb-8">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Établissements illimités</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Toutes les fonctionnalités</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> API & intégrations</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-emerald-500 mt-0.5 shrink-0"></i> Account manager dédié</li>
+          </ul>
+          <a href="dashboard.html" class="block w-full text-center py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Nous contacter</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section id="testimonials" class="py-20 lg:py-28">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-16">
+        <h2 class="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-4">Ils en parlent mieux que nous</h2>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
+        <blockquote class="p-7 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+          <div class="flex gap-1 mb-4 text-amber-400">
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+          </div>
+          <p class="text-slate-700 dark:text-slate-300 mb-6 leading-relaxed">« Séjoura a transformé notre gestion. Le ménage est automatique, la caisse est claire, et les réservations arrivent sans effort. »</p>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-sm">MK</div>
+            <div>
+              <div class="font-semibold text-sm">M. Kouassi</div>
+              <div class="text-xs text-slate-500">Gérant, Hôtel Riviera Abidjan</div>
+            </div>
+          </div>
+        </blockquote>
+
+        <blockquote class="p-7 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+          <div class="flex gap-1 mb-4 text-amber-400">
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+          </div>
+          <p class="text-slate-700 dark:text-slate-300 mb-6 leading-relaxed">« Avant c'était le chaos. Maintenant je vois en 2 secondes qui arrive, qui part, et combien on a encaissé aujourd'hui. »</p>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">AY</div>
+            <div>
+              <div class="font-semibold text-sm">Mme Aya</div>
+              <div class="text-xs text-slate-500">Directrice, Résidence Palm Beach</div>
+            </div>
+          </div>
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA final -->
+  <section class="py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-800 p-10 lg:p-14 text-center text-white shadow-2xl shadow-brand-600/30">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <h2 class="font-display text-3xl sm:text-4xl font-bold mb-4 relative">Prêt à simplifier votre gestion ?</h2>
+        <p class="text-brand-100 text-lg mb-8 max-w-xl mx-auto relative">Rejoignez les 50+ établissements qui utilisent déjà Séjoura. 1 mois offert, sans engagement.</p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center relative">
+          <a href="dashboard.html" class="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-white text-brand-700 font-bold shadow-lg hover:bg-brand-50 transition-colors">
+            Essayer la démo
+            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+          </a>
+          <a href="https://wa.me/2250100372900" target="_blank" class="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl border border-white/30 hover:bg-white/10 font-semibold transition-colors">
+            <i data-lucide="message-circle" class="w-5 h-5"></i>
+            Contacter sur WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-200 dark:border-slate-800 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+            <i data-lucide="building-2" class="w-4 h-4 text-white"></i>
+          </div>
+          <span class="font-display font-bold text-lg">Séjoura</span>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400">© 2026 Refontiq. Tous droits réservés. Démo interactive.</p>
+        <div class="flex items-center gap-4 text-sm">
+          <a href="dashboard.html" class="text-slate-600 dark:text-slate-300 hover:text-brand-600 transition-colors">Dashboard démo</a>
+          <a href="https://github.com/refontiq-dotcom/Sejoura" target="_blank" class="text-slate-600 dark:text-slate-300 hover:text-brand-600 transition-colors">GitHub</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
