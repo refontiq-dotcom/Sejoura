@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -304,13 +305,13 @@ export default function BookingsPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
       } else {
         setCleaningModalOpen(false);
-        alert("Demande de ménage envoyée dans le pool des ménagères.");
+        toast.success("Demande de ménage envoyée dans le pool des ménagères.");
       }
     } catch {
-      alert("Une erreur est survenue.");
+      toast.error("Une erreur est survenue.");
     } finally {
       setCleaningLoading(false);
     }
@@ -328,7 +329,7 @@ export default function BookingsPage() {
       );
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
         return;
       }
 

@@ -17,7 +17,7 @@ export type SubscriptionStatus =
   | "suspended"
   | "cancelled";
 
-export type SubscriptionPlan = "standard" | "pro" | "enterprise";
+export type SubscriptionPlan = "free" | "standard" | "pro" | "enterprise";
 
 export type BookingStatus =
   | "confirmed"

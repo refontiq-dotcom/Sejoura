@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/utils";
 import { Sparkles, Loader2, Clock, AlertCircle, CheckCircle2, BedDouble, Timer, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import type { CleaningTask, Room, Accommodation } from "@/types/database";
 
 export default function MenagePage() {
@@ -62,8 +63,8 @@ export default function MenagePage() {
         p_user_id: userId,
       });
 
-      if (error) { alert("Erreur: " + error.message); return; }
-      if (!data) { alert("Cette tâche a déjà été prise."); loadData(); return; }
+      if (error) { toast.error("Erreur: " + error.message); return; }
+      if (!data) { toast.error("Cette tâche a déjà été prise."); loadData(); return; }
       loadData();
     } catch {
       // Erreur silencieuse
@@ -77,7 +78,7 @@ export default function MenagePage() {
         p_task_id: taskId,
         p_user_id: userId,
       });
-      if (error) { alert("Erreur: " + error.message); return; }
+      if (error) { toast.error("Erreur: " + error.message); return; }
       loadData();
     } catch {
       // Erreur silencieuse

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,12 +72,12 @@ export default function CleaningPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
         return;
       }
 
       if (!data) {
-        alert("Cette tâche a déjà été prise par une autre ménagère.");
+        toast.error("Cette tâche a déjà été prise par une autre ménagère.");
         loadData();
         return;
       }
@@ -96,7 +97,7 @@ export default function CleaningPage() {
       });
 
       if (error) {
-        alert("Erreur: " + error.message);
+        toast.error("Erreur: " + error.message);
         return;
       }
 

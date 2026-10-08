@@ -90,6 +90,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Plans tarifaires
 DO $$ BEGIN
   CREATE TYPE subscription_plan AS ENUM (
+    'free',       -- Plan Gratuit
     'standard',   -- 15 000 FCFA/mois
     'pro',        -- 35 000 FCFA/mois
     'enterprise'  -- 55 000 FCFA/mois

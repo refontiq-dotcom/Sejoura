@@ -199,6 +199,7 @@ export function getRoleLabel(role: string): string {
  */
 export function getPlanLabel(plan: string): string {
   const labels: Record<string, string> = {
+    free: "Gratuit",
     standard: "Standard",
     pro: "Pro",
     enterprise: "Enterprise",
@@ -295,6 +296,7 @@ export function getRoomStatusChartColor(status: string): string {
  */
 export function getPlanPrice(plan: string): number {
   const prices: Record<string, number> = {
+    free: 0,
     standard: 15000,
     pro: 35000,
     enterprise: 55000,
@@ -321,6 +323,14 @@ export function getPlanLimits(plan: string): {
     hasAdvancedStats: boolean;
     hasMultiResidences: boolean;
   }> = {
+    free: {
+      maxAccommodations: 1,
+      maxAdmins: 1,
+      maxReceptionnists: 0,
+      hasCleaningModule: false,
+      hasAdvancedStats: false,
+      hasMultiResidences: false,
+    },
     standard: {
       maxAccommodations: 5,
       maxAdmins: 1,
@@ -346,5 +356,5 @@ export function getPlanLimits(plan: string): {
       hasMultiResidences: true,
     },
   };
-  return limits[plan] || limits.standard;
+  return limits[plan] || limits.free;
 }

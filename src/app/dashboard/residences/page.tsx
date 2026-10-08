@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ export default function ResidencesPage() {
   function openAddModal() {
     const limits = getPlanLimits(plan);
     if (limits.maxAccommodations !== null && residences.length >= limits.maxAccommodations) {
-      alert(`Votre plan ${plan} est limité à ${limits.maxAccommodations} hébergements. Passez au plan Pro pour des hébergements illimités.`);
+      toast.error(`Votre plan ${plan} est limité à ${limits.maxAccommodations} hébergements. Passez au plan Pro pour des hébergements illimités.`);
       return;
     }
     setEditingResidence(null);

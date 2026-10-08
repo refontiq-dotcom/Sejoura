@@ -179,3 +179,54 @@ body {
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
 }
+/* ============================================
+   Sonner Toaster — Glassmorphism SaaS
+   ============================================ */
+.toaster-group {
+  --normal-bg: var(--card);
+  --normal-border: var(--border);
+  --normal-text: var(--foreground);
+  --success-bg: #064e3b;
+  --success-border: #10b981;
+  --success-text: #ecfdf5;
+  --error-bg: #7f1d1d;
+  --error-border: #ef4444;
+  --error-text: #fef2f2;
+}
+
+.toaster-group [data-sonner-toast] {
+  border-radius: 0.75rem;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--normal-border);
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--normal-bg), transparent 12%);
+}
+
+.toaster-group [data-sonner-toast][data-type="success"] {
+  border-color: var(--success-border);
+  background: color-mix(in srgb, var(--success-bg), transparent 18%);
+  color: var(--success-text);
+}
+
+.toaster-group [data-sonner-toast][data-type="error"] {
+  border-color: var(--error-border);
+  background: color-mix(in srgb, var(--error-bg), transparent 18%);
+  color: var(--error-text);
+}
+
+.toaster-group [data-sonner-toast] {
+  animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}

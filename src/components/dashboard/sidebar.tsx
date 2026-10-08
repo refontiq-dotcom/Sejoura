@@ -42,9 +42,10 @@ interface SidebarProps {
   userName: string;
   companyName: string;
   plan: string;
+  monthlyPrice: number;
 }
 
-export function Sidebar({ userRole, userName, companyName, plan }: SidebarProps) {
+export function Sidebar({ userRole, userName, companyName, plan, monthlyPrice }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -107,10 +108,10 @@ export function Sidebar({ userRole, userName, companyName, plan }: SidebarProps)
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-indigo-300">Plan actuel</p>
-              <p className="text-sm font-semibold text-white capitalize">{plan}</p>
-            </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-indigo-300">Plan actuel</p>
+                <p className="text-sm font-semibold text-white capitalize">{monthlyPrice === 0 ? "Free" : plan}</p>
+              </div>
           </div>
         </div>
       )}
