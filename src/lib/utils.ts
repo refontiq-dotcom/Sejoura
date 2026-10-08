@@ -489,3 +489,23 @@ export function translateRpcError(
   }
   return fallback;
 }
+
+/**
+ * Détecte une erreur de double réservation émise par `create_booking`.
+ *
+ * Deux chemins d'échec existent côté PostgreSQL :
+ * 1. `check_double_booking` détecte le conflit → `RAISE EXCEPTION 'DOUBLE_BOOKING: ...'`
+ *    (SQLSTATE P0001, message explicite) ;
+ * 2. sous concurrence, deux transactions passent le check avant l'INSERT : la
+ *    contrainte EXCLUDE `no_double_booking` rejette le second INSERT
+ *    (SQLSTATE 23P01, « conflicts with exclusion constraint ... » — message en
+ *    minuscules, non couvert par une comparaison case-sensitive de « DOUBLE_BOOKING »).
+ *
+ * Les deux chemins doivent être traduits en 409 DOUBLE_BOOKING, jamais en 500.
+ */
+export function isDoubleBookingError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  if (code === "23P01") return true;
+  return typeof message === "string" && /double_booking/i.test(message);
+}

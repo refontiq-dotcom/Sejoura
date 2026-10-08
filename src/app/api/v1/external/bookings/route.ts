@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isDoubleBookingError } from "@/lib/utils";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -71,6 +72,18 @@ export async function GET(request: Request) {
 // Sélectionne automatiquement une chambre disponible du type sur la période,
 // réutilise le client (même téléphone) sinon le crée, puis appelle la fonction
 // `create_booking` (anti double-booking, code RES-YY-NNNN). Statut : `confirmed`.
+//
+// Concurrence : l'intégrité est garantie au niveau PostgreSQL — la sélection
+// applicative ignore les statuts bloquants (pending_payment/confirmed/checked_in),
+// `create_booking` vérifie via `check_double_booking` et la contrainte EXCLUDE
+// `no_double_booking` rejette la seconde INSERT ; le perdant reçoit un
+// 409 DOUBLE_BOOKING (jamais un 500).
+//
+// Idempotence : l'endpoint ne porte pas de clé d'idempotence. Une requête
+// identique rejouée est refusée en 409 tant qu'aucune chambre du type n'est
+// libre pour la période ; si une autre chambre du type est disponible, la
+// seconde réservation est créée (limite documentée — à traiter côté appelant,
+// ex. dédoublonnage côté Trouvetou).
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
@@ -322,7 +335,10 @@ export async function POST(request: Request) {
     });
 
     if (bookingErr) {
-      if (bookingErr.message.includes("DOUBLE_BOOKING")) {
+      // Le concurrent perdant peut échouer de deux façons : RAISE 'DOUBLE_BOOKING'
+      // (P0001) ou contrainte EXCLUDE no_double_booking (23P01 sous concurrence).
+      // Les deux doivent répondre 409, jamais 500.
+      if (isDoubleBookingError(bookingErr)) {
         return NextResponse.json(
           { error: "Cette chambre vient d'être réservée pour ces dates", code: "DOUBLE_BOOKING" },
           { status: 409 }
