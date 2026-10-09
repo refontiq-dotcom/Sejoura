@@ -872,8 +872,9 @@ export default function ResidenceDetailPage() {
                   <ImagePlus className="w-4 h-4" /> Ajouter
                 </Button>
               </div>
-              <label className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
- border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 cursor-pointer hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors">
+              <label
+                className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors`}
+              >
                 {uploadingImage ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
