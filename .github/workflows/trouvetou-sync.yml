@@ -11,10 +11,13 @@ jobs:
     steps:
       - name: Appel de la synchronisation Séjoura vers Trouvetou
         env:
-          SYNC_URL: "https://sejoura.app/api/trouvetou/sync"
+          # Hôte Vercel du déploiement de production. NB : l'ancien domaine
+          # sejoura.app redirige désormais (301) vers sejoura.fr qui ne sert
+          # PAS l'app Next.js — l'URL Vercel est la source de vérité.
+          SYNC_URL: "https://sejoura-lemon.vercel.app/api/trouvetou/sync"
           CRON_SECRET: ${{ secrets.TROUVETOU_SYNC_SECRET }}
         run: |
-          code=$(curl -sS -o /tmp/sync.out -w "%{http_code}" \
+          code=$(curl -sS -L -o /tmp/sync.out -w "%{http_code}" \
             -H "Authorization: Bearer $CRON_SECRET" \
             "$SYNC_URL")
           echo "HTTP $code"
