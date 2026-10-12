@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouEligible } from "@/lib/trouvetou/eligibility";
+import { resolveTrouvetouCategorySlug } from "@/lib/trouvetou/category";
 
 /**
  * SÉJOURA → TROUVETOU — Synchronisation des annonces
@@ -63,6 +64,7 @@ interface SyncRow {
     tenant_id: string;
     name: string;
     description: string | null;
+    accommodation_type: string | null;
     city: string | null;
     is_active: boolean;
     tenants: {
@@ -114,6 +116,7 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
         tenant_id,
         name,
         description,
+        accommodation_type,
         city,
         is_active,
         tenants!inner (
@@ -281,7 +284,9 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
-        category_slug: accommodation.description === "bnb" ? "residence" : "hotel",
+        // Catégorie Trouvetou dérivée du type de l'établissement
+        // (accommodations.accommodation_type, repli legacy sur description).
+        category_slug: resolveTrouvetouCategorySlug(accommodation),
       };
     });
 

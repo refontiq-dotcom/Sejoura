@@ -26,7 +26,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
   const router = useRouter();
   const [formFullName, setFormFullName] = useState(fullName || "");
   const [residenceName, setResidenceName] = useState("");
-  const [residenceType, setResidenceType] = useState("bnb");
+  const [residenceType, setResidenceType] = useState("residence");
   const [residenceLocation, setResidenceLocation] = useState("");
   const [country, setCountry] = useState("Côte d'Ivoire");
   const [phone, setPhone] = useState(() => {
@@ -261,7 +261,7 @@ export function OnboardingModal({ userId, email, fullName, userRole, onComplete,
                 onChange={(e) => setResidenceType(e.target.value)}
                 className={inputClass}
               >
-                <option value="bnb">{t.typeBnb}</option>
+                <option value="residence">{t.typeBnb}</option>
                 <option value="hotel">{t.typeHotel}</option>
               </select>
             </div>

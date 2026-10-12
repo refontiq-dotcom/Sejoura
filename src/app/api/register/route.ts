@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { normalizePlan, getPlanPrice } from "@/lib/subscription-plans";
+import { normalizeAccommodationType } from "@/lib/trouvetou/category";
 import { getCountryByNameOrCode } from "@/lib/countries";
 import { getPlanLabel } from "@/lib/utils";
 import {
@@ -87,6 +88,11 @@ export async function POST(request: Request) {
     const countryConfig = getCountryByNameOrCode(country);
     const countryName = countryConfig?.name ?? country;
 
+    // Type d'établissement normalisé — détermine la catégorie de l'annonce
+    // sur Trouvetou ('bnb' → residence, 'hotel' → hotel ; clients en cache
+    // envoyant encore 'bnb' sont acceptés).
+    const accommodationType = normalizeAccommodationType(residenceType);
+
     const admin = createAdminClient();
 
     // Profil applicatif existant (créé par le trigger handle_new_user à
@@ -118,7 +124,7 @@ export async function POST(request: Request) {
     const accommodationPayload = {
       tenant_id: tenantId,
       name: residenceName,
-      description: residenceType,
+      accommodation_type: accommodationType,
       address: residenceLocation,
       city: residenceLocation,
       country: countryName,
@@ -296,7 +302,7 @@ export async function POST(request: Request) {
     const { data: accommodationData, error: accError } = await admin.from("accommodations").insert({
       tenant_id: newTenantId,
       name: residenceName,
-      description: residenceType,
+      accommodation_type: accommodationType,
       address: residenceLocation,
       city: residenceLocation,
       country: countryName,

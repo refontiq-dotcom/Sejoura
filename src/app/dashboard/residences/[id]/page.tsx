@@ -35,7 +35,7 @@ export default function ResidenceDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{ type: "room" | "type" | "residence"; id: string; name: string } | null>(null);
 
-  const [residenceForm, setResidenceForm] = useState({ name: "", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
+  const [residenceForm, setResidenceForm] = useState({ name: "", accommodation_type: "residence", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
   const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[], check_out_time: "11:00" });
   const [newTypeImageUrl, setNewTypeImageUrl] = useState("");
@@ -72,6 +72,7 @@ export default function ResidenceDetailPage() {
       setResidence(accData as unknown as Accommodation);
       setResidenceForm({
         name: accData.name,
+        accommodation_type: accData.accommodation_type === "hotel" ? "hotel" : "residence",
         address: accData.address || "",
         city: accData.city || "",
         contact_phone: accData.contact_phone || "",
@@ -121,6 +122,7 @@ export default function ResidenceDetailPage() {
   function openEditResidenceModal() {
     setResidenceForm({
       name: residence!.name,
+      accommodation_type: residence!.accommodation_type === "hotel" ? "hotel" : "residence",
       address: residence!.address || "",
       city: residence!.city || "",
       contact_phone: residence!.contact_phone || "",
@@ -142,6 +144,7 @@ export default function ResidenceDetailPage() {
         .from("accommodations")
         .update({
           name: residenceForm.name,
+          accommodation_type: residenceForm.accommodation_type === "hotel" ? "hotel" : "residence",
           address: residenceForm.address,
           city: residenceForm.city,
           contact_phone: residenceForm.contact_phone,
@@ -154,6 +157,7 @@ export default function ResidenceDetailPage() {
       setResidence({
         ...residence!,
         name: residenceForm.name,
+        accommodation_type: residenceForm.accommodation_type === "hotel" ? "hotel" : "residence",
         address: residenceForm.address,
         city: residenceForm.city,
         contact_phone: residenceForm.contact_phone,
@@ -728,6 +732,17 @@ export default function ResidenceDetailPage() {
         <Modal open={residenceModalOpen} onClose={() => setResidenceModalOpen(false)} title="Modifier l'établissement" description="Renseignez les informations de votre établissement">
           <div className="space-y-3">
             <Input label="Nom de l'établissement" value={residenceForm.name} onChange={(e) => setResidenceForm({ ...residenceForm, name: e.target.value })} placeholder="Ex: Hôtel Palm Beach" />
+            <div>
+              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-0.5">Type d&apos;établissement</label>
+              <select
+                value={residenceForm.accommodation_type}
+                onChange={(e) => setResidenceForm({ ...residenceForm, accommodation_type: e.target.value })}
+                className="w-full px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1.5 focus:ring-[var(--primary-color,#0C1C33)]"
+              >
+                <option value="residence">Résidence meublée (BnB)</option>
+                <option value="hotel">Hôtel</option>
+              </select>
+            </div>
             <Input label="Adresse" value={residenceForm.address} onChange={(e) => setResidenceForm({ ...residenceForm, address: e.target.value })} placeholder="Cocody Riviera 2" />
             <Input label="Ville" value={residenceForm.city} onChange={(e) => setResidenceForm({ ...residenceForm, city: e.target.value })} placeholder="Abidjan" />
             <Input label="Téléphone de contact" value={residenceForm.contact_phone} onChange={(e) => setResidenceForm({ ...residenceForm, contact_phone: e.target.value })} placeholder="+225 07 00 00 00 00" />

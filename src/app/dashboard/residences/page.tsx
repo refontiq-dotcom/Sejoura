@@ -39,6 +39,7 @@ export default function ResidencesPage() {
   const [editingResidence, setEditingResidence] = useState<Accommodation | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    accommodation_type: "residence",
     address: "",
     city: "",
     country: "Côte d'Ivoire",
@@ -164,6 +165,7 @@ export default function ResidencesPage() {
     setEditingResidence(null);
     setFormData({
       name: initialName,
+      accommodation_type: "residence",
       address: "",
       city: "",
       country: "Côte d'Ivoire",
@@ -185,6 +187,7 @@ export default function ResidencesPage() {
     setEditingResidence(acc);
     setFormData({
       name: acc.name,
+      accommodation_type: acc.accommodation_type === "hotel" ? "hotel" : "residence",
       address: acc.address || "",
       city: acc.city || "",
       country: acc.country || "Côte d'Ivoire",
@@ -238,6 +241,7 @@ export default function ResidencesPage() {
 
       const payload = {
         name: formData.name,
+        accommodation_type: formData.accommodation_type === "hotel" ? "hotel" : "residence",
         address: formData.address,
         city: formData.city,
         country: formData.country,
@@ -593,6 +597,22 @@ export default function ResidencesPage() {
       >
         <div className="space-y-3">
           <Input label="Nom de l'établissement *" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Hôtel Palm Beach, Villa Ivoire" required />
+
+          {/* Type d'établissement — détermine la catégorie Trouvetou de l'annonce */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-0.5 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-[var(--primary-color,#0C1C33)]" />
+              Type d&apos;établissement
+            </label>
+            <select
+              value={formData.accommodation_type}
+              onChange={(e) => setFormData({ ...formData, accommodation_type: e.target.value })}
+              className="w-full px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1.5 focus:ring-[var(--primary-color,#0C1C33)]"
+            >
+              <option value="residence">Résidence meublée (BnB)</option>
+              <option value="hotel">Hôtel</option>
+            </select>
+          </div>
 
           {/* Sélecteur de Pays avec auto-mapping */}
           <div>

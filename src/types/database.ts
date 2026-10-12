@@ -304,6 +304,8 @@ export interface Accommodation {
   tenant_id: string;
   name: string;
   description: string | null;
+  /** Type d'établissement ('residence' | 'hotel') — catégorie de l'annonce Trouvetou. */
+  accommodation_type?: string;
   address: string | null;
   city: string | null;
   country: string;
