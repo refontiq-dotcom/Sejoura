@@ -19,8 +19,13 @@ import { resolveTrouvetouCategorySlug } from "@/lib/trouvetou/category";
  * L'UPSERT côté Trouvetou repose sur le couple (provider_id, external_id) —
  * `external_id = "rt:<room_type_id>"` est stable, ce qui rend l'envoi idempotent.
  *
- * La clé API active du tenant est transmise dans `attributes.sejoura_api_key`
- * pour permettre la création de réservations depuis le portail (POST /bookings).
+ * SÉCURITÉ : aucune clé API ni secret n'est transmis dans `attributes` ou
+ * ailleurs dans le payload métier. L'authentification de la synchronisation
+ * utilise exclusivement l'en-tête HTTP `x-trouvetou-api-key` (secret serveur
+ * `TROUVETOU_API_KEY`), et les réservations externes s'authentifient via les
+ * en-têtes `x-api-key` / `Authorization: Bearer` (table `external_api_keys`).
+ * La présence d'une clé API externe active reste une condition d'éligibilité
+ * (filtre), jamais une donnée publiée.
  */
 
 export interface TrouvetouSyncItem {
@@ -80,19 +85,22 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
 
   // 1. Clés API externes actives par tenant — requête plate : la FK
   //    `tenants → external_api_keys` n'est pas garantie en base, on joint en JS.
+  //    SÉCURITÉ : on ne lit que `tenant_id` (existence d'une clé active comme
+  //    condition d'éligibilité). La valeur `api_key` n'est JAMAIS lue ici et
+  //    n'est JAMAIS incluse dans le payload publié vers Trouvetou.
   const { data: activeKeys, error: keysError } = await admin
     .from("external_api_keys")
-    .select("tenant_id, api_key")
+    .select("tenant_id")
     .eq("is_active", true);
 
   if (keysError) {
     return { items: [], error: `Lecture des clés API Séjoura : ${keysError.message}` };
   }
 
-  const apiKeyByTenant = new Map<string, string>();
+  const tenantsWithActiveKey = new Set<string>();
   for (const k of activeKeys ?? []) {
-    if (k.tenant_id && !apiKeyByTenant.has(k.tenant_id)) {
-      apiKeyByTenant.set(k.tenant_id, k.api_key);
+    if (k.tenant_id) {
+      tenantsWithActiveKey.add(k.tenant_id);
     }
   }
 
@@ -139,10 +147,13 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
   // Certains tenants ont activé "Publier sur Trouvetou" mais n'ont pas encore
   // de clé API externe. On la génère automatiquement pour que la synchro
   // ne les ignore plus.
+  // NOTE : seule l'existence de la clé est exploitée ici (éligibilité). La
+  // valeur générée reste en base (`external_api_keys`) et n'est JAMAIS
+  // recopiée dans le payload publié.
   const tenantsNeedingKeys = new Set<string>();
   for (const row of rows) {
     const tId = row.accommodations?.tenant_id;
-    if (tId && !apiKeyByTenant.has(tId)) {
+    if (tId && !tenantsWithActiveKey.has(tId)) {
       tenantsNeedingKeys.add(tId);
     }
   }
@@ -159,11 +170,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
     const { data: insertedKeys, error: insertError } = await admin
       .from("external_api_keys")
       .insert(newKeysData)
-      .select("tenant_id, api_key");
+      .select("tenant_id");
 
     if (!insertError && insertedKeys) {
       for (const k of insertedKeys) {
-        apiKeyByTenant.set(k.tenant_id, k.api_key);
+        if (k.tenant_id) tenantsWithActiveKey.add(k.tenant_id);
       }
     } else {
       console.error("Erreur auto-provisioning clés API:", insertError);
@@ -216,10 +227,11 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
   const items: TrouvetouSyncItem[] = rows
     .filter((row) => {
       // Gating : le tenant doit disposer d'une clé API externe active (résidence
-      // diffusée seulement si sa clé API est active).
+      // diffusée seulement si sa clé API est active). Seule l'existence est
+      // testée — la valeur de la clé n'est jamais publiée.
       const hasActiveApiKey =
         !!row.accommodations?.tenant_id &&
-        apiKeyByTenant.has(row.accommodations.tenant_id);
+        tenantsWithActiveKey.has(row.accommodations.tenant_id);
 
       return (
         hasActiveApiKey &&
@@ -258,12 +270,6 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
       // Nombre de chambres libres à cet instant (info temps-réel dans attributes).
       const availableNow = typeRooms.filter((r) => !occupiedRoomIds.has(r.id)).length;
 
-      // Clé API Séjoura du tenant (active — garantie par le filtre ci-dessus).
-      // Stockée côté portail pour permettre la création de réservations (POST /bookings).
-      const sejouraApiKey = row.accommodations?.tenant_id
-        ? (apiKeyByTenant.get(row.accommodations.tenant_id) ?? null)
-        : null;
-
       return {
         external_id: `rt:${row.id}`,
         title: `${row.name} — ${accommodation.name}`,
@@ -281,7 +287,6 @@ async function buildPayload(): Promise<{ items: TrouvetouSyncItem[]; error: stri
           ...(row.panorama_360_hd_url ? { panorama_360_hd_url: row.panorama_360_hd_url } : {}),
           ...(row.panorama_tour ? { panorama_tour: row.panorama_tour } : {}),
           available_rooms_now: availableNow,
-          ...(sejouraApiKey ? { sejoura_api_key: sejouraApiKey } : {}),
         },
         is_available: isAvailable,
         // Catégorie Trouvetou dérivée du type de l'établissement

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { isDoubleBookingError } from "@/lib/utils";
+import { normalizePgDateToUtcMidnight } from "@/lib/pg-date";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Tests d'intégrité anti double-booking (scénarios A→F) — exécutés uniquement
@@ -130,7 +131,12 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
       userId: rows[0].user_id,
     };
 
-    // Fenêtre de dates sans conflit sur la chambre fixture
+    // Fenêtre de dates sans conflit sur la chambre fixture.
+    // `pg` peut retourner un DATE sous forme de chaîne "YYYY-MM-DD" (défaut
+    // pg-types) ou d'objet Date (parser surchargé / TZ du runner). La
+    // concaténation aveugle `String(v) + "T00:00:00Z"` produit alors
+    // `Invalid Date` → `RangeError: Invalid time value` sur `toISOString()`.
+    // On normalise donc explicitement vers minuit UTC, avec garde d'erreur.
     const { rows: dateRows } = await client.query(
       `SELECT (COALESCE(MAX(check_out_date), CURRENT_DATE) + INTERVAL '30 days')::date AS start
        FROM public.bookings
@@ -138,7 +144,13 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
          AND status IN ('pending_payment', 'confirmed', 'checked_in')`,
       [fixture.roomId]
     );
-    const start = new Date(`${String(dateRows[0].start)}T00:00:00Z`);
+    const rawStart: unknown = dateRows[0]?.start;
+    const start = normalizePgDateToUtcMidnight(rawStart);
+    if (Number.isNaN(start.getTime())) {
+      throw new Error(
+        `Fenêtre de dates invalide reçue de la base (start=${String(rawStart)})`
+      );
+    }
     checkIn = start.toISOString().slice(0, 10);
     checkOut = new Date(start.getTime() + 2 * 86_400_000).toISOString().slice(0, 10);
 
@@ -267,12 +279,13 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
         // Assert
         expect(loserError).not.toBeNull();
         expect(isDoubleBookingError(loserError)).toBe(true);
+        const loserCode = (loserError as RpcError | null)?.code;
         if (blocked) {
           // B attendait sur la contrainte EXCLUDE → échec 23P01 (chemin corrigé)
-          expect(loserError?.code).toBe("23P01");
+          expect(loserCode).toBe("23P01");
         } else {
           // Repli : B a pris connaissance de l'engagement de A → RAISE P0001
-          expect(["23P01", "P0001"]).toContain(loserError?.code);
+          expect(["23P01", "P0001"]).toContain(loserCode);
         }
 
         // Nettoyage de la réservation engagée
