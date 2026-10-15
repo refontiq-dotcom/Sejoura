@@ -110,7 +110,7 @@ export class PiSpiPaymentService implements PaymentProvider {
    * propose TOUS les modes de paiement disponibles (Wave, OM, MTN, virement).
    * C'est la solution la plus inclusive de la zone UEMOA.
    */
-  async initiatePayment(): Promise<PaymentInitResult> {
+  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
     // TODO : Décommenter et adapter selon les specs de votre banque partenaire
     /*
     try {
@@ -235,7 +235,7 @@ export class PiSpiPaymentService implements PaymentProvider {
    *
    * Validation : recalculer la signature et la comparer à celle reçue.
    */
-  validateWebhookSignature(): boolean {
+  validateWebhookSignature(_payload: unknown, _signature: string): boolean {
     // TODO : Décommenter quand les specs de signature de la banque sont connues
     /*
     const p = payload as Record<string, string | number>;
@@ -252,7 +252,7 @@ export class PiSpiPaymentService implements PaymentProvider {
     );
     */
 
-    console.warn("[PI-SPI] validateWebhookSignature non implémentée.");
-    return true; // ⚠️ À sécuriser en production
+    console.warn("[PI-SPI] validateWebhookSignature non implementee - refus ferme (aucune confirmation acceptee).");
+    return false;
   }
 }
