@@ -292,6 +292,9 @@ CREATE TABLE IF NOT EXISTS employee_assignments (
   tenant_id       UUID NOT NULL,
   user_id         UUID NOT NULL,
   accommodation_id UUID,
+  start_date      DATE NOT NULL DEFAULT CURRENT_DATE,
+  end_date        DATE NULL,
+  notes           TEXT NULL,
   created_by      UUID,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
