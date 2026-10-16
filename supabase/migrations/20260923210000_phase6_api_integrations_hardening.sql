@@ -13,5 +13,4 @@ CREATE INDEX IF NOT EXISTS idx_external_api_keys_tenant_active
 CREATE INDEX IF NOT EXISTS idx_sync_logs_provider_created_at
   ON public.sync_logs (provider_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_trouvetou_sync_logs_provider_created_at
-  ON public.trouvetou_sync_logs (provider_id, created_at DESC);
+
