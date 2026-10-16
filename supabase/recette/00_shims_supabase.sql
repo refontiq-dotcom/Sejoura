@@ -217,6 +217,12 @@ CREATE TABLE IF NOT EXISTS billing_configs (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE billing_configs ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'billing_configs' AND policyname = 'billing_configs_read') THEN
+    CREATE POLICY "billing_configs_read" ON billing_configs
+      FOR SELECT USING ((select auth.uid()) IS NOT NULL);
+  END IF;
+END $$;
 
 -- ── 4e. Tables manquantes (groupes 1) ciblees par 20260923161234 ──
 -- Tables sans politiques RLS specifiques dans la migration d'optimisation.
@@ -503,3 +509,100 @@ $$;
 GRANT EXECUTE ON FUNCTION recette.expect_ok(text, text) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION recette.expect_error(text, text, text, text) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION recette.expect_true(text, boolean) TO PUBLIC;
+
+-- ── Politiques RLS requises par les migrations ultérieures (ALTER POLICY) ──
+-- Le shim les crée avec une définition minimale ; les migrations les
+-- remplacent ensuite via ALTER POLICY / DROP POLICY IF EXISTS + CREATE POLICY.
+DO $$ BEGIN
+  -- employee_assignments
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_select_tenant') THEN
+    CREATE POLICY "employee_assignments_select_tenant" ON employee_assignments
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_insert') THEN
+    CREATE POLICY "employee_assignments_insert" ON employee_assignments
+      FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_update_admin') THEN
+    CREATE POLICY "employee_assignments_update_admin" ON employee_assignments
+      FOR UPDATE USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_delete') THEN
+    CREATE POLICY "employee_assignments_delete" ON employee_assignments
+      FOR DELETE USING (true);
+  END IF;
+
+  -- feature_request_votes
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_delete_own') THEN
+    CREATE POLICY "feature_request_votes_delete_own" ON feature_request_votes
+      FOR DELETE USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_insert_auth') THEN
+    CREATE POLICY "feature_request_votes_insert_auth" ON feature_request_votes
+      FOR INSERT WITH CHECK (true);
+  END IF;
+
+  -- feature_requests
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_requests' AND policyname = 'feature_requests_insert_auth') THEN
+    CREATE POLICY "feature_requests_insert_auth" ON feature_requests
+      FOR INSERT WITH CHECK (true);
+  END IF;
+
+  -- notifications
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notifications' AND policyname = 'notifications_select_own') THEN
+    CREATE POLICY "notifications_select_own" ON notifications
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notifications' AND policyname = 'notifications_update_own') THEN
+    CREATE POLICY "notifications_update_own" ON notifications
+      FOR UPDATE USING (true);
+  END IF;
+
+  -- subscription_payment_intents
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
+    CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
+      FOR SELECT USING (true);
+  END IF;
+
+  -- tenant_billing_profiles
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
+    CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
+      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
+  -- tenants
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenants' AND policyname = 'tenants_insert_public') THEN
+    CREATE POLICY "tenants_insert_public" ON tenants
+      FOR INSERT WITH CHECK (true);
+  END IF;
+
+  -- trouvetou_listings
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_listings' AND policyname = 'trouvetou_listings_manage_own') THEN
+    CREATE POLICY "trouvetou_listings_manage_own" ON trouvetou_listings
+      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
+  -- trouvetou_providers
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
+    CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
+      FOR SELECT USING (true);
+  END IF;
+
+  -- users
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'users_select_self') THEN
+    CREATE POLICY "users_select_self" ON users
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'users_update_self') THEN
+    CREATE POLICY "users_update_self" ON users
+      FOR UPDATE USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Les utilisateurs peuvent lire leur propre profil') THEN
+    CREATE POLICY "Les utilisateurs peuvent lire leur propre profil" ON users
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Les utilisateurs peuvent modifier leur propre profil') THEN
+    CREATE POLICY "Les utilisateurs peuvent modifier leur propre profil" ON users
+      FOR UPDATE USING (true) WITH CHECK (true);
+  END IF;
+END $$;
