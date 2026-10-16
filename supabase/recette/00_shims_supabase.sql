@@ -279,8 +279,13 @@ CREATE TABLE IF NOT EXISTS subscription_payment_requests (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       UUID NOT NULL,
   subscription_id UUID,
+  plan            TEXT NOT NULL,
+  amount          INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
   requested_by    UUID,
   validated_by    UUID,
+  validated_at    TIMESTAMPTZ,
+  notes           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
