@@ -134,19 +134,31 @@ CREATE OR REPLACE FUNCTION recette.expect_error(
 RETURNS void
 LANGUAGE plpgsql
 AS $$
+DECLARE
+  v_state text;
+  v_message text;
 BEGIN
-  EXECUTE p_sql;
-EXCEPTION WHEN OTHERS THEN
-  IF SQLSTATE <> p_expected_state
-     OR (p_msg_like IS NOT NULL AND SQLERRM NOT LIKE p_msg_like) THEN
-    RAISE EXCEPTION 'SCEN [%] NON CONFORME : attendu [%] "%" ; obtenu [%] "%"',
-      p_label, p_expected_state, p_msg_like, SQLSTATE, SQLERRM;
-  END IF;
-  RAISE NOTICE 'SCEN [%] OK : erreur conforme [%] %', p_label, SQLSTATE, SQLERRM;
-  RETURN;
+  BEGIN
+    EXECUTE p_sql;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS
+      v_state = RETURNED_SQLSTATE,
+      v_message = MESSAGE_TEXT;
+
+    IF v_state <> p_expected_state
+       OR (p_msg_like IS NOT NULL AND v_message NOT LIKE p_msg_like) THEN
+      RAISE EXCEPTION 'SCEN [%] NON CONFORME : attendu [%] "%" ; obtenu [%] "%"',
+        p_label, p_expected_state, p_msg_like, v_state, v_message;
+    END IF;
+
+    RAISE NOTICE 'SCEN [%] OK : erreur conforme [%] %',
+      p_label, v_state, v_message;
+    RETURN;
+  END;
+
+  RAISE EXCEPTION 'SCEN [%] NON CONFORME : aucune erreur levee (attendu [%] "%")',
+    p_label, p_expected_state, coalesce(p_msg_like, '(indifferent)');
 END;
-RAISE EXCEPTION 'SCEN [%] NON CONFORME : aucune erreur levee (attendu [%] "%")',
-  p_label, p_expected_state, coalesce(p_msg_like, '(indifferent)');
 $$;
 
 -- 7c. expect_true : vérification d'état APRÈS exécution (rôle/tenant inchangés…).
