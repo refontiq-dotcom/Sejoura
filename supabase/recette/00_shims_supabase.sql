@@ -331,10 +331,17 @@ ALTER TABLE feature_request_votes ENABLE ROW LEVEL SECURITY;
 
 -- subscription_payment_intents
 CREATE TABLE IF NOT EXISTS subscription_payment_intents (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL,
+  plan            TEXT NOT NULL,
+  provider        TEXT NOT NULL,
+  transaction_id  TEXT,
+  reference       TEXT NOT NULL,
+  amount          INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  raw_response    JSONB,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE subscription_payment_intents ENABLE ROW LEVEL SECURITY;
 
