@@ -78,6 +78,13 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
     echo "!!! Référence : supabase/migrations_proposees/RECETTE_P0_APPLY.md §5."
     exit 1
   fi
+  # Fichier de compatibilité recette : recrée les politiques RLS françaises
+  # sur public.users détruites par le DROP TABLE ... CASCADE de
+  # 20260701_initial_schema.sql, avant qu'ALTER POLICY de
+  # 20260923161234_optimize_p1_indexes_and_rls_policies.sql ne les modifie.
+  if [ "$(basename "$f")" = "20260701_initial_schema.sql" ]; then
+    run_file "compat-users-rls-fr" "$ROOT/supabase/recette/30-compat-users-rls-fr.sql" || exit 1
+  fi
 done
 echo "== $replayed migrations historiques rejouées sans erreur"
 

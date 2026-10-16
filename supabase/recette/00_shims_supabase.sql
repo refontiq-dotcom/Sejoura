@@ -102,6 +102,18 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- ── Table sync_logs (objet Supabase manquant) ───────────────────────────────
+-- Référencée par 20260923210000_phase6_api_integrations_hardening.sql
+-- (REVOKE + CREATE INDEX) mais créée par aucune migration historique.
+-- Fournie ici en tant qu'objet de service de recette, avant tout rejeu.
+-- Colonnes strictement nécessaires à l'index de la migration de phase 6 :
+-- idx_sync_logs_provider_created_at (provider_id, created_at DESC).
+CREATE TABLE IF NOT EXISTS public.sync_logs (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider_id  text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS uuid
 LANGUAGE sql
