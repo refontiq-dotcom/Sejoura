@@ -332,10 +332,11 @@ END $$;
 
 -- feature_request_votes
 CREATE TABLE IF NOT EXISTS feature_request_votes (
-  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL,
-  user_id   UUID NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  feature_request_id UUID NOT NULL,
+  tenant_id          UUID NOT NULL,
+  user_id            UUID NOT NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE feature_request_votes ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
