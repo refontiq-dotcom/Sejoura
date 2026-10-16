@@ -105,15 +105,23 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Cast implicite user_role -> text pour permettre TEXT = user_role
-CREATE OR REPLACE FUNCTION public._user_role_to_text(ur public.user_role)
-RETURNS text LANGUAGE sql IMMUTABLE AS $$
-  SELECT ur::text;
+-- Operateur = (text, user_role) pour resoudre TEXT = user_role
+-- (utilise par 20260822_notification_recipient_role: recipient_role TEXT
+--  = get_current_user_role() user_role).  Creer UNIQUEMENT l'operateur
+--  text = user_role (et non l'inverse) pour eviter l'ambiguite
+--  "operator is not unique" sur user_role = unknown dans les politiques
+--  de la migration initiale (ex: get_current_user_role() = 'admin_residence').
+CREATE OR REPLACE FUNCTION public._text_eq_user_role(t text, ur public.user_role)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT t = ur::text;
 $$;
 
-CREATE CAST (public.user_role AS text)
-  WITH FUNCTION public._user_role_to_text(public.user_role)
-  AS IMPLICIT;
+CREATE OPERATOR public.= (
+  LEFTARG = text,
+  RIGHTARG = public.user_role,
+  PROCEDURE = public._text_eq_user_role,
+  COMMUTATOR = '='
+);
 
 -- ── 4c. Helpers de contexte utilisateur (shims, remplacés par les migrations) ─
 -- get_current_user_tenant_id() : retourne UUID ; NULL si pas de contexte.
