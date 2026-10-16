@@ -278,11 +278,17 @@ CREATE TABLE IF NOT EXISTS shifts (
 );
 
 CREATE TABLE IF NOT EXISTS stay_activities (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL,
-  created_by  UUID,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      UUID NOT NULL,
+  booking_id     UUID NOT NULL,
+  client_id      UUID,
+  activity_type  TEXT NOT NULL,
+  title          TEXT NOT NULL,
+  description    TEXT,
+  meta           JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by     UUID,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS stay_notes (
