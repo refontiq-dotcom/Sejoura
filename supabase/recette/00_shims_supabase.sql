@@ -517,3 +517,24 @@ GRANT EXECUTE ON FUNCTION recette.expect_true(text, boolean) TO PUBLIC;
 -- Toutes les autres politiques RLS sont créées par CREATE POLICY dans les
 -- migrations historiques : ne pas les dupliquer ici pour éviter les conflits
 -- "already exists".
+-- Exception : certaines politiques ALTER par la migration d'optimisation ne
+-- sont créées par aucune migration CREATE POLICY. Elles doivent être dans le
+-- shim car la table est créée ici.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_select_tenant') THEN
+    CREATE POLICY "employee_assignments_select_tenant" ON employee_assignments
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
+    CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
+      FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
+    CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
+      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
+    CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
+      FOR SELECT USING (true);
+  END IF;
+END $$;
