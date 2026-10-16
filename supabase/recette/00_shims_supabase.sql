@@ -340,10 +340,14 @@ ALTER TABLE subscription_payment_intents ENABLE ROW LEVEL SECURITY;
 
 -- tenant_billing_profiles
 CREATE TABLE IF NOT EXISTS tenant_billing_profiles (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL,
+  preferred_provider TEXT NOT NULL DEFAULT 'wave',
+  billing_phone     TEXT,
+  auto_renew        BOOLEAN NOT NULL DEFAULT FALSE,
+  notify_days_before INT NOT NULL DEFAULT 3,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE tenant_billing_profiles ENABLE ROW LEVEL SECURITY;
 
