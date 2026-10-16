@@ -510,61 +510,10 @@ GRANT EXECUTE ON FUNCTION recette.expect_ok(text, text) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION recette.expect_error(text, text, text, text) TO PUBLIC;
 GRANT EXECUTE ON FUNCTION recette.expect_true(text, boolean) TO PUBLIC;
 
--- ── Politiques RLS requises par les migrations ultérieures (ALTER POLICY) ──
--- Le shim les crée avec une définition minimale ; les migrations les
--- remplacent ensuite via ALTER POLICY / DROP POLICY IF EXISTS + CREATE POLICY.
--- Seules les tables présentes dans ce shim sont concernées (feature_requests,
--- notifications, users, tenants sont créées par les migrations).
-DO $$ BEGIN
-  -- employee_assignments
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_select_tenant') THEN
-    CREATE POLICY "employee_assignments_select_tenant" ON employee_assignments
-      FOR SELECT USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_insert') THEN
-    CREATE POLICY "employee_assignments_insert" ON employee_assignments
-      FOR INSERT WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_update_admin') THEN
-    CREATE POLICY "employee_assignments_update_admin" ON employee_assignments
-      FOR UPDATE USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_delete') THEN
-    CREATE POLICY "employee_assignments_delete" ON employee_assignments
-      FOR DELETE USING (true);
-  END IF;
-
-  -- feature_request_votes
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_delete_own') THEN
-    CREATE POLICY "feature_request_votes_delete_own" ON feature_request_votes
-      FOR DELETE USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_insert_auth') THEN
-    CREATE POLICY "feature_request_votes_insert_auth" ON feature_request_votes
-      FOR INSERT WITH CHECK (true);
-  END IF;
-
-  -- subscription_payment_intents
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
-    CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
-      FOR SELECT USING (true);
-  END IF;
-
-  -- tenant_billing_profiles
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
-    CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
-      FOR ALL USING (true) WITH CHECK (true);
-  END IF;
-
-  -- trouvetou_listings
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_listings' AND policyname = 'trouvetou_listings_manage_own') THEN
-    CREATE POLICY "trouvetou_listings_manage_own" ON trouvetou_listings
-      FOR ALL USING (true) WITH CHECK (true);
-  END IF;
-
-  -- trouvetou_providers
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
-    CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
-      FOR SELECT USING (true);
-  END IF;
-END $$;
+-- billing_configs_read est requise par ALTER POLICY dans
+-- 20260923161234_optimize_p1_indexes_and_rls_policies.sql. Aucune migration
+-- ne la crée avec CREATE POLICY (la table billing_configs n'existe que dans
+-- ce shim), donc le shim doit la fournir.
+-- Toutes les autres politiques RLS sont créées par CREATE POLICY dans les
+-- migrations historiques : ne pas les dupliquer ici pour éviter les conflits
+-- "already exists".
