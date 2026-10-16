@@ -221,11 +221,16 @@ ALTER TABLE billing_configs ENABLE ROW LEVEL SECURITY;
 -- ── 4e. Tables manquantes (groupes 1) ciblees par 20260923161234 ──
 -- Tables sans politiques RLS specifiques dans la migration d'optimisation.
 CREATE TABLE IF NOT EXISTS booking_extensions (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id   UUID NOT NULL,
-  created_by  UUID,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id              UUID NOT NULL,
+  booking_id             UUID NOT NULL,
+  previous_check_out_date DATE NOT NULL,
+  new_check_out_date     DATE NOT NULL,
+  extra_nights           INTEGER NOT NULL DEFAULT 1,
+  source                 TEXT NOT NULL DEFAULT 'manual',
+  created_by             UUID,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS client_service_requests (
