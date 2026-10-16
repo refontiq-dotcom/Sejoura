@@ -1,0 +1,78 @@
+# ============================================================================
+# RECETTE P0 — Workflow GitHub Actions, DÉCLENCHEMENT MANUEL UNIQUEMENT
+# Fichier : .github/workflows/recette-p0.yml
+#
+# Garanties :
+#   - on: workflow_dispatch uniquement (aucun push/schedule/PR) ;
+#   - permissions: contents: read (aucun droit d'écriture, persist-credentials
+#     désactivé sur le checkout => impossible de committer/pousser) ;
+#   - aucun `secrets.*` référencé, aucune URL Supabase, aucun déploiement :
+#     PostgreSQL éphémère postgres:16 jetable du runner ;
+#   - AUCUNE donnée de production : le dump n'est ni copié ni monté ; tout le
+#     seed vient de supabase/recette/01_seed_synthetic.sql (synthétique).
+#   - Ne pas lancer ce workflow sans autorisation explicite.
+# ============================================================================
+name: "Recette P0 — PostgreSQL isolé"
+
+on:
+  workflow_dispatch:
+    inputs:
+      motif:
+        description: "Motif du lancement (trace d'autorisation)"
+        required: false
+        default: "recette P0 manuelle"
+
+permissions:
+  contents: read
+
+jobs:
+  recette-p0:
+    name: "Rejeu migrations + scénarios P0"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: recette-p0-ephemere
+          POSTGRES_DB: sejoura_recette
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sejoura_recette"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: sejoura_recette
+      PGPASSWORD: recette-p0-ephemere
+      PGGSSENCMODE: disable
+    steps:
+      - name: "Checkout (lecture seule, sans credentials)"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: "S'assurer que psql est disponible"
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
+      - name: "Exécuter la recette P0 (shims, rejeu, seed, scénarios)"
+        run: bash scripts/recette-p0-run.sh
+
+      - name: "Journal de recette (artefact)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recette-p0-logs
+          path: .recette-logs/
+          if-no-files-found: ignore
+          retention-days: 7
