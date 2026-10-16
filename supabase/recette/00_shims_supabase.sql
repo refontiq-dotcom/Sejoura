@@ -68,40 +68,6 @@ CREATE TABLE IF NOT EXISTS auth.users (
   updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
--- ── Tables publiques de base (schéma minimal) ───────────────────────────────
--- Créées ici pour que les politiques RLS référencées par ALTER POLICY dans
--- 20260923161234_optimize_p1_indexes_and_rls_policies.sql puissent exister.
--- Les migrations historiques feront CREATE TABLE IF NOT EXISTS (sans effet)
--- puis ALTER TABLE ... ADD COLUMN pour compléter le schéma.
-CREATE TABLE IF NOT EXISTS public.users (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email        text,
-  auth_user_id uuid,
-  tenant_id    uuid,
-  role         text,
-  full_name    text,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.tenants (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_name text,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.notifications (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id    uuid,
-  user_id      uuid,
-  action       text,
-  entity_type  text,
-  entity_id    uuid,
-  new_values   jsonb,
-  created_at   timestamptz NOT NULL DEFAULT now()
-);
-
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS uuid
 LANGUAGE sql
@@ -562,33 +528,5 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
     CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
       FOR SELECT USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'users_select_self') THEN
-    CREATE POLICY "users_select_self" ON public.users
-      FOR SELECT USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'users_update_self') THEN
-    CREATE POLICY "users_update_self" ON public.users
-      FOR UPDATE USING (true) WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Les utilisateurs peuvent lire leur propre profil') THEN
-    CREATE POLICY "Les utilisateurs peuvent lire leur propre profil" ON public.users
-      FOR SELECT USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Les utilisateurs peuvent modifier leur propre profil') THEN
-    CREATE POLICY "Les utilisateurs peuvent modifier leur propre profil" ON public.users
-      FOR UPDATE USING (true) WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenants' AND policyname = 'tenants_insert_public') THEN
-    CREATE POLICY "tenants_insert_public" ON public.tenants
-      FOR INSERT WITH CHECK (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notifications' AND policyname = 'notifications_select_own') THEN
-    CREATE POLICY "notifications_select_own" ON public.notifications
-      FOR SELECT USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notifications' AND policyname = 'notifications_update_own') THEN
-    CREATE POLICY "notifications_update_own" ON public.notifications
-      FOR UPDATE USING (true);
   END IF;
 END $$;
