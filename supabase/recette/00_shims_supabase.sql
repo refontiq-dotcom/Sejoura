@@ -350,7 +350,7 @@ ALTER TABLE subscription_payment_intents ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
     CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
-      FOR SELECT USING (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())));
+      FOR SELECT USING ((select auth.uid()) IS NOT NULL);
   END IF;
 END $$;
 
@@ -365,8 +365,8 @@ ALTER TABLE tenant_billing_profiles ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
     CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
-      FOR SELECT USING (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())))
-      WITH CHECK (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())));
+      FOR SELECT USING ((select auth.uid()) IS NOT NULL)
+      WITH CHECK ((select auth.uid()) IS NOT NULL);
   END IF;
 END $$;
 
