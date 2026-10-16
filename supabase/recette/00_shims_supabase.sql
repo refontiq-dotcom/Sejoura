@@ -243,12 +243,18 @@ CREATE TABLE IF NOT EXISTS client_service_requests (
 );
 
 CREATE TABLE IF NOT EXISTS client_stay_extension_requests (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id      UUID NOT NULL,
-  client_id      UUID,
-  processed_by   UUID,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                 UUID NOT NULL,
+  booking_id                UUID NOT NULL,
+  client_id                 UUID NOT NULL,
+  requested_check_out_date  DATE NOT NULL,
+  message                   TEXT,
+  status                    TEXT NOT NULL DEFAULT 'pending',
+  processed_at              TIMESTAMPTZ,
+  processed_by              UUID,
+  processed_note            TEXT,
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS shifts (
