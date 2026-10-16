@@ -206,6 +206,24 @@ CREATE TABLE IF NOT EXISTS advertisement_payment_requests (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- billing_configs : pas de migration de creation dans ce depot, uniquement
+-- referencee par ALTER POLICY dans 20260923161234_optimize_p1_indexes_and_rls_policies.
+CREATE TABLE IF NOT EXISTS billing_configs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  config_key  TEXT NOT NULL,
+  config_val  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE billing_configs ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'billing_configs' AND policyname = 'billing_configs_read') THEN
+    CREATE POLICY "billing_configs_read" ON billing_configs
+      FOR SELECT USING ((select auth.uid()) IS NOT NULL);
+  END IF;
+END $$;
+
 -- ── 5. Schéma storage (buckets référencés par les migrations) ────────────────
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id         text PRIMARY KEY,
