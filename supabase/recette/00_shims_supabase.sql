@@ -224,6 +224,185 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- ── 4e. Tables manquantes (groupes 1) ciblees par 20260923161234 ──
+-- Tables sans politiques RLS specifiques dans la migration d'optimisation.
+CREATE TABLE IF NOT EXISTS booking_extensions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  created_by  UUID,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS client_service_requests (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  client_id   UUID,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS client_stay_extension_requests (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      UUID NOT NULL,
+  client_id      UUID,
+  processed_by   UUID,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS shifts (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      UUID NOT NULL,
+  accommodation_id UUID,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS stay_activities (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  created_by  UUID,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS stay_notes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  created_by  UUID,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS subscription_payment_requests (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL,
+  subscription_id UUID,
+  requested_by    UUID,
+  validated_by    UUID,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── 4f. Tables manquantes (groupes 2) avec politiques RLS ──
+-- employee_assignments
+CREATE TABLE IF NOT EXISTS employee_assignments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL,
+  user_id         UUID NOT NULL,
+  accommodation_id UUID,
+  created_by      UUID,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE employee_assignments ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_select_tenant') THEN
+    CREATE POLICY "employee_assignments_select_tenant" ON employee_assignments
+      FOR SELECT USING (tenant_id = public.get_current_user_tenant_id());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_insert') THEN
+    CREATE POLICY "employee_assignments_insert" ON employee_assignments
+      FOR INSERT WITH CHECK (tenant_id = public.get_current_user_tenant_id());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_update_admin') THEN
+    CREATE POLICY "employee_assignments_update_admin" ON employee_assignments
+      FOR UPDATE USING (tenant_id = public.get_current_user_tenant_id());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'employee_assignments' AND policyname = 'employee_assignments_delete') THEN
+    CREATE POLICY "employee_assignments_delete" ON employee_assignments
+      FOR DELETE USING (tenant_id = public.get_current_user_tenant_id());
+  END IF;
+END $$;
+
+-- feature_request_votes
+CREATE TABLE IF NOT EXISTS feature_request_votes (
+  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL,
+  user_id   UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE feature_request_votes ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_select_auth') THEN
+    CREATE POLICY "feature_request_votes_select_auth" ON feature_request_votes
+      FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_insert_auth') THEN
+    CREATE POLICY "feature_request_votes_insert_auth" ON feature_request_votes
+      FOR INSERT TO authenticated WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'feature_request_votes' AND policyname = 'feature_request_votes_delete_own') THEN
+    CREATE POLICY "feature_request_votes_delete_own" ON feature_request_votes
+      FOR DELETE USING (true);
+  END IF;
+END $$;
+
+-- subscription_payment_intents
+CREATE TABLE IF NOT EXISTS subscription_payment_intents (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE subscription_payment_intents ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
+    CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
+      FOR SELECT USING (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())));
+  END IF;
+END $$;
+
+-- tenant_billing_profiles
+CREATE TABLE IF NOT EXISTS tenant_billing_profiles (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id   UUID NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE tenant_billing_profiles ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
+    CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
+      FOR SELECT USING (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())))
+      WITH CHECK (tenant_id IN (SELECT users.tenant_id FROM public.users WHERE users.auth_user_id = (select auth.uid())));
+  END IF;
+END $$;
+
+-- trouvetou_listings
+CREATE TABLE IF NOT EXISTS trouvetou_listings (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL,
+  establishment_id  UUID,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE trouvetou_listings ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_listings' AND policyname = 'trouvetou_listings_manage_own') THEN
+    CREATE POLICY "trouvetou_listings_manage_own" ON trouvetou_listings
+      FOR ALL USING ((select auth.uid()) IS NOT NULL)
+      WITH CHECK ((select auth.uid()) IS NOT NULL);
+  END IF;
+END $$;
+
+-- trouvetou_providers
+CREATE TABLE IF NOT EXISTS trouvetou_providers (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id         UUID NOT NULL,
+  accommodation_id  UUID,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE trouvetou_providers ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
+    CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
+      FOR SELECT USING ((select auth.uid()) IS NOT NULL);
+  END IF;
+END $$;
+
 -- ── 5. Schéma storage (buckets référencés par les migrations) ────────────────
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id         text PRIMARY KEY,
