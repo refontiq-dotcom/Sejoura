@@ -294,6 +294,11 @@ CREATE TABLE IF NOT EXISTS stay_activities (
 CREATE TABLE IF NOT EXISTS stay_notes (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   UUID NOT NULL,
+  booking_id  UUID NOT NULL,
+  client_id   UUID,
+  note_type   TEXT NOT NULL DEFAULT 'other',
+  description TEXT NOT NULL,
+  severity    TEXT NOT NULL DEFAULT 'low',
   created_by  UUID,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
