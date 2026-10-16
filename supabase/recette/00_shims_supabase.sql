@@ -159,6 +159,53 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT current_setting('request.jwt.claim.role', true) = 'super_admin';
 $$;
 
+-- ── 4d. Tables référencées par des migrations d'optimisation postérieures ──
+-- La migration 20260923161234_optimize_p1_indexes_and_rls_policies crée des
+-- indexes sur des tables qui ne sont creees que par des migrations ULTERIEURES
+-- (ordre lexicographique). Pour eviter "relation does not exist", on cree ici
+-- ces tables avec les colonnes minimales (sans FK, sans index, sans RLS :
+-- les migrations ultérieures les compléteront via CREATE TABLE IF NOT EXISTS
+-- / CREATE INDEX IF NOT EXISTS / ALTER POLICY).
+CREATE TABLE IF NOT EXISTS advertisements (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id               UUID NOT NULL,
+  created_by              UUID,
+  title                   TEXT NOT NULL,
+  description             TEXT,
+  image_url               TEXT NOT NULL,
+  redirect_url            TEXT NOT NULL,
+  targeting               JSONB NOT NULL DEFAULT '{}'::jsonb,
+  duration_days           INTEGER NOT NULL,
+  amount                  INTEGER NOT NULL,
+  status                  TEXT NOT NULL DEFAULT 'draft',
+  starts_at               TIMESTAMPTZ,
+  ends_at                 TIMESTAMPTZ,
+  sender_phone            TEXT,
+  trouvetou_external_id   TEXT,
+  trouvetou_synced_at     TIMESTAMPTZ,
+  trouvetou_unpublished_at TIMESTAMPTZ,
+  trouvetou_is_published  BOOLEAN NOT NULL DEFAULT FALSE,
+  trouvetou_sync_error    TEXT,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS advertisement_payment_requests (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id       UUID NOT NULL,
+  advertisement_id UUID NOT NULL,
+  amount          INTEGER NOT NULL,
+  duration_days   INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  requested_by    UUID,
+  validated_by    UUID,
+  validated_at    TIMESTAMPTZ,
+  sender_phone    TEXT,
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── 5. Schéma storage (buckets référencés par les migrations) ────────────────
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id         text PRIMARY KEY,
