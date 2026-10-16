@@ -376,8 +376,16 @@ END $$;
 -- trouvetou_listings
 CREATE TABLE IF NOT EXISTS trouvetou_listings (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id         UUID NOT NULL,
-  establishment_id  UUID,
+  unit_id           UUID NOT NULL,
+  establishment_id  UUID NOT NULL,
+  is_published      BOOLEAN NOT NULL DEFAULT FALSE,
+  public_title      TEXT,
+  public_description TEXT,
+  featured_images   TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  amenities_badges  TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  direct_whatsapp   TEXT,
+  views_count       INTEGER NOT NULL DEFAULT 0,
+  whatsapp_clicks_count INTEGER NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
