@@ -365,7 +365,7 @@ ALTER TABLE tenant_billing_profiles ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'tenant_billing_profiles' AND policyname = 'tenant_billing_profiles_own') THEN
     CREATE POLICY "tenant_billing_profiles_own" ON tenant_billing_profiles
-      FOR SELECT USING ((select auth.uid()) IS NOT NULL)
+      FOR ALL USING ((select auth.uid()) IS NOT NULL)
       WITH CHECK ((select auth.uid()) IS NOT NULL);
   END IF;
 END $$;
