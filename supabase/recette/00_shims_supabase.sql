@@ -36,6 +36,11 @@ BEGIN
 END;
 $$;
 
+-- Schémas de service absents d'un PostgreSQL vierge de recette
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS storage;
+CREATE SCHEMA IF NOT EXISTS recette;
+
 -- ── 3. Privilièges (miroir Supabase : tout le public schema + défauts) ───────
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
