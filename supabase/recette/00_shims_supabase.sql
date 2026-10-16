@@ -88,6 +88,55 @@ AS $$
   SELECT 'authenticated';
 $$;
 
+-- ── 4b. Type user_role + cast implicite vers text ─────────────────────────────
+-- Le type enum user_role est défini par la migration initiale, mais le shim
+-- doit le fournir pour que les politiques RLS des migrations intermédiaires
+-- (ex. 20260822_notification_recipient_role) puissent comparer recipient_role
+-- (TEXT) avec get_current_user_role() (user_role) sans erreur d'opérateur.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE public.user_role AS ENUM (
+      'super_admin',
+      'admin_residence',
+      'receptionniste',
+      'menagere',
+      'client'
+    );
+  END IF;
+END $$;
+
+-- Cast implicite user_role -> text pour permettre TEXT = user_role
+CREATE OR REPLACE FUNCTION public._user_role_to_text(ur public.user_role)
+RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT ur::text;
+$$;
+
+CREATE CAST (public.user_role AS text)
+  WITH FUNCTION public._user_role_to_text(public.user_role)
+  AS IMPLICIT;
+
+-- ── 4c. Helpers de contexte utilisateur (shims, remplacés par les migrations) ─
+-- get_current_user_tenant_id() : retourne UUID ; NULL si pas de contexte.
+-- Remplacé par supabase/migrations/20260701_initial_schema.sql.
+CREATE OR REPLACE FUNCTION public.get_current_user_tenant_id()
+RETURNS uuid LANGUAGE sql STABLE AS $$
+  SELECT nullif(current_setting('request.jwt.claim.tenant_id', true), '')::uuid;
+$$;
+
+-- get_current_user_role() : retourne user_role ; NULL si pas de contexte.
+-- Remplacé par supabase/migrations/20260701_initial_schema.sql.
+CREATE OR REPLACE FUNCTION public.get_current_user_role()
+RETURNS public.user_role LANGUAGE sql STABLE AS $$
+  SELECT nullif(current_setting('request.jwt.claim.role', true), '')::public.user_role;
+$$;
+
+-- is_super_admin() : retourne BOOLEAN.
+-- Remplacé par supabase/migrations/20260701_initial_schema.sql.
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT current_setting('request.jwt.claim.role', true) = 'super_admin';
+$$;
+
 -- ── 5. Schéma storage (buckets référencés par les migrations) ────────────────
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id         text PRIMARY KEY,
