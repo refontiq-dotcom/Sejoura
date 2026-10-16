@@ -231,7 +231,11 @@ CREATE TABLE IF NOT EXISTS booking_extensions (
 CREATE TABLE IF NOT EXISTS client_service_requests (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   UUID NOT NULL,
-  client_id   UUID,
+  booking_id  UUID NOT NULL,
+  client_id   UUID NOT NULL,
+  request_type TEXT NOT NULL,
+  message     TEXT,
+  status      TEXT NOT NULL DEFAULT 'pending',
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
