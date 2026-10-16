@@ -76,6 +76,18 @@ AS $$
   SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
 
+-- ── auth.role() ─────────────────────────────────────────────────────────────
+-- Remplaçant de auth.role() de Supabase : retourne 'authenticated' par défaut
+-- dans l'environnement de recette (pas de JWT, pas de Supabase GoTrue).
+-- Utilisé par les politiques RLS des migrations historiques (ex: feature_requests).
+CREATE OR REPLACE FUNCTION auth.role()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT 'authenticated';
+$$;
+
 -- ── 5. Schéma storage (buckets référencés par les migrations) ────────────────
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id         text PRIMARY KEY,
