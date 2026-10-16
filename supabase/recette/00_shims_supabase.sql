@@ -525,10 +525,6 @@ DO $$ BEGIN
     CREATE POLICY "employee_assignments_select_tenant" ON employee_assignments
       FOR SELECT USING (true);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subscription_payment_intents' AND policyname = 'sub_payment_intents_own') THEN
-    CREATE POLICY "sub_payment_intents_own" ON subscription_payment_intents
-      FOR SELECT USING (true);
-  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'trouvetou_providers' AND policyname = 'trouvetou_providers_select_tenant') THEN
     CREATE POLICY "trouvetou_providers_select_tenant" ON trouvetou_providers
       FOR SELECT USING (true);
