@@ -123,6 +123,20 @@ CREATE OPERATOR public.= (
   COMMUTATOR = '='
 );
 
+-- Operateur inverse user_role = text (necessaire pour
+-- get_current_user_role() = 'admin_residence' dans les politiques RLS).
+CREATE OR REPLACE FUNCTION public._user_role_eq_text(ur public.user_role, t text)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT ur::text = t;
+$$;
+
+CREATE OPERATOR public.= (
+  LEFTARG = public.user_role,
+  RIGHTARG = text,
+  PROCEDURE = public._user_role_eq_text,
+  COMMUTATOR = '='
+);
+
 -- ── 4c. Helpers de contexte utilisateur (shims, remplacés par les migrations) ─
 -- get_current_user_tenant_id() : retourne UUID ; NULL si pas de contexte.
 -- Remplacé par supabase/migrations/20260701_initial_schema.sql.
