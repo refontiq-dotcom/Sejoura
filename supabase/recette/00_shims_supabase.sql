@@ -255,8 +255,17 @@ CREATE TABLE IF NOT EXISTS shifts (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id      UUID NOT NULL,
   accommodation_id UUID,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  receptionist_id  UUID NOT NULL,
+  opened_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  closed_at        TIMESTAMPTZ,
+  opening_cash     INTEGER NOT NULL DEFAULT 0,
+  expected_cash    INTEGER,
+  counted_cash     INTEGER,
+  difference       INTEGER,
+  status           TEXT NOT NULL DEFAULT 'open',
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS stay_activities (
