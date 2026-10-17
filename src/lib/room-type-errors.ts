@@ -32,3 +32,16 @@ export function describeRoomTypeError(error: DbError, action: "save" | "delete")
   const fallback = action === "delete" ? "Suppression impossible" : "Enregistrement impossible";
   return error?.message ? `${fallback} : ${error.message}` : `${fallback}.`;
 }
+
+/** Erreur lors de la suppression d'une chambre (clé étrangère bookings.room_id en NO ACTION). */
+export function describeRoomDeleteError(error: DbError): string {
+  const code = error?.code ?? "";
+  const text = `${error?.message ?? ""} ${error?.details ?? ""}`;
+  if (code === "23503") {
+    return "Cette chambre a des réservations enregistrées : elle ne peut pas être supprimée, afin de conserver l'historique et la comptabilité.";
+  }
+  if (code === "42501" || /row-level security/i.test(text)) {
+    return "Vous n'avez pas les droits pour supprimer cette chambre.";
+  }
+  return error?.message ? `Suppression impossible : ${error.message}` : "Suppression impossible.";
+}

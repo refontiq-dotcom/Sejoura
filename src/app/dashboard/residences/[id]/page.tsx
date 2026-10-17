@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import {
   type RoomTypeFormErrors,
   type RoomTypeFormState,
 } from "@/lib/validations/rooms";
-import { describeRoomTypeError } from "@/lib/room-type-errors";
+import { describeRoomDeleteError, describeRoomTypeError } from "@/lib/room-type-errors";
 import type { Accommodation, RoomType, Room } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -43,7 +43,11 @@ export default function ResidenceDetailPage() {
   const [roomModalOpen, setRoomModalOpen] = useState(false);
   const [typeModalOpen, setTypeModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteItem, setDeleteItem] = useState<{ type: "room" | "type" | "residence"; id: string; name: string } | null>(null);
+  type DeleteItem = { type: "room" | "type" | "residence"; id: string; name: string };
+  const [deleteItem, setDeleteItem] = useState<DeleteItem | null>(null);
+  // Nombre de réservations touchées par la suppression (null = vérification en cours).
+  const [deleteBookingCount, setDeleteBookingCount] = useState<number | null>(null);
+  const deleteRequestRef = useRef(0);
 
   const [residenceForm, setResidenceForm] = useState({ name: "", accommodation_type: "residence", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
@@ -266,6 +270,29 @@ export default function ResidenceDetailPage() {
     }
   }
 
+  /** Ouvre la confirmation et compte les réservations qui seraient touchées. */
+  async function requestDelete(item: DeleteItem) {
+    const token = ++deleteRequestRef.current;
+    setDeleteItem(item);
+    setDeleteBookingCount(item.type === "type" ? 0 : null);
+    setDeleteConfirmOpen(true);
+    if (item.type === "type") return;
+
+    let count = 0;
+    try {
+      const supabase = createClient();
+      const base = supabase.from("bookings").select("id", { count: "exact", head: true });
+      const { count: found, error } = await (item.type === "room"
+        ? base.eq("room_id", item.id)
+        : base.eq("accommodation_id", item.id));
+      // En cas d'échec du comptage on n'invente pas de chiffre : la base reste le garde-fou.
+      if (!error) count = found ?? 0;
+    } catch (err) {
+      console.error("[delete] booking count error:", err);
+    }
+    if (deleteRequestRef.current === token) setDeleteBookingCount(count);
+  }
+
   async function deleteRoom(id: string): Promise<boolean> {
     setSaving(true);
     try {
@@ -276,8 +303,8 @@ export default function ResidenceDetailPage() {
       toast.success("Chambre supprimée 🗑️");
       return true;
     } catch (err) {
-      toast.error("La chambre n'a pas pu être supprimée 🛏️");
-      console.error(err);
+      console.error("[rooms] delete error:", err);
+      toast.error(describeRoomDeleteError(err as { code?: string; message?: string }));
       return false;
     } finally {
       setSaving(false);
@@ -496,6 +523,30 @@ export default function ResidenceDetailPage() {
   const deleteTypeRoomCount =
     deleteItem?.type === "type" ? rooms.filter((room) => room.room_type_id === deleteItem.id).length : 0;
 
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  let deleteDescription = "Êtes-vous sûr de vouloir supprimer cet élément ?";
+  let deleteBlocked = false;
+  if (deleteItem?.type === "type") {
+    deleteBlocked = deleteTypeRoomCount > 0;
+    deleteDescription = deleteBlocked
+      ? `Le type « ${deleteItem.name} » contient ${plural(deleteTypeRoomCount, "chambre", "chambres")}. Supprimez ou déplacez-les avant de supprimer ce type.`
+      : `Supprimer le type « ${deleteItem.name} » ?`;
+  } else if (deleteItem?.type === "room") {
+    deleteBlocked = deleteBookingCount === null || deleteBookingCount > 0;
+    deleteDescription =
+      deleteBookingCount === null
+        ? `Vérification des réservations de la chambre ${deleteItem.name}…`
+        : deleteBookingCount > 0
+          ? `La chambre ${deleteItem.name} a ${plural(deleteBookingCount, "réservation enregistrée", "réservations enregistrées")}. Elle ne peut pas être supprimée, afin de conserver l'historique et la comptabilité.`
+          : `Supprimer la chambre ${deleteItem.name} ?`;
+  } else if (deleteItem?.type === "residence") {
+    deleteBlocked = deleteBookingCount === null;
+    deleteDescription =
+      deleteBookingCount === null
+        ? "Vérification du contenu de l'établissement…"
+        : `Supprimer « ${deleteItem.name} » est définitif : ses ${plural(roomTypes.length, "type de chambre", "types de chambre")}, ses ${plural(rooms.length, "chambre", "chambres")} et ${plural(deleteBookingCount, "réservation", "réservations")} seront effacés.`;
+  }
+
   return (
     <div className="space-y-3 animate-fade-in">
       <div className="flex items-center gap-4">
@@ -533,7 +584,7 @@ export default function ResidenceDetailPage() {
             <Button variant="outline" onClick={openEditResidenceModal}>
               <Edit2 className="w-4 h-4" /> Modifier l&apos;établissement
             </Button>
-             <Button variant="outline" onClick={() => { setDeleteItem({ type: "residence", id: residence.id, name: residence.name }); setDeleteConfirmOpen(true); }} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement" aria-label="Supprimer l'établissement">
+             <Button variant="outline" onClick={() => requestDelete({ type: "residence", id: residence.id, name: residence.name })} className="text-red-600 hover:text-red-700" title="Supprimer l'établissement" aria-label="Supprimer l'établissement">
                <Trash2 className="w-4 h-4" />
              </Button>
           </div>
@@ -573,7 +624,7 @@ export default function ResidenceDetailPage() {
                       <button onClick={() => openEditTypeModal(rt)} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" title="Modifier le type de chambre" aria-label="Modifier le type de chambre">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => { setDeleteItem({ type: "type", id: rt.id, name: rt.name }); setDeleteConfirmOpen(true); }} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre" aria-label="Supprimer le type de chambre">
+                      <button onClick={() => requestDelete({ type: "type", id: rt.id, name: rt.name })} className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600" title="Supprimer le type de chambre" aria-label="Supprimer le type de chambre">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -675,7 +726,7 @@ export default function ResidenceDetailPage() {
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => { setDeleteItem({ type: "room", id: room.id, name: room.room_number }); setDeleteConfirmOpen(true); }}
+                                onClick={() => requestDelete({ type: "room", id: room.id, name: room.room_number })}
                                 className="p-1 rounded-md text-slate-400 dark:text-slate-500 hover:bg-red-50 hover:text-red-600"
                                 title="Supprimer la chambre"
                                 aria-label="Supprimer la chambre"
@@ -792,13 +843,7 @@ export default function ResidenceDetailPage() {
 
       {/* Delete confirmation */}
       {!isReadOnly && (
-        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description={
-          deleteItem?.type === "type"
-            ? deleteTypeRoomCount > 0
-              ? `Le type « ${deleteItem.name} » contient ${deleteTypeRoomCount} chambre${deleteTypeRoomCount > 1 ? "s" : ""}. Supprimez ou déplacez-les avant de supprimer ce type.`
-              : `Supprimer le type « ${deleteItem.name} » ?`
-            : "Êtes-vous sûr de vouloir supprimer cet élément ?"
-        }>
+        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description={deleteDescription}>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
             <Button
@@ -815,7 +860,7 @@ export default function ResidenceDetailPage() {
                 }
               }}
               loading={saving}
-              disabled={deleteItem?.type === "type" && deleteTypeRoomCount > 0}
+              disabled={deleteBlocked}
             >
               Supprimer
             </Button>

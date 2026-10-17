@@ -122,3 +122,15 @@ describe("describeRoomTypeError", () => {
     expect(describeRoomTypeError({ message: "boom" }, "save")).toContain("boom");
   });
 });
+
+import { describeRoomDeleteError } from "../src/lib/room-type-errors";
+
+describe("describeRoomDeleteError", () => {
+  it("explique qu'une chambre avec réservations ne peut pas être supprimée", () => {
+    expect(describeRoomDeleteError({ code: "23503" })).toMatch(/réservations/);
+  });
+  it("traduit les droits insuffisants et conserve les autres messages", () => {
+    expect(describeRoomDeleteError({ code: "42501" })).toMatch(/droits/);
+    expect(describeRoomDeleteError({ message: "boom" })).toContain("boom");
+  });
+});
