@@ -12,6 +12,7 @@ import { useCurrency } from "@/hooks/use-currency";
 import { getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
 import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, Store } from "lucide-react";
 import { RoomTypeForm } from "@/components/dashboard/room-type-form";
+import { PanoramaManager } from "@/components/dashboard/panorama-manager";
 import {
   EMPTY_ROOM_TYPE_FORM,
   toRoomTypeInsertPayload,
@@ -774,6 +775,12 @@ export default function ResidenceDetailPage() {
               onUploadPhoto={uploadTypeImage}
               uploadingPhoto={uploadingImage}
               disabled={saving}
+              panoramaSlot={
+                editingType ? <PanoramaManager roomTypeId={editingType.id} isReadOnly={isReadOnly} /> : null
+              }
+              panoramaUnavailableReason={
+                editingType ? undefined : "La visite 360° s'ajoute après la création du type de chambre."
+              }
             />
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)} disabled={saving}>Annuler</Button>

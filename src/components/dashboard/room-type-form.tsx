@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type Dispatch, type SetStateAction } from "react";
+import { useId, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { toast } from "sonner";
 import { AlertCircle, Check, ImagePlus, Loader2, Store, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,13 @@ interface RoomTypeFormProps {
   /** Envoi d'un fichier photo (variant « full »). */
   onUploadPhoto?: (file: File) => void;
   uploadingPhoto?: boolean;
+  /**
+   * Gestionnaire de visite 360°, rendu entre les photos classiques et l'interrupteur
+   * Trouvetou. Fourni par l'appelant : une visite se rattache à un type déjà enregistré.
+   */
+  panoramaSlot?: ReactNode;
+  /** Message affiché à la place du gestionnaire quand il n'est pas encore disponible. */
+  panoramaUnavailableReason?: string;
 }
 
 export function RoomTypeForm({
@@ -48,6 +55,8 @@ export function RoomTypeForm({
   disabled = false,
   onUploadPhoto,
   uploadingPhoto = false,
+  panoramaSlot,
+  panoramaUnavailableReason,
 }: RoomTypeFormProps) {
   const uid = useId();
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
@@ -316,6 +325,16 @@ export function RoomTypeForm({
               <p className="mt-1 text-[11px] text-[var(--destructive)]">{errors.featured_images}</p>
             )}
           </div>
+
+          {/* Visite 360° — distincte des photos classiques, jamais une photo de plus */}
+          {panoramaSlot ?? (
+            panoramaUnavailableReason ? (
+              <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-600 p-3">
+                <p className="text-xs font-semibold text-slate-900 dark:text-white">Visite 360°</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{panoramaUnavailableReason}</p>
+              </div>
+            ) : null
+          )}
 
           {/* Visibilité Trouvetou */}
           <div
