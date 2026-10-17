@@ -10,8 +10,17 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useCurrency } from "@/hooks/use-currency";
 import { getRoomStatusLabel, getRoomStatusColor } from "@/lib/utils";
-import { ROOM_AMENITIES } from "@/lib/amenities";
-import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, ImagePlus, Store, Check, X } from "lucide-react";
+import { Plus, MapPin, Phone, BedDouble, Edit2, Trash2, Loader2, ArrowLeft, Tag, AlertCircle, Eye, Ruler, Store } from "lucide-react";
+import { RoomTypeForm } from "@/components/dashboard/room-type-form";
+import {
+  EMPTY_ROOM_TYPE_FORM,
+  toRoomTypeInsertPayload,
+  toRoomTypeUpdatePayload,
+  validateRoomTypeForm,
+  type RoomTypeFormErrors,
+  type RoomTypeFormState,
+} from "@/lib/validations/rooms";
+import { describeRoomTypeError } from "@/lib/room-type-errors";
 import type { Accommodation, RoomType, Room } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -37,8 +46,8 @@ export default function ResidenceDetailPage() {
 
   const [residenceForm, setResidenceForm] = useState({ name: "", accommodation_type: "residence", address: "", city: "", contact_phone: "", latitude: "", longitude: "" });
   const [roomForm, setRoomForm] = useState({ room_number: "", floor: "", room_type_id: "", accommodation_id: "" });
-  const [typeForm, setTypeForm] = useState({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: "", amenities: [] as string[], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [] as string[], check_out_time: "11:00" });
-  const [newTypeImageUrl, setNewTypeImageUrl] = useState("");
+  const [typeForm, setTypeForm] = useState<RoomTypeFormState>({ ...EMPTY_ROOM_TYPE_FORM });
+  const [typeErrors, setTypeErrors] = useState<RoomTypeFormErrors>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
@@ -276,14 +285,14 @@ export default function ResidenceDetailPage() {
 
   function openAddTypeModal() {
     setEditingType(null);
-    setNewTypeImageUrl("");
-    setTypeForm({ name: "", description: "", base_price: "", capacity: "2", accommodation_id: residenceId, amenities: [], surface_m2: "", is_listed_on_trouvetou: false, featured_images: [], check_out_time: "11:00" });
+    setTypeErrors({});
+    setTypeForm({ ...EMPTY_ROOM_TYPE_FORM, accommodation_id: residenceId });
     setTypeModalOpen(true);
   }
 
   function openEditTypeModal(rt: RoomType) {
     setEditingType(rt);
-    setNewTypeImageUrl("");
+    setTypeErrors({});
     setTypeForm({
       name: rt.name,
       description: rt.description || "",
@@ -294,38 +303,9 @@ export default function ResidenceDetailPage() {
       surface_m2: rt.surface_m2 ? rt.surface_m2.toString() : "",
       is_listed_on_trouvetou: rt.is_listed_on_trouvetou,
       featured_images: (rt.featured_images || []).slice(0, 4),
-      check_out_time: rt.check_out_time || "11:00",
+      check_out_time: (rt.check_out_time || "11:00").slice(0, 5),
     });
     setTypeModalOpen(true);
-  }
-
-  function toggleTypeAmenity(amenity: string) {
-    setTypeForm((prev) => ({
-      ...prev,
-      amenities: prev.amenities.includes(amenity)
-        ? prev.amenities.filter((a) => a !== amenity)
-        : [...prev.amenities, amenity],
-    }));
-  }
-
-  function addTypeImage() {
-    const url = newTypeImageUrl.trim();
-    if (!url) return;
-    if (typeForm.featured_images.length >= 4) {
-      toast.error("Maximum 4 photos classiques pour Trouvetou 📸");
-      return;
-    }
-    setTypeForm((prev) => ({
-      ...prev,
-      featured_images: prev.featured_images.length < 4
-        ? [...prev.featured_images, url].slice(0, 4)
-        : prev.featured_images,
-    }));
-    setNewTypeImageUrl("");
-  }
-
-  function removeTypeImage(index: number) {
-    setTypeForm((prev) => ({ ...prev, featured_images: prev.featured_images.filter((_, i) => i !== index) }));
   }
 
   async function uploadTypeImage(file: File) {
@@ -351,13 +331,13 @@ export default function ResidenceDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "L'action a échoué : uploader la photo.");
+        toast.error(data.error || "L'envoi de la photo a échoué.");
         return;
       }
       setTypeForm((prev) => ({
         ...prev,
-        featured_images: prev.featured_images.length < 4
-          ? [...prev.featured_images, data.url].slice(0, 4)
+        featured_images: prev.featured_images.length < 4 && !prev.featured_images.includes(data.url)
+          ? [...prev.featured_images, data.url]
           : prev.featured_images,
       }));
       toast.success("Photo ajoutée avec succès 📸");
@@ -368,74 +348,49 @@ export default function ResidenceDetailPage() {
     }
   }
 
-  function toggleTrouvetouListing() {
-    if (!typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
-      toast.error("Ajoutez une photo pour activer Trouvetou 📸");
-      return;
-    }
-    setTypeForm((prev) => ({ ...prev, is_listed_on_trouvetou: !prev.is_listed_on_trouvetou }));
-  }
-
   async function saveType() {
-    if (!typeForm.name || !typeForm.base_price) {
-      toast.error("Il manque des champs obligatoires ! Remplissez tout 📋");
-      return;
-    }
+    // Noms déjà pris dans cet établissement (hors le type en cours de modification).
+    const siblingNames = roomTypes
+      .filter((rt) => rt.accommodation_id === residenceId && rt.id !== editingType?.id)
+      .map((rt) => rt.name);
 
-    const nameLower = typeForm.name.trim().toLowerCase();
-    const isDuplicate = roomTypes.some(
-      (rt) => rt.name.trim().toLowerCase() === nameLower && rt.id !== editingType?.id
-    );
-    if (isDuplicate) {
-      toast.error("Ce nom de type de chambre existe déjà dans cette résidence 🛏️");
+    const result = validateRoomTypeForm(typeForm, { existingNames: siblingNames });
+    if (!result.success) {
+      setTypeErrors(result.errors);
+      toast.error("Corrigez les champs signalés en rouge.");
       return;
     }
+    setTypeErrors({});
 
-    if (typeForm.is_listed_on_trouvetou && typeForm.featured_images.length === 0) {
-      toast.error("Ajoutez une photo pour activer Trouvetou 📸");
-      return;
-    }
     setSaving(true);
     try {
       const supabase = createClient();
-      const surface_m2 = typeForm.surface_m2 ? parseFloat(typeForm.surface_m2) : null;
       let typeId = editingType?.id || "";
       if (editingType) {
-        const { error } = await supabase.from("room_types").update({
-          name: typeForm.name,
-          description: typeForm.description,
-          base_price: parseInt(typeForm.base_price),
-          capacity: parseInt(typeForm.capacity),
-          amenities: typeForm.amenities,
-          surface_m2,
-          is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
-          featured_images: typeForm.featured_images.slice(0, 4),
-          check_out_time: typeForm.check_out_time,
-        }).eq("id", editingType.id);
+        const { error } = await supabase
+          .from("room_types")
+          .update(toRoomTypeUpdatePayload(result.data))
+          .eq("id", editingType.id);
         if (error) throw error;
       } else {
-        const { data: created, error: insertError } = await supabase.from("room_types").insert({
-          accommodation_id: typeForm.accommodation_id,
-          name: typeForm.name,
-          description: typeForm.description,
-          base_price: parseInt(typeForm.base_price),
-          capacity: parseInt(typeForm.capacity),
-          amenities: typeForm.amenities,
-          surface_m2,
-          is_listed_on_trouvetou: typeForm.is_listed_on_trouvetou,
-          featured_images: typeForm.featured_images.slice(0, 4),
-          check_out_time: typeForm.check_out_time,
-        }).select("id").single();
-        if (insertError) throw insertError;
+        const { data: created, error } = await supabase
+          .from("room_types")
+          .insert(toRoomTypeInsertPayload(result.data))
+          .select("id")
+          .single();
+        if (error) throw error;
         typeId = created?.id || "";
       }
 
       // Synchronisation Trouvetou : l'interrupteur du type pilote la fiche publique.
-      // Déclenchée côté serveur (route dédiée) pour une logique transactionnelle
-      // et rejouable, sans boucle de requêtes côté client.
-      if (typeId) {
-        await syncTrouvetouForType(typeId);
-      }
+      // Inutile (et coûteuse : elle repousse tous les listings du tenant) tant que le
+      // type n'a jamais été diffusé ; indispensable s'il l'est ou vient de l'être
+      // (changement de prix, de photos, ou retrait de la diffusion).
+      const wasListed = editingType?.is_listed_on_trouvetou === true;
+      const syncError =
+        typeId && (result.data.is_listed_on_trouvetou || wasListed)
+          ? await syncTrouvetouForType(typeId)
+          : null;
 
       // Synchronisation intelligente de l'heure de sortie : dès que l'heure de
       // départ du type change, les réservations actives (confirmées / arrivées)
@@ -448,20 +403,28 @@ export default function ResidenceDetailPage() {
 
       setTypeModalOpen(false);
       loadData(true);
-      toast.success(editingType ? "Type de chambre modifié" : "Type de chambre créé");
+
+      const savedLabel = editingType ? "Type de chambre modifié" : "Type de chambre créé";
+      if (syncError) {
+        // Le type est bien enregistré : on ne l'annonce pas comme un échec total.
+        toast.warning(`${savedLabel}, mais la synchronisation Trouvetou a échoué : ${syncError}`);
+      } else {
+        toast.success(savedLabel);
+      }
     } catch (err) {
-      toast.error("L'action a échoué : enregistrer le type de chambre.");
-      console.error(err);
+      console.error("[room_types] save error:", err);
+      toast.error(describeRoomTypeError(err as { code?: string; message?: string }, "save"));
     } finally {
       setSaving(false);
     }
   }
 
-  async function syncTrouvetouForType(typeId: string) {
+  /** Renvoie null si la synchronisation a réussi, sinon un message d'erreur lisible. */
+  async function syncTrouvetouForType(typeId: string): Promise<string | null> {
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
+      if (!session?.access_token) return "session expirée, reconnectez-vous.";
 
       const res = await fetch("/api/v1/trouvetou/sync-type", {
         method: "POST",
@@ -472,20 +435,17 @@ export default function ResidenceDetailPage() {
         body: JSON.stringify({ roomTypeId: typeId }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        toast.error(data?.error || "Impossible de synchroniser la visibilité Trouvetou.");
-        return;
-      }
       const data = await res.json().catch(() => null);
-      if (data?.trouvetouPush && data.trouvetouPush.ok === false) {
-        toast.error(
-          data.trouvetouPush.error || "Fiche locale enregistrée mais le push Trouvetou a échoué."
-        );
+      if (!res.ok) {
+        return data?.error || "impossible de synchroniser la visibilité.";
       }
+      if (data?.trouvetouPush && data.trouvetouPush.ok === false) {
+        return data.trouvetouPush.error || "le portail n'a pas accepté la mise à jour.";
+      }
+      return null;
     } catch (err) {
       console.error("syncTrouvetouForType error:", err);
-      toast.error("La sync Trouvetou a échoué 🔄");
+      return "connexion impossible.";
     }
   }
 
@@ -510,6 +470,11 @@ export default function ResidenceDetailPage() {
   }
 
   async function deleteType(id: string): Promise<boolean> {
+    // Garde-fou côté interface ; la base refuse aussi (clé étrangère NO ACTION).
+    if (rooms.some((room) => room.room_type_id === id)) {
+      toast.error("Ce type contient encore des chambres. Supprimez ou déplacez-les d'abord.");
+      return false;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -519,13 +484,16 @@ export default function ResidenceDetailPage() {
       toast.success("Type de chambre supprimé 🗑️");
       return true;
     } catch (err) {
-      toast.error("Le type de chambre n'a pas pu être supprimé 🛏️");
-      console.error(err);
+      console.error("[room_types] delete error:", err);
+      toast.error(describeRoomTypeError(err as { code?: string; message?: string }, "delete"));
       return false;
     } finally {
       setSaving(false);
     }
   }
+
+  const deleteTypeRoomCount =
+    deleteItem?.type === "type" ? rooms.filter((room) => room.room_type_id === deleteItem.id).length : 0;
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -798,145 +766,17 @@ export default function ResidenceDetailPage() {
       {!isReadOnly && (
         <Modal open={typeModalOpen} onClose={() => setTypeModalOpen(false)} title={editingType ? "Modifier le type de chambre" : "Nouveau type de chambre"}>
           <div className="space-y-3">
-            <Input 
-              label="Type de chambre (ex: Chambre, Studio, Appartement, Suite)" 
-              value={typeForm.name} 
-              onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} 
-              placeholder="Studio" 
-              list="accommodation-types"
-              required 
+            <RoomTypeForm
+              value={typeForm}
+              onChange={setTypeForm}
+              errors={typeErrors}
+              currencySymbol={symbol}
+              onUploadPhoto={uploadTypeImage}
+              uploadingPhoto={uploadingImage}
+              disabled={saving}
             />
-            <datalist id="accommodation-types">
-              <option value="Chambre standard" />
-              <option value="Studio" />
-              <option value="Appartement" />
-              <option value="Suite" />
-              <option value="Villa" />
-              <option value="Chambre + Salon" />
-              <option value="2 Chambres + Salon" />
-              <option value="3 Chambres + Salon" />
-            </datalist>
-            <Input label="Description (optionnelle)" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} placeholder="Grand studio avec cuisine équipée" />
-            <div className="grid grid-cols-2 gap-2.5">
-              <Input label={`Prix de base (${symbol})`} type="number" value={typeForm.base_price} onChange={(e) => setTypeForm({ ...typeForm, base_price: e.target.value })} placeholder="15000" min="0" required />
-              <Input label="Capacité (personnes)" type="number" value={typeForm.capacity} onChange={(e) => setTypeForm({ ...typeForm, capacity: e.target.value })} placeholder="2" min="1" required />
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Input label="Superficie en m² (optionnelle)" type="number" value={typeForm.surface_m2} onChange={(e) => setTypeForm({ ...typeForm, surface_m2: e.target.value })} placeholder="25" min="0" />
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Heure de sortie <span className="text-slate-400 dark:text-slate-500 font-normal">(appliquée aux réservations)</span>
-                </label>
-                <Input type="time" value={typeForm.check_out_time} onChange={(e) => setTypeForm({ ...typeForm, check_out_time: e.target.value })} className="w-full" />
-              </div>
-            </div>
-
-            {/* Commodités */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Commodités</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {ROOM_AMENITIES.map((amenity) => {
-                  const checked = typeForm.amenities.includes(amenity);
-                  return (
-                    <button
-                      key={amenity}
-                      type="button"
-                      onClick={() => toggleTypeAmenity(amenity)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-left text-xs transition-colors ${
-                        checked
-                          ? "border-[var(--primary-color,#0C1C33)] bg-[var(--primary-muted)] text-slate-900 dark:text-white"
-                          : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                      }`}
-                    >
-                      <span className={`flex items-center justify-center w-3.5 h-3.5 rounded border ${checked ? "bg-[var(--primary-color,#0C1C33)] border-[var(--primary-color,#0C1C33)]" : "border-slate-300 dark:border-slate-500"}`}>
-                        {checked && <Check className="w-2.5 h-2.5 text-white" />}
-                      </span>
-                      {amenity}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Photos pour Trouvetou */}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                Photos de la chambre <span className="text-slate-400 font-normal">(4 maximum)</span>
-              </label>
-              {typeForm.featured_images.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {typeForm.featured_images.map((img, index) => (
-                    <div key={index} className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 dark:border-slate-600">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeTypeImage(index)}
-                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white"
-                        title="Retirer cette photo"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input value={newTypeImageUrl} onChange={(e) => setNewTypeImageUrl(e.target.value)} placeholder="URL de la photo (https://…)" />
-                <Button type="button" variant="outline" size="sm" onClick={addTypeImage} disabled={typeForm.featured_images.length >= 4}>
-                  <ImagePlus className="w-4 h-4" /> Ajouter
-                </Button>
-              </div>
-              <label
-                className={`flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-md border border-dashed border-slate-300 dark:border-slate-600 text-xs font-medium text-slate-500 dark:text-slate-400 ${typeForm.featured_images.length >= 4 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} hover:border-[var(--primary-color,#0C1C33)] hover:text-[var(--primary-color,#0C1C33)] transition-colors`}
-              >
-                {uploadingImage ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ImagePlus className="w-4 h-4" />
-                )}
-                {uploadingImage ? "Traitement en cours…" : typeForm.featured_images.length >= 4 ? "Limite atteinte : 4 photos maximum" : "Téléverser une photo depuis votre appareil (JPEG, PNG, WebP, AVIF — max 12 Mo, optimisée automatiquement)"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-                  className="hidden"
-                  disabled={uploadingImage || typeForm.featured_images.length >= 4}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadTypeImage(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            </div>
-
-            {/* Visibilité Trouvetou */}
-            <div className={`rounded-lg border p-3 space-y-2.5 ${typeForm.is_listed_on_trouvetou ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20" : "border-slate-200 dark:border-slate-600"}`}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-white">
-                    <Store className="w-3.5 h-3.5" /> Diffusion Trouvetou
-                  </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Afficher ce type de chambre sur le portail Trouvetou (si l&apos;abonnement est actif)</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={toggleTrouvetouListing}
-                  className={`relative w-10 h-5.5 shrink-0 rounded-full transition-colors ${typeForm.is_listed_on_trouvetou ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`}
-                  style={{ height: 22 }}
-                  aria-pressed={typeForm.is_listed_on_trouvetou}
-                  aria-label="Activer ou désactiver la diffusion Trouvetou"
-                >
-                  <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${typeForm.is_listed_on_trouvetou ? "left-5.5" : "left-0.5"}`} style={{ width: 18, height: 18, top: 2 }} />
-                </button>
-              </div>
-              <p className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
-                <AlertCircle className="w-3.5 h-3.5" /> L&apos;interrupteur ne peut s&apos;activer qu&apos;avec au moins une photo.
-              </p>
-            </div>
-
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)}>Annuler</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setTypeModalOpen(false)} disabled={saving}>Annuler</Button>
               <Button className="flex-1" onClick={saveType} loading={saving}>{editingType ? "Enregistrer" : "Créer"}</Button>
             </div>
           </div>
@@ -945,7 +785,13 @@ export default function ResidenceDetailPage() {
 
       {/* Delete confirmation */}
       {!isReadOnly && (
-        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description="Êtes-vous sûr de vouloir supprimer cet élément ?">
+        <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirmation" description={
+          deleteItem?.type === "type"
+            ? deleteTypeRoomCount > 0
+              ? `Le type « ${deleteItem.name} » contient ${deleteTypeRoomCount} chambre${deleteTypeRoomCount > 1 ? "s" : ""}. Supprimez ou déplacez-les avant de supprimer ce type.`
+              : `Supprimer le type « ${deleteItem.name} » ?`
+            : "Êtes-vous sûr de vouloir supprimer cet élément ?"
+        }>
           <div className="flex gap-3 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>Annuler</Button>
             <Button
@@ -962,6 +808,7 @@ export default function ResidenceDetailPage() {
                 }
               }}
               loading={saving}
+              disabled={deleteItem?.type === "type" && deleteTypeRoomCount > 0}
             >
               Supprimer
             </Button>
