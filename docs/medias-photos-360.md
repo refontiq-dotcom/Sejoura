@@ -310,8 +310,14 @@ validation et des dimensions mesurées sur les octets réels.
 ```
 
 Côté Trouvetou, `parsePanoramas()` valide ce payload et `room-card.tsx` affiche
-`room.panoramas[0]` dans `PanoramaViewer`. **Aucune modification de Trouvetou
-n'a été nécessaire.**
+`room.panoramas[0]` dans `PanoramaViewer` (bouton « Vue 360° »).
+
+> **Prérequis de livraison.** Le visionneur 360° n'était pas sur la branche
+> `main` de Trouvetou : il vivait sur `backup/local-wip-2026-09-29`. Il a été
+> porté sur `main` (branche `feat/panorama-viewer`, avec un test de contrat sur
+> ce payload exact). **Tant que cette version n'est pas déployée sur Trouvetou,
+> les panoramas sont stockés mais restent invisibles.** Voir « Mise en
+> production » ci-dessous.
 
 ### Fonction de séparation
 
@@ -364,4 +370,49 @@ de la base, jamais du client ; un identifiant appartenant à un autre
    des fichiers refusés, seulement un message utilisateur.
 5. La migration **n'a pas été appliquée** sur une base Supabase réelle (pas
    d'accès `DATABASE_URL` dans cet environnement).
+
+---
+
+## 7. Mise en production — liste de contrôle
+
+À faire dans cet ordre. Les points 2 et 3 sont les seuls qui peuvent faire
+échouer la visite *en silence* (le reste de la fiche s'affiche normalement).
+
+1. **Migrations** (appliquées par `npm run db:push`, dans l'ordre des fichiers) :
+   `20261006_room_type_panoramas`, `20261012_room_type_integrity`,
+   `20261013_protect_room_bookings`. Les trois sont rejouables sans effet de bord.
+   `20261012` renomme d'éventuels doublons de noms de types de chambre
+   (« Studio (2-a1b2) ») avant de poser l'index unique.
+2. **CORS du stockage public des médias (Cloudflare R2).** Le visionneur
+   Trouvetou charge le panorama comme texture WebGL avec
+   `crossOrigin="anonymous"` : sans en-tête `Access-Control-Allow-Origin`, le
+   navigateur refuse l'image et l'utilisateur voit « La visite 360° n'a pas pu
+   être chargée ». Les photos classiques, affichées par de simples `<img>`,
+   fonctionnent sans CORS, ce qui masque le problème en recette.
+   Dans R2 → bucket des médias (`R2_BUCKET_MEDIA`) → *Settings* → *CORS Policy* :
+
+   ```json
+   [
+     {
+       "AllowedOrigins": [
+         "https://trouvetou.com",
+         "https://trouvetou.vercel.app"
+       ],
+       "AllowedMethods": ["GET", "HEAD"],
+       "AllowedHeaders": ["*"],
+       "MaxAgeSeconds": 86400
+     }
+   ]
+   ```
+
+   Adapter la liste aux domaines réels de Trouvetou (les URL de prévisualisation
+   Vercel ne sont pas couvertes). Ces fichiers sont publics en lecture : un
+   `"*"` en `AllowedOrigins` reste acceptable si la liste est trop contraignante.
+3. **Version de Trouvetou.** Déployer Trouvetou avec la branche
+   `feat/panorama-viewer` fusionnée dans `main`.
+4. **Recette bout en bout** (une fois, en production ou en préproduction) :
+   téléverser un panorama 2:1 d'au moins 3000×1500 sur un type de chambre →
+   publier → activer « Diffusion Trouvetou » (au moins une photo classique est
+   exigée) → ouvrir l'annonce sur Trouvetou → « Vue 360° » → la scène doit se
+   charger et répondre au glissement.
 
