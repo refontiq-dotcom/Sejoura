@@ -1,0 +1,35 @@
+name: Control Center Metrics
+
+# Cadence horaire des métriques du Control Center.
+#
+# Pourquoi ici et pas dans vercel.json : le plan Vercel Hobby n'accepte que des
+# tâches planifiées QUOTIDIENNES. Une expression plus fréquente (« 0 * * * * »)
+# fait ÉCHOUER LE DÉPLOIEMENT ENTIER. Cela a bloqué toutes les mises en production
+# du 24/09 au 18/10/2026 (commit d40721c). Ne pas remettre ce cron dans vercel.json
+# tant que le projet n'est pas sur un plan Pro.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Synchronisation des métriques Séjoura → Control Center
+        env:
+          # Même hôte de production que trouvetou-sync.yml (l'URL Vercel fait foi).
+          METRICS_URL: "https://sejoura-lemon.vercel.app/api/cron/control-center-metrics"
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS -L -o /tmp/metrics.out -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$METRICS_URL")
+          echo "HTTP $code"
+          cat /tmp/metrics.out
+          echo
+          if [ "$code" != "200" ]; then
+            echo "Échec de la synchronisation des métriques (HTTP $code)"
+            exit 1
+          fi
