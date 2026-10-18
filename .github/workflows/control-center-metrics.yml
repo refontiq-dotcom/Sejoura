@@ -8,9 +8,18 @@ name: Control Center Metrics
 # du 24/09 au 18/10/2026 (commit d40721c). Ne pas remettre ce cron dans vercel.json
 # tant que le projet n'est pas sur un plan Pro.
 
+# PLANIFICATION SUSPENDUE (18/10/2026). La route répond HTTP 500 « Metrics synchronization
+# failed » : l'authentification (CRON_SECRET) est bonne, mais l'envoi vers le Control
+# Center échoue, soit parce que CONTROL_CENTER_URL / METRICS_PUSH_SECRET ne sont pas
+# définies sur Vercel, soit parce que le Control Center refuse la requête. Tant que ce
+# n'est pas réglé, une exécution horaire enverrait un e-mail d'échec chaque heure.
+#
+# Pour réactiver : 1) définir ces deux variables dans Vercel (Production) ;
+# 2) lancer ce workflow à la main (Actions > Control Center Metrics > Run workflow)
+# jusqu'à obtenir HTTP 200 ; 3) décommenter le bloc « schedule » ci-dessous.
 on:
-  schedule:
-    - cron: "0 * * * *"
+  # schedule:
+  #   - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
