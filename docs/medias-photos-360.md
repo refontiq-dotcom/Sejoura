@@ -378,11 +378,28 @@ de la base, jamais du client ; un identifiant appartenant à un autre
 À faire dans cet ordre. Les points 2 et 3 sont les seuls qui peuvent faire
 échouer la visite *en silence* (le reste de la fiche s'affiche normalement).
 
-1. **Migrations** (appliquées par `npm run db:push`, dans l'ordre des fichiers) :
-   `20261006_room_type_panoramas`, `20261012_room_type_integrity`,
-   `20261013_protect_room_bookings`. Les trois sont rejouables sans effet de bord.
-   `20261012` renomme d'éventuels doublons de noms de types de chambre
-   (« Studio (2-a1b2) ») avant de poser l'index unique.
+1. **Migrations.** La base de production ne suit dans `schema_migrations` que 21 des
+   117 fichiers : le reste a été appliqué à la main. `npm run db:push` **refuse
+   désormais de s'exécuter** dans cet état (il tenterait de rejouer 85 anciennes
+   migrations). Procédure, une seule fois :
+   ```bash
+   # a) enregistrer l'existant SANS l'exécuter (vérifier d'abord qu'il est bien en base)
+   npm run db:push -- --baseline 20261005_trouvetou_free_all_plans
+   # b) contrôle : doit lister exactement les 5 migrations ci-dessous
+   npm run db:push -- --dry-run
+   # c) appliquer
+   npm run db:push
+   ```
+   Les 5 migrations : `20261006_room_type_panoramas`, `20261011_accommodation_type`,
+   `20261012_room_type_integrity`, `20261013_protect_room_bookings`,
+   `20261014_serialize_booking_code_generation`. `20261006`, `20261012`, `20261013` et
+   `20261014` ont été rejouées plusieurs fois sur PostgreSQL 16 sans effet de bord ;
+   `20261011` est écrite pour l'être (`IF NOT EXISTS`, `DROP … IF EXISTS`) mais n'a pas été rejouée.
+   - `20261012` renomme d'éventuels doublons de noms de types (« Studio (2-a1b2) »).
+     Contrôle fait le 18/10/2026 sur la base : 0 doublon, donc aucun renommage.
+   - `20261014` corrige une course réelle : deux réservations simultanées du même
+     établissement pouvaient produire le même code `RES-yy-nnnn` et la seconde
+     échouait (erreur 23505). Le verrou est par établissement.
 2. **CORS du stockage public des médias (Cloudflare R2).** Le visionneur
    Trouvetou charge le panorama comme texture WebGL avec
    `crossOrigin="anonymous"` : sans en-tête `Access-Control-Allow-Origin`, le
