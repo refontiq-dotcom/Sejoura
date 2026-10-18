@@ -30,6 +30,8 @@ jobs:
           cat /tmp/metrics.out
           echo
           if [ "$code" != "200" ]; then
-            echo "Échec de la synchronisation des métriques (HTTP $code)"
+            # Annotation lisible depuis l'onglet Actions et l'API (sans ouvrir les journaux).
+            body=$(head -c 300 /tmp/metrics.out | tr '\n' ' ')
+            echo "::error title=Métriques Control Center::HTTP $code — $body"
             exit 1
           fi
