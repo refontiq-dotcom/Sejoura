@@ -66,7 +66,7 @@ BEGIN
 
   RETURN v_request;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 CREATE OR REPLACE FUNCTION reject_advertisement_payment(p_request_id UUID)
 RETURNS advertisement_payment_requests AS $$
@@ -117,4 +117,4 @@ BEGIN
 
   RETURN v_request;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
