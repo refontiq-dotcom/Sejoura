@@ -357,12 +357,50 @@ export interface RoomType {
   surface_m2: number | null;
   is_listed_on_trouvetou: boolean;
   featured_images: string[];
-  panorama_360_url: string | null;
-  panorama_360_preview_url: string | null;
-  panorama_360_mobile_url: string | null;
-  panorama_360_hd_url: string | null;
+  // Colonnes 360° non utilisées par le code. Elles EXISTENT bien en base
+  // (ajoutées hors migration) mais y sont NULL sur toutes les lignes ; la
+  // source de vérité des visites 360° est désormais la table
+  // `room_type_panoramas` (voir `RoomTypePanorama`), qui porte en plus un
+  // identifiant stable, un statut de validation et des dimensions vérifiées.
   panorama_tour: Record<string, unknown> | null;
   check_out_time: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Visite 360° (panorama équirectangulaire 2:1) d'un type de chambre.
+ * Miroir de la table `room_type_panoramas` (migration 20261006).
+ */
+export type RoomTypePanoramaStatus =
+  | "uploaded"
+  | "validated"
+  | "published"
+  | "rejected"
+  | "superseded";
+
+export interface RoomTypePanorama {
+  id: string;
+  room_type_id: string;
+  accommodation_id: string;
+  tenant_id: string;
+  media_type: "photo_360";
+  projection: "equirectangular_2_1";
+  storage_driver: "r2" | "supabase";
+  storage_bucket: string;
+  storage_key: string;
+  public_url: string;
+  content_type: string;
+  byte_size: number;
+  width: number;
+  height: number;
+  seam_delta: number | null;
+  original_filename: string | null;
+  status: RoomTypePanoramaStatus;
+  validation_error: string | null;
+  validated_at: string | null;
+  published_at: string | null;
+  superseded_at: string | null;
   created_at: string;
   updated_at: string;
 }

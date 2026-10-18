@@ -5,6 +5,15 @@ import { BedDouble, Building2, Check, ChevronLeft, ChevronRight, Loader2, Minus,
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
+import { RoomTypeForm } from "@/components/dashboard/room-type-form";
+import {
+  EMPTY_ROOM_TYPE_FORM,
+  toRoomTypeInsertPayload,
+  validateRoomTypeForm,
+  type RoomTypeFormErrors,
+  type RoomTypeFormState,
+} from "@/lib/validations/rooms";
+import { describeRoomTypeError } from "@/lib/room-type-errors";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import type { Room, RoomType } from "@/types/database";
@@ -34,11 +43,8 @@ export function InitialSetupFlow({
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedType, setSelectedType] = useState<RoomType | null>(null);
-  const [typeForm, setTypeForm] = useState({
-    name: "",
-    base_price: "",
-    capacity: "2",
-  });
+  const [typeForm, setTypeForm] = useState<RoomTypeFormState>({ ...EMPTY_ROOM_TYPE_FORM });
+  const [typeErrors, setTypeErrors] = useState<RoomTypeFormErrors>({});
   const [roomCount, setRoomCount] = useState(1);
   const [roomNumbers, setRoomNumbers] = useState<string[]>(["101"]);
 
@@ -102,7 +108,8 @@ export function InitialSetupFlow({
           return;
         }
 
-        setTypeForm({ name: "", base_price: "", capacity: "2" });
+        setTypeForm({ ...EMPTY_ROOM_TYPE_FORM });
+        setTypeErrors({});
       } catch (error) {
         console.error("initial setup load:", error);
         toast.error("Impossible de charger la configuration de votre établissement.");
@@ -140,37 +147,23 @@ export function InitialSetupFlow({
   async function createRoomType() {
     if (!accommodationId) return;
 
-    const name = typeForm.name.trim();
-    const basePrice = Number.parseInt(typeForm.base_price, 10);
-    const capacity = Number.parseInt(typeForm.capacity, 10);
-
-    if (!name || !Number.isFinite(basePrice) || basePrice <= 0 || !Number.isFinite(capacity) || capacity <= 0) {
-      toast.error("Renseignez le nom, le tarif par nuit et la capacité.");
+    const result = validateRoomTypeForm(
+      { ...typeForm, accommodation_id: accommodationId },
+      { existingNames: roomTypes.map((type) => type.name) }
+    );
+    if (!result.success) {
+      setTypeErrors(result.errors);
+      toast.error("Corrigez les champs signalés en rouge.");
       return;
     }
-
-    if (roomTypes.some((type) => type.name.trim().toLowerCase() === name.toLowerCase())) {
-      toast.error("Ce type de chambre existe déjà dans cet établissement.");
-      return;
-    }
+    setTypeErrors({});
 
     setSaving(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("room_types")
-        .insert({
-          accommodation_id: accommodationId,
-          name,
-          description: "",
-          base_price: basePrice,
-          capacity,
-          amenities: [],
-          surface_m2: null,
-          is_listed_on_trouvetou: false,
-          featured_images: [],
-          check_out_time: "11:00",
-        })
+        .insert(toRoomTypeInsertPayload(result.data))
         .select("*")
         .single();
 
@@ -185,7 +178,7 @@ export function InitialSetupFlow({
       toast.success("Type de chambre créé ✓");
     } catch (error) {
       console.error("initial setup type:", error);
-      toast.error("Impossible de créer le type de chambre.");
+      toast.error(describeRoomTypeError(error as { code?: string; message?: string }, "save"));
     } finally {
       setSaving(false);
     }
@@ -308,35 +301,13 @@ export function InitialSetupFlow({
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Input
-                  label="Nom du type de chambre *"
-                  value={typeForm.name}
-                  onChange={(event) => setTypeForm((current) => ({ ...current, name: event.target.value }))}
-                  placeholder="Ex. Chambre Standard"
-                  disabled={saving}
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Tarif par nuit *"
-                    type="number"
-                    min="1"
-                    value={typeForm.base_price}
-                    onChange={(event) => setTypeForm((current) => ({ ...current, base_price: event.target.value }))}
-                    placeholder="Ex. 25000"
-                    disabled={saving}
-                  />
-                  <Input
-                    label="Capacité *"
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={typeForm.capacity}
-                    onChange={(event) => setTypeForm((current) => ({ ...current, capacity: event.target.value }))}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
+              <RoomTypeForm
+                variant="compact"
+                value={typeForm}
+                onChange={setTypeForm}
+                errors={typeErrors}
+                disabled={saving}
+              />
 
               <div className="flex items-center justify-between gap-3 pt-1">
                 <Button variant="ghost" onClick={closeFlow} disabled={saving}>
