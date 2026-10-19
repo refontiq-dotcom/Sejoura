@@ -42,7 +42,9 @@ export function LanguageProvider({ children, initialLang = "fr" }: { children: R
         { onConflict: "user_id" }
       )
       .then(({ error }) => {
-        if (error) console.error("[i18n] unable to persist language preference", error);
+        if (error && typeof error.message === "string" && error.message.length > 0) {
+          console.error("[i18n] unable to persist language preference", error.message);
+        }
       });
   }, [lang, preferenceResolved]);
 

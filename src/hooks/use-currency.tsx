@@ -65,7 +65,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("sejoura-currency-updated", handleUpdate);
   }, []);
 
-  const displayCurrency = activeCurrency ?? currency;
+  const displayCurrency = activeCurrency?.code ? activeCurrency : currency;
 
   const setCurrency = (c: CurrencyInfo) => setCurrencyState(c);
 
