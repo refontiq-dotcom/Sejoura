@@ -31,21 +31,39 @@ export function LanguageProvider({ children, initialLang = "fr" }: { children: R
     if (!preferenceResolved || !resolvedUserIdRef.current) return;
 
     const supabase = createClient();
-    void supabase
-      .from("user_preferences")
-      .upsert(
-        {
-          user_id: resolvedUserIdRef.current,
-          language: lang,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-      .then(({ error }) => {
+    const preferenceUserId = resolvedUserIdRef.current;
+    const preferencePayload = {
+      user_id: preferenceUserId,
+      language: lang,
+      updated_at: new Date().toISOString(),
+    };
+
+    void (async () => {
+      try {
+        // La table user_preferences n'a pas de contrainte UNIQUE sur user_id :
+        // l'upsert avec ON CONFLICT (user_id) échoue avec « there is no unique
+        // or exclusion constraint matching the ON CONFLICT specification ».
+        // On fait donc une lecture puis update (si existant) ou insert.
+        const { data: existing } = await supabase
+          .from("user_preferences")
+          .select("user_id")
+          .eq("user_id", preferenceUserId)
+          .maybeSingle();
+
+        const { error } = existing
+          ? await supabase
+              .from("user_preferences")
+              .update(preferencePayload)
+              .eq("user_id", preferenceUserId)
+          : await supabase.from("user_preferences").insert(preferencePayload);
+
         if (error && typeof error.message === "string" && error.message.length > 0) {
           console.error("[i18n] unable to persist language preference", error.message);
         }
-      });
+      } catch (err) {
+        console.error("[i18n] unable to persist language preference", err);
+      }
+    })();
   }, [lang, preferenceResolved]);
 
   useEffect(() => {
