@@ -175,14 +175,10 @@ export function RoomCard({
       <div className="relative h-40 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-100 dark:from-slate-900/80 to-slate-200 dark:to-slate-800/80" />
         <div
-          className={`absolute inset-0 flex items-center justify-center ${illustration.gradient} opacity-90`}
+          className={`absolute inset-0 flex items-center justify-center overflow-hidden ${illustration.gradient} opacity-90`}
         >
-          <illustration.icon className="w-12 h-12 text-white/90 drop-shadow-lg" />
-        </div>
-        <div className="absolute top-3 left-3 z-10">
-          <span
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white text-xs font-bold shadow-sm backdrop-blur-sm"
-          >
+          <illustration.icon className="absolute -right-5 -bottom-7 w-28 h-28 text-white/10 -rotate-12" />
+          <span className="relative z-10 px-4 text-center text-5xl sm:text-6xl font-black italic leading-none tracking-tighter text-white select-none drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]">
             {room.room_number}
           </span>
         </div>
@@ -206,7 +202,7 @@ export function RoomCard({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white leading-tight">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
                 {room.room_number}
               </h3>
               {onClick && (
