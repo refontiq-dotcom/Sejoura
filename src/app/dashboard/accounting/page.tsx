@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StayTimeline } from "@/components/stay-timeline";
 import { ClientScoreBadge } from "@/components/client-score-badge";
+import { WaveLogo } from "@/components/ui/wave-logo";
 import type { Expense, AuditLog, Payment, Invoice, Client, Booking, ClientScoreTier, InvoiceStatus } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -2257,7 +2258,10 @@ export default function AccountingPage() {
                         </p>
                         {MOBILE_MONEY_OPERATORS.map((op) => (
                           <div key={op.value} className="flex items-center justify-between gap-6 text-[11px] py-0.5">
-                            <span className="text-slate-600 dark:text-slate-400">{op.label}</span>
+                            <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+                              {op.value === "wave" && <WaveLogo size={14} alt="" />}
+                              {op.label}
+                            </span>
                             <span className="font-bold text-slate-900 dark:text-white tabular-nums">{mobileMoneyBreakdown[op.value] ? fmt(mobileMoneyBreakdown[op.value]) : "—"}</span>
                           </div>
                         ))}

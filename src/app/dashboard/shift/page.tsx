@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { getActiveAssignmentId } from "@/lib/assignments";
 import { isMobileMoney, getMobileMoneyOperatorLabel, MOBILE_MONEY_OPERATORS } from "@/lib/utils";
+import { WaveLogo } from "@/components/ui/wave-logo";
 import type { Payment, Booking, Shift } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
 
@@ -55,9 +56,14 @@ interface ShiftPayment extends Payment {
   receptionist_name?: string;
 }
 
+// Logo officiel Wave (pingouin), à la place de l'icône générique « smartphone ».
+function WaveMethodIcon({ className = "" }: { className?: string }) {
+  return <WaveLogo size={12} alt="" className={className} />;
+}
+
 const METHOD_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   cash: { label: "Espèces", icon: Banknote },
-  wave: { label: "Wave", icon: Smartphone },
+  wave: { label: "Wave", icon: WaveMethodIcon },
   pi_spi: { label: "Pi-SPI", icon: Smartphone },
   mobile_money: { label: "Mobile Money", icon: Smartphone },
   bank: { label: "Virement", icon: Building },
@@ -817,7 +823,10 @@ export default function ShiftPage() {
                     <MethodIcon className="w-3 h-3" />
                     {methodInfo.label}
                     {p.payment_method === "mobile_money" && p.mobile_money_operator && (
-                      <span className="opacity-80">· {getMobileMoneyOperatorLabel(p.mobile_money_operator)}</span>
+                      <span className="inline-flex items-center gap-1 opacity-80">
+                        · {p.mobile_money_operator === "wave" && <WaveLogo size={12} alt="" />}
+                        {getMobileMoneyOperatorLabel(p.mobile_money_operator)}
+                      </span>
                     )}
                   </span>
                   {isAdmin && (
@@ -896,7 +905,10 @@ export default function ShiftPage() {
                           <MethodIcon className="w-3 h-3" />
                           {methodInfo.label}
                           {p.payment_method === "mobile_money" && p.mobile_money_operator && (
-                            <span className="opacity-80">· {getMobileMoneyOperatorLabel(p.mobile_money_operator)}</span>
+                            <span className="inline-flex items-center gap-1 opacity-80">
+                              · {p.mobile_money_operator === "wave" && <WaveLogo size={12} alt="" />}
+                              {getMobileMoneyOperatorLabel(p.mobile_money_operator)}
+                            </span>
                           )}
                         </span>
                       </td>

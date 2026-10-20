@@ -26,20 +26,7 @@ import {
 } from "lucide-react";
 import type { Subscription, SubscriptionPaymentRequest } from "@/types/database";
 import { useCurrentUser } from "@/contexts/current-user-context";
-
-// Icône stylisée de l'application Wave (bloc bleu + W)
-function WaveIcon({ className = "" }: { className?: string }) {
-  return (
-    <span
-      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-[#1C3AA9] text-white ${className}`}
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 17 L8 7 L10.5 14.5 L13 7 L16 17" />
-      </svg>
-    </span>
-  );
-}
+import { WaveLogo } from "@/components/ui/wave-logo";
 
 export default function SubscriptionPage() {
   const { fmt } = useCurrency();
@@ -495,7 +482,7 @@ export default function SubscriptionPage() {
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/10">
-                <WaveIcon className="h-6 w-6 rounded-lg" />
+                <WaveLogo size={24} alt="" />
               </div>
             </div>
 
@@ -507,7 +494,7 @@ export default function SubscriptionPage() {
                 rel="noopener noreferrer"
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1C3AA9] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-[#162C85] hover:shadow-blue-900/30"
               >
-                <WaveIcon className="bg-white/15" />
+                <WaveLogo size={20} alt="" className="rounded-md bg-white/15 p-0.5" />
                 Payer avec l&apos;application Wave
               </a>
               <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">

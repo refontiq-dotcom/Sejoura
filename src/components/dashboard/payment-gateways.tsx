@@ -14,6 +14,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
+import { WaveLogo } from "@/components/ui/wave-logo";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,8 @@ type Provider = {
   key: string;
   name: string;
   emoji: string;
+  /** Logo officiel à afficher à la place de l'emoji (quand il existe). */
+  logo?: "wave";
   color: string;
   description: string;
   docsUrl: string;
@@ -50,6 +53,7 @@ const PROVIDERS: Provider[] = [
     key: "wave",
     name: "Wave",
     emoji: "🌊",
+    logo: "wave",
     color: "#0070F3",
     description: "Paiement mobile Wave CI — Intégration directe via l'API Wave Business.",
     docsUrl: "https://developer.wave.com",
@@ -235,10 +239,14 @@ function ProviderCard({
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-xl overflow-hidden"
             style={{ backgroundColor: `${provider.color}15`, border: `1.5px solid ${provider.color}40` }}
           >
-            {provider.emoji}
+            {provider.logo === "wave" ? (
+              <WaveLogo size={28} alt="" />
+            ) : (
+              provider.emoji
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
