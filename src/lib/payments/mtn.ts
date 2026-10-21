@@ -131,7 +131,7 @@ export class MtnPaymentService implements PaymentProvider {
    *    Le client est notifié par PUSH/USSD sur son téléphone.
    *    Il faut afficher une page "Vérifiez votre téléphone MTN" sur Trouvetou.
    */
-  async initiatePayment(): Promise<PaymentInitResult> {
+  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API MTN sont disponibles
     /*
     try {
@@ -248,10 +248,14 @@ export class MtnPaymentService implements PaymentProvider {
    * Recommandation : vérifier l'IP source ou utiliser un token secret
    * passé dans l'URL du webhook (query param secret).
    */
-  validateWebhookSignature(): boolean {
-    // TODO : Implémenter validation IP source MTN
-    // IPs de production MTN : à demander à MTN lors de l'enrôlement
-    console.warn("[MTN] validateWebhookSignature non implémentée.");
-    return true; // ⚠️ À sécuriser en production
+  validateWebhookSignature(_payload: unknown, _signature: string): boolean {
+    // SECURITE (echec ferme) : MTN ne signe pas les webhooks par defaut et
+    // les IPs de production MTN ne sont pas encore obtenues ("a demander a
+    // MTN lors de l'enrolement"). Tant que ce n'est pas implemente et
+    // verifie, aucune notification ne peut etre acceptee par ce biais. Les
+    // webhooks entrants passent exclusivement par /api/v1/webhooks/payments
+    // qui impose un secret partage (x-webhook-secret) en plus.
+    console.warn("[MTN] validateWebhookSignature non implementee - refus ferme (aucune confirmation acceptee).");
+    return false;
   }
 }

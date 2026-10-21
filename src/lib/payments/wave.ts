@@ -166,7 +166,7 @@ export class WavePaymentService implements PaymentProvider {
    *   Webhook URL → https://sejoura-lemon.vercel.app/api/v1/webhooks/payments
    *   Événements → checkout.session.completed, checkout.session.expired
    */
-  validateWebhookSignature(): boolean {
+  validateWebhookSignature(_payload: unknown, _signature: string): boolean {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     const [tPart, vPart] = signature.split(",");

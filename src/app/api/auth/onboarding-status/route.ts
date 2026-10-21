@@ -31,7 +31,19 @@ export async function GET() {
       );
     }
 
-    const admin = createAdminClient();
+    // Le client admin (service_role) contourne les RLS pour vérifier
+    // l'onboarding. En dev local, la clé peut manquer : on dégrade vers le
+    // client de session (RLS) plutôt que de renvoyer une 500. Les lectures
+    // « profil propre » et « établissements du tenant » disposent de
+    // politiques compatibles, et accommodationError est déjà géré plus bas.
+    let admin = supabase;
+    try {
+      admin = createAdminClient() as typeof supabase;
+    } catch {
+      console.warn(
+        "[onboarding-status] SUPABASE_SERVICE_ROLE_KEY absente : dégradation vers le client de session."
+      );
+    }
 
     const { data: userData } = await admin
       .from("users")
@@ -113,7 +125,10 @@ export async function GET() {
       tenantId: userData.tenant_id,
       accommodationId: accommodation?.id ?? null,
     } satisfies OnboardingStatusResponse);
-  } catch {
+  } catch (error) {
+    // Log serveur pour diagnostiquer les 500 (sinon le catch silencieux
+    // masque la cause réelle, ex. clé service_role manquante).
+    console.error("[onboarding-status] erreur inattendue :", error);
     return NextResponse.json(
       { needsOnboarding: false, tenantId: null, accommodationId: null } satisfies OnboardingStatusResponse,
       { status: 500 }

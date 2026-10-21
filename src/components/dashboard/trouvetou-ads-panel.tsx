@@ -46,19 +46,7 @@ import {
   type AdStatus,
 } from "@/lib/ads";
 import type { Advertisement, AdvertisementTargeting } from "@/types/database";
-
-function WaveIcon({ className = "" }: { className?: string }) {
-  return (
-    <span
-      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-[#1C3AA9] text-white ${className}`}
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 17 L8 7 L10.5 14.5 L13 7 L16 17" />
-      </svg>
-    </span>
-  );
-}
+import { WaveLogo } from "@/components/ui/wave-logo";
 
 function statusBadgeVariant(status: AdStatus): "default" | "success" | "warning" | "error" | "info" {
   switch (status) {
@@ -619,7 +607,7 @@ export function TrouvetouAdsPanel() {
                   <span className="text-sm font-normal text-slate-400"> · {payTarget.duration_days} jours</span>
                 </p>
               </div>
-              <WaveIcon className="h-6 w-6 rounded-lg" />
+              <WaveLogo size={24} alt="" />
             </div>
             {waveUrl && (
               <a
@@ -628,7 +616,7 @@ export function TrouvetouAdsPanel() {
                 rel="noopener noreferrer"
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1C3AA9] px-4 py-3 text-sm font-bold text-white min-h-[44px]"
               >
-                <WaveIcon className="bg-white/15" />
+                <WaveLogo size={20} alt="" className="rounded-md bg-white/15 p-0.5" />
                 Payer avec l&apos;application Wave
               </a>
             )}
