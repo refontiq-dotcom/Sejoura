@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { expireAndUnpublishAdvertisements } from "@/lib/trouvetou/ads";
 import { syncListingsToTrouvetou } from "@/lib/trouvetou/sync";
-import { pushControlCenterMetrics } from "@/lib/control-center-metrics";
+import { describePushFailure, pushControlCenterMetrics } from "@/lib/control-center-metrics";
 import { getRequestId, logger } from "@/lib/logger";
 
 /**
@@ -63,8 +63,14 @@ export async function GET(req: Request) {
     const { payload } = await pushControlCenterMetrics();
     results.control_center_metrics = { ok: true, data: { status: payload.statut_sante } };
   } catch (error) {
-    logger.error("daily-tasks.control_center_metrics.failed", error, { request_id: requestId });
-    results.control_center_metrics = { ok: false, error: error instanceof Error ? error.message : "Erreur inconnue" };
+    // Étape, code et statut amont : la cause n'est plus noyée dans un message générique.
+    const failure = describePushFailure(error).body;
+    logger.error("daily-tasks.control_center_metrics.failed", error, {
+      request_id: requestId,
+      stage: String(failure.stage),
+      code: String(failure.code),
+    });
+    results.control_center_metrics = { ok: false, error: String(failure.message), ...failure };
   }
 
   const allOk = Object.values(results).every((r) => r.ok);

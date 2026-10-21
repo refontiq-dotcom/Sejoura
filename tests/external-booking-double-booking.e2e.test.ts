@@ -47,7 +47,10 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
     initialStatus: "confirmed" | "pending_payment" = "confirmed"
   ): Promise<{ id: string }> {
     const { rows } = await c.query(
-      `SELECT create_booking(
+      // `(create_booking(...)).id` et non `create_booking(...) AS booking` : la fonction
+      // renvoie un type composite que le driver pg livre en TEXTE « (uuid,…) », donc
+      // `.id` valait `undefined` et les UPDATE/DELETE ciblés par id ne touchaient rien.
+      `SELECT (create_booking(
          p_tenant_id := $1,
          p_accommodation_id := $2,
          p_room_id := $3,
@@ -63,7 +66,7 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
          p_special_requests := $8,
          p_booking_source := 'external',
          p_initial_status := $9::booking_status
-       ) AS booking`,
+       )).id AS id`,
       [
         fixture.tenantId,
         fixture.accommodationId,
@@ -76,7 +79,7 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
         initialStatus,
       ]
     );
-    return rows[0].booking as { id: string };
+    return rows[0] as { id: string };
   }
 
   async function expectCreateRejected(c: pg.Client): Promise<RpcError> {
@@ -138,7 +141,7 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
     // `Invalid Date` → `RangeError: Invalid time value` sur `toISOString()`.
     // On normalise donc explicitement vers minuit UTC, avec garde d'erreur.
     const { rows: dateRows } = await client.query(
-      `SELECT (COALESCE(MAX(check_out_date), CURRENT_DATE) + INTERVAL '30 days')::date AS start
+      `SELECT (COALESCE(MAX(check_out_date), CURRENT_DATE) + INTERVAL '30 days')::date::text AS start
        FROM public.bookings
        WHERE room_id = $1
          AND status IN ('pending_payment', 'confirmed', 'checked_in')`,
@@ -245,7 +248,7 @@ describeDb("Anti double-booking — create_booking (base réelle)", () => {
     async () => {
       const clientB = new pg.Client({ connectionString: DATABASE_URL });
       await clientB.connect();
-      let loserError: RpcError | null = null;
+      let loserError = null as RpcError | null;
 
       try {
         // Act

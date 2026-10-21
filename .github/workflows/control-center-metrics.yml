@@ -1,0 +1,46 @@
+name: Control Center Metrics
+
+# Cadence horaire des métriques du Control Center.
+#
+# Pourquoi ici et pas dans vercel.json : le plan Vercel Hobby n'accepte que des
+# tâches planifiées QUOTIDIENNES. Une expression plus fréquente (« 0 * * * * »)
+# fait ÉCHOUER LE DÉPLOIEMENT ENTIER. Cela a bloqué toutes les mises en production
+# du 24/09 au 18/10/2026 (commit d40721c). Ne pas remettre ce cron dans vercel.json
+# tant que le projet n'est pas sur un plan Pro.
+
+# PLANIFICATION SUSPENDUE (18/10/2026). La route répond HTTP 500 « Metrics synchronization
+# failed » : l'authentification (CRON_SECRET) est bonne, mais l'envoi vers le Control
+# Center échoue, soit parce que CONTROL_CENTER_URL / METRICS_PUSH_SECRET ne sont pas
+# définies sur Vercel, soit parce que le Control Center refuse la requête. Tant que ce
+# n'est pas réglé, une exécution horaire enverrait un e-mail d'échec chaque heure.
+#
+# Pour réactiver : 1) définir ces deux variables dans Vercel (Production) ;
+# 2) lancer ce workflow à la main (Actions > Control Center Metrics > Run workflow)
+# jusqu'à obtenir HTTP 200 ; 3) décommenter le bloc « schedule » ci-dessous.
+on:
+  # schedule:
+  #   - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Synchronisation des métriques Séjoura → Control Center
+        env:
+          # Même hôte de production que trouvetou-sync.yml (l'URL Vercel fait foi).
+          METRICS_URL: "https://sejoura-lemon.vercel.app/api/cron/control-center-metrics"
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS -L -o /tmp/metrics.out -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$METRICS_URL")
+          echo "HTTP $code"
+          cat /tmp/metrics.out
+          echo
+          if [ "$code" != "200" ]; then
+            # Annotation lisible depuis l'onglet Actions et l'API (sans ouvrir les journaux).
+            body=$(head -c 300 /tmp/metrics.out | tr '\n' ' ')
+            echo "::error title=Métriques Control Center::HTTP $code — $body"
+            exit 1
+          fi
