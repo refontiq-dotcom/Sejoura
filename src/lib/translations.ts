@@ -767,6 +767,7 @@ export const translations = {
         { label: "Rooms", href: "/dashboard/rooms" },
         { label: "Bookings", href: "/dashboard/bookings" },
         { label: "Cleaning", href: "/dashboard/cleaning" },
+        { label: "My Shift / Cash", href: "/dashboard/shift" },
         { label: "Accounting", href: "/dashboard/accounting" },
         { label: "Employees", href: "/dashboard/employees" },
         { label: "HR Records", href: "/dashboard/hr" },

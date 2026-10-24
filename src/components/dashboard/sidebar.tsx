@@ -17,6 +17,7 @@ import {
   Store,
   IdCard,
   DoorOpen,
+  Globe,
 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { getRoleLabel } from "@/lib/utils";
@@ -104,8 +105,10 @@ function SidebarImpl({ userRole, userName, companyName, companyLogo = null, them
   const filteredItems = useMemo(
     () => navItems
       .filter((item) => !item.roles || item.roles.includes(userRole))
-      .map((item) => ({ ...item, label: t.navItems[item.translationIndex]?.label ?? "" })),
-    [userRole, t.navItems]
+      // Résolution par `href` (et non par index) : les listes FR/EN n'ont pas
+      // forcément le même nombre d'entrées, l'index serait désaligné.
+      .map((item) => ({ ...item, label: navLabels[item.href] ?? "" })),
+    [userRole, navLabels]
   );
 
   return (
