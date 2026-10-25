@@ -3,7 +3,22 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSupabaseUrl, getSupabasePublicKey } from "@/lib/supabase/env";
 
+const ADMIN_ONLY_ROUTES = [
+  "/dashboard/accounting",
+  "/dashboard/employees",
+  "/dashboard/subscription",
+  "/dashboard/residences",
+];
 
+const EMPLOYEE_ALLOWED_ROUTES = [
+  "/dashboard",
+  "/dashboard/bookings",
+  "/dashboard/cleaning",
+  "/dashboard/shift",
+  "/dashboard/residences/",
+  "/dashboard/rooms",
+  "/dashboard/settings",
+];
 
 function isAdminOnlyRoute(pathname: string): boolean {
   if (pathname === "/dashboard/residences") return true;
@@ -98,10 +113,7 @@ export async function middleware(req: NextRequest) {
   const role = dbRole as string | null;
 
   
-  // Les anciens comptes super_admin Séjoura sont donc privés de tout accès applicatif.
-  // Exception : la console de validation des demandes de site vitrine
-  // (/admin/vitrine), qui est un flux de gestion propre à Séjoura.
-  
+  // Les anciens comptes super_admin Séjoura sont privés de tout accès applicatif.
 
   const isEmployee = role === "receptionniste" || role === "menagere";
 
@@ -124,5 +136,4 @@ export async function middleware(req: NextRequest) {
 
   return supabaseResponse;
 }
-
 
