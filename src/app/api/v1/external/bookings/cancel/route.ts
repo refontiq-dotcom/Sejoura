@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/external/bookings/cancel
@@ -17,45 +18,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const isTrouvetou = isTrouvetouBookingRequest(request.headers);
     const authHeader = request.headers.get("x-api-key") || request.headers.get("authorization") || "";
     const apiKey = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-    if (!apiKey) {
+    if (!apiKey && !isTrouvetou) {
       return NextResponse.json({ error: "Clé API manquante" }, { status: 401 });
     }
 
     const admin = createAdminClient();
-    const { data: keyData, error } = await admin
-      .from("external_api_keys")
-      .select("tenant_id, is_active, scopes")
-      .eq("api_key", apiKey)
-      .maybeSingle();
-
-    if (error || !keyData || !keyData.is_active) {
-      return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
-    }
-
-    const scopes = keyData.scopes || [];
-    if (!scopes.includes("bookings")) {
-      return NextResponse.json(
-        { error: "Cette clé API n'a pas le scope 'bookings'" },
-        { status: 403 }
-      );
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", keyData.tenant_id)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json(
-        { error: "Cette clé API est réservée à la formule Entreprise" },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
@@ -66,7 +37,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "booking_id est requis" }, { status: 400 });
     }
 
-    const tenantId = keyData.tenant_id;
+    let tenantId: string;
+    if (isTrouvetou) {
+      const { data: booking } = await admin
+        .from("bookings")
+        .select("tenant_id")
+        .eq("id", booking_id)
+        .maybeSingle();
+      if (!booking) {
+        return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
+      }
+      tenantId = booking.tenant_id;
+    } else {
+      const { data: keyData, error } = await admin
+        .from("external_api_keys")
+        .select("tenant_id, is_active, scopes")
+        .eq("api_key", apiKey)
+        .maybeSingle();
+
+      if (error || !keyData || !keyData.is_active) {
+        return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
+      }
+
+      const scopes = keyData.scopes || [];
+      if (!scopes.includes("bookings")) {
+        return NextResponse.json(
+          { error: "Cette clé API n'a pas le scope 'bookings'" },
+          { status: 403 }
+        );
+      }
+      tenantId = keyData.tenant_id;
+    }
+
+    const { data: subscription } = await admin
+      .from("subscriptions")
+      .select("plan")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    if (!subscription || subscription.plan !== "entreprise") {
+      return NextResponse.json(
+        { error: "Cette clé API est réservée à la formule Entreprise" },
+        { status: 403 }
+      );
+    }
 
     // La réservation doit appartenir au tenant
     const { data: booking, error: bErr } = await admin

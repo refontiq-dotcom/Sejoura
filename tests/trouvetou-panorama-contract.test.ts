@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("sharp", () => {
+  throw new Error("sharp should not load while preparing Trouvetou sync data");
+});
+
 import {
   buildTrouvetouPanoramas,
   splitTrouvetouMedia,

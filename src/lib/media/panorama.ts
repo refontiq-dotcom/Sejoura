@@ -25,7 +25,6 @@
 //     nécessaire, pas une preuve. Un message l'indique explicitement à l'UI.
 // =============================================================================
 
-import sharp from "sharp";
 import { detectImageKind, type DetectedImageKind } from "./format";
 
 // -----------------------------------------------------------------------------
@@ -203,6 +202,7 @@ export async function validatePanoramaBytes(
   let raw: Buffer;
   let channels: number;
   try {
+    const { default: sharp } = await import("sharp");
     const { data, info } = await sharp(input, { failOn: "error" })
       .raw()
       .toBuffer({ resolveWithObject: true });
@@ -403,4 +403,3 @@ export function splitTrouvetouMedia(params: {
 
   return { images, panoramas };
 }
-

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDoubleBookingError } from "@/lib/utils";
+import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -87,36 +88,77 @@ export async function GET(request: Request) {
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const isTrouvetou = isTrouvetouBookingRequest(request.headers);
     const authHeader = request.headers.get("x-api-key") || request.headers.get("authorization") || "";
     const apiKey = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-    if (!apiKey) {
+    if (!apiKey && !isTrouvetou) {
       return NextResponse.json({ error: "Clé API manquante" }, { status: 401 });
     }
 
     const admin = createAdminClient();
-    const { data: keyData, error } = await admin
-      .from("external_api_keys")
-      .select("tenant_id, is_active, scopes")
-      .eq("api_key", apiKey)
-      .maybeSingle();
-
-    if (error || !keyData || !keyData.is_active) {
-      return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
     }
 
-    const scopes = keyData.scopes || [];
-    if (!scopes.includes("bookings")) {
-      return NextResponse.json(
-        { error: "Cette clé API n'a pas le scope 'bookings'" },
-        { status: 403 }
-      );
+    let tenantId: string;
+    let partnerRoomType: {
+      id: string;
+      accommodation_id: string;
+      base_price: number;
+    } | null = null;
+    if (isTrouvetou) {
+      if (typeof body.room_type_id !== "string" || !body.room_type_id) {
+        return NextResponse.json(
+          { error: "room_type_id est requis" },
+          { status: 400 }
+        );
+      }
+
+      const { data: roomType, error: roomTypeError } = await admin
+        .from("room_types")
+        .select("id, accommodation_id, base_price")
+        .eq("id", body.room_type_id)
+        .maybeSingle();
+      if (roomTypeError || !roomType) {
+        return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
+      }
+      const { data: accommodation, error: accommodationError } = await admin
+        .from("accommodations")
+        .select("tenant_id")
+        .eq("id", roomType.accommodation_id)
+        .maybeSingle();
+      if (accommodationError || !accommodation) {
+        return NextResponse.json({ error: "Établissement introuvable" }, { status: 404 });
+      }
+      tenantId = accommodation.tenant_id;
+      partnerRoomType = roomType;
+    } else {
+      const { data: keyData, error } = await admin
+        .from("external_api_keys")
+        .select("tenant_id, is_active, scopes")
+        .eq("api_key", apiKey)
+        .maybeSingle();
+
+      if (error || !keyData || !keyData.is_active) {
+        return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
+      }
+
+      const scopes = keyData.scopes || [];
+      if (!scopes.includes("bookings")) {
+        return NextResponse.json(
+          { error: "Cette clé API n'a pas le scope 'bookings'" },
+          { status: 403 }
+        );
+      }
+      tenantId = keyData.tenant_id;
     }
 
     const { data: subscription } = await admin
       .from("subscriptions")
       .select("plan")
-      .eq("tenant_id", keyData.tenant_id)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (!subscription || subscription.plan !== "entreprise") {
@@ -124,11 +166,6 @@ export async function POST(request: Request) {
         { error: "Cette clé API est réservée à la formule Entreprise" },
         { status: 403 }
       );
-    }
-
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
     }
 
     const {
@@ -169,14 +206,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "guest.full_name est requis" }, { status: 400 });
     }
 
-    const tenantId = keyData.tenant_id;
-
-    // 1. Vérifier que le type de chambre appartient au tenant
-    const { data: roomType, error: rtError } = await admin
-      .from("room_types")
-      .select("id, accommodation_id, base_price")
-      .eq("id", room_type_id)
-      .maybeSingle();
+    // 1. Vérifier que le type de chambre appartient au tenant.
+    const { data: roomType, error: rtError } = partnerRoomType
+      ? { data: partnerRoomType, error: null }
+      : await admin
+          .from("room_types")
+          .select("id, accommodation_id, base_price")
+          .eq("id", room_type_id)
+          .maybeSingle();
 
     if (rtError || !roomType) {
       return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
