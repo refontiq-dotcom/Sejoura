@@ -142,6 +142,7 @@ export async function POST(request: Request) {
       payment_provider, // 'wave' | 'orange_money' | 'mtn' | 'moov_africa' | 'pi_spi'
       is_third_party,
       occupant,
+      idempotency_key,
     } = body;
 
     const isThirdParty = Boolean(is_third_party);
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
       );
     }
     const isValidDateOnly = (value: string) => {
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
       const parsed = new Date(value + "T00:00:00.000Z");
       return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
     };
@@ -180,6 +181,28 @@ export async function POST(request: Request) {
     }
 
     const tenantId = keyData.tenant_id;
+    const idempotencyKey =
+      typeof idempotency_key === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotency_key)
+        ? idempotency_key
+        : null;
+    if (idempotency_key !== undefined && !idempotencyKey) {
+      return NextResponse.json({ error: "idempotency_key doit être un UUID valide" }, { status: 400 });
+    }
+
+    if (idempotencyKey) {
+      const { data: priorBooking, error: priorError } = await admin
+        .from("bookings")
+        .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+        .eq("tenant_id", tenantId)
+        .eq("external_idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (priorError) {
+        return NextResponse.json({ error: "Impossible de vérifier la clé d'idempotence" }, { status: 500 });
+      }
+      if (priorBooking) {
+        return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+      }
+    }
 
     // 1. Vérifier que le type de chambre appartient au tenant
     const { data: roomType, error: rtError } = await admin
@@ -349,6 +372,17 @@ export async function POST(request: Request) {
       // (P0001) ou contrainte EXCLUDE no_double_booking (23P01 sous concurrence).
       // Les deux doivent répondre 409, jamais 500.
       if (isDoubleBookingError(bookingErr)) {
+        if (idempotencyKey) {
+          const { data: priorBooking } = await admin
+            .from("bookings")
+            .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+            .eq("tenant_id", tenantId)
+            .eq("external_idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (priorBooking) {
+            return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+          }
+        }
         return NextResponse.json(
           { error: "Cette chambre vient d'être réservée pour ces dates", code: "DOUBLE_BOOKING" },
           { status: 409 }
@@ -358,6 +392,27 @@ export async function POST(request: Request) {
         { error: `Erreur DB lors de la création de la réservation: ${bookingErr.message || JSON.stringify(bookingErr)}` },
         { status: 500 }
       );
+    }
+
+    if (idempotencyKey) {
+      const { error: idempotencyError } = await admin
+        .from("bookings")
+        .update({ external_idempotency_key: idempotencyKey })
+        .eq("id", booking.id);
+      if (idempotencyError) {
+        const { data: priorBooking } = await admin
+          .from("bookings")
+          .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+          .eq("tenant_id", tenantId)
+          .eq("external_idempotency_key", idempotencyKey)
+          .maybeSingle();
+        if (priorBooking) {
+          await admin.from("bookings").delete().eq("id", booking.id);
+          return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+        }
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json({ error: "Impossible d'enregistrer la clé d'idempotence" }, { status: 500 });
+      }
     }
 
     // 7. Si paiement en ligne demandé, on tente d'initialiser le paiement
