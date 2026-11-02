@@ -393,6 +393,7 @@ CREATE TABLE bookings (
   status          booking_status NOT NULL DEFAULT 'confirmed',
   number_of_guests INTEGER NOT NULL DEFAULT 1,
   special_requests TEXT,
+  external_idempotency_key UUID,
   is_overstay     BOOLEAN NOT NULL DEFAULT FALSE,      -- Dépassement de séjour détecté
   overstay_detected_at TIMESTAMPTZ,                     -- Premier signalement du dépassement
   overstay_auto_checked_out BOOLEAN NOT NULL DEFAULT FALSE, -- Auto check-out après délai de grâce
@@ -406,6 +407,9 @@ CREATE TABLE bookings (
 );
 
 CREATE INDEX idx_bookings_tenant ON bookings(tenant_id);
+CREATE UNIQUE INDEX bookings_tenant_external_idempotency_key
+  ON bookings (tenant_id, external_idempotency_key)
+  WHERE external_idempotency_key IS NOT NULL;
 CREATE INDEX idx_bookings_room ON bookings(room_id);
 CREATE INDEX idx_bookings_dates ON bookings(check_in_date, check_out_date);
 CREATE INDEX idx_bookings_status ON bookings(status);
