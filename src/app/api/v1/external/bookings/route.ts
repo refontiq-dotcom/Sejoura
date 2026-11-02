@@ -207,12 +207,15 @@ export async function POST(request: Request) {
     // 1. Vérifier que le type de chambre appartient au tenant
     const { data: roomType, error: rtError } = await admin
       .from("room_types")
-      .select("id, accommodation_id, base_price")
+      .select("id, accommodation_id, base_price, capacity")
       .eq("id", room_type_id)
       .maybeSingle();
 
     if (rtError || !roomType) {
       return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
+    }
+    if (guestCount > roomType.capacity) {
+      return NextResponse.json({ error: "Le nombre de voyageurs dépasse la capacité de cette chambre" }, { status: 400 });
     }
 
     const { data: accCheck } = await admin
