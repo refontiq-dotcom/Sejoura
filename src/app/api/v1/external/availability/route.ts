@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00.000Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 // GET /api/v1/external/availability
 // ──────────────────────────────────────────────────────────────────────────────
 // API externe (réservée au plan Entreprise). Authentification par clé API :
@@ -60,10 +66,13 @@ export async function GET(request: Request) {
     const checkOut   = searchParams.get("check_out");
 
     // ── Mode 2 : disponibilité d'un type de chambre sur une période ──────────
-    if (roomTypeId && checkIn && checkOut) {
-      if (checkIn >= checkOut) {
+    if (roomTypeId || checkIn || checkOut) {
+      if (!roomTypeId || !checkIn || !checkOut) {
+        return NextResponse.json({ error: "room_type_id, check_in et check_out sont requis ensemble" }, { status: 400 });
+      }
+      if (!isValidDateOnly(checkIn) || !isValidDateOnly(checkOut) || checkIn >= checkOut) {
         return NextResponse.json(
-          { error: "check_out doit être postérieur à check_in" },
+          { error: "Dates invalides : format YYYY-MM-DD et départ postérieur requis" },
           { status: 400 }
         );
       }
@@ -71,7 +80,7 @@ export async function GET(request: Request) {
       // 1. Vérifier que le type de chambre appartient au tenant de la clé.
       const { data: roomType, error: roomTypeError } = await admin
         .from("room_types")
-        .select("id, accommodation_id, accommodations!inner(tenant_id)")
+        .select("id, accommodation_id, base_price, accommodations!inner(tenant_id)")
         .eq("id", roomTypeId)
         .eq("accommodations.tenant_id", keyData.tenant_id)
         .maybeSingle();
@@ -120,6 +129,8 @@ export async function GET(request: Request) {
         check_out: checkOut,
         available: availableRooms.length > 0,
         available_rooms: availableRooms.length,
+        nights: Math.round((Date.parse(checkOut + "T00:00:00.000Z") - Date.parse(checkIn + "T00:00:00.000Z")) / 86400000),
+        estimated_total: Number(roomType.base_price ?? 0) * Math.round((Date.parse(checkOut + "T00:00:00.000Z") - Date.parse(checkIn + "T00:00:00.000Z")) / 86400000),
         rooms: availableRooms.map((r) => ({ id: r.id, status: r.status })),
       });
     }
