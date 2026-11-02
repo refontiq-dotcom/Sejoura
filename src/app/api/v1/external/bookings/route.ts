@@ -97,11 +97,11 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: keyData, error } = await admin
       .from("external_api_keys")
-      .select("tenant_id, is_active, scopes")
+      .select("tenant_id, is_active, scopes, expires_at")
       .eq("api_key", apiKey)
       .maybeSingle();
 
-    if (error || !keyData || !keyData.is_active) {
+    if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
       return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
     }
 
@@ -159,7 +159,12 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (check_in_date >= check_out_date) {
+    const isValidDateOnly = (value: string) => {
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+      const parsed = new Date(value + "T00:00:00.000Z");
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (!isValidDateOnly(check_in_date) || !isValidDateOnly(check_out_date) || check_in_date >= check_out_date) {
       return NextResponse.json(
         { error: "check_out_date doit être postérieur à check_in_date" },
         { status: 400 }
@@ -167,6 +172,11 @@ export async function POST(request: Request) {
     }
     if (!guest?.full_name || typeof guest.full_name !== "string" || !guest.full_name.trim()) {
       return NextResponse.json({ error: "guest.full_name est requis" }, { status: 400 });
+    }
+
+    const guestCount = Number(number_of_guests ?? 1);
+    if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 50) {
+      return NextResponse.json({ error: "number_of_guests doit être compris entre 1 et 50" }, { status: 400 });
     }
 
     const tenantId = keyData.tenant_id;
