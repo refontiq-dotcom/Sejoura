@@ -27,11 +27,11 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: keyData, error } = await admin
       .from("external_api_keys")
-      .select("tenant_id, is_active, scopes")
+      .select("tenant_id, is_active, scopes, expires_at")
       .eq("api_key", apiKey)
       .maybeSingle();
 
-    if (error || !keyData || !keyData.is_active) {
+    if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
       return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
     }
 
