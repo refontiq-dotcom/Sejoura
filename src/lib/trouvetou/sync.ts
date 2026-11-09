@@ -26,10 +26,9 @@ import {
  * SÉCURITÉ : aucune clé API ni secret n'est transmis dans `attributes` ou
  * ailleurs dans le payload métier. L'authentification de la synchronisation
  * utilise exclusivement l'en-tête HTTP `x-trouvetou-api-key` (secret serveur
- * `TROUVETOU_API_KEY`), et les réservations externes s'authentifient via les
- * en-têtes `x-api-key` / `Authorization: Bearer` (table `external_api_keys`).
- * La présence d'une clé API externe active reste une condition d'éligibilité
- * (filtre), jamais une donnée publiée.
+ * `TROUVETOU_API_KEY`). Les réservations Trouvetou utilisent un secret serveur
+ * distinct dans l'en-tête `x-trouvetou-booking-secret` ; aucune clé API par
+ * annonce n'est publiée.
  */
 
 export interface TrouvetouSyncItem {
