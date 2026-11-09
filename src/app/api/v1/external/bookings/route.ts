@@ -168,6 +168,37 @@ export async function POST(request: Request) {
       );
     }
 
+    const rawIdempotencyKey = body?.idempotency_key;
+    const idempotencyKey =
+      typeof rawIdempotencyKey === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawIdempotencyKey)
+        ? rawIdempotencyKey
+        : null;
+    if (rawIdempotencyKey !== undefined && !idempotencyKey) {
+      return NextResponse.json(
+        { error: "idempotency_key doit être un UUID valide" },
+        { status: 400 }
+      );
+    }
+
+    if (idempotencyKey) {
+      const { data: priorBooking, error: priorError } = await admin
+        .from("bookings")
+        .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+        .eq("tenant_id", tenantId)
+        .eq("external_idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (priorError) {
+        return NextResponse.json(
+          { error: "Impossible de vérifier la clé d'idempotence" },
+          { status: 500 }
+        );
+      }
+      if (priorBooking) {
+        return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+      }
+    }
+
     const {
       room_type_id,
       check_in_date,
@@ -385,6 +416,35 @@ export async function POST(request: Request) {
         { error: `Erreur DB lors de la création de la réservation: ${bookingErr.message || JSON.stringify(bookingErr)}` },
         { status: 500 }
       );
+    }
+
+    // Associer la clé à la réservation. L'index unique tenant + clé protège
+    // aussi les requêtes concurrentes qui ont passé le contrôle initial.
+    if (idempotencyKey) {
+      const { error: idempotencyError } = await admin
+        .from("bookings")
+        .update({ external_idempotency_key: idempotencyKey })
+        .eq("id", booking.id);
+
+      if (idempotencyError) {
+        const { data: priorBooking } = await admin
+          .from("bookings")
+          .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+          .eq("tenant_id", tenantId)
+          .eq("external_idempotency_key", idempotencyKey)
+          .maybeSingle();
+
+        if (priorBooking) {
+          await admin.from("bookings").delete().eq("id", booking.id);
+          return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+        }
+
+        await admin.from("bookings").delete().eq("id", booking.id);
+        return NextResponse.json(
+          { error: "Impossible d'enregistrer la clé d'idempotence" },
+          { status: 500 }
+        );
+      }
     }
 
     // 7. Si paiement en ligne demandé, on tente d'initialiser le paiement
