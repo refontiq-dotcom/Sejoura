@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
     const { data: subscription } = await admin
       .from("subscriptions")
-      .select("plan")
+      .select("plan, status")
       .eq("tenant_id", keyData.tenant_id)
       .maybeSingle();
 
@@ -165,6 +165,16 @@ export async function POST(request: Request) {
     if (!subscription || subscription.plan !== "entreprise") {
       return NextResponse.json(
         { error: "Cette clé API est réservée à la formule Entreprise" },
+        { status: 403 }
+      );
+    }
+
+    if (subscription.status === "suspended" || subscription.status === "cancelled") {
+      return NextResponse.json(
+        {
+          error: "L'abonnement de cet établissement est suspendu ou annulé. La réservation en ligne est désactivée.",
+          code: "SUBSCRIPTION_INACTIVE",
+        },
         { status: 403 }
       );
     }
