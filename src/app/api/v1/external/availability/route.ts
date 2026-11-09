@@ -4,8 +4,8 @@ import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // GET /api/v1/external/availability
 // ──────────────────────────────────────────────────────────────────────────────
-// API externe (réservée au plan Entreprise). Authentification par clé API :
-//   Header `x-api-key: <clé>` ou `Authorization: Bearer <clé>`.
+// API externe (réservée au plan Entreprise). Authentification partenaire :
+//   Header `x-trouvetou-booking-secret` (Trouvetou) ou clé API externe historique.
 //
 // Deux modes :
 //   1. Sans paramètre  → liste des établissements actifs du tenant
@@ -79,13 +79,23 @@ export async function GET(request: Request) {
 
     const { data: subscription } = await admin
       .from("subscriptions")
-      .select("plan")
+      .select("plan, status")
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (!subscription || subscription.plan !== "entreprise") {
       return NextResponse.json(
         { error: "Cette clé API est réservée à la formule Entreprise" },
+        { status: 403 }
+      );
+    }
+
+    if (subscription.status === "suspended" || subscription.status === "cancelled") {
+      return NextResponse.json(
+        {
+          error: "L'abonnement de cet établissement est suspendu ou annulé. La réservation en ligne est désactivée.",
+          code: "SUBSCRIPTION_INACTIVE",
+        },
         { status: 403 }
       );
     }
