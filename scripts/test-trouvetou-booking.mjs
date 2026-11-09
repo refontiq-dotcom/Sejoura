@@ -189,7 +189,7 @@ async function main() {
       );
       if (!Array.isArray(rts) || rts.length === 0) {
         fail("Aucun type de chambre avec is_listed_on_trouvetou=true.");
-        warn("La sync Trouvetou n'envoie RIEN → la sejoura_api_key n'est jamais transmise.");
+        warn("Aucun type de chambre n'est actuellement publié vers Trouvetou.");
       } else {
         ok(`${rts.length} type(s) listés sur Trouvetou.`);
         for (const rt of rts) {
