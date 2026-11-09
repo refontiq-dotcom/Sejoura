@@ -737,6 +737,7 @@ export function HomePage() {
         </ul>
       </div>
     ),
+
     Tarifs: (
       <div className="space-y-5">
         <h4 className="font-bold text-blue-600 dark:text-blue-400 text-base mb-3 border-b border-slate-200 dark:border-[#404040] pb-2">
@@ -760,7 +761,7 @@ export function HomePage() {
               {lang === "fr" ? "1 établissement maximum" : "Up to 1 establishment"}
             </p>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
-              9 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+              Prix sur demande
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
@@ -793,7 +794,7 @@ export function HomePage() {
               {lang === "fr" ? "Jusqu'à 35 unités & module ménage" : "Up to 35 units & cleaning module"}
             </p>
             <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mb-4">
-              24 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+              Prix sur demande
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
@@ -827,7 +828,7 @@ export function HomePage() {
               {lang === "fr" ? "Établissements illimités & API" : "Unlimited establishments & API"}
             </p>
             <div className="text-3xl font-black text-blue-600 dark:text-blue-400 mb-4">
-              54 900 F <span className="text-xs font-semibold text-slate-500">/mois</span>
+              Prix sur demande
             </div>
             <ul className="text-sm space-y-3 text-slate-700 dark:text-[#c0c0c0]">
               <li className="flex items-start">
