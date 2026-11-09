@@ -59,7 +59,7 @@ export async function GET(request: Request) {
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/external/bookings
 // Crée une réservation depuis un portail externe (ex : Trouvetou).
-// Authentification : `x-api-key: <clé>` ou `Authorization: Bearer <clé>`.
+// Authentification partenaire : `x-trouvetou-booking-secret`; clé API historique pour les appels directs.
 //
 // Corps attendu :
 //   {
@@ -81,11 +81,8 @@ export async function GET(request: Request) {
 // `no_double_booking` rejette la seconde INSERT ; le perdant reçoit un
 // 409 DOUBLE_BOOKING (jamais un 500).
 //
-// Idempotence : l'endpoint ne porte pas de clé d'idempotence. Une requête
-// identique rejouée est refusée en 409 tant qu'aucune chambre du type n'est
-// libre pour la période ; si une autre chambre du type est disponible, la
-// seconde réservation est créée (limite documentée — à traiter côté appelant,
-// ex. dédoublonnage côté Trouvetou).
+// Idempotence : une clé UUID fournie par le partenaire permet de retrouver
+// la réservation déjà créée au lieu de créer un doublon.
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
@@ -158,7 +155,7 @@ export async function POST(request: Request) {
 
     const { data: subscription } = await admin
       .from("subscriptions")
-      .select("plan")
+      .select("plan, status")
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
