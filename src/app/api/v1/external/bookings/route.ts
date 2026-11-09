@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDoubleBookingError } from "@/lib/utils";
 import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
+import { parseExternalIdempotencyKey } from "@/lib/trouvetou/idempotency";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -169,11 +170,7 @@ export async function POST(request: Request) {
     }
 
     const rawIdempotencyKey = body?.idempotency_key;
-    const idempotencyKey =
-      typeof rawIdempotencyKey === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawIdempotencyKey)
-        ? rawIdempotencyKey
-        : null;
+    const idempotencyKey = parseExternalIdempotencyKey(rawIdempotencyKey);
     if (rawIdempotencyKey !== undefined && !idempotencyKey) {
       return NextResponse.json(
         { error: "idempotency_key doit être un UUID valide" },
