@@ -4,6 +4,7 @@ import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/external/bookings/cancel
+// Annulation partenaire disponible pour tous les forfaits.
 // Annule une réservation depuis un portail externe (ex : Trouvetou).
 // Authentification : `x-api-key: <clé>` ou `Authorization: Bearer <clé>`.
 //
@@ -67,19 +68,6 @@ export async function POST(request: Request) {
         );
       }
       tenantId = keyData.tenant_id;
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json(
-        { error: "Cette clé API est réservée à la formule Entreprise" },
-        { status: 403 }
-      );
     }
 
     // La réservation doit appartenir au tenant
