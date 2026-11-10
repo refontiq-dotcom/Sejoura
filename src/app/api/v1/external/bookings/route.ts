@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isDoubleBookingError } from "@/lib/utils";
 import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 import { parseExternalIdempotencyKey } from "@/lib/trouvetou/idempotency";
-import { isValidDateOnly } from "@/lib/trouvetou/validation";
+import { canAccommodateGuests, isValidDateOnly, parseGuestCount } from "@/lib/trouvetou/validation";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
       id: string;
       accommodation_id: string;
       base_price: number;
+      capacity: number;
     } | null = null;
     if (isTrouvetou) {
       if (typeof body.room_type_id !== "string" || !body.room_type_id) {
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
 
       const { data: roomType, error: roomTypeError } = await admin
         .from("room_types")
-        .select("id, accommodation_id, base_price")
+        .select("id, accommodation_id, base_price, capacity")
         .eq("id", body.room_type_id)
         .maybeSingle();
       if (roomTypeError || !roomType) {
@@ -248,17 +249,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "guest.full_name est requis" }, { status: 400 });
     }
 
+    const guestCount = parseGuestCount(number_of_guests);
+    if (guestCount === null) {
+      return NextResponse.json({ error: "number_of_guests doit être un entier compris entre 1 et 50" }, { status: 400 });
+    }
+
     // 1. Vérifier que le type de chambre appartient au tenant.
     const { data: roomType, error: rtError } = partnerRoomType
       ? { data: partnerRoomType, error: null }
       : await admin
           .from("room_types")
-          .select("id, accommodation_id, base_price")
+          .select("id, accommodation_id, base_price, capacity")
           .eq("id", room_type_id)
           .maybeSingle();
 
     if (rtError || !roomType) {
       return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
+    }
+    if (!canAccommodateGuests(guestCount, roomType.capacity)) {
+      return NextResponse.json({ error: "Le nombre de voyageurs dépasse la capacité de ce type de chambre" }, { status: 400 });
     }
 
     const { data: accCheck } = await admin
@@ -398,7 +407,7 @@ export async function POST(request: Request) {
       p_negotiated_price: basePrice,
       p_nights_count: nights,
       p_total_amount: totalAmount,
-      p_number_of_guests: parseInt(String(number_of_guests), 10) || 1,
+      p_number_of_guests: guestCount,
       p_special_requests: special_requests ? String(special_requests) : null,
       p_created_by: ownerUser.id,
       p_initial_status: initialStatus,
