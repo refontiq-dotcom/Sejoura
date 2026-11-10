@@ -123,6 +123,7 @@ async function getDynamicRate(code: string): Promise<number> {
 // ─── FONCTIONS SYNCHRONES (fallback statique, pas d'await) ─────────────────
 
 export function getRate(code: string): number {
+  if (!code) return FALLBACK_RATES[BASE_CURRENCY]; // devise par défaut (XOF) si code manquant
   const entry = FALLBACK_RATES[code];
   if (entry === undefined) throw new Error(`Devise non supportée: ${code}`);
   return entry;

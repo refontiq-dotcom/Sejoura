@@ -67,7 +67,7 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *    Il n'y a pas de page web de paiement — le client valide depuis son téléphone.
    *    Afficher "Vérifiez votre téléphone Moov" sur Trouvetou.
    */
-  async initiatePayment(): Promise<PaymentInitResult> {
+  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API Moov Africa sont disponibles
     /*
     try {
@@ -163,10 +163,14 @@ export class MoovAfricaPaymentService implements PaymentProvider {
    *   "amount": 15000
    * }
    */
-  validateWebhookSignature(): boolean {
-    // TODO : Implémenter selon la documentation Moov Africa
-    // Contacter marchands@moov-africa.ci pour les détails de sécurité
-    console.warn("[MoovAfrica] validateWebhookSignature non implémentée.");
-    return true; // ⚠️ À sécuriser en production
+  validateWebhookSignature(_payload: unknown, _signature: string): boolean {
+    // SECURITE (echec ferme) : le contrat de notification Moov Africa n'est
+    // pas confirme ("a valider avec la documentation officielle"). Tant que
+    // la mecanique reelle (signature, IP, token) n'est pas documentee et
+    // verifiee, aucune notification ne peut etre acceptee par ce biais. Les
+    // webhooks entrants passent exclusivement par /api/v1/webhooks/payments
+    // qui impose un secret partage (x-webhook-secret) en plus.
+    console.warn("[MoovAfrica] validateWebhookSignature non implementee - refus ferme (aucune confirmation acceptee).");
+    return false;
   }
 }

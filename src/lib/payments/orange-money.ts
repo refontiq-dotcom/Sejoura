@@ -120,7 +120,7 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   }
    * }
    */
-  async initiatePayment(): Promise<PaymentInitResult> {
+  async initiatePayment(params: InitiatePaymentParams): Promise<PaymentInitResult> {
     // TODO : Décommenter quand les clés API sont disponibles
     /*
     try {
@@ -225,12 +225,14 @@ export class OrangeMoneyPaymentService implements PaymentProvider {
    *   "orderId": "RES-26-0001"
    * }
    */
-  validateWebhookSignature(): boolean {
-    // Orange Money ne signe pas avec HMAC, il faut vérifier l'IP source.
-    // Whitelist des IPs Orange Money CI : à confirmer avec Orange.
-    // Pour l'instant on valide en vérifiant que le notifToken est connu.
-    // TODO : Implémenter la validation IP ou le token de notification
-    console.warn("[OrangeMoney] validateWebhookSignature non implémentée.");
-    return true; // ⚠️ À sécuriser en production
+  validateWebhookSignature(_payload: unknown, _signature: string): boolean {
+    // SÉCURITE (echec ferme) : le contrat de notification Orange Money n'est
+    // pas verifie (validation IP ou notifToken non implementee, whitelist
+    // "a confirmer" avec Orange). Tant que ce n'est pas implemente et verifie,
+    // aucune notification ne peut etre acceptee par ce biais. Les webhooks
+    // entrants passent exclusivement par /api/v1/webhooks/payments qui impose
+    // un secret partage (x-webhook-secret) en plus.
+    console.warn("[OrangeMoney] validateWebhookSignature non implementee - refus ferme (aucune confirmation acceptee).");
+    return false;
   }
 }
