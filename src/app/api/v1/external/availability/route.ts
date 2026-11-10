@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-function isValidDateOnly(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(value + "T00:00:00.000Z");
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
+import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // GET /api/v1/external/availability
 // ──────────────────────────────────────────────────────────────────────────────
-// API externe (réservée au plan Entreprise). Authentification par clé API :
-//   Header `x-api-key: <clé>` ou `Authorization: Bearer <clé>`.
+// API externe (réservée au plan Entreprise). Authentification partenaire :
+//   Header `x-trouvetou-booking-secret` (Trouvetou) ou clé API externe historique.
 //
 // Deux modes :
 //   1. Sans paramètre  → liste des établissements actifs du tenant
@@ -21,36 +16,71 @@ function isValidDateOnly(value: string): boolean {
 // ──────────────────────────────────────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
+    const isTrouvetou = isTrouvetouBookingRequest(request.headers);
     const authHeader = request.headers.get("x-api-key") || request.headers.get("authorization") || "";
     const apiKey = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-    if (!apiKey) {
+    if (!apiKey && !isTrouvetou) {
       return NextResponse.json({ error: "Clé API manquante" }, { status: 401 });
     }
 
     const admin = createAdminClient();
-    const { data: keyData, error } = await admin
-      .from("external_api_keys")
-      .select("tenant_id, is_active, scopes, expires_at")
-      .eq("api_key", apiKey)
-      .maybeSingle();
+    const { searchParams } = new URL(request.url);
+    const roomTypeId = searchParams.get("room_type_id");
+    const checkIn = searchParams.get("check_in");
+    const checkOut = searchParams.get("check_out");
 
-    if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
-      return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
-    }
+    let tenantId: string;
+    let scopes: string[] = [];
+    if (isTrouvetou) {
+      if (!roomTypeId || !checkIn || !checkOut) {
+        return NextResponse.json(
+          { error: "room_type_id, check_in et check_out sont requis pour Trouvetou." },
+          { status: 400 }
+        );
+      }
 
-    const scopes = keyData.scopes || [];
-    if (!scopes.includes("availability")) {
-      return NextResponse.json(
-        { error: "Cette clé API n'a pas le scope 'availability'" },
-        { status: 403 }
-      );
+      const { data: roomType } = await admin
+        .from("room_types")
+        .select("accommodation_id")
+        .eq("id", roomTypeId)
+        .maybeSingle();
+      if (!roomType) {
+        return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
+      }
+      const { data: accommodation } = await admin
+        .from("accommodations")
+        .select("tenant_id")
+        .eq("id", roomType.accommodation_id)
+        .maybeSingle();
+      if (!accommodation) {
+        return NextResponse.json({ error: "Établissement introuvable" }, { status: 404 });
+      }
+      tenantId = accommodation.tenant_id;
+    } else {
+      const { data: keyData, error } = await admin
+        .from("external_api_keys")
+        .select("tenant_id, is_active, scopes, expires_at")
+        .eq("api_key", apiKey)
+        .maybeSingle();
+
+      if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
+        return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
+      }
+      scopes = keyData.scopes || [];
+      if (!scopes.includes("availability")) {
+        return NextResponse.json(
+          { error: "Cette clé API n'a pas le scope 'availability'" },
+          { status: 403 }
+        );
+      }
+      tenantId = keyData.tenant_id;
     }
 
     const { data: subscription } = await admin
       .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", keyData.tenant_id)
+      .select("plan, status")
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (!subscription || subscription.plan !== "entreprise") {
@@ -60,19 +90,21 @@ export async function GET(request: Request) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const roomTypeId = searchParams.get("room_type_id");
-    const checkIn    = searchParams.get("check_in");
-    const checkOut   = searchParams.get("check_out");
+    if (subscription.status === "suspended" || subscription.status === "cancelled") {
+      return NextResponse.json(
+        {
+          error: "L'abonnement de cet établissement est suspendu ou annulé. La réservation en ligne est désactivée.",
+          code: "SUBSCRIPTION_INACTIVE",
+        },
+        { status: 403 }
+      );
+    }
 
     // ── Mode 2 : disponibilité d'un type de chambre sur une période ──────────
-    if (roomTypeId || checkIn || checkOut) {
-      if (!roomTypeId || !checkIn || !checkOut) {
-        return NextResponse.json({ error: "room_type_id, check_in et check_out sont requis ensemble" }, { status: 400 });
-      }
-      if (!isValidDateOnly(checkIn) || !isValidDateOnly(checkOut) || checkIn >= checkOut) {
+    if (roomTypeId && checkIn && checkOut) {
+      if (checkIn >= checkOut) {
         return NextResponse.json(
-          { error: "Dates invalides : format YYYY-MM-DD et départ postérieur requis" },
+          { error: "check_out doit être postérieur à check_in" },
           { status: 400 }
         );
       }
@@ -80,9 +112,9 @@ export async function GET(request: Request) {
       // 1. Vérifier que le type de chambre appartient au tenant de la clé.
       const { data: roomType, error: roomTypeError } = await admin
         .from("room_types")
-        .select("id, accommodation_id, base_price, accommodations!inner(tenant_id)")
+        .select("id, accommodation_id, accommodations!inner(tenant_id)")
         .eq("id", roomTypeId)
-        .eq("accommodations.tenant_id", keyData.tenant_id)
+        .eq("accommodations.tenant_id", tenantId)
         .maybeSingle();
 
       if (roomTypeError || !roomType) {
@@ -123,14 +155,12 @@ export async function GET(request: Request) {
       );
 
       return NextResponse.json({
-        tenantId: keyData.tenant_id,
+        tenantId,
         room_type_id: roomTypeId,
         check_in: checkIn,
         check_out: checkOut,
         available: availableRooms.length > 0,
         available_rooms: availableRooms.length,
-        nights: Math.round((Date.parse(checkOut + "T00:00:00.000Z") - Date.parse(checkIn + "T00:00:00.000Z")) / 86400000),
-        estimated_total: Number(roomType.base_price ?? 0) * Math.round((Date.parse(checkOut + "T00:00:00.000Z") - Date.parse(checkIn + "T00:00:00.000Z")) / 86400000),
         rooms: availableRooms.map((r) => ({ id: r.id, status: r.status })),
       });
     }
@@ -139,11 +169,11 @@ export async function GET(request: Request) {
     const { data: accommodations } = await admin
       .from("accommodations")
       .select("id,name,currency")
-      .eq("tenant_id", keyData.tenant_id)
+      .eq("tenant_id", tenantId)
       .eq("is_active", true);
 
     return NextResponse.json({
-      tenantId: keyData.tenant_id,
+      tenantId,
       scopes,
       accommodations: accommodations || [],
     });
