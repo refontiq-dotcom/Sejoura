@@ -15,7 +15,7 @@ import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 //   }
 //
 // Vérifie que la réservation appartient au tenant, puis appelle la fonction
-// `cancel_booking` (statut `cancelled`, la chambre occupée est libérée).
+// `cancel_booking_external` (statut `cancelled`, la chambre est libérée ou remise en ménage).
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
@@ -52,11 +52,11 @@ export async function POST(request: Request) {
     } else {
       const { data: keyData, error } = await admin
         .from("external_api_keys")
-        .select("tenant_id, is_active, scopes")
+        .select("tenant_id, is_active, scopes, expires_at")
         .eq("api_key", apiKey)
         .maybeSingle();
 
-      if (error || !keyData || !keyData.is_active) {
+      if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
         return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
       }
 
