@@ -19,6 +19,7 @@ afterEach(() => {
 
 describe("authentification serveur Trouvetou → Séjoura", () => {
   it("accepte uniquement le secret d'intégration dans son en-tête dédié", () => {
+    delete process.env.TROUVETOU_BOOKING_SECRET_SEJOURA;
     process.env.TROUVETOU_BOOKING_SHARED_SECRET = "test-shared-secret";
 
     expect(
@@ -55,6 +56,7 @@ describe("authentification serveur Trouvetou → Séjoura", () => {
   });
 
   it("refuse les requêtes si le secret serveur n'est pas configuré", () => {
+    delete process.env.TROUVETOU_BOOKING_SECRET_SEJOURA;
     delete process.env.TROUVETOU_BOOKING_SHARED_SECRET;
 
     expect(
