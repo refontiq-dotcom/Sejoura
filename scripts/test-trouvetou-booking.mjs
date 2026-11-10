@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * DIAGNOSTIC — Intégration Trouvetou → Séjoura
+ * DIAGNOSTIC EN LECTURE SEULE — Intégration Trouvetou → Séjoura
  * =============================================
- * Ce script teste chaque étape du flux de réservation Trouvetou
- * pour identifier exactement où ça bloque.
+ * Ce script vérifie la configuration et la disponibilité sans créer,
+ * modifier ni annuler aucune réservation.
  *
  * Usage :
  *   node scripts/test-trouvetou-booking.mjs
@@ -11,6 +11,7 @@
  * Variables lues depuis .env.local :
  *   NEXT_PUBLIC_SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
+ *   TROUVETOU_BOOKING_SHARED_SECRET (pour la disponibilité partenaire)
  *   SEJOURA_PROD_URL  (optionnel, ex: https://app.sejoura.com)
  */
 
@@ -43,7 +44,8 @@ function loadEnv() {
 loadEnv();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+const BOOKING_SECRET = process.env.TROUVETOU_BOOKING_SHARED_SECRET;
 const APP_URL =
   process.env.SEJOURA_PROD_URL ||
   (process.env.NEXT_PUBLIC_APP_URL?.includes("localhost")
@@ -187,7 +189,7 @@ async function main() {
       );
       if (!Array.isArray(rts) || rts.length === 0) {
         fail("Aucun type de chambre avec is_listed_on_trouvetou=true.");
-        warn("La sync Trouvetou n'envoie RIEN → la sejoura_api_key n'est jamais transmise.");
+        warn("Aucun type de chambre n'est actuellement publié vers Trouvetou.");
       } else {
         ok(`${rts.length} type(s) listés sur Trouvetou.`);
         for (const rt of rts) {
@@ -228,88 +230,26 @@ async function main() {
   }
 
   // ────────────────────────────────────────────────────────────────────────
-  step(5, "Test POST /api/v1/external/bookings (simulation Trouvetou)");
+  step(5, "Vérification de disponibilité partenaire (lecture seule)");
   // ────────────────────────────────────────────────────────────────────────
-  if (!apiKey || !roomTypeId) {
-    warn("Clé API ou room_type_id manquant — test de réservation ignoré.");
+  if (!roomTypeId || !BOOKING_SECRET) {
+    warn("room_type_id ou TROUVETOU_BOOKING_SHARED_SECRET manquant — vérification ignorée.");
   } else {
-    // Dates dans 30 jours pour éviter tout conflit
     const d1 = new Date(); d1.setDate(d1.getDate() + 30);
     const d2 = new Date(d1); d2.setDate(d2.getDate() + 2);
-    const checkIn  = d1.toISOString().slice(0, 10);
+    const checkIn = d1.toISOString().slice(0, 10);
     const checkOut = d2.toISOString().slice(0, 10);
-
-    const payload = {
-      room_type_id    : roomTypeId,
-      check_in_date   : checkIn,
-      check_out_date  : checkOut,
-      number_of_guests: 1,
-      special_requests: "[TEST DIAGNOSTIC AUTO - À ANNULER]",
-      guest: {
-        full_name: "Test Trouvetou Diagnostic",
-        phone    : "+22500000000",
-        email    : "test-diagnostic@trouvetou.ci",
-      },
-    };
-
-    console.log(`\n   Payload :`);
-    console.log(`   ${JSON.stringify(payload, null, 2).replace(/\n/g, "\n   ")}`);
-
-    const res = await sejouraFetch("/api/v1/external/bookings", {
-      method : "POST",
-      body   : JSON.stringify(payload),
-      headers: { "x-api-key": apiKey },
+    const query = new URLSearchParams({ room_type_id: roomTypeId, check_in: checkIn, check_out: checkOut });
+    const res = await sejouraFetch(`/api/v1/external/availability?${query.toString()}`, {
+      headers: { "x-trouvetou-booking-secret": BOOKING_SECRET },
     });
-
-    console.log(`\n   ┌─ Réponse HTTP ${res.status} ${"─".repeat(40)}`);
-    console.log(`   ${JSON.stringify(res.data, null, 2).replace(/\n/g, "\n   ")}`);
-    console.log(`   └${"─".repeat(50)}`);
-
-    if (res.status === 201) {
-      ok(`🎉 Réservation créée ! Code : ${res.data?.booking?.booking_code}`);
-      warn(`⚠️  ANNULEZ cette réservation de test dans le tableau de bord.`);
-      warn(`    booking_id : ${res.data?.booking?.id}`);
-
-      // Vérification en base
-      step(6, "Vérification en base Supabase");
-      const bookingId = res.data?.booking?.id;
-      const { data: bk } = await sbFetch(
-        `bookings?id=eq.${bookingId}&select=id,booking_code,status,tenant_id`
-      );
-      if (Array.isArray(bk) && bk.length > 0) {
-        ok(`Réservation trouvée en base ✓`);
-        console.log(`   📋`, JSON.stringify(bk[0]));
-        info(`→ Si elle n'apparaît PAS dans le tableau de bord, c'est un bug UI (filtre/cache).`);
-      } else {
-        fail(`Réservation NON trouvée en base malgré HTTP 201 — anomalie grave !`);
-      }
-
-    } else if (res.status === 403) {
-      fail(`HTTP 403 — ${res.data?.error}`);
-      if (res.data?.error?.includes("Entreprise") || res.data?.error?.includes("entreprise")) {
-        warn(`CAUSE CONFIRMÉE : Plan pas "entreprise".`);
-        console.log(`\n   🔧 Correction SQL à exécuter dans Supabase :`);
-        console.log(`   UPDATE subscriptions SET plan = 'entreprise' WHERE tenant_id = '${tenantId}';`);
-      } else if (res.data?.error?.includes("scope")) {
-        warn(`CAUSE CONFIRMÉE : scope "bookings" manquant sur la clé API.`);
-        console.log(`\n   🔧 Correction SQL à exécuter dans Supabase :`);
-        console.log(`   UPDATE external_api_keys`);
-        console.log(`   SET scopes = array_append(COALESCE(scopes, '{}'), 'bookings')`);
-        console.log(`   WHERE tenant_id = '${tenantId}' AND is_active = true;`);
-      }
-    } else if (res.status === 401) {
-      fail(`HTTP 401 — Clé API invalide.`);
-      warn(`La clé reçue par Trouvetou ne correspond pas à external_api_keys.`);
-      warn(`Relancez une sync Trouvetou depuis le super admin pour rafraîchir la clé.`);
-    } else if (res.status === 409) {
-      warn(`HTTP 409 — ${res.data?.error} (code: ${res.data?.code})`);
-      info(`Aucune chambre disponible à ces dates — l'API fonctionne correctement.`);
-    } else if (res.status === 500) {
-      fail(`HTTP 500 — Erreur interne.`);
-      warn(`Consultez les logs Vercel → sejoura → Logs → /api/v1/external/bookings`);
-    } else if (res.status === 0) {
-      fail(`Impossible de joindre ${APP_URL}`);
-      warn(`Ajoutez SEJOURA_PROD_URL=https://votre-url-prod.com dans .env.local`);
+    console.log(`   Status : HTTP ${res.status}`);
+    if (res.ok) {
+      ok("Endpoint partenaire accessible ; aucune réservation n'a été créée.");
+      console.log(`   Disponibilité : ${res.data?.available ? "oui" : "non"}`);
+      console.log(`   Chambres libres : ${res.data?.available_rooms ?? 0}`);
+    } else {
+      fail(`HTTP ${res.status} — ${res.data?.error || JSON.stringify(res.data)}`);
     }
   }
 
