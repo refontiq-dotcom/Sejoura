@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 
 // GET /api/v1/external/availability
+// Consultation disponible pour tous les forfaits : aucun contrôle d'abonnement ici.
 // ──────────────────────────────────────────────────────────────────────────────
 // API externe (réservée au plan Entreprise). Authentification partenaire :
 //   Header `x-trouvetou-booking-secret` (Trouvetou) ou clé API externe historique.
@@ -75,29 +76,6 @@ export async function GET(request: Request) {
         );
       }
       tenantId = keyData.tenant_id;
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan, status")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json(
-        { error: "Cette clé API est réservée à la formule Entreprise" },
-        { status: 403 }
-      );
-    }
-
-    if (subscription.status === "suspended" || subscription.status === "cancelled") {
-      return NextResponse.json(
-        {
-          error: "L'abonnement de cet établissement est suspendu ou annulé. La réservation en ligne est désactivée.",
-          code: "SUBSCRIPTION_INACTIVE",
-        },
-        { status: 403 }
-      );
     }
 
     // ── Mode 2 : disponibilité d'un type de chambre sur une période ──────────
