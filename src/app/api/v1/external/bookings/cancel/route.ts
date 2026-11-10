@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: cancelled, error: cancelErr } = await admin.rpc("cancel_booking", {
+    const { data: cancelled, error: cancelErr } = await admin.rpc("cancel_booking_external", {
       p_booking_id: booking_id,
       p_user_id: ownerUser.id,
       p_reason: reason ? String(reason) : null,
