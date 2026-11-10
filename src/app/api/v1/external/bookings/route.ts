@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isDoubleBookingError } from "@/lib/utils";
+import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
+import { parseExternalIdempotencyKey } from "@/lib/trouvetou/idempotency";
+import { canAccommodateGuests, isValidDateOnly, parseGuestCount } from "@/lib/trouvetou/validation";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -30,16 +33,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Cette clé API n'a pas le scope 'bookings'" }, { status: 403 });
     }
 
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", keyData.tenant_id)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json({ error: "Cette clé API est réservée à la formule Entreprise" }, { status: 403 });
-    }
-
     const { data: bookings } = await admin
       .from("bookings")
       .select("id, booking_code, status, check_in_date, check_out_date, total_amount")
@@ -56,8 +49,9 @@ export async function GET(request: Request) {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/external/bookings
+// Réservation disponible pour tous les forfaits : aucun contrôle d'abonnement ici.
 // Crée une réservation depuis un portail externe (ex : Trouvetou).
-// Authentification : `x-api-key: <clé>` ou `Authorization: Bearer <clé>`.
+// Authentification partenaire : `x-trouvetou-booking-secret`; clé API historique pour les appels directs.
 //
 // Corps attendu :
 //   {
@@ -79,56 +73,110 @@ export async function GET(request: Request) {
 // `no_double_booking` rejette la seconde INSERT ; le perdant reçoit un
 // 409 DOUBLE_BOOKING (jamais un 500).
 //
-// Idempotence : l'endpoint ne porte pas de clé d'idempotence. Une requête
-// identique rejouée est refusée en 409 tant qu'aucune chambre du type n'est
-// libre pour la période ; si une autre chambre du type est disponible, la
-// seconde réservation est créée (limite documentée — à traiter côté appelant,
-// ex. dédoublonnage côté Trouvetou).
+// Idempotence : une clé UUID fournie par le partenaire permet de retrouver
+// la réservation déjà créée au lieu de créer un doublon.
 // ──────────────────────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
+    const isTrouvetou = isTrouvetouBookingRequest(request.headers);
     const authHeader = request.headers.get("x-api-key") || request.headers.get("authorization") || "";
     const apiKey = authHeader.replace(/^Bearer\s+/i, "").trim();
 
-    if (!apiKey) {
+    if (!apiKey && !isTrouvetou) {
       return NextResponse.json({ error: "Clé API manquante" }, { status: 401 });
     }
 
     const admin = createAdminClient();
-    const { data: keyData, error } = await admin
-      .from("external_api_keys")
-      .select("tenant_id, is_active, scopes, expires_at")
-      .eq("api_key", apiKey)
-      .maybeSingle();
-
-    if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
-      return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
-    }
-
-    const scopes = keyData.scopes || [];
-    if (!scopes.includes("bookings")) {
-      return NextResponse.json(
-        { error: "Cette clé API n'a pas le scope 'bookings'" },
-        { status: 403 }
-      );
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", keyData.tenant_id)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json(
-        { error: "Cette clé API est réservée à la formule Entreprise" },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
+    }
+
+    let tenantId: string;
+    let partnerRoomType: {
+      id: string;
+      accommodation_id: string;
+      base_price: number;
+      capacity: number;
+    } | null = null;
+    if (isTrouvetou) {
+      if (typeof body.room_type_id !== "string" || !body.room_type_id) {
+        return NextResponse.json(
+          { error: "room_type_id est requis" },
+          { status: 400 }
+        );
+      }
+
+      const { data: roomType, error: roomTypeError } = await admin
+        .from("room_types")
+        .select("id, accommodation_id, base_price, capacity")
+        .eq("id", body.room_type_id)
+        .maybeSingle();
+      if (roomTypeError || !roomType) {
+        return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
+      }
+      const { data: accommodation, error: accommodationError } = await admin
+        .from("accommodations")
+        .select("tenant_id")
+        .eq("id", roomType.accommodation_id)
+        .maybeSingle();
+      if (accommodationError || !accommodation) {
+        return NextResponse.json({ error: "Établissement introuvable" }, { status: 404 });
+      }
+      tenantId = accommodation.tenant_id;
+      partnerRoomType = roomType;
+    } else {
+      const { data: keyData, error } = await admin
+        .from("external_api_keys")
+        .select("tenant_id, is_active, scopes, expires_at")
+        .eq("api_key", apiKey)
+        .maybeSingle();
+
+      if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
+        return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
+      }
+
+      const scopes = keyData.scopes || [];
+      if (!scopes.includes("bookings")) {
+        return NextResponse.json(
+          { error: "Cette clé API n'a pas le scope 'bookings'" },
+          { status: 403 }
+        );
+      }
+      tenantId = keyData.tenant_id;
+    }
+
+    const rawIdempotencyKey = body?.idempotency_key;
+    const idempotencyKey = parseExternalIdempotencyKey(rawIdempotencyKey);
+    if (rawIdempotencyKey !== undefined && !idempotencyKey) {
+      return NextResponse.json(
+        { error: "idempotency_key doit être un UUID valide" },
+        { status: 400 }
+      );
+    }
+    if (isTrouvetou && !idempotencyKey) {
+      return NextResponse.json(
+        { error: "Une clé d'idempotence UUID est obligatoire pour les réservations Trouvetou." },
+        { status: 400 }
+      );
+    }
+
+    if (idempotencyKey) {
+      const { data: priorBooking, error: priorError } = await admin
+        .from("bookings")
+        .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
+        .eq("tenant_id", tenantId)
+        .eq("external_idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (priorError) {
+        return NextResponse.json(
+          { error: "Impossible de vérifier la clé d'idempotence" },
+          { status: 500 }
+        );
+      }
+      if (priorBooking) {
+        return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
+      }
     }
 
     const {
@@ -142,7 +190,6 @@ export async function POST(request: Request) {
       payment_provider, // 'wave' | 'orange_money' | 'mtn' | 'moov_africa' | 'pi_spi'
       is_third_party,
       occupant,
-      idempotency_key,
     } = body;
 
     const isThirdParty = Boolean(is_third_party);
@@ -160,11 +207,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const isValidDateOnly = (value: string) => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-      const parsed = new Date(value + "T00:00:00.000Z");
-      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-    };
     if (!isValidDateOnly(check_in_date) || !isValidDateOnly(check_out_date) || check_in_date >= check_out_date) {
       return NextResponse.json(
         { error: "check_out_date doit être postérieur à check_in_date" },
@@ -175,47 +217,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "guest.full_name est requis" }, { status: 400 });
     }
 
-    const guestCount = Number(number_of_guests ?? 1);
-    if (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 50) {
-      return NextResponse.json({ error: "number_of_guests doit être compris entre 1 et 50" }, { status: 400 });
+    const guestCount = parseGuestCount(number_of_guests);
+    if (guestCount === null) {
+      return NextResponse.json({ error: "number_of_guests doit être un entier compris entre 1 et 50" }, { status: 400 });
     }
 
-    const tenantId = keyData.tenant_id;
-    const idempotencyKey =
-      typeof idempotency_key === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotency_key)
-        ? idempotency_key
-        : null;
-    if (idempotency_key !== undefined && !idempotencyKey) {
-      return NextResponse.json({ error: "idempotency_key doit être un UUID valide" }, { status: 400 });
-    }
-
-    if (idempotencyKey) {
-      const { data: priorBooking, error: priorError } = await admin
-        .from("bookings")
-        .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
-        .eq("tenant_id", tenantId)
-        .eq("external_idempotency_key", idempotencyKey)
-        .maybeSingle();
-      if (priorError) {
-        return NextResponse.json({ error: "Impossible de vérifier la clé d'idempotence" }, { status: 500 });
-      }
-      if (priorBooking) {
-        return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
-      }
-    }
-
-    // 1. Vérifier que le type de chambre appartient au tenant
-    const { data: roomType, error: rtError } = await admin
-      .from("room_types")
-      .select("id, accommodation_id, base_price, capacity")
-      .eq("id", room_type_id)
-      .maybeSingle();
+    // 1. Vérifier que le type de chambre appartient au tenant.
+    const { data: roomType, error: rtError } = partnerRoomType
+      ? { data: partnerRoomType, error: null }
+      : await admin
+          .from("room_types")
+          .select("id, accommodation_id, base_price, capacity")
+          .eq("id", room_type_id)
+          .maybeSingle();
 
     if (rtError || !roomType) {
       return NextResponse.json({ error: "Type de chambre introuvable" }, { status: 404 });
     }
-    if (guestCount > roomType.capacity) {
-      return NextResponse.json({ error: "Le nombre de voyageurs dépasse la capacité de cette chambre" }, { status: 400 });
+    if (!canAccommodateGuests(guestCount, roomType.capacity)) {
+      return NextResponse.json({ error: "Le nombre de voyageurs dépasse la capacité de ce type de chambre" }, { status: 400 });
     }
 
     const { data: accCheck } = await admin
@@ -355,7 +375,7 @@ export async function POST(request: Request) {
       p_negotiated_price: basePrice,
       p_nights_count: nights,
       p_total_amount: totalAmount,
-      p_number_of_guests: parseInt(String(number_of_guests), 10) || 1,
+      p_number_of_guests: guestCount,
       p_special_requests: special_requests ? String(special_requests) : null,
       p_created_by: ownerUser.id,
       p_initial_status: initialStatus,
@@ -375,17 +395,6 @@ export async function POST(request: Request) {
       // (P0001) ou contrainte EXCLUDE no_double_booking (23P01 sous concurrence).
       // Les deux doivent répondre 409, jamais 500.
       if (isDoubleBookingError(bookingErr)) {
-        if (idempotencyKey) {
-          const { data: priorBooking } = await admin
-            .from("bookings")
-            .select("id, booking_code, status, check_in_date, check_out_date, total_amount, number_of_guests, room_id, client_id")
-            .eq("tenant_id", tenantId)
-            .eq("external_idempotency_key", idempotencyKey)
-            .maybeSingle();
-          if (priorBooking) {
-            return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
-          }
-        }
         return NextResponse.json(
           { error: "Cette chambre vient d'être réservée pour ces dates", code: "DOUBLE_BOOKING" },
           { status: 409 }
@@ -397,11 +406,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Associer la clé à la réservation. L'index unique tenant + clé protège
+    // aussi les requêtes concurrentes qui ont passé le contrôle initial.
     if (idempotencyKey) {
       const { error: idempotencyError } = await admin
         .from("bookings")
         .update({ external_idempotency_key: idempotencyKey })
         .eq("id", booking.id);
+
       if (idempotencyError) {
         const { data: priorBooking } = await admin
           .from("bookings")
@@ -409,12 +421,17 @@ export async function POST(request: Request) {
           .eq("tenant_id", tenantId)
           .eq("external_idempotency_key", idempotencyKey)
           .maybeSingle();
+
         if (priorBooking) {
           await admin.from("bookings").delete().eq("id", booking.id);
           return NextResponse.json({ success: true, booking: priorBooking }, { status: 200 });
         }
+
         await admin.from("bookings").delete().eq("id", booking.id);
-        return NextResponse.json({ error: "Impossible d'enregistrer la clé d'idempotence" }, { status: 500 });
+        return NextResponse.json(
+          { error: "Impossible d'enregistrer la clé d'idempotence" },
+          { status: 500 }
+        );
       }
     }
 
