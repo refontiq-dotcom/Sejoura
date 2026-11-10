@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import crypto from "crypto";
 
+// La création des clés API de réservation est ouverte à tous les forfaits.
 export async function POST(request: Request) {
   try {
     // ── Authentification requise ──────────────────────────────────────────────
@@ -35,16 +36,6 @@ export async function POST(request: Request) {
     // Vérifier que l'admin appartient bien au tenant demandé
     if (userProfile.role !== "super_admin" && userProfile.tenant_id !== tenantId) {
       return NextResponse.json({ error: "Accès refusé à cet établissement." }, { status: 403 });
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json({ error: "Les clés API sont réservées à la formule Entreprise" }, { status: 403 });
     }
 
     const apiKey = crypto.randomBytes(24).toString("hex");
