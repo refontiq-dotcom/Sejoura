@@ -184,6 +184,12 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (isTrouvetou && !idempotencyKey) {
+      return NextResponse.json(
+        { error: "Une clé d'idempotence UUID est obligatoire pour les réservations Trouvetou." },
+        { status: 400 }
+      );
+    }
 
     if (idempotencyKey) {
       const { data: priorBooking, error: priorError } = await admin
