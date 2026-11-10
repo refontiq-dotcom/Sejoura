@@ -33,16 +33,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Cette clé API n'a pas le scope 'bookings'" }, { status: 403 });
     }
 
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan, status")
-      .eq("tenant_id", keyData.tenant_id)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json({ error: "Cette clé API est réservée à la formule Entreprise" }, { status: 403 });
-    }
-
     const { data: bookings } = await admin
       .from("bookings")
       .select("id, booking_code, status, check_in_date, check_out_date, total_amount")
@@ -59,6 +49,7 @@ export async function GET(request: Request) {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/v1/external/bookings
+// Réservation disponible pour tous les forfaits : aucun contrôle d'abonnement ici.
 // Crée une réservation depuis un portail externe (ex : Trouvetou).
 // Authentification partenaire : `x-trouvetou-booking-secret`; clé API historique pour les appels directs.
 //
@@ -153,29 +144,6 @@ export async function POST(request: Request) {
         );
       }
       tenantId = keyData.tenant_id;
-    }
-
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .select("plan, status")
-      .eq("tenant_id", tenantId)
-      .maybeSingle();
-
-    if (!subscription || subscription.plan !== "entreprise") {
-      return NextResponse.json(
-        { error: "Cette clé API est réservée à la formule Entreprise" },
-        { status: 403 }
-      );
-    }
-
-    if (subscription.status === "suspended" || subscription.status === "cancelled") {
-      return NextResponse.json(
-        {
-          error: "L'abonnement de cet établissement est suspendu ou annulé. La réservation en ligne est désactivée.",
-          code: "SUBSCRIPTION_INACTIVE",
-        },
-        { status: 403 }
-      );
     }
 
     const rawIdempotencyKey = body?.idempotency_key;
