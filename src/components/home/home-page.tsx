@@ -907,8 +907,8 @@ export function HomePage() {
               q: lang === "fr" ? "Ai-je besoin d'un site web ?" : "Do I need a website?",
               a:
                 lang === "fr"
-                  ? "Non. Séjoura fonctionne même sans site web. Avec le plan Entreprise, votre site peut se connecter à Séjoura pour vérifier les disponibilités et créer des réservations."
-                  : "No. Séjoura works even without a website. With the Entreprise plan, your site can connect to Séjoura to check availability and create bookings.",
+                  ? "Non. Séjoura fonctionne même sans site web. Tous les forfaits peuvent publier leurs chambres sur Trouvetou, consulter les disponibilités et recevoir des réservations en ligne."
+                  : "No. Séjoura works even without a website. Every plan can publish rooms on Trouvetou, check availability and receive online bookings.",
             },
             {
               q: lang === "fr" ? "Mes données sont-elles en sécurité ?" : "Is my data safe?",
