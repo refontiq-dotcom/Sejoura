@@ -2,8 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { isTrouvetouBookingRequest } from "../src/lib/trouvetou/booking-auth";
 
 const originalSecret = process.env.TROUVETOU_BOOKING_SHARED_SECRET;
+const originalScopedSecret = process.env.TROUVETOU_BOOKING_SECRET_SEJOURA;
 
 afterEach(() => {
+  if (originalScopedSecret === undefined) {
+    delete process.env.TROUVETOU_BOOKING_SECRET_SEJOURA;
+  } else {
+    process.env.TROUVETOU_BOOKING_SECRET_SEJOURA = originalScopedSecret;
+  }
   if (originalSecret === undefined) {
     delete process.env.TROUVETOU_BOOKING_SHARED_SECRET;
   } else {
@@ -28,6 +34,22 @@ describe("authentification serveur Trouvetou → Séjoura", () => {
     expect(
       isTrouvetouBookingRequest(
         new Headers({ "x-trouvetou-booking-secret": "wrong-secret" })
+      )
+    ).toBe(false);
+  });
+
+  it("préfère le secret dédié à Séjoura et conserve le secret historique en secours", () => {
+    process.env.TROUVETOU_BOOKING_SECRET_SEJOURA = "scoped-secret";
+    process.env.TROUVETOU_BOOKING_SHARED_SECRET = "legacy-secret";
+
+    expect(
+      isTrouvetouBookingRequest(
+        new Headers({ "x-trouvetou-booking-secret": "scoped-secret" })
+      )
+    ).toBe(true);
+    expect(
+      isTrouvetouBookingRequest(
+        new Headers({ "x-trouvetou-booking-secret": "legacy-secret" })
       )
     ).toBe(false);
   });
