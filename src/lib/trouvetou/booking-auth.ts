@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 export function isTrouvetouBookingRequest(headers: Headers): boolean {
-  const expected = process.env.TROUVETOU_BOOKING_SHARED_SECRET;
+  const expected = (process.env.TROUVETOU_BOOKING_SECRET_SEJOURA || process.env.TROUVETOU_BOOKING_SHARED_SECRET)?.trim();
   const provided = headers.get("x-trouvetou-booking-secret") ?? "";
   if (!expected || !provided) return false;
 
