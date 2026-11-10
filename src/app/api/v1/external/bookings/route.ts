@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isDoubleBookingError } from "@/lib/utils";
 import { isTrouvetouBookingRequest } from "@/lib/trouvetou/booking-auth";
 import { parseExternalIdempotencyKey } from "@/lib/trouvetou/idempotency";
+import { isValidDateOnly } from "@/lib/trouvetou/validation";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/external/bookings
@@ -135,11 +136,11 @@ export async function POST(request: Request) {
     } else {
       const { data: keyData, error } = await admin
         .from("external_api_keys")
-        .select("tenant_id, is_active, scopes")
+        .select("tenant_id, is_active, scopes, expires_at")
         .eq("api_key", apiKey)
         .maybeSingle();
 
-      if (error || !keyData || !keyData.is_active) {
+      if (error || !keyData || !keyData.is_active || (keyData.expires_at && new Date(keyData.expires_at) <= new Date())) {
         return NextResponse.json({ error: "Clé API invalide" }, { status: 401 });
       }
 
@@ -237,7 +238,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (check_in_date >= check_out_date) {
+    if (!isValidDateOnly(check_in_date) || !isValidDateOnly(check_out_date) || check_in_date >= check_out_date) {
       return NextResponse.json(
         { error: "check_out_date doit être postérieur à check_in_date" },
         { status: 400 }
