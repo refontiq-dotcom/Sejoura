@@ -458,6 +458,7 @@ export interface Booking {
   room_id: string;
   client_id: string;
   booking_code: string;
+  external_idempotency_key: string | null;
   check_in_date: string;
   check_out_date: string;
   check_in_time: string;
@@ -1010,7 +1011,9 @@ export interface Database {
       };
       bookings: {
         Row: Booking;
-        Insert: Omit<Booking, "id" | "created_at" | "updated_at">;
+        Insert: Omit<Booking, "id" | "created_at" | "updated_at" | "external_idempotency_key"> & {
+          external_idempotency_key?: string | null;
+        };
         Update: Partial<Omit<Booking, "id" | "created_at" | "updated_at">>;
       };
       booking_extensions: {
