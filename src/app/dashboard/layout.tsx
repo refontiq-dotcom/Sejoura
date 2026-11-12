@@ -390,7 +390,7 @@ export default function DashboardLayout({
               .maybeSingle(),
             supabase
               .from("accommodations")
-              .select("id, name, address, city, logo_url, accommodation_type, created_at, tenant_id, is_active")
+              .select("id, name, address, city, logo_url, accommodation_type, currency, currency_symbol, created_at, tenant_id, is_active")
               .eq("tenant_id", userData.tenant_id)
               .order("name"),
             fetchOnboardingStatus(),
