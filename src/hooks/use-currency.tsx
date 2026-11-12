@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { convertXofTo, getCurrencySymbol, getCurrencyDecimals, BASE_CURRENCY } from "@/lib/currencyConverter";
+import { convertXofTo, getCurrencySymbol, getCurrencyDecimals, getRate, BASE_CURRENCY } from "@/lib/currencyConverter";
 import { useAccommodation } from "@/hooks/use-accommodation";
 
 export interface CurrencyInfo {
@@ -47,8 +47,25 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // chaque résidence a sa propre devise (accommodations.currency).
   // Sans résidence active (onboarding), on reste sur la devise par défaut.
   const { activeAccommodation } = useAccommodation();
+  // Les résidences historiques ou incomplètement renseignées ne doivent pas
+  // faire planter tout le dashboard : une devise absente/inconnue retombe sur XOF.
   const activeCurrency = activeAccommodation
-    ? { code: activeAccommodation.currency, symbol: activeAccommodation.currency_symbol || getCurrencySymbol(activeAccommodation.currency) }
+    ? (() => {
+        const requestedCode = activeAccommodation.currency;
+        let code = requestedCode || DEFAULT_CURRENCY.code;
+        try {
+          getRate(code);
+        } catch {
+          code = DEFAULT_CURRENCY.code;
+        }
+        return {
+          code,
+          symbol:
+            code === DEFAULT_CURRENCY.code
+              ? DEFAULT_CURRENCY.symbol
+              : activeAccommodation.currency_symbol || getCurrencySymbol(code),
+        };
+      })()
     : null;
 
   useEffect(() => {
