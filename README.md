@@ -1,7 +1,11 @@
 # Séjoura — Plateforme de gestion de résidences meublées
 
 
-🌐 **Portfolio professionnel : [https://portfolio.refontiq.com](https://portfolio.refontiq.com)**
+
+🌐 **Site du projet : [https://sejoura.refontiq.com/](https://sejoura.refontiq.com/)**
+💻 **Dépôt GitHub : [https://github.com/refontiq-dotcom/Sejoura](https://github.com/refontiq-dotcom/Sejoura)**
+👤 **Portfolio : [https://portfolio.refontiq.com](https://portfolio.refontiq.com)**
+
 ## 🧾 Paiement d'abonnement Wave
 
 Le gérant effectue son paiement via Wave depuis `/dashboard/subscription`, puis
