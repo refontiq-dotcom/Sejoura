@@ -1799,16 +1799,25 @@ export default function AccountingPage() {
       toast.error("Impossible d'ouvrir le reçu. Autorisez les pop-ups.");
       return;
     }
+    // Escape user-controlled values to prevent XSS via document.write
+    const esc = (s: string | undefined | null): string => {
+      if (s == null) return "";
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    };
     const method = paymentMethodDisplay(pay);
-    win.document.write(`<!DOCTYPE html><html><head><title>Reçu ${pay.reference || pay.id}</title>
+    win.document.write(`<!DOCTYPE html><html><head><title>Reçu ${esc(pay.reference || pay.id)}</title>
       <style>body{font-family:system-ui,sans-serif;padding:32px;color:#0f172a}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:6px 0;border-bottom:1px solid #e2e8f0;font-size:13px}.muted{color:#64748b}</style></head><body>
       <h1>Reçu de paiement</h1>
-      <p class="muted">${formatDate(pay.payment_date)}</p>
+      <p class="muted">${esc(formatDate(pay.payment_date))}</p>
       <table>
-        <tr><td class="muted">Client / opération</td><td>${pay.booking?.client_name || pay.notes || "Opération de caisse"}</td></tr>
-        ${pay.booking?.booking_code ? `<tr><td class="muted">Réservation</td><td>${pay.booking.booking_code}</td></tr>` : ""}
-        <tr><td class="muted">Méthode</td><td>${method}</td></tr>
-        <tr><td class="muted">Référence</td><td>${pay.reference || "—"}</td></tr>
+        <tr><td class="muted">Client / opération</td><td>${esc(pay.booking?.client_name || pay.notes || "Opération de caisse")}</td></tr>
+        ${pay.booking?.booking_code ? `<tr><td class="muted">Réservation</td><td>${esc(pay.booking.booking_code)}</td></tr>` : ""}
+        <tr><td class="muted">Méthode</td><td>${esc(method)}</td></tr>
+        <tr><td class="muted">Référence</td><td>${esc(pay.reference || "—")}</td></tr>
         <tr><td class="muted">Montant</td><td><strong>${fmt(Math.abs(pay.amount))}</strong></td></tr>
       </table>
       <p class="muted" style="margin-top:24px">Séjoura</p>

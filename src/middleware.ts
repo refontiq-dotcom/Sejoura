@@ -85,7 +85,26 @@ export async function middleware(req: NextRequest) {
         return NextResponse.json({ error: "Référent de requête invalide." }, { status: 403 });
       }
     }
-    if (suppliedOrigin && suppliedOrigin !== requestOrigin) {
+    // For high-security endpoints, strictly enforce Origin header presence
+    // and match. Sensitive operations require explicit Origin validation.
+    const sensitiveEndpoints = [
+      "/api/employee-pin",
+      "/api/employee-biometric/",
+      "/api/employee-verify",
+      "/api/stay/",
+      "/api/v1/external/",
+      "/api/wave/",
+    ];
+    const isSensitive = sensitiveEndpoints.some(ep => pathname.startsWith(ep));
+    if (isSensitive) {
+      // Require explicit Origin for sensitive endpoints
+      if (!suppliedOrigin) {
+        return NextResponse.json({ error: "Origine manquante pour cette opération sensible." }, { status: 403 });
+      }
+      if (suppliedOrigin !== requestOrigin) {
+        return NextResponse.json({ error: "Origine de requête refusée." }, { status: 403 });
+      }
+    } else if (suppliedOrigin && suppliedOrigin !== requestOrigin) {
       return NextResponse.json({ error: "Origine de requête refusée." }, { status: 403 });
     }
   }

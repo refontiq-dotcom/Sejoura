@@ -8,6 +8,11 @@ import {
   sendTelegramMessage,
 } from "@/lib/telegram";
 import { formatFCFA, getPlanLabel } from "@/lib/utils";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+
+// Rate limit: max 30 requests per minute per IP to prevent DoS/spam on webhook endpoint
+const WEBHOOK_RATE_LIMIT_REQUESTS = 30;
+const WEBHOOK_RATE_LIMIT_WINDOW = "1 m";
 
 function rpcErrorStatus(message: string) {
   if (
@@ -45,6 +50,21 @@ export async function POST(request: Request) {
       { error: "Signature Wave invalide." },
       { status: 400 }
     );
+  }
+
+  // Rate limit to prevent DoS/spam attacks on webhook endpoint
+  try {
+    const rl = await checkRateLimit("wave-webhook", getRateLimitKey(request), WEBHOOK_RATE_LIMIT_REQUESTS, WEBHOOK_RATE_LIMIT_WINDOW);
+    if (!rl.success) {
+      const retryAfter = Math.max(1, Math.ceil((rl.reset - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "Trop de requêtes. Réessayez plus tard." },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+      );
+    }
+  } catch {
+    // If Redis is unavailable, allow request (fail open for webhooks)
+    // Signature verification already provides primary security
   }
 
   let event: unknown;

@@ -34,7 +34,9 @@ export async function checkRateLimit(
   window: Parameters<typeof Ratelimit.slidingWindow>[1],
 ) {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    throw new Error("RATE_LIMIT_BACKEND_NOT_CONFIGURED");
+    // Fail closed: return a failed result instead of throwing
+    // This ensures security-sensitive endpoints are blocked when Redis is unavailable
+    return { success: false, remaining: 0, reset: Date.now() + 900000 };
   }
   return getLimiter(name, requests, window).limit(key);
 }
